@@ -1,0 +1,260 @@
+/* NetLogo Mobile CodeMirror Stylesheet */
+
+/* Layout */
+html, body, select {
+	margin: 0;
+	padding: 0;
+	font-size: 1em;
+	overflow: hidden;
+	scroll-behavior: smooth;
+}
+html {
+	font-size: 30px;
+}
+code, .CodeMirror, .cm-s-netlogo-default, .CodeMirror-dialog input, .CodeMirror-hints {
+	font-family: Consolas, "Droid Sans Mono", "PingFangSC", "Microsoft Yahei", monospace;
+}
+html, body, select {
+	font-family: "Helvetica", "Noto Sans", "Roboto", "PingFangSC", "Microsoft Yahei", serif;
+}
+p {
+	margin: 0;
+}
+#Container {
+	width: 100%;
+	height: 100%;
+	overflow: hidden;
+	box-sizing: border-box;
+}
+
+/** Hints **/
+.Mobile .CodeMirror-hints {
+	max-height: 18em;
+	line-height: 1.8;
+}
+@media (max-device-height: 720px) {
+	.CodeMirror-hints,
+	.Mobile .CodeMirror-hints {
+		max-height: 12em;
+	}
+}
+@media (max-device-height: 480px) {
+	.CodeMirror-hints,
+	.Mobile .CodeMirror-hints {
+		max-height: 9em;
+	}
+}
+
+/** Code Editor **/
+#Main-Editor {
+	width: 100%;
+	height: 100%;
+	line-height: 1.3;
+	position: relative;
+	flex-direction: column;
+}
+#Main-Editor .CodeMirror {
+	width: 100%;
+	height: 100%;
+	/* font-size: 0.95em; some devices have a larger font =_= */ 
+}
+.jconfirm-content {
+	line-height: 1.5;
+}
+.CodeMirror-dialog {
+	background: #082A84;
+	color: #FFF;
+}
+.CodeMirror-dialog input {
+	font-size: 1rem;
+}
+.CodeMirror-linenumber {
+    padding: 0 0.26em 0 0.85em;
+	font-size: 0.9em;
+}
+.CodeMirror-marker-error {
+	display: inline-block;
+	width: 0.7em;
+	height: 0.7em;
+	margin: 0.3em 0.1em;
+	background-image: url(../images/error.png);
+}
+.CodeMirror-context-tips {
+	cursor: pointer;
+	padding: 0.2em 0.3em;
+	font-size: 0.9em;
+	line-height: 1.2;
+	background: #FFFFF0;
+}
+.darkmode--activated .CodeMirror-context-tips {
+	background: #CCC;
+}
+.CodeMirror pre.CodeMirror-line, .CodeMirror pre.CodeMirror-line-like {
+	padding: 0 0.13em 0 0.26em;
+}
+.darkmode--activated .CodeMirror-line::selection, 
+.darkmode--activated .CodeMirror-line > span::selection, 
+.darkmode--activated .CodeMirror-line > span > span::selection {
+	background-color: #909090;
+}
+.darkmode--activated .CodeMirror-selected,
+.darkmode--activated .CodeMirror-focused .CodeMirror-selected {
+	background-color: #909090;
+}
+.darkmode--activated .CodeMirror-line::-moz-selection, 
+.darkmode--activated .CodeMirror-line > span::-moz-selection, 
+.darkmode--activated .CodeMirror-line > span > span::-moz-selection {
+	background-color: #909090;
+}
+
+/* Overlays */
+.Overlays div {
+	top: 50%;
+	left: 50%;
+	z-index: 255;
+	display: none;
+	position: absolute;
+	border-radius: 20px;
+	transform: translate(-50%, -50%) !important;
+}
+.Backdrop {
+	background: rgba(234, 234, 234, 0.9);
+}
+@supports ((-webkit-backdrop-filter: blur(2em)) or (backdrop-filter: blur(2em))) {
+	.Backdrop  {
+		backdrop-filter: blur(3px);
+		-webkit-backdrop-filter: blur(3px);
+		background: rgba(234, 234, 234, 0.6);
+	}
+}
+
+/* Dialog: Rotate Screen */
+#Rotate-Screen {
+	width: 460px;
+	height: 70px;
+	padding: 20px;
+	cursor: pointer;
+}
+#Rotate-Screen img {
+	float: left;
+	width: 70px;
+	height: 70px;
+	margin: 0 16px 0 0;
+}
+#Rotate-Screen p {
+	font-size: 27px;
+	line-height: 37px;
+}
+
+#Main-Tips {
+	top: 0;
+	width: 100%;
+	cursor: pointer;
+	padding: 15px;
+	display: none;
+	z-index: 255;
+	position: fixed;
+	background: #FFFFE0;
+	-webkit-user-select: none;
+}
+
+/* Dialog: Procedures */
+#Dialog-Procedures {
+	width: auto;
+	display: none;
+	padding: 8px 0;
+	min-width: 20em;
+	max-width: 75vw;
+}
+
+#Dialog-Procedures h4 {
+	color: #333;
+	margin: 0.5em 1em;
+}
+
+#Dialog-Procedures ul {
+	margin: 0;
+	padding: 0;
+	cursor: grab;
+	overflow: auto;
+	list-style: none;
+	max-height: 50vh;
+	-webkit-user-select: none;
+	-moz-user-select: none;
+	-ms-user-select: none;  
+	user-select: none; 
+}
+
+#Dialog-Procedures ul li {
+	color: #2881e0;
+	padding: 0.5em 1em;
+	background: #F7F7F7;
+}
+
+#Dialog-Procedures ul li:hover {
+	background: #F0F0F0;
+}
+
+#Dialog-Procedures ul li:not(:last-child) {
+	border-bottom: 1px solid #E0E0E0;
+}
+
+/* Styles */
+.Backdrop {
+	-webkit-backdrop-filter: blur(10px);
+}
+.darkmode-layer {
+	z-index: 256;
+}
+
+/*
+Copyright (C) 2011 by MarkLogic Corporation
+Author: Mike Brevoort <mike@brevoort.com>
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+*/
+
+/* Adapted by John Chen for NetLogo Mobile */
+
+.cm-s-netlogo-default span.cm-keyword { line-height: 1em; font-weight: bold; color: #007F69; }
+.cm-s-netlogo-default span.cm-command { color: #0000AA; }
+.cm-s-netlogo-default span.cm-atom { color: #6C8CD5; }
+.cm-s-netlogo-default span.cm-number { color: #963700; }
+.cm-s-netlogo-default span.cm-constant { color: #963700; }
+.cm-s-netlogo-default span.cm-def { text-decoration:underline; }
+.cm-s-netlogo-default span.cm-variable { color: black; }
+.cm-s-netlogo-default span.cm-variable-2 { color:black; }
+.cm-s-netlogo-default span.cm-variable-3, .cm-s-netlogo-default span.cm-type { color: black; }
+.cm-s-netlogo-default span.cm-property {}
+.cm-s-netlogo-default span.cm-operator {}
+.cm-s-netlogo-default span.cm-comment { color: #5A5A5A; }
+.darkmode--activated .cm-s-netlogo-default span.cm-comment { color: #333; }
+.cm-s-netlogo-default span.cm-string { color: #963700; }
+.cm-s-netlogo-default span.cm-meta { color: yellow; }
+.cm-s-netlogo-default span.cm-qualifier { color: grey; }
+.cm-s-netlogo-default span.cm-builtin { color: #7EA656; }
+.cm-s-netlogo-default span.cm-bracket { color: #cc7; }
+.cm-s-netlogo-default span.cm-tag { color: #3F7F7F; }
+.cm-s-netlogo-default span.cm-attribute { color: #7F007F; }
+.cm-s-netlogo-default span.cm-error { color: #FFF; background: #CC2200; }
+.darkmode--activated .cm-s-netlogo-default span.cm-error { color: #000; background: #33DDFF; }
+.cm-s-netlogo-default span.cm-reporter { color: #660096; }
+
+.cm-s-netlogo-default .CodeMirror-activeline-background { background: #e8f2ff; }
+.cm-s-netlogo-default .CodeMirror-matchingbracket { outline:1px solid grey; color:black !important; background:yellow; }

@@ -777,7 +777,6 @@ Commands = function() {
 				`);
 				break;
 			case "Output":
-				var Last = Outputs.children().last();
 				Output = $(`<p class="Output output"></p>`);
 				Output.get(0).innerText = Content;
 				break;

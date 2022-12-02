@@ -1,0 +1,126 @@
+
+<head>
+	<meta id="viewport" name="viewport" content="width=device-width,maximum-scale=0.5,minimum-scale=0.5,initial-scale=0.5,user-scalable=no,viewport-fit=cover">
+	<link rel="stylesheet" href="lib/codemirror.css">
+	<link rel="stylesheet" href="addon/hint/show-hint.css">
+	<link rel="stylesheet" href="addon/dialog/dialog.css">
+	<link rel="stylesheet" href="lib/toastr.css">
+	<link rel="stylesheet" href="lib/jquery.modal.min.css">
+	<link rel="stylesheet" href="lib/jquery.confirm.min.css">
+	<link rel="stylesheet" href="lib/netlogo.css">
+	<link rel="stylesheet" href="lib/command.css">
+	<meta charset="UTF-8" />
+	<script src="lib/codemirror.js"></script>
+	<script src="addon/mode/simple.js"></script>
+	<script src="addon/runmode/runmode.js"></script>
+	<script src="addon/hint/show-hint.js"></script>
+	<script src="addon/dialog/dialog.js"></script>
+	<script src="addon/search/search.js"></script>
+	<script src="addon/search/searchcursor.js"></script>
+	<script src="addon/search/jump-to-line.js"></script>
+	<script src="addon/edit/matchbrackets.js"></script>
+	<script src="addon/edit/closebrackets.js"></script>
+	<script src="lib/jquery.min.js"></script>
+	<script src="lib/jquery.modal.min.js"></script>
+	<script src="lib/jquery.confirm.min.js"></script>
+	<script src="lib/showdown.min.js"></script>
+	<script src="lib/scrolllock.js"></script>
+	<script src="lib/toastr.min.js"></script>
+	<script src="lib/darkmode.min.js"></script>
+	<script src="lib/netlogo.js"></script>
+</head>
+<body>
+	<div id="Container">
+		<div id="Command-Center" class="command">
+			<div class="command-output">
+				<p class="Comment output Keep">; <span class="Localized">你可以在这里输入 NetLogo 代码，试试会发生什么。</span></p>
+				<p class="Comment output Keep">; <span class="Localized">不同的主语决定了代码会“由谁执行”。例如，“海龟”的意思是让所有海龟一起执行。你也可以由“观察者”向海龟发布命令：</span> <code>ask turtles [ fd 1 ]</code></p>
+				<p class="Comment output Keep">; <span class="Localized">点击“帮助”按钮显示关于 NetLogo 建模语言的帮助。有些模型可能会提供专属的探索指南。</span></p>
+				<p class="Comment output Keep">; <span class="Localized">点击“代码”按钮可以查看和编辑模型的完整代码。</span></p>
+			</div>
+			<div class="command-fulltext">
+				<h2><strong>Ask</strong><span></span></h2>
+				<p><a href="javascript:void(0)" onclick="Commands.HideFullText(true);"><span class="Localized">返回上一页……</span></a></p>
+				<div class="translator">
+					<p><span class="Localized">正在显示由 Google 翻译的内容。</span> <a href="javascript:void(0)" class="Original Localized">点击这里</a> <span class="Localized">切换到原始语言。</span></p>
+					<p><span class="Localized">正在显示原文。</span> <a href="javascript:void(0)" class="Translation Localized">点击这里</a> <span class="Localized">切换到智能翻译。</span></p>
+				</div>
+				<div class="fulltext"></div>
+				<h4 class="Localized">致谢</h4>
+				<p class="Acknowledge"></p>
+				<h4 class="Localized">参见</h4>
+				<ul class="SeeAlso"></ul>
+				<p><a href="javascript:void(0)" onclick="Commands.HideFullText(true);"><span class="Localized">返回上一页……</span></a></p>
+			</div>
+			<div id="Command-Line" class="command-line">
+				<div class="wrapper">
+					<select name="objectives" class="darkmode-ignore" id="Command-Objective">
+						<option class="Localized" value="observer">观察者</option>
+						<option class="Localized" value="turtles">所有海龟</option>
+						<option class="Localized" value="patches">所有格子</option>
+						<option class="Localized" value="links">所有链接</option>
+					</select>
+					<div id="Command-Input"></div>
+				</div>
+			</div>
+		</div>
+		<div id="Main-Editor">
+			<div id="Main-Tips"></div>
+			<div id="Main-CodeMirror"></div>
+			<div class="Overlays">
+				<div id="Rotate-Screen" class="Backdrop">
+					<img src="images/rotate.png" />
+					<p class="Localized">编辑器支持竖屏使用。旋转屏幕获得最佳体验！</p>
+				</div>
+			</div>
+		</div>
+		<div id="Dialog-Procedures" class="modal">
+			<h4></h4>
+			<ul></ul>
+		</div>
+	</div>
+	<script type="text/javascript">
+		(function() {
+			// Script loader
+			window.LoadScript = function (Name) {
+				var Element = document.createElement("script");
+				Element.src = Name + "?" + Date.now();
+				document.body.appendChild(Element);
+			};
+			// Basic scripts
+			window.modelConfig = {};
+			LoadScript("tortoise-editor.js");
+			// Load event
+			window.addEventListener("load", function () {
+				Editor.Initialize();
+				Commands.Initialize();
+				PostMessage(navigator.userAgent);
+			})
+			// Messenger
+			if (navigator.userAgent.indexOf("ZFBrowser") != -1) {
+				window.PostMessage = function(Data) {
+					if (typeof ZFCallback != "undefined") ZFCallback(Data);
+				};
+			} else {
+				if (window && window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.unityControl) {
+					window.PostMessage = function (Result) {
+						window.webkit.messageHandlers.unityControl.postMessage(Result);
+						return Result;
+					};
+				} else {
+					window.PostMessage = function (Result) {
+						window.location = 'unity:' + Result;
+						return Result;
+					}
+				}
+			}
+
+			// Command Center
+			window.addEventListener("load", function() {
+				const scrollHeight = document.querySelector('.command-output').scrollHeight;
+				document.querySelector('.command-output').scrollTop = scrollHeight;
+			});
+		})();
+	</script>
+</body>
+</html>

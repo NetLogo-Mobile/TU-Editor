@@ -1,1 +1,4 @@
-*.meta
+/package-lock.json
+node_modules
+.DS_Store
+src/.DS_Store

@@ -11,7 +11,7 @@ select {
 }
 
 html {
-	font-size: 30px;
+	font-size: 15px;
 }
 
 code,
@@ -139,8 +139,8 @@ p {
 	z-index: 255;
 	display: none;
 	position: absolute;
-	border-radius: 20px;
-	transform: translate(-50%, -50%) !important;
+	border-radius: 0.75em;
+	transform: translate(-50%, -50%) translateZ(0) !important;
 }
 
 .Backdrop {
@@ -157,29 +157,28 @@ p {
 
 /* Dialog: Rotate Screen */
 #Rotate-Screen {
-	width: 460px;
-	height: 70px;
-	padding: 20px;
+	width: 16em;
 	cursor: pointer;
+	padding: 0.75em;
+	line-height: 1.25;
 }
 
 #Rotate-Screen img {
 	float: left;
-	width: 70px;
-	height: 70px;
-	margin: 0 16px 0 0;
+	width: 2.3em;
+	height: 2.3em;
+	margin: 0 0.5em 0 0;
 }
 
 #Rotate-Screen p {
-	font-size: 27px;
-	line-height: 37px;
+	font-size: 0.9em;
 }
 
 #Main-Tips {
 	top: 0;
 	width: 100%;
 	cursor: pointer;
-	padding: 15px;
+	padding: 0.5em;
 	display: none;
 	z-index: 255;
 	position: fixed;
@@ -191,7 +190,7 @@ p {
 #Dialog-Procedures {
 	width: auto;
 	display: none;
-	padding: 8px 0;
+	padding: 0.25em 0;
 	min-width: 20em;
 	max-width: 75vw;
 }
@@ -359,7 +358,7 @@ div.command {
 .command-wrapper .icon {
 	align-items: center;
 	width: 1rem;
-	padding: 0 16px;
+	padding: 0 0.5em;
 	display: flex;
 }
 
@@ -435,14 +434,26 @@ div.command {
 .command-line #Command-Input {
 	flex: 1 auto;
 	flex-grow: 1;
-	width: 42px;
+	width: 1.4em;
 	/* Arbitrary width */
 	height: 2rem;
 }
 
-.command-line #Command-Input .CodeMirror {
+.command-line #Command-Input .cm-editor {
 	height: auto;
-	border-radius: 0.24rem;
 	font-size: 1em;
-	line-height: 52px;
+	background: #FFF;
+	border-radius: 0.24rem;
+}
+
+.command-line #Command-Input .cm-editor .cm-gutters {
+	display: none;
+}
+
+.command-line #Command-Input .cm-editor .cm-scroller {
+	line-height: 1.7;
+}
+
+.command-line #Command-Input .cm-editor .cm-activeLine {
+	background: transparent;
 }

@@ -2,7 +2,7 @@
 // REFACTOR NEEDED IF WE ARE GOING TO SUPPORT MORE STATUSES
 Editor = function() {
 	var Editor = {};
-	var MainEditor = null;
+	var Galapagos = null;
 	var DarkMode = null;
 
 	// UI support
@@ -50,10 +50,10 @@ Editor = function() {
 		this.PositionFrom = Source.from;
 		this.PositionTo = Source.to;
 		if (this.PositionFrom != null && this.PositionTo != null) return;
-		var LineCount = MainEditor.lineCount();
+		var LineCount = Galapagos.lineCount();
 		var Accumulated = 0;
 		for (var N = 0; N < LineCount; N++) {
-			var Length = MainEditor.getLine(N).length;
+			var Length = Galapagos.getLine(N).length;
 			if (this.PositionFrom == null && Source.start <= Accumulated + Length) this.PositionFrom = { line: N, ch: Source.start - Accumulated };
 			if (this.PositionTo == null && Source.end <= Accumulated + Length) this.PositionTo = { line: N, ch: Source.end - Accumulated };
 			if (this.PositionFrom != null && this.PositionTo != null) break;
@@ -62,16 +62,16 @@ Editor = function() {
 	}
 	Highlight.prototype.Clear = function() {
 		if (this.TextMarker != null) this.TextMarker.clear();
-		if (this.Gutter != null) MainEditor.doc.setGutterMarker(this.PositionFrom.line, this.Type, null);
+		if (this.Gutter != null) Galapagos.doc.setGutterMarker(this.PositionFrom.line, this.Type, null);
 		if (this.TipsWidget != null) this.HideTips();
 		return null;
 	}
 	Highlight.prototype.ScrollIntoView = function(Distance = 200) {
-		MainEditor.scrollIntoView(this.PositionFrom, Distance);
+		Galapagos.scrollIntoView(this.PositionFrom, Distance);
 		return this;
 	}
 	Highlight.prototype.MarkText = function() {
-		this.TextMarker = MainEditor.doc.markText(this.PositionFrom, this.PositionTo, { className: "cm-" + this.Type });
+		this.TextMarker = Galapagos.doc.markText(this.PositionFrom, this.PositionTo, { className: "cm-" + this.Type });
 		return this;
 	}
 	Highlight.prototype.ShowTips = function(Callback) {
@@ -81,7 +81,7 @@ Editor = function() {
 			Element.html(this.Message);
 		else Element.text(this.Message);
 		Element.click(Callback != null ? Callback : () => this.HideTips());
-		this.TipsWidget = MainEditor.doc.addLineWidget(this.PositionFrom.line, Element[0], {});
+		this.TipsWidget = Galapagos.doc.addLineWidget(this.PositionFrom.line, Element[0], {});
 		return this;
 	}
 	Highlight.prototype.HideTips = function() {
@@ -93,7 +93,7 @@ Editor = function() {
 	Highlight.prototype.ShowGutter = function() {
 		this.Gutter = $("<div class='CodeMirror-marker-" + this.Type + "'></div>")[0];
 		this.Gutter.Callback = () => this.ShowTips();
-		MainEditor.doc.setGutterMarker(this.PositionFrom.line, this.Type, this.Gutter);
+		Galapagos.doc.setGutterMarker(this.PositionFrom.line, this.Type, this.Gutter);
 		return this;
 	}
 	Highlight.prototype.ShowAll = function(Callback) {
@@ -102,11 +102,11 @@ Editor = function() {
 
 	// Explain support
 	// Explain: Start explaining things.
-	Editor.Explain = function(Explicit = true) {
+	Editor.Explain = function(Forced = true) {
 		if (Commands.Visible) {
-			Commands.Explain(Explicit);
+			Commands.Explain(Forced);
 		} else {
-			ExplainInternal(Explicit);
+			ExplainInternal(Forced);
 		}
 	}
 
@@ -123,23 +123,23 @@ Editor = function() {
 	
 	// ExplainInEditor: Explain in the editor.
 	var ExplainHandle = 0;
-	var ExplainInternal = function(Explicit) {
+	var ExplainInternal = function(Forced) {
 		// Clear the timeout handle
 		clearTimeout(ExplainHandle);
-		if (!MainEditor.doc.somethingSelected()) return;
+		if (!Galapagos.doc.somethingSelected()) return;
 		// Get the first and try to expand it
-		var Selection = MainEditor.doc.listSelections()[0];
+		var Selection = Galapagos.doc.listSelections()[0];
 		var Packet = { from: Selection.anchor, to: Selection.head };
 		// Recognize the command
 		for (var I = Packet.from.line; I <= Packet.to.line; I++) {
-			var Tokens = MainEditor.getLineTokens(I);
+			var Tokens = Galapagos.getLineTokens(I);
 			for (var Token of Tokens) {
 				// Check eligibility
 				if (I == Packet.from.line && Token.end < Packet.from.ch) continue;
 				if (I == Packet.to.line && Token.start > Packet.to.ch) continue;
 				if (Token.type == null) continue;
 				// Ignore if there are multiple eligible tokens
-				if (Packet.message != null && !Explicit) return;
+				if (Packet.message != null && !Forced) return;
 				// Show information
 				var Command = `<span class="cm-${Token.type}">${Token.string}</span>`
 				Packet.command = Token.string;
@@ -156,7 +156,7 @@ Editor = function() {
 		}
 		// Message not found
 		if (Packet.message == null) {
-			if (!Explicit) return;
+			if (!Forced) return;
 			return Editor.ExplainNotFound();
 		} 
 		// Show the highlight
@@ -203,46 +203,47 @@ Editor = function() {
 	}
 
 	// Editor support
-	// SetContent: Set the content of the editor.
-	Editor.SetContent = function(Content, Unapplied) {
+	var IgnoreUpdate = false;
+	// SetCode: Set the content of the editor.
+	Editor.SetCode = function(Content, Unapplied) {
 		// Set the content
-		if (Content != Editor.GetCode()) {
-			MainEditor.SetCode(Content);
-			MainEditor.ClearHistory();
+		if (Content != Galapagos.GetCode()) {
+			IgnoreUpdate = true;
+			Galapagos.SetCode(Content);
+			Galapagos.ClearHistory();
 			Editor.ClearHighlights();
+			IgnoreUpdate = false;
 		}
 		// Mark clean or show tips
 		if (!Unapplied) Editor.SetApplied();
 	}
 
-	// GetEditor: Get the main editor.
-	Editor.GetEditor = function() {
-		return MainEditor;
-	}
+	// Galapagos: Refers to the main editor.
+	Editor.Galapagos = null;
 
-	// GetContent: Get the content of the editor.
-	Editor.GetContent = function(Finalizing) {
+	// GetCode: Get the content of the editor.
+	Editor.GetCode = function(Finalizing) {
 		if (Finalizing) {
-			MainEditor.Blur();
-			Commands.CommandEditor.Blur();
+			Galapagos.Blur();
+			Commands.Galapagos.Blur();
 		}
-		return MainEditor.GetCode();
+		return Galapagos.GetCode();
 	}
 
 	// SetApplied: Set applied status.
 	Editor.SetApplied = function() {
-		// Generation = MainEditor.doc.changeGeneration();
+		// Generation = Galapagos.doc.changeGeneration();
 		Editor.HideTips();
 	}
 
 	// JumpNetTango: Jump to the NetTango portion.
 	Editor.JumpNetTango = function() {
 		Commands.Hide();
-		var Index = Editor.GetContent().indexOf("; --- NETTANGO BEGIN ---");
+		var Index = Editor.GetCode().indexOf("; --- NETTANGO BEGIN ---");
 		if (Index == -1) return;
-		var Start = MainEditor.doc.posFromIndex(Index);
-		MainEditor.scrollTo(0, MainEditor.getScrollInfo().height);
-		MainEditor.scrollIntoView(Start, 0);
+		var Start = Galapagos.doc.posFromIndex(Index);
+		Galapagos.scrollTo(0, Galapagos.getScrollInfo().height);
+		Galapagos.scrollIntoView(Start, 0);
 	}
 	
 	// Reset: Show the reset dialog.
@@ -257,10 +258,10 @@ Editor = function() {
 		var List = Dialog.children("ul").empty();
 		Dialog.children("h4").text(Localized.Get("更多功能"));
 		var Features = {};
-		Features[Localized.Get("选择全部")] = Editor.SelectAll;
-		Features[Localized.Get("撤销操作")] = Editor.Undo;
-		Features[Localized.Get("重做操作")] = Editor.Redo;
-		Features[Localized.Get("跳转到行")] = Editor.JumpTo;
+		Features[Localized.Get("选择全部")] = Editor.Galapagos.SelectAll;
+		Features[Localized.Get("撤销操作")] = Editor.Galapagos.Undo;
+		Features[Localized.Get("重做操作")] = Editor.Galapagos.Redo;
+		Features[Localized.Get("跳转到行")] = Editor.Galapagos.ShowJumpTo;
 		Features[Localized.Get("重置代码")] = Editor.Reset;
 		for (var Feature in Features) {
 			$(`<li>${Feature}</li>`).attr("Tag", Feature).appendTo(List).click(function() {
@@ -281,7 +282,7 @@ Editor = function() {
 			var List = Dialog.children("ul").empty();
 			Dialog.children("h4").text(Localized.Get("跳转到子程序"));
 			var Handler = function() {
-				MainEditor.Select($(this).attr("start"), $(this).attr("end"));
+				Galapagos.Select($(this).attr("start"), $(this).attr("end"));
 				$.modal.close();
 			};
 			for (var Procedure in Procedures) {
@@ -296,7 +297,7 @@ Editor = function() {
 	// GetProcedures: Get all procedures from the code.
 	Editor.GetProcedures = function() {
 		var Rule = /^\s*(?:to|to-report)\s(?:\s*;.*\n)*\s*(\w\S*)/gm // From NLW
-		var Content = Editor.GetContent(); var Names = [];
+		var Content = Editor.GetCode(); var Names = [];
 		while (Match = Rule.exec(Content)) {
 			var Length = Match.index + Match[0].length;
 			Names[Match[1]] = [ Length - Match[1].length, Length ];
@@ -309,10 +310,16 @@ Editor = function() {
 		Editor.Container = $("#Main-Editor");
 		DarkMode = new Darkmode();
 		// Basic initialization
-		MainEditor = new GalapagosEditor(document.getElementById("Main-CodeMirror"), {
+		Galapagos = new GalapagosEditor(document.getElementById("Main-CodeMirror"), {
+			Wrapping: true,
+			OnUpdate: (Changed, Update) => {
+				if (Changed && !IgnoreUpdate) {
+					Editor.Call({ Type: "CodeChanged" });
+				}
+			}
 		});
 		/*// Click on gutter
-		MainEditor.on('gutterClick', (cm, n) => {
+		Galapagos.on('gutterClick', (cm, n) => {
 			var Line = cm.doc.getLineHandle(n);
 			if (Line.gutterMarkers == null) return;
 			Object.keys(Line.gutterMarkers).forEach((Key) => {
@@ -320,7 +327,7 @@ Editor = function() {
 			});
 		});
 		// Selection
-		MainEditor.on('beforeSelectionChange', (cm, obj) => {
+		Galapagos.on('beforeSelectionChange', (cm, obj) => {
 			if (obj.ranges.length == 0) return;
 			// Only identify single-line selections
 			var Range = obj.ranges[0];
@@ -337,15 +344,11 @@ Editor = function() {
 			} else {
 				Editor.ClearExplanation();
 			}
-		});
-		// Customize KeyMap
-		MainEditor.addKeyMap({
-			"Cmd-X": "indentMore"
 		});*/
 		// Other interfaces
 		Overlays.Initialize();
 		Editor.ClearDialogs();
-		Editor.MainEditor = MainEditor;
+		Editor.Galapagos = Galapagos;
 	}
 
 	// Engine features
@@ -408,7 +411,6 @@ Localized = function() {
 	// Initialize: Initialize the manager with given data.
 	Localized.Initialize = function(Data) {
 		Localized.Data = Data;
-		Editor.GetEditor().options.phrases = Data;
 		$(".Localized").each((Index, Target) => $(Target).text(Localized.Get($(Target).text())));
 	}
 
@@ -449,17 +451,18 @@ Dictionary = function() {
 // Commands: Handle the interaction of CodeMirror command center.
 Commands = function() {
 	var Commands = {};
-	var CommandEditor = null;
+	var Galapagos = null;
 	var Outputs = null;
 	var Fulltext = null;
 
 	// Command center would be disabled before compile output come out.
 	Commands.Disabled = false;
-
 	// Whether it is visible.
 	Commands.Visible = true;
+	// Galapagos: Refers to the main editor.
+	Commands.Galapagos = null;
 
-	// Hide MainEditor and Command Center would show up
+	// Hide Galapagos and Command Center would show up
 	Commands.Show = function() {
 		Editor.Container.css("display", "none");
 		Commands.Container.css("display", "block");
@@ -471,7 +474,7 @@ Commands = function() {
 		Editor.ClearDialogs();
 	}
 
-	// Hide Command Center and MainEditor would show up
+	// Hide Command Center and Galapagos would show up
 	Commands.Hide = function() {
 		Editor.Container.css("display", "block");
 		Commands.Container.css("display", "none");
@@ -493,14 +496,14 @@ Commands = function() {
 		Fulltext = $(".command-fulltext");
 		KeepSize = Outputs.children(".Keep").length;
 		// CodeMirror Editor
-		CommandEditor = new GalapagosEditor(document.getElementById("Command-Input"), {
+		Galapagos = new GalapagosEditor(document.getElementById("Command-Input"), {
 			OneLine: true, 
 			OnKeyUp: (Event) => {
 				const Key = Event.key;
 				const Code = Event.code;
 				// After press key `Enter`, excute command
 				if (Key == "Enter" || Code == "Enter") {
-					const Content = CommandEditor.GetCode();
+					const Content = Galapagos.GetCode();
 					Commands.ClearInput();
 					if (!Content || Commands.Disabled) return;
 					const Objective = $('#Command-Objective').val();
@@ -509,14 +512,14 @@ Commands = function() {
 					CommandStack.push([Objective, Content]);
 					CurrentCommandIndex = 0;
 					CurrentCommand = [];
-					CommandEditor.CloseCompletion();
+					Galapagos.CloseCompletion();
 				}
 				// After press key `ArrowUp`, get previous command from command history
 				else if (Key == "ArrowUp" || Code == "ArrowUp") {
 					if (CurrentCommandIndex >= CommandStack.length) return;
 					CurrentCommandIndex += 1;
 					const index = CommandStack.length - CurrentCommandIndex;
-					Commands.SetContent(CommandStack[index][0], CommandStack[index][1]);
+					Commands.SetCode(CommandStack[index][0], CommandStack[index][1]);
 				}
 				// After press key `ArrowDown`, get next command from command history
 				else if (Key == "ArrowDown" || Code == "ArrowDown") {
@@ -525,21 +528,22 @@ Commands = function() {
 						if (CurrentCommand.length == 0) {
 							Commands.ClearInput();
 						} else {
-							Commands.SetContent(CurrentCommand[0], CurrentCommand[1]);
+							Commands.SetCode(CurrentCommand[0], CurrentCommand[1]);
 						}
 						return;
 					}
 					const index = CommandStack.length - CurrentCommandIndex;
-					Commands.SetContent(CommandStack[index][0], CommandStack[index][1]);
+					Commands.SetCode(CommandStack[index][0], CommandStack[index][1]);
 					CurrentCommandIndex -= 1;
 				} else if (CurrentCommandIndex == 0) {
-					const Content = CommandEditor.GetCode();
+					const Content = Galapagos.GetCode();
 					const Objective = $('#Command-Objective').val();
 					CurrentCommand = [Objective, Content];
 					CurrentCommandIndex = 0;
 				}
 			}
 		});
+		Commands.Galapagos = Galapagos;
 
 		// Annotate by default
 		AnnotateCode(Outputs.find(".keep code"), null, true);
@@ -629,7 +633,7 @@ Commands = function() {
 
 		// Click to copy
 		Wrapper.children(".icon").on("click", () => {
-			Commands.SetContent(Wrapper.attr("objective"), Wrapper.attr("content"));
+			Commands.SetCode(Wrapper.attr("objective"), Wrapper.attr("content"));
 			Editor.Call({ Type: "ClipboardWrite", Content: `${Wrapper.attr("objective")}: ${Wrapper.attr("content")}` });
 		});
 
@@ -720,12 +724,12 @@ Commands = function() {
 		for (var Item of Target.get()) {
 			var Snippet = $(Item);
 			// Render the code
-			var Output = CommandEditor.Highlight(Content ?? Item.innerText);
+			var Output = Galapagos.Highlight(Content != null ? Content : Item.innerText);
 			Snippet.empty().append($(Output));
 			// Copy support
 			if (AllowCopy && Item.innerText.trim().indexOf(" ") >= 0 && Snippet.parent("pre").length == 0)
 				Snippet.addClass("copyable").append($(`<img class="copy-icon" src="images/copy.png"/>`)).on("click", function() {
-					Commands.SetContent("observer", this.innerText);
+					Commands.SetCode("observer", this.innerText);
 				});
 		}
 	}
@@ -777,7 +781,7 @@ Commands = function() {
 
 	// Clear the input box of Command Center
 	Commands.ClearInput = function() {
-		CommandEditor.SetCode("");
+		Galapagos.SetCode("");
 	}
 
 	// Clear the output region of Command Center
@@ -799,10 +803,10 @@ Commands = function() {
 	}
 
 	// Set the content of command input
-	Commands.SetContent = function(Objective, Content) {
+	Commands.SetCode = function(Objective, Content) {
 		document.querySelector('select').value = Objective.toLowerCase();
-		CommandEditor.SetCode(Content);
-		setTimeout(() => CommandEditor.SetCursorPosition(Content.length), 1);
+		Galapagos.SetCode(Content);
+		setTimeout(() => Galapagos.SetCursorPosition(Content.length), 1);
 	}
 
 	// Provide for Unity to notify completion of the command
@@ -835,21 +839,21 @@ Commands = function() {
 		var Original = Translator.find("a.Original").bind("click", () => {
 			Original.hide();
 			Translation.show();
-			SetContent(Data["content"]);
+			SetCode(Data["content"]);
 		}).parent().show();
 		var Translation = Translator.find("a.Translation").bind("click", () => {
 			Translation.hide();
 			Original.show();
-			SetContent(Data["translation"]);
+			SetCode(Data["translation"]);
 		}).parent().hide();
 		// Render the full text
-		var SetContent = (Content) => {
+		var SetCode = (Content) => {
 			if (Content != null) Fulltext.find("div.fulltext")
 				.html(new showdown.Converter().makeHtml(Content));
 			AnnotateCode(Fulltext.find("code"), null, true);
 			Fulltext.get(0).scrollTop = 0;
 		}
-		SetContent(Data["translation"] != null ? Data["translation"] : Data["content"]);
+		SetCode(Data["translation"] != null ? Data["translation"] : Data["content"]);
 		// Acknowledge
 		Editor.TransformLinks(Fulltext.find(".Acknowledge").html(Data["acknowledge"]));
 	}

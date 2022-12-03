@@ -204,19 +204,15 @@ Editor = function() {
 
 	// Editor support
 	// SetContent: Set the content of the editor.
-	var Generation;
 	Editor.SetContent = function(Content, Unapplied) {
-		MainEditor.off("changes");
 		// Set the content
-		if (Content != Editor.GetContent()) {
-			MainEditor.setValue(Content);
-			MainEditor.doc.clearHistory();
+		if (Content != Editor.GetCode()) {
+			MainEditor.SetCode(Content);
+			MainEditor.ClearHistory();
 			Editor.ClearHighlights();
 		}
 		// Mark clean or show tips
 		if (!Unapplied) Editor.SetApplied();
-		// Event listener
-		MainEditor.on("changes", () => Editor.Call({ Type: "CodeChanged" }));
 	}
 
 	// GetEditor: Get the main editor.
@@ -227,60 +223,16 @@ Editor = function() {
 	// GetContent: Get the content of the editor.
 	Editor.GetContent = function(Finalizing) {
 		if (Finalizing) {
-			Editor.Blur();
-			Commands.Blur();
+			MainEditor.Blur();
+			Commands.CommandEditor.Blur();
 		}
-		return MainEditor.getValue();
+		return MainEditor.GetCode();
 	}
 
 	// SetApplied: Set applied status.
 	Editor.SetApplied = function() {
-		Generation = MainEditor.doc.changeGeneration();
+		// Generation = MainEditor.doc.changeGeneration();
 		Editor.HideTips();
-	}
-
-	// SetReadonly: Set readonly status.
-	Editor.SetReadonly = function(Status) {
-		MainEditor.setOption("readOnly", Status);
-	}
-
-	// Blur: Blur the editor.
-	Editor.Blur = function() {
-		MainEditor.getInputField().blur();
-	}
-
-	// Undo: Undo last change.
-	Editor.Undo = function() {
-		if (MainEditor.getOption("readOnly")) return;
-		MainEditor.doc.undo();
-	}
-
-	// Redo: Redo last change.
-	Editor.Redo = function() {
-		if (MainEditor.getOption("readOnly")) return;
-		MainEditor.doc.redo();
-	}
-
-	// Find: Start finding things.
-	Editor.Find = function() {
-		Editor.ClearDialogs();
-		MainEditor.execCommand("find");
-	}
-
-	// Replace: Start replace things.
-	Editor.Replace = function() {
-		Editor.ClearDialogs();
-		MainEditor.execCommand("replace");
-	}
-	
-	// JumpTo: Try to jump to lines or a specific place.
-	Editor.JumpTo = function(Data) {
-		if (Data != null) {
-			
-		} else {
-			Editor.ClearDialogs();
-			MainEditor.execCommand("jumpToLine");
-		}
 	}
 
 	// JumpNetTango: Jump to the NetTango portion.
@@ -292,13 +244,7 @@ Editor = function() {
 		MainEditor.scrollTo(0, MainEditor.getScrollInfo().height);
 		MainEditor.scrollIntoView(Start, 0);
 	}
-
-	// SelectAll: Select all text.
-	Editor.SelectAll = function() {
-		MainEditor.focus();
-		MainEditor.execCommand("selectAll");
-	}
-
+	
 	// Reset: Show the reset dialog.
 	Editor.Reset = function() {
 		Editor.Confirm(Localized.Get("重置代码"), Localized.Get("是否将代码重置到最后一次成功编译的状态？"),
@@ -335,10 +281,7 @@ Editor = function() {
 			var List = Dialog.children("ul").empty();
 			Dialog.children("h4").text(Localized.Get("跳转到子程序"));
 			var Handler = function() {
-				var Start = MainEditor.doc.posFromIndex($(this).attr("start"));
-				var End = MainEditor.doc.posFromIndex($(this).attr("end"));
-				MainEditor.scrollIntoView(Start, 200);
-				MainEditor.setSelection(Start, End);
+				MainEditor.Select($(this).attr("start"), $(this).attr("end"));
 				$.modal.close();
 			};
 			for (var Procedure in Procedures) {
@@ -366,40 +309,9 @@ Editor = function() {
 		Editor.Container = $("#Main-Editor");
 		DarkMode = new Darkmode();
 		// Basic initialization
-		MainEditor = CodeMirror(document.getElementById("Main-CodeMirror"), {
-			lineNumbers: true,
-			lineWrapping: true,
-			mode: "netlogo",
-			theme: "netlogo-default",
-			gutters: ["error", "CodeMirror-linenumbers"],
-			matchBrackets: true,
-			autoCloseBrackets: true
+		MainEditor = new GalapagosEditor(document.getElementById("Main-CodeMirror"), {
 		});
-		// Auto complete
-		CodeMirror.registerHelper('hintWords', 'netlogo', window.keywords.all.filter(
-			(word) => !window.keywords.unsupported.includes(word)));
-		CodeMirror.registerHelper('hint', 'fromList', (cm, options) => {
-			var cur = cm.getCursor();
-			var token = cm.getTokenAt(cur);
-			var to = CodeMirror.Pos(cur.line, token.end);
-			if (token.string && /\S/.test(token.string[token.string.length - 1])) {
-				term = token.string.toLowerCase();
-				from = CodeMirror.Pos(cur.line, token.start);
-			} else {
-				term = '';
-				from = to;
-			}
-			found = options.words.filter((word) => word.slice(0, term.length) == term).map((word) => word.replace("\\?", "?")).sort();
-			if (found.length > 0 && !(found.length == 1 && found[0] == term))
-				return { list: found, from: from, to: to };
-		});
-		MainEditor.on('keyup', (cm, event) => {
-			if (cm.state.completionActive || event.ctrlKey || event.code.startsWith("Control")) return;
-			if ((event.keyCode > 64 && event.keyCode < 91) || event.keyCode == 186 || event.keyCode == 189) {
-				cm.showHint({ completeSingle: false, container: $("#Container").get(0) });
-			}
-		});
-		// Click on gutter
+		/*// Click on gutter
 		MainEditor.on('gutterClick', (cm, n) => {
 			var Line = cm.doc.getLineHandle(n);
 			if (Line.gutterMarkers == null) return;
@@ -429,7 +341,7 @@ Editor = function() {
 		// Customize KeyMap
 		MainEditor.addKeyMap({
 			"Cmd-X": "indentMore"
-		});
+		});*/
 		// Other interfaces
 		Overlays.Initialize();
 		Editor.ClearDialogs();
@@ -541,14 +453,6 @@ Commands = function() {
 	var Outputs = null;
 	var Fulltext = null;
 
-	// Following three variables are used for command histrory.
-	var CommandStack = [];
-	var CurrentCommand = [];
-	var CurrentCommandIndex = 0;
-
-	// Store [Objective, Input Content]
-	Contents = [];
-
 	// Command center would be disabled before compile output come out.
 	Commands.Disabled = false;
 
@@ -562,7 +466,6 @@ Commands = function() {
 		bodyScrollLock.clearAllBodyScrollLocks();
 		bodyScrollLock.disableBodyScroll(document.querySelector('div.command-output'));
 		bodyScrollLock.disableBodyScroll(document.querySelector('div.command-fulltext'));
-		CommandEditor.refresh();
 		Commands.HideFullText();
 		Commands.Visible = true;
 		Editor.ClearDialogs();
@@ -575,13 +478,12 @@ Commands = function() {
 		Commands.Visible = false;
 		bodyScrollLock.clearAllBodyScrollLocks();
 		bodyScrollLock.disableBodyScroll(document.querySelector('.CodeMirror-scroll'), { allowTouchMove: () => true });
-		Editor.MainEditor.refresh();
 	}
 
-	// Blur the command center's editor.
-	Commands.Blur = function() {
-		CommandEditor.getInputField().blur();
-	}
+	// Following three variables are used for command histrory.
+	var CommandStack = [];
+	var CurrentCommand = [];
+	var CurrentCommandIndex = 0;
 
 	// Initialize the command center
 	Commands.Initialize = function() {
@@ -589,77 +491,58 @@ Commands = function() {
 		Commands.Container = $("#Command-Center");
 		Outputs = $(".command-output");
 		Fulltext = $(".command-fulltext");
-		AnnotateCode(Outputs.find(".keep code"), null, true);
 		KeepSize = Outputs.children(".Keep").length;
 		// CodeMirror Editor
-		CommandEditor = CodeMirror(document.getElementById("Command-Input"), {
-			mode: "netlogo",
-			theme: "netlogo-default",
-			scrollbarStyle: "null",
-			viewportMargin: Infinity,
-			cursorHeight: 0.8,
-			matchBrackets: true,
-			autoCloseBrackets: true
-		});
-
-		CommandEditor.on('keyup', (cm, event) => {
-			const key = event.code;
-			if (key !== "Enter" && key !== "ArrowUp" && key !== "ArrowDown" && CurrentCommandIndex == 0) {
-				const content = CommandEditor.getValue();
-				const objective = $('#Command-Objective').val();
-				CurrentCommand = [objective, content];
-				CurrentCommandIndex = 0;
-			}
-			
-			if (cm.state.completionActive || event.ctrlKey || key.startsWith("Control")) return;
-			if ((event.keyCode > 64 && event.keyCode < 91) || event.keyCode == 186 || event.keyCode == 189) {
-				cm.showHint({ completeSingle: false, container: $("#Container").get(0) });
-			}
-		});
-
-		// After press key `Enter`, excute command
-		CommandEditor.on('keydown', (cm, event) => {
-			if (event.key == "Enter" || event.code == "Enter") {
-				const content = CommandEditor.getValue().replace(/\n/ig, '');
-				Commands.ClearInput();
-				if (!content || Commands.Disabled) return;
-				const objective = $('#Command-Objective').val();
-				Commands.Disabled = true;
-				Commands.Execute(objective, content);
-				CommandStack.push([objective, content]);
-				CurrentCommandIndex = 0;
-				CurrentCommand = [];
-				CommandEditor.closeHint();
-			}
-		});
-
-		// After press key `ArrowUp`, get previous command from command history
-		CommandEditor.on('keydown', (cm, event) => {
-			if (event.key == "ArrowUp" || event.code == "ArrowUp") {
-				if (CurrentCommandIndex >= CommandStack.length) return;
-				CurrentCommandIndex += 1;
-				const index = CommandStack.length - CurrentCommandIndex;
-				Commands.SetContent(CommandStack[index][0], CommandStack[index][1]);
-			}
-		});
-
-		// After press key `ArrowDown`, get next command from command history
-		CommandEditor.on('keydown', (cm, event) => {
-			if (event.key == "ArrowDown" || event.code == "ArrowDown") {
-				if (CurrentCommandIndex <= 1) {
+		CommandEditor = new GalapagosEditor(document.getElementById("Command-Input"), {
+			OneLine: true, 
+			OnKeyUp: (Event) => {
+				const Key = Event.key;
+				const Code = Event.code;
+				// After press key `Enter`, excute command
+				if (Key == "Enter" || Code == "Enter") {
+					const Content = CommandEditor.GetCode();
+					Commands.ClearInput();
+					if (!Content || Commands.Disabled) return;
+					const Objective = $('#Command-Objective').val();
+					Commands.Disabled = true;
+					Commands.Execute(Objective, Content);
+					CommandStack.push([Objective, Content]);
 					CurrentCommandIndex = 0;
-					if (CurrentCommand.length == 0) {
-						Commands.ClearInput();
-					} else {
-						Commands.SetContent(CurrentCommand[0], CurrentCommand[1]);
-					}
-					return;
+					CurrentCommand = [];
+					CommandEditor.CloseCompletion();
 				}
-				const index = CommandStack.length - CurrentCommandIndex;
-				Commands.SetContent(CommandStack[index][0], CommandStack[index][1]);
-				CurrentCommandIndex -= 1;
+				// After press key `ArrowUp`, get previous command from command history
+				else if (Key == "ArrowUp" || Code == "ArrowUp") {
+					if (CurrentCommandIndex >= CommandStack.length) return;
+					CurrentCommandIndex += 1;
+					const index = CommandStack.length - CurrentCommandIndex;
+					Commands.SetContent(CommandStack[index][0], CommandStack[index][1]);
+				}
+				// After press key `ArrowDown`, get next command from command history
+				else if (Key == "ArrowDown" || Code == "ArrowDown") {
+					if (CurrentCommandIndex <= 1) {
+						CurrentCommandIndex = 0;
+						if (CurrentCommand.length == 0) {
+							Commands.ClearInput();
+						} else {
+							Commands.SetContent(CurrentCommand[0], CurrentCommand[1]);
+						}
+						return;
+					}
+					const index = CommandStack.length - CurrentCommandIndex;
+					Commands.SetContent(CommandStack[index][0], CommandStack[index][1]);
+					CurrentCommandIndex -= 1;
+				} else if (CurrentCommandIndex == 0) {
+					const Content = CommandEditor.GetCode();
+					const Objective = $('#Command-Objective').val();
+					CurrentCommand = [Objective, Content];
+					CurrentCommandIndex = 0;
+				}
 			}
 		});
+
+		// Annotate by default
+		AnnotateCode(Outputs.find(".keep code"), null, true);
 
 		// Listen to selection changed
 		/*var ExplainHandler = null;
@@ -732,9 +615,7 @@ Commands = function() {
 		var Wrapper = $(`
 			<div class="command-wrapper">
 				<div class="content">
-					<p class="input Code">${Objective}&gt;
-						<span class="cm-s-netlogo-default"></span>
-					</p>
+					<p class="input Code">${Objective}&gt;<span></span></p>
 				</div>
 				<div class="icon">
 					<img class="copy-icon" src="images/copy.png"/>
@@ -839,8 +720,8 @@ Commands = function() {
 		for (var Item of Target.get()) {
 			var Snippet = $(Item);
 			// Render the code
-			Snippet.addClass("cm-s-netlogo-default");
-			CodeMirror.runMode(Content ? Content : Item.innerText, "netlogo", Item);
+			var Output = CommandEditor.Highlight(Content ?? Item.innerText);
+			Snippet.empty().append($(Output));
 			// Copy support
 			if (AllowCopy && Item.innerText.trim().indexOf(" ") >= 0 && Snippet.parent("pre").length == 0)
 				Snippet.addClass("copyable").append($(`<img class="copy-icon" src="images/copy.png"/>`)).on("click", function() {
@@ -896,7 +777,7 @@ Commands = function() {
 
 	// Clear the input box of Command Center
 	Commands.ClearInput = function() {
-		CommandEditor.getDoc().setValue("");
+		CommandEditor.SetCode("");
 	}
 
 	// Clear the output region of Command Center
@@ -920,9 +801,8 @@ Commands = function() {
 	// Set the content of command input
 	Commands.SetContent = function(Objective, Content) {
 		document.querySelector('select').value = Objective.toLowerCase();
-		CommandEditor.getDoc().setValue(Content);
-		CommandEditor.focus();
-		setTimeout(() => CommandEditor.setCursor(Content.length), 1);
+		CommandEditor.SetCode(Content);
+		setTimeout(() => CommandEditor.SetCursorPosition(Content.length), 1);
 	}
 
 	// Provide for Unity to notify completion of the command

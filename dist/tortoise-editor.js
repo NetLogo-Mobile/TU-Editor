@@ -158,6 +158,7 @@ Editor = function() {
 		if (Content != Galapagos.GetCode()) {
 			IgnoreUpdate = true;
 			Editor.SetCompilerErrors([]);
+			Galapagos.SetCursorPosition(0);
 			Galapagos.SetCode(Content);
 			Galapagos.ClearHistory();
 			Editor.HideTips();
@@ -185,14 +186,11 @@ Editor = function() {
 		Editor.HideTips();
 	}
 
-	// JumpNetTango: Jump to the NetTango portion.
-	Editor.JumpNetTango = function() {
-		Commands.Hide();
+	// JumpToNetTango: Jump to the NetTango portion.
+	Editor.JumpToNetTango = function() {
 		var Index = Editor.GetCode().indexOf("; --- NETTANGO BEGIN ---");
 		if (Index == -1) return;
-		var Start = Galapagos.doc.posFromIndex(Index);
-		Galapagos.scrollTo(0, Galapagos.getScrollInfo().height);
-		Galapagos.scrollIntoView(Start, 0);
+		Galapagos.SetCursorPosition(Index);
 	}
 	
 	// Reset: Show the reset dialog.

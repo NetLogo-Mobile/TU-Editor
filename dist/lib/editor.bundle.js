@@ -27421,7 +27421,7 @@
            return {
                from: Error.start,
                to: Error.end,
-               severity: 'info',
+               severity: 'error',
                message: Error.message,
            };
        });

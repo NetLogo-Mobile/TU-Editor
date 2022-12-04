@@ -16,6 +16,7 @@ html {
 
 code,
 .cm-editor .cm-content,
+.cm-editor .cm-diagnostic,
 .cm-editor .cm-tooltip.cm-tooltip-autocomplete > ul {
 	font-family: Consolas, "Droid Sans Mono", "PingFangSC", "Microsoft Yahei", monospace;
 }
@@ -160,7 +161,7 @@ p {
 	width: 16em;
 	cursor: pointer;
 	padding: 0.75em;
-	line-height: 1.25;
+	line-height: 1.4;
 }
 
 #Rotate-Screen img {

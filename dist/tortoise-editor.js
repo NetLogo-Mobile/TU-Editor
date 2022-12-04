@@ -12,92 +12,40 @@ Editor = function() {
 		if (Callback == null) Callback = () => { Editor.HideTips(); };
 		$("#Main-Tips").off("click").text(Content).click(Callback).show();
 		TipsActive = true;
-		Editor.ClearHighlights();
 	}
 
 	// Hide the tips
 	Editor.HideTips = function() {
 		$("#Main-Tips").hide();
 		TipsActive = false;
-		Editor.ClearHighlights();
 	}
 
-	// ShowErrors: Show the error tips & markers.
-	Editor.ShowErrors = function(Error) {
-		Editor.ClearHighlights();
-		var Message = JSON.parse(Error)[0];
-		if (Message.start == 2147483647) {
+	// SetCompilerErrors: Show the compiler error linting messages.
+	Editor.SetCompilerErrors = function(Errors) {
+		if (Errors.length == 0) Editor.HideTips();
+		// Temp hack: the Galapagos does not support unknown position errors yet.
+		if (Errors.length > 0 && Errors[0].start == 2147483647) {
 			Editor.ShowTips(Message.message);
+			Galapagos.SetCompilerErrors([]);
 		} else {
-			Highlights.push(new Highlight("error", Message).ShowAll());
+			if (Errors.length > 0) {
+				Galapagos.SetCursorPosition(Errors[0].start);
+			}
+			Galapagos.SetCompilerErrors(Errors);
 		}
 	}
 
-	// ClearHighlights: Clear all highlights.
-	var Highlights = [];
-	var ContextualHighlight = null;
-	Editor.ClearHighlights = function() {
-		for (var I = 0; I < Highlights.length; I++)
-			Highlights[I].Clear();
-		Editor.ClearExplanation();
-		Highlights = [];
-	}
-
-	// Class: Highlight
-	var Highlight = function(Type, Source) {
-		this.Type = Type;
-		this.Message = Source.message;
-		this.PositionFrom = Source.from;
-		this.PositionTo = Source.to;
-		if (this.PositionFrom != null && this.PositionTo != null) return;
-		var LineCount = Galapagos.lineCount();
-		var Accumulated = 0;
-		for (var N = 0; N < LineCount; N++) {
-			var Length = Galapagos.getLine(N).length;
-			if (this.PositionFrom == null && Source.start <= Accumulated + Length) this.PositionFrom = { line: N, ch: Source.start - Accumulated };
-			if (this.PositionTo == null && Source.end <= Accumulated + Length) this.PositionTo = { line: N, ch: Source.end - Accumulated };
-			if (this.PositionFrom != null && this.PositionTo != null) break;
-			Accumulated += Length + 1;
+	// SetRuntimeErrors: Show the runtime error linting messages.
+	Editor.SetRuntimeErrors = function(Errors) {
+		if (Errors.length > 0 && Errors[0].start == 2147483647) {
+			Editor.ShowTips(Message.message);
+			Galapagos.SetRuntimeErrors([]);
+		}else {
+			if (Errors.length > 0) {
+				Galapagos.SetCursorPosition(Errors[0].start);
+			}
+			Galapagos.SetRuntimeErrors(Errors);
 		}
-	}
-	Highlight.prototype.Clear = function() {
-		if (this.TextMarker != null) this.TextMarker.clear();
-		if (this.Gutter != null) Galapagos.doc.setGutterMarker(this.PositionFrom.line, this.Type, null);
-		if (this.TipsWidget != null) this.HideTips();
-		return null;
-	}
-	Highlight.prototype.ScrollIntoView = function(Distance = 200) {
-		Galapagos.scrollIntoView(this.PositionFrom, Distance);
-		return this;
-	}
-	Highlight.prototype.MarkText = function() {
-		this.TextMarker = Galapagos.doc.markText(this.PositionFrom, this.PositionTo, { className: "cm-" + this.Type });
-		return this;
-	}
-	Highlight.prototype.ShowTips = function(Callback) {
-		if (this.TipsWidget != null) return;
-		var Element = $("<div class='CodeMirror-context-tips'></div>");
-		if (this.Message.indexOf("<span") != -1)
-			Element.html(this.Message);
-		else Element.text(this.Message);
-		Element.click(Callback != null ? Callback : () => this.HideTips());
-		this.TipsWidget = Galapagos.doc.addLineWidget(this.PositionFrom.line, Element[0], {});
-		return this;
-	}
-	Highlight.prototype.HideTips = function() {
-		if (this.TipsWidget == null) return;
-		this.TipsWidget.clear();
-		this.TipsWidget = null;
-		return this;
-	}
-	Highlight.prototype.ShowGutter = function() {
-		this.Gutter = $("<div class='CodeMirror-marker-" + this.Type + "'></div>")[0];
-		this.Gutter.Callback = () => this.ShowTips();
-		Galapagos.doc.setGutterMarker(this.PositionFrom.line, this.Type, this.Gutter);
-		return this;
-	}
-	Highlight.prototype.ShowAll = function(Callback) {
-		return this.MarkText().ShowTips(Callback).ShowGutter().ScrollIntoView();
 	}
 
 	// Explain support
@@ -209,9 +157,10 @@ Editor = function() {
 		// Set the content
 		if (Content != Galapagos.GetCode()) {
 			IgnoreUpdate = true;
+			Editor.SetCompilerErrors([]);
 			Galapagos.SetCode(Content);
 			Galapagos.ClearHistory();
-			Editor.ClearHighlights();
+			Editor.HideTips();
 			IgnoreUpdate = false;
 		}
 		// Mark clean or show tips
@@ -409,8 +358,9 @@ Localized = function() {
 	var Localized = {};
 
 	// Initialize: Initialize the manager with given data.
-	Localized.Initialize = function(Data) {
+	Localized.Initialize = function(Data, Language) {
 		Localized.Data = Data;
+		EditorLocalized.Switch(Language);
 		$(".Localized").each((Index, Target) => $(Target).text(Localized.Get($(Target).text())));
 	}
 

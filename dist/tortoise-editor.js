@@ -370,7 +370,8 @@ Commands = function() {
 					CurrentCommand = [Objective, Content];
 					CurrentCommandIndex = 0;
 				}
-			}
+			},
+			OnDictionaryClick: Commands.ExplainFull
 		});
 		Commands.Galapagos = Galapagos;
 
@@ -702,16 +703,17 @@ Commands = function() {
 		var Parent = $(window.getSelection().focusNode).parents();
 		if (!Parent.is(".command-output")) return;
 		// Check the plain text
-		if (ExplainInternal(Selection.toString())) return;
+		if (Commands.ExplainFull(Selection.toString())) return;
 		// Check the grammatical tag
 		if (Parent.hasClass("cm-command") || Parent.hasClass("cm-reporter") || Parent.hasClass("cm-keyword")) 
-			ExplainInternal(Parent.get(0).innerText);
+			Commands.ExplainFull(Parent.get(0).innerText);
 	}
 
-	var ExplainInternal = function(Command) {
+	// ExplainFull: Explain the selected text in the command center in full.
+	Commands.ExplainFull = function(Command) {
 		if (!EditorDictionary.Check(Command)) return false;
 		Commands.ScrollToBottom();
-		Commands.Execute(null, `ask ${Command} -full`);
+		Commands.Execute("observer", `help ${Command} -full`);
 	}
 
 	return Commands;

@@ -48,74 +48,6 @@ Editor = function() {
 		}
 	}
 
-	// Explain support
-	// Explain: Start explaining things.
-	Editor.Explain = function(Forced = true) {
-		if (Commands.Visible) {
-			Commands.Explain(Forced);
-		} else {
-			ExplainInternal(Forced);
-		}
-	}
-
-	// ExplainNotFound: Show toast for explain not found.
-	Editor.ExplainNotFound = function() {
-		Editor.Toast("warning", Localized.Get("未能找到选中内容的相关信息。"));
-	}
-
-	// ClearExplanation: Clear the explanation.
-	Editor.ClearExplanation = function() {
-		if (ContextualHighlight != null)
-			ContextualHighlight = ContextualHighlight.Clear();
-	}
-	
-	// ExplainInEditor: Explain in the editor.
-	var ExplainHandle = 0;
-	var ExplainInternal = function(Forced) {
-		// Clear the timeout handle
-		clearTimeout(ExplainHandle);
-		if (!Galapagos.doc.somethingSelected()) return;
-		// Get the first and try to expand it
-		var Selection = Galapagos.doc.listSelections()[0];
-		var Packet = { from: Selection.anchor, to: Selection.head };
-		// Recognize the command
-		for (var I = Packet.from.line; I <= Packet.to.line; I++) {
-			var Tokens = Galapagos.getLineTokens(I);
-			for (var Token of Tokens) {
-				// Check eligibility
-				if (I == Packet.from.line && Token.end < Packet.from.ch) continue;
-				if (I == Packet.to.line && Token.start > Packet.to.ch) continue;
-				if (Token.type == null) continue;
-				// Ignore if there are multiple eligible tokens
-				if (Packet.message != null && !Forced) return;
-				// Show information
-				var Command = `<span class="cm-${Token.type}">${Token.string}</span>`
-				Packet.command = Token.string;
-				if (Dictionary.Check(Packet.command)) {
-					Packet.message = `${Command}: ${Dictionary.Get(Packet.command)} ➤`;
-				} else if (Dictionary.Check("~" + Token.type)) {
-					Packet.message = Dictionary.Get("~" + Token.type).replace("{0}", Command);
-					Packet.command = null;
-				} else {
-					// Packet.message = Token.type;
-				}
-			}
-			if (Packet.message != null) break;
-		}
-		// Message not found
-		if (Packet.message == null) {
-			if (!Forced) return;
-			return Editor.ExplainNotFound();
-		} 
-		// Show the highlight
-		Editor.ClearExplanation();
-		ContextualHighlight = new Highlight("help", Packet).ShowAll(() => {
-			if (Packet.command != null)
-				Commands.Execute(null, `help ${Packet.command} -full`);
-			Editor.ClearExplanation();
-		});
-	}
-
 	// Interface-related
 	// ClearDialogs: Clear all dialogs.
 	Editor.ClearDialogs = function() {
@@ -158,9 +90,9 @@ Editor = function() {
 		if (Content != Galapagos.GetCode()) {
 			IgnoreUpdate = true;
 			Editor.SetCompilerErrors([]);
-			Galapagos.SetCursorPosition(0);
-			Galapagos.SetCode(Content);
 			Galapagos.ClearHistory();
+			Galapagos.SetCode(Content);
+			Galapagos.SetCursorPosition(0);
 			Editor.HideTips();
 			IgnoreUpdate = false;
 		}
@@ -265,33 +197,6 @@ Editor = function() {
 				}
 			}
 		});
-		/*// Click on gutter
-		Galapagos.on('gutterClick', (cm, n) => {
-			var Line = cm.doc.getLineHandle(n);
-			if (Line.gutterMarkers == null) return;
-			Object.keys(Line.gutterMarkers).forEach((Key) => {
-				Line.gutterMarkers[Key].Callback();
-			});
-		});
-		// Selection
-		Galapagos.on('beforeSelectionChange', (cm, obj) => {
-			if (obj.ranges.length == 0) return;
-			// Only identify single-line selections
-			var Range = obj.ranges[0];
-			if (Range.anchor.line != Range.head.line || Range.anchor.ch == Range.head.ch) {
-				Editor.ClearExplanation();
-				return;
-			}
-			// For different origins, we do differently
-			clearTimeout(ExplainHandle);
-			if (obj.origin == "double-tap") {
-				ExplainHandle = setTimeout(() => Editor.Explain(false), 1);
-			} else if (obj.origin != "triple-tap" && navigator.maxTouchPoints == 0) {
-				ExplainHandle = setTimeout(() => Editor.Explain(false), 500);
-			} else {
-				Editor.ClearExplanation();
-			}
-		});*/
 		// Other interfaces
 		Overlays.Initialize();
 		Editor.ClearDialogs();
@@ -370,30 +275,6 @@ Localized = function() {
 	}
 
 	return Localized;
-}();
-
-// Dictionary: Dictionary support.
-Dictionary = function() {
-	var Dictionary = {};
-
-	// Initialize: Initialize the manager with given data.
-	Dictionary.Initialize = function(Data) {
-		Dictionary.Data = Data;
-	}
-
-	// Get: Get dictionary string.
-	Dictionary.Get = function(Source) {
-		if (Dictionary.Check(Source.trim().toLowerCase()))
-			return Dictionary.Data[Source];
-		return Source;
-	}
-	
-	// Check: Check dictionary item.
-	Dictionary.Check = function(Source) {
-		return Dictionary.Data && Dictionary.Data.hasOwnProperty(Source.trim().toLowerCase());
-	}
-
-	return Dictionary;
 }();
 
 // Commands: Handle the interaction of CodeMirror command center.
@@ -828,7 +709,7 @@ Commands = function() {
 	}
 
 	var ExplainInternal = function(Command) {
-		if (!Dictionary.Check(Command)) return false;
+		if (!EditorDictionary.Check(Command)) return false;
 		Commands.ScrollToBottom();
 		Commands.Execute(null, `ask ${Command} -full`);
 	}

@@ -84,6 +84,8 @@ Editor = function() {
 
 	// Editor support
 	var IgnoreUpdate = false;
+	// CodeRefreshed: Did we refresh the code on the background?
+	Editor.CodeRefreshed = false;
 	// SetCode: Set the content of the editor.
 	Editor.SetCode = function(Content, Unapplied) {
 		// Set the content
@@ -92,6 +94,7 @@ Editor = function() {
 			Editor.SetCompilerErrors([]);
 			Galapagos.ClearHistory();
 			Galapagos.SetCode(Content);
+			if (Commands.Visible) Editor.CodeRefreshed = true;
 			Galapagos.SetCursorPosition(0);
 			Editor.HideTips();
 			IgnoreUpdate = false;
@@ -310,6 +313,7 @@ Commands = function() {
 		Commands.Visible = false;
 		bodyScrollLock.clearAllBodyScrollLocks();
 		bodyScrollLock.disableBodyScroll(document.querySelector('.CodeMirror-scroll'), { allowTouchMove: () => true });
+		if (Editor.CodeRefreshed) Galapagos.SetCursorPosition(0);
 	}
 
 	// Following three variables are used for command histrory.

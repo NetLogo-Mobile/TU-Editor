@@ -1662,17 +1662,19 @@
                    return 0;
                },
                reconfigure: (state, oldState) => {
-                   let newVal = getter(state);
-                   let oldAddr = oldState.config.address[id];
+                   let newVal, oldAddr = oldState.config.address[id];
                    if (oldAddr != null) {
                        let oldVal = getAddr(oldState, oldAddr);
                        if (this.dependencies.every(dep => {
                            return dep instanceof Facet ? oldState.facet(dep) === state.facet(dep) :
                                dep instanceof StateField ? oldState.field(dep, false) == state.field(dep, false) : true;
-                       }) || (multi ? compareArray(newVal, oldVal, compare) : compare(newVal, oldVal))) {
+                       }) || (multi ? compareArray(newVal = getter(state), oldVal, compare) : compare(newVal = getter(state), oldVal))) {
                            state.values[idx] = oldVal;
                            return 0;
                        }
+                   }
+                   else {
+                       newVal = getter(state);
                    }
                    state.values[idx] = newVal;
                    return 1 /* SlotStatus.Changed */;
@@ -2807,6 +2809,18 @@
        /**
        Find the values for a given language data field, provided by the
        the [`languageData`](https://codemirror.net/6/docs/ref/#state.EditorState^languageData) facet.
+       
+       Examples of language data fields are...
+       
+       - [`"commentTokens"`](https://codemirror.net/6/docs/ref/#commands.CommentTokens) for specifying
+         comment syntax.
+       - [`"autocomplete"`](https://codemirror.net/6/docs/ref/#autocomplete.autocompletion^config.override)
+         for providing language-specific completion sources.
+       - [`"wordChars"`](https://codemirror.net/6/docs/ref/#state.EditorState.charCategorizer) for adding
+         characters that should be considered part of words in this
+         language.
+       - [`"closeBrackets"`](https://codemirror.net/6/docs/ref/#autocomplete.CloseBracketConfig) controls
+         bracket closing behavior.
        */
        languageDataAt(name, pos, side = -1) {
            let values = [];
@@ -3311,7 +3325,7 @@
        */
        static eq(oldSets, newSets, from = 0, to) {
            if (to == null)
-               to = 1000000000 /* C.Far */;
+               to = 1000000000 /* C.Far */ - 1;
            let a = oldSets.filter(set => !set.isEmpty && newSets.indexOf(set) < 0);
            let b = newSets.filter(set => !set.isEmpty && oldSets.indexOf(set) < 0);
            if (a.length != b.length)
@@ -3345,23 +3359,24 @@
        */
        minPointSize = -1) {
            let cursor = new SpanCursor(sets, null, minPointSize).goto(from), pos = from;
-           let open = cursor.openStart;
+           let openRanges = cursor.openStart;
            for (;;) {
                let curTo = Math.min(cursor.to, to);
                if (cursor.point) {
-                   iterator.point(pos, curTo, cursor.point, cursor.activeForPoint(cursor.to), open, cursor.pointRank);
-                   open = cursor.openEnd(curTo) + (cursor.to > curTo ? 1 : 0);
+                   let active = cursor.activeForPoint(cursor.to);
+                   let openCount = cursor.pointFrom < from ? active.length + 1 : Math.min(active.length, openRanges);
+                   iterator.point(pos, curTo, cursor.point, active, openCount, cursor.pointRank);
+                   openRanges = Math.min(cursor.openEnd(curTo), active.length);
                }
                else if (curTo > pos) {
-                   iterator.span(pos, curTo, cursor.active, open);
-                   open = cursor.openEnd(curTo);
+                   iterator.span(pos, curTo, cursor.active, openRanges);
+                   openRanges = cursor.openEnd(curTo);
                }
                if (cursor.to > to)
-                   break;
+                   return openRanges + (cursor.point && cursor.to > to ? 1 : 0);
                pos = cursor.to;
                cursor.next();
            }
-           return open;
        }
        /**
        Create a range set for the given range or array of ranges. By
@@ -3665,6 +3680,8 @@
            this.pointRank = 0;
            this.to = -1000000000 /* C.Far */;
            this.endSide = 0;
+           // The amount of open active ranges at the start of the iterator.
+           // Not including points.
            this.openStart = -1;
            this.cursor = HeapCursor.from(sets, skip, minPoint);
        }
@@ -3705,7 +3722,7 @@
        next() {
            let from = this.to, wasPoint = this.point;
            this.point = null;
-           let trackOpen = this.openStart < 0 ? [] : null, trackExtra = 0;
+           let trackOpen = this.openStart < 0 ? [] : null;
            for (;;) {
                let a = this.minActive;
                if (a > -1 && (this.activeTo[a] - this.cursor.from || this.active[a].endSide - this.cursor.startSide) < 0) {
@@ -3731,8 +3748,6 @@
                    let nextVal = this.cursor.value;
                    if (!nextVal.point) { // Opening a range
                        this.addActive(trackOpen);
-                       if (this.cursor.from < from && this.cursor.to > from)
-                           trackExtra++;
                        this.cursor.next();
                    }
                    else if (wasPoint && this.cursor.to == this.to && this.cursor.from < this.cursor.to) {
@@ -3745,8 +3760,6 @@
                        this.pointRank = this.cursor.rank;
                        this.to = this.cursor.to;
                        this.endSide = nextVal.endSide;
-                       if (this.cursor.from < from)
-                           trackExtra = 1;
                        this.cursor.next();
                        this.forward(this.to, this.endSide);
                        break;
@@ -3754,10 +3767,9 @@
                }
            }
            if (trackOpen) {
-               let openStart = 0;
-               while (openStart < trackOpen.length && trackOpen[openStart] < from)
-                   openStart++;
-               this.openStart = openStart + trackExtra;
+               this.openStart = 0;
+               for (let i = trackOpen.length - 1; i >= 0 && trackOpen[i] < from; i--)
+                   this.openStart++;
            }
        }
        activeForPoint(to) {
@@ -4334,6 +4346,26 @@
                break;
            }
        }
+   }
+   function scrollableParent(dom) {
+       let doc = dom.ownerDocument;
+       for (let cur = dom.parentNode; cur;) {
+           if (cur == doc.body) {
+               break;
+           }
+           else if (cur.nodeType == 1) {
+               if (cur.scrollHeight > cur.clientHeight || cur.scrollWidth > cur.clientWidth)
+                   return cur;
+               cur = cur.assignedSlot || cur.parentNode;
+           }
+           else if (cur.nodeType == 11) {
+               cur = cur.host;
+           }
+           else {
+               break;
+           }
+       }
+       return null;
    }
    class DOMSelectionState {
        constructor() {
@@ -5019,7 +5051,7 @@
                if (pos > 0 ? i == 0 : i == rects.length - 1 || rect.top < rect.bottom)
                    break;
            }
-           return (pos == 0 && side > 0 || pos == this.length && side <= 0) ? rect : flattenRect(rect, pos == 0);
+           return this.length ? rect : flattenRect(rect, this.side > 0);
        }
        get isEditable() { return false; }
        destroy() {
@@ -5172,7 +5204,6 @@
                break;
            off = end;
        }
-       //  if (i) return DOMPos.after(children[i - 1].dom!)
        for (let j = i; j > 0; j--) {
            let prev = children[j - 1];
            if (prev.dom.parentNode == dom)
@@ -5199,21 +5230,33 @@
        parent.length += view.length;
    }
    function coordsInChildren(view, pos, side) {
-       for (let off = 0, i = 0; i < view.children.length; i++) {
-           let child = view.children[i], end = off + child.length, next;
-           if ((side <= 0 || end == view.length || child.getSide() > 0 ? end >= pos : end > pos) &&
-               (pos < end || i + 1 == view.children.length || (next = view.children[i + 1]).length || next.getSide() > 0)) {
-               let flatten = 0;
-               if (end == off) {
-                   if (child.getSide() <= 0)
-                       continue;
-                   flatten = side = -child.getSide();
+       let before = null, beforePos = -1, after = null, afterPos = -1;
+       function scan(view, pos) {
+           for (let i = 0, off = 0; i < view.children.length && off <= pos; i++) {
+               let child = view.children[i], end = off + child.length;
+               if (end >= pos) {
+                   if (child.children.length) {
+                       scan(child, pos - off);
+                   }
+                   else if (!after && (end > pos || off == end && child.getSide() > 0)) {
+                       after = child;
+                       afterPos = pos - off;
+                   }
+                   else if (off < pos || (off == end && child.getSide() < 0)) {
+                       before = child;
+                       beforePos = pos - off;
+                   }
                }
-               let rect = child.coordsAt(Math.max(0, pos - off), side);
-               return flatten && rect ? flattenRect(rect, side < 0) : rect;
+               off = end;
            }
-           off = end;
        }
+       scan(view, pos);
+       let target = (side < 0 ? before : after) || before || after;
+       if (target)
+           return target.coordsAt(Math.max(0, target == before ? beforePos : afterPos), side);
+       return fallbackRect(view);
+   }
+   function fallbackRect(view) {
        let last = view.dom.lastChild;
        if (!last)
            return view.dom.getBoundingClientRect();
@@ -5735,6 +5778,7 @@
            this.curLine = null;
            this.breakAtStart = 0;
            this.pendingBuffer = 0 /* Buf.No */;
+           this.bufferMarks = [];
            // Set to false directly after a widget that covers the position after it
            this.atCursorPos = true;
            this.openStart = -1;
@@ -5757,20 +5801,20 @@
            }
            return this.curLine;
        }
-       flushBuffer(active) {
+       flushBuffer(active = this.bufferMarks) {
            if (this.pendingBuffer) {
                this.curLine.append(wrapMarks(new WidgetBufferView(-1), active), active.length);
                this.pendingBuffer = 0 /* Buf.No */;
            }
        }
        addBlockWidget(view) {
-           this.flushBuffer([]);
+           this.flushBuffer();
            this.curLine = null;
            this.content.push(view);
        }
        finish(openEnd) {
-           if (!openEnd)
-               this.flushBuffer([]);
+           if (this.pendingBuffer && openEnd <= this.bufferMarks.length)
+               this.flushBuffer();
            else
                this.pendingBuffer = 0 /* Buf.No */;
            if (!this.posCovered())
@@ -5790,8 +5834,9 @@
                            this.content[this.content.length - 1].breakAfter = 1;
                        else
                            this.breakAtStart = 1;
-                       this.flushBuffer([]);
+                       this.flushBuffer();
                        this.curLine = null;
+                       this.atCursorPos = true;
                        length--;
                        continue;
                    }
@@ -5801,7 +5846,7 @@
                    }
                }
                let take = Math.min(this.text.length - this.textOff, length, 512 /* T.Chunk */);
-               this.flushBuffer(active.slice(0, openStart));
+               this.flushBuffer(active.slice(active.length - openStart));
                this.getLine().append(wrapMarks(new TextView(this.text.slice(this.textOff, this.textOff + take)), active), openStart);
                this.atCursorPos = true;
                this.textOff += take;
@@ -5831,9 +5876,9 @@
                    this.addBlockWidget(new BlockWidgetView(deco.widget || new NullWidget("div"), len, type));
                }
                else {
-                   let view = WidgetView.create(deco.widget || new NullWidget("span"), len, deco.startSide);
+                   let view = WidgetView.create(deco.widget || new NullWidget("span"), len, len ? 0 : deco.startSide);
                    let cursorBefore = this.atCursorPos && !view.isEditable && openStart <= active.length && (from < to || deco.startSide > 0);
-                   let cursorAfter = !view.isEditable && (from < to || deco.startSide <= 0);
+                   let cursorAfter = !view.isEditable && (from < to || openStart > active.length || deco.startSide <= 0);
                    let line = this.getLine();
                    if (this.pendingBuffer == 2 /* Buf.IfCursor */ && !cursorBefore)
                        this.pendingBuffer = 0 /* Buf.No */;
@@ -5844,7 +5889,9 @@
                    }
                    line.append(wrapMarks(view, active), openStart);
                    this.atCursorPos = cursorAfter;
-                   this.pendingBuffer = !cursorAfter ? 0 /* Buf.No */ : from < to ? 1 /* Buf.Yes */ : 2 /* Buf.IfCursor */;
+                   this.pendingBuffer = !cursorAfter ? 0 /* Buf.No */ : from < to || openStart > active.length ? 1 /* Buf.Yes */ : 2 /* Buf.IfCursor */;
+                   if (this.pendingBuffer)
+                       this.bufferMarks = active.slice();
                }
            }
            else if (this.doc.lineAt(this.pos).from == this.pos) { // Line decoration
@@ -5896,6 +5943,9 @@
    const updateListener = /*@__PURE__*/Facet.define();
    const inputHandler$1 = /*@__PURE__*/Facet.define();
    const perLineTextDirection = /*@__PURE__*/Facet.define({
+       combine: values => values.some(x => x)
+   });
+   const nativeSelectionHidden = /*@__PURE__*/Facet.define({
        combine: values => values.some(x => x)
    });
    class ScrollTarget {
@@ -6810,8 +6860,9 @@
        enforceCursorAssoc() {
            if (this.compositionDeco.size)
                return;
-           let cursor = this.view.state.selection.main;
-           let sel = getSelection(this.view.root);
+           let { view } = this, cursor = view.state.selection.main;
+           let sel = getSelection(view.root);
+           let { anchorNode, anchorOffset } = view.observer.selectionRange;
            if (!sel || !cursor.empty || !cursor.assoc || !sel.modify)
                return;
            let line = LineView.find(this, cursor.head);
@@ -6826,6 +6877,12 @@
            let dom = this.domAtPos(cursor.head + cursor.assoc);
            sel.collapse(dom.node, dom.offset);
            sel.modify("move", cursor.assoc < 0 ? "forward" : "backward", "lineboundary");
+           // This can go wrong in corner cases like single-character lines,
+           // so check and reset if necessary.
+           view.observer.readSelectionRange();
+           let newRange = view.observer.selectionRange;
+           if (view.docView.posFromDOM(newRange.anchorNode, newRange.anchorOffset) != cursor.from)
+               sel.collapse(anchorNode, anchorOffset);
        }
        mayControlSelection() {
            let active = this.view.root.activeElement;
@@ -7508,22 +7565,30 @@
            this.compositionFirstChange = null;
            this.compositionEndedAt = 0;
            this.mouseSelection = null;
+           let handleEvent = (handler, event) => {
+               if (this.ignoreDuringComposition(event))
+                   return;
+               if (event.type == "keydown" && this.keydown(view, event))
+                   return;
+               if (this.mustFlushObserver(event))
+                   view.observer.forceFlush();
+               if (this.runCustomHandlers(event.type, view, event))
+                   event.preventDefault();
+               else
+                   handler(view, event);
+           };
            for (let type in handlers) {
                let handler = handlers[type];
-               view.contentDOM.addEventListener(type, (event) => {
-                   if (!eventBelongsToEditor(view, event) || this.ignoreDuringComposition(event))
-                       return;
-                   if (type == "keydown" && this.keydown(view, event))
-                       return;
-                   if (this.mustFlushObserver(event))
-                       view.observer.forceFlush();
-                   if (this.runCustomHandlers(type, view, event))
-                       event.preventDefault();
-                   else
-                       handler(view, event);
+               view.contentDOM.addEventListener(type, event => {
+                   if (eventBelongsToEditor(view, event))
+                       handleEvent(handler, event);
                }, handlerOptions[type]);
                this.registeredEvents.push(type);
            }
+           view.scrollDOM.addEventListener("mousedown", (event) => {
+               if (event.target == view.scrollDOM)
+                   handleEvent(handlers.mousedown, event);
+           });
            if (browser.chrome && browser.chrome_version == 102) { // FIXME remove at some point
                // On Chrome 102, viewport updates somehow stop wheel-based
                // scrolling. Turning off pointer events during the scroll seems
@@ -7680,12 +7745,18 @@
    const EmacsyPendingKeys = "dthko";
    // Key codes for modifier keys
    const modifierCodes = [16, 17, 18, 20, 91, 92, 224, 225];
+   function dragScrollSpeed(dist) {
+       return dist * 0.7 + 8;
+   }
    class MouseSelection {
        constructor(view, startEvent, style, mustSelect) {
            this.view = view;
            this.style = style;
            this.mustSelect = mustSelect;
+           this.scrollSpeed = { x: 0, y: 0 };
+           this.scrolling = -1;
            this.lastEvent = startEvent;
+           this.scrollParent = scrollableParent(view.contentDOM);
            let doc = view.contentDOM.ownerDocument;
            doc.addEventListener("mousemove", this.move = this.move.bind(this));
            doc.addEventListener("mouseup", this.up = this.up.bind(this));
@@ -7701,11 +7772,24 @@
            }
        }
        move(event) {
+           var _a;
            if (event.buttons == 0)
                return this.destroy();
            if (this.dragging !== false)
                return;
            this.select(this.lastEvent = event);
+           let sx = 0, sy = 0;
+           let rect = ((_a = this.scrollParent) === null || _a === void 0 ? void 0 : _a.getBoundingClientRect())
+               || { left: 0, top: 0, right: this.view.win.innerWidth, bottom: this.view.win.innerHeight };
+           if (event.clientX <= rect.left)
+               sx = -dragScrollSpeed(rect.left - event.clientX);
+           else if (event.clientX >= rect.right)
+               sx = dragScrollSpeed(event.clientX - rect.right);
+           if (event.clientY <= rect.top)
+               sy = -dragScrollSpeed(rect.top - event.clientY);
+           else if (event.clientY >= rect.bottom)
+               sy = dragScrollSpeed(event.clientY - rect.bottom);
+           this.setScrollSpeed(sx, sy);
        }
        up(event) {
            if (this.dragging == null)
@@ -7715,10 +7799,33 @@
            this.destroy();
        }
        destroy() {
+           this.setScrollSpeed(0, 0);
            let doc = this.view.contentDOM.ownerDocument;
            doc.removeEventListener("mousemove", this.move);
            doc.removeEventListener("mouseup", this.up);
            this.view.inputState.mouseSelection = null;
+       }
+       setScrollSpeed(sx, sy) {
+           this.scrollSpeed = { x: sx, y: sy };
+           if (sx || sy) {
+               if (this.scrolling < 0)
+                   this.scrolling = setInterval(() => this.scroll(), 50);
+           }
+           else if (this.scrolling > -1) {
+               clearInterval(this.scrolling);
+               this.scrolling = -1;
+           }
+       }
+       scroll() {
+           if (this.scrollParent) {
+               this.scrollParent.scrollLeft += this.scrollSpeed.x;
+               this.scrollParent.scrollTop += this.scrollSpeed.y;
+           }
+           else {
+               this.view.win.scrollBy(this.scrollSpeed.x, this.scrollSpeed.y);
+           }
+           if (this.dragging === false)
+               this.select(this.lastEvent);
        }
        select(event) {
            let selection = this.style.get(event, this.extend, this.multiple);
@@ -7726,8 +7833,7 @@
                selection.main.assoc != this.view.state.selection.main.assoc)
                this.view.dispatch({
                    selection,
-                   userEvent: "select.pointer",
-                   scrollIntoView: true
+                   userEvent: "select.pointer"
                });
            this.mustSelect = false;
        }
@@ -7918,23 +8024,15 @@
    function basicMouseSelection(view, event) {
        let start = queryPos(view, event), type = getClickType(event);
        let startSel = view.state.selection;
-       let last = start, lastEvent = event;
        return {
            update(update) {
                if (update.docChanged) {
                    start.pos = update.changes.mapPos(start.pos);
                    startSel = startSel.map(update.changes);
-                   lastEvent = null;
                }
            },
            get(event, extend, multiple) {
-               let cur;
-               if (lastEvent && event.clientX == lastEvent.clientX && event.clientY == lastEvent.clientY)
-                   cur = last;
-               else {
-                   cur = last = queryPos(view, event);
-                   lastEvent = event;
-               }
+               let cur = queryPos(view, event);
                let range = rangeForClick(view, cur.pos, cur.bias, type);
                if (start.pos != cur.pos && !extend) {
                    let startRange = rangeForClick(view, start.pos, start.bias, type);
@@ -8159,9 +8257,9 @@
 
    const wrappingWhiteSpace = ["pre-wrap", "normal", "pre-line", "break-spaces"];
    class HeightOracle {
-       constructor() {
+       constructor(lineWrapping) {
+           this.lineWrapping = lineWrapping;
            this.doc = Text.empty;
-           this.lineWrapping = false;
            this.heightSamples = {};
            this.lineHeight = 14;
            this.charWidth = 7;
@@ -8900,7 +8998,6 @@
            this.contentDOMHeight = 0;
            this.editorHeight = 0;
            this.editorWidth = 0;
-           this.heightOracle = new HeightOracle;
            // See VP.MaxDOMHeight
            this.scaler = IdScaler;
            this.scrollTarget = null;
@@ -8909,7 +9006,7 @@
            // Flag set when editor content was redrawn, so that the next
            // measure stage knows it must read DOM layout
            this.mustMeasureContent = true;
-           this.defaultTextDirection = Direction.RTL;
+           this.defaultTextDirection = Direction.LTR;
            this.visibleRanges = [];
            // Cursor 'assoc' is only significant when the cursor is on a line
            // wrap point, where it must stick to the character that it is
@@ -8920,6 +9017,8 @@
            // boundary and, if so, reset it to make sure it is positioned in
            // the right place.
            this.mustEnforceCursorAssoc = false;
+           let guessWrapping = state.facet(contentAttributes).some(v => typeof v != "function" && v.class == "cm-lineWrapping");
+           this.heightOracle = new HeightOracle(guessWrapping);
            this.stateDeco = state.facet(decorations).filter(d => typeof d != "function");
            this.heightMap = HeightMap.empty().applyChanges(this.stateDeco, Text.empty, this.heightOracle.setDoc(state.doc), [new ChangedRange(0, 0, 0, state.doc.length)]);
            this.viewport = this.getViewport(0, null);
@@ -8974,7 +9073,8 @@
            if (scrollTarget)
                this.scrollTarget = scrollTarget;
            if (!this.mustEnforceCursorAssoc && update.selectionSet && update.view.lineWrapping &&
-               update.state.selection.main.empty && update.state.selection.main.assoc)
+               update.state.selection.main.empty && update.state.selection.main.assoc &&
+               !update.state.facet(nativeSelectionHidden))
                this.mustEnforceCursorAssoc = true;
        }
        measure(view) {
@@ -9024,7 +9124,7 @@
                    refresh = true;
                if (refresh || oracle.lineWrapping && Math.abs(contentWidth - this.contentDOMWidth) > oracle.charWidth) {
                    let { lineHeight, charWidth } = view.docView.measureTextSize();
-                   refresh = oracle.refresh(whiteSpace, lineHeight, charWidth, contentWidth / charWidth, lineHeights);
+                   refresh = lineHeight > 0 && oracle.refresh(whiteSpace, lineHeight, charWidth, contentWidth / charWidth, lineHeights);
                    if (refresh) {
                        view.docView.minWidth = 0;
                        result |= 8 /* UpdateFlag.Geometry */;
@@ -9037,7 +9137,7 @@
                oracle.heightChanged = false;
                for (let vp of this.viewports) {
                    let heights = vp.from == this.viewport.from ? lineHeights : view.docView.measureVisibleLineHeights(vp);
-                   this.heightMap = this.heightMap.updateHeight(oracle, 0, refresh, new MeasuredHeights(vp.from, heights));
+                   this.heightMap = (refresh ? HeightMap.empty().applyChanges(this.stateDeco, Text.empty, this.heightOracle, [new ChangedRange(0, 0, 0, view.state.doc.length)]) : this.heightMap).updateHeight(oracle, 0, refresh, new MeasuredHeights(vp.from, heights));
                }
                if (oracle.heightChanged)
                    result |= 2 /* UpdateFlag.Height */;
@@ -9168,8 +9268,10 @@
                    let marginHeight = (margin / this.heightOracle.lineLength) * this.heightOracle.lineHeight;
                    let top, bot;
                    if (target != null) {
-                       top = Math.max(line.from, target - margin);
-                       bot = Math.min(line.to, target + margin);
+                       let targetFrac = findFraction(structure, target);
+                       let spaceFrac = ((this.visibleBottom - this.visibleTop) / 2 + marginHeight) / line.height;
+                       top = targetFrac - spaceFrac;
+                       bot = targetFrac + spaceFrac;
                    }
                    else {
                        top = (this.visibleTop - line.top - marginHeight) / line.height;
@@ -9179,14 +9281,16 @@
                    viewTo = findPosition(structure, bot);
                }
                else {
+                   let totalWidth = structure.total * this.heightOracle.charWidth;
+                   let marginWidth = margin * this.heightOracle.charWidth;
                    let left, right;
                    if (target != null) {
-                       left = Math.max(line.from, target - doubleMargin);
-                       right = Math.min(line.to, target + doubleMargin);
+                       let targetFrac = findFraction(structure, target);
+                       let spaceFrac = ((this.pixelViewport.right - this.pixelViewport.left) / 2 + marginWidth) / totalWidth;
+                       left = targetFrac - spaceFrac;
+                       right = targetFrac + spaceFrac;
                    }
                    else {
-                       let totalWidth = structure.total * this.heightOracle.charWidth;
-                       let marginWidth = margin * this.heightOracle.charWidth;
                        left = (this.pixelViewport.left - marginWidth) / totalWidth;
                        right = (this.pixelViewport.right + marginWidth) / totalWidth;
                    }
@@ -9405,7 +9509,6 @@
            margin: 0,
            flexGrow: 2,
            flexShrink: 0,
-           minHeight: "100%",
            display: "block",
            whiteSpace: "pre",
            wordWrap: "normal",
@@ -9427,14 +9530,13 @@
        "&dark .cm-content": { caretColor: "white" },
        ".cm-line": {
            display: "block",
-           padding: "0 2px 0 4px"
+           padding: "0 2px 0 6px"
        },
-       ".cm-selectionLayer": {
-           zIndex: -1,
-           contain: "size style"
-       },
-       ".cm-selectionBackground": {
-           position: "absolute",
+       ".cm-layer": {
+           contain: "size style",
+           "& > *": {
+               position: "absolute"
+           }
        },
        "&light .cm-selectionBackground": {
            background: "#d9d9d9"
@@ -9449,8 +9551,6 @@
            background: "#233"
        },
        ".cm-cursorLayer": {
-           zIndex: 100,
-           contain: "size style",
            pointerEvents: "none"
        },
        "&.cm-focused .cm-cursorLayer": {
@@ -9462,7 +9562,6 @@
        "@keyframes cm-blink": { "0%": {}, "50%": { opacity: 0 }, "100%": {} },
        "@keyframes cm-blink2": { "0%": {}, "50%": { opacity: 0 }, "100%": {} },
        ".cm-cursor, .cm-dropCursor": {
-           position: "absolute",
            borderLeft: "1.2px solid black",
            marginLeft: "-0.6px",
            pointerEvents: "none",
@@ -9556,6 +9655,21 @@
            display: "inline-block",
            verticalAlign: "top",
        },
+       ".cm-highlightSpace:before": {
+           content: "attr(data-display)",
+           position: "absolute",
+           pointerEvents: "none",
+           color: "#888"
+       },
+       ".cm-highlightTab": {
+           backgroundImage: `url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="20"><path stroke="%23888" stroke-width="1" fill="none" d="M1 10H196L190 5M190 15L196 10M197 4L197 16"/></svg>')`,
+           backgroundSize: "auto 100%",
+           backgroundPosition: "right 90%",
+           backgroundRepeat: "no-repeat"
+       },
+       ".cm-trailingSpace": {
+           backgroundColor: "#ff332255"
+       },
        ".cm-button": {
            verticalAlign: "middle",
            color: "inherit",
@@ -9593,6 +9707,240 @@
        }
    }, lightDarkIDs);
 
+   class DOMChange {
+       constructor(view, start, end, typeOver) {
+           this.typeOver = typeOver;
+           this.bounds = null;
+           this.text = "";
+           let { impreciseHead: iHead, impreciseAnchor: iAnchor } = view.docView;
+           if (view.state.readOnly && start > -1) {
+               // Ignore changes when the editor is read-only
+               this.newSel = null;
+           }
+           else if (start > -1 && (this.bounds = view.docView.domBoundsAround(start, end, 0))) {
+               let selPoints = iHead || iAnchor ? [] : selectionPoints(view);
+               let reader = new DOMReader(selPoints, view.state);
+               reader.readRange(this.bounds.startDOM, this.bounds.endDOM);
+               this.text = reader.text;
+               this.newSel = selectionFromPoints(selPoints, this.bounds.from);
+           }
+           else {
+               let domSel = view.observer.selectionRange;
+               let head = iHead && iHead.node == domSel.focusNode && iHead.offset == domSel.focusOffset ||
+                   !contains(view.contentDOM, domSel.focusNode)
+                   ? view.state.selection.main.head
+                   : view.docView.posFromDOM(domSel.focusNode, domSel.focusOffset);
+               let anchor = iAnchor && iAnchor.node == domSel.anchorNode && iAnchor.offset == domSel.anchorOffset ||
+                   !contains(view.contentDOM, domSel.anchorNode)
+                   ? view.state.selection.main.anchor
+                   : view.docView.posFromDOM(domSel.anchorNode, domSel.anchorOffset);
+               this.newSel = EditorSelection.single(anchor, head);
+           }
+       }
+   }
+   function applyDOMChange(view, domChange) {
+       let change;
+       let { newSel } = domChange, sel = view.state.selection.main;
+       if (domChange.bounds) {
+           let { from, to } = domChange.bounds;
+           let preferredPos = sel.from, preferredSide = null;
+           // Prefer anchoring to end when Backspace is pressed (or, on
+           // Android, when something was deleted)
+           if (view.inputState.lastKeyCode === 8 && view.inputState.lastKeyTime > Date.now() - 100 ||
+               browser.android && domChange.text.length < to - from) {
+               preferredPos = sel.to;
+               preferredSide = "end";
+           }
+           let diff = findDiff(view.state.doc.sliceString(from, to, LineBreakPlaceholder), domChange.text, preferredPos - from, preferredSide);
+           if (diff) {
+               // Chrome inserts two newlines when pressing shift-enter at the
+               // end of a line. DomChange drops one of those.
+               if (browser.chrome && view.inputState.lastKeyCode == 13 &&
+                   diff.toB == diff.from + 2 && domChange.text.slice(diff.from, diff.toB) == LineBreakPlaceholder + LineBreakPlaceholder)
+                   diff.toB--;
+               change = { from: from + diff.from, to: from + diff.toA,
+                   insert: Text.of(domChange.text.slice(diff.from, diff.toB).split(LineBreakPlaceholder)) };
+           }
+       }
+       else if (newSel && (!view.hasFocus || !view.state.facet(editable) || newSel.main.eq(sel))) {
+           newSel = null;
+       }
+       if (!change && !newSel)
+           return false;
+       if (!change && domChange.typeOver && !sel.empty && newSel && newSel.main.empty) {
+           // Heuristic to notice typing over a selected character
+           change = { from: sel.from, to: sel.to, insert: view.state.doc.slice(sel.from, sel.to) };
+       }
+       else if (change && change.from >= sel.from && change.to <= sel.to &&
+           (change.from != sel.from || change.to != sel.to) &&
+           (sel.to - sel.from) - (change.to - change.from) <= 4) {
+           // If the change is inside the selection and covers most of it,
+           // assume it is a selection replace (with identical characters at
+           // the start/end not included in the diff)
+           change = {
+               from: sel.from, to: sel.to,
+               insert: view.state.doc.slice(sel.from, change.from).append(change.insert).append(view.state.doc.slice(change.to, sel.to))
+           };
+       }
+       else if ((browser.mac || browser.android) && change && change.from == change.to && change.from == sel.head - 1 &&
+           /^\. ?$/.test(change.insert.toString())) {
+           // Detect insert-period-on-double-space Mac and Android behavior,
+           // and transform it into a regular space insert.
+           if (newSel && change.insert.length == 2)
+               newSel = EditorSelection.single(newSel.main.anchor - 1, newSel.main.head - 1);
+           change = { from: sel.from, to: sel.to, insert: Text.of([" "]) };
+       }
+       else if (browser.chrome && change && change.from == change.to && change.from == sel.head &&
+           change.insert.toString() == "\n " && view.lineWrapping) {
+           // In Chrome, if you insert a space at the start of a wrapped
+           // line, it will actually insert a newline and a space, causing a
+           // bogus new line to be created in CodeMirror (#968)
+           if (newSel)
+               newSel = EditorSelection.single(newSel.main.anchor - 1, newSel.main.head - 1);
+           change = { from: sel.from, to: sel.to, insert: Text.of([" "]) };
+       }
+       if (change) {
+           let startState = view.state;
+           if (browser.ios && view.inputState.flushIOSKey(view))
+               return true;
+           // Android browsers don't fire reasonable key events for enter,
+           // backspace, or delete. So this detects changes that look like
+           // they're caused by those keys, and reinterprets them as key
+           // events. (Some of these keys are also handled by beforeinput
+           // events and the pendingAndroidKey mechanism, but that's not
+           // reliable in all situations.)
+           if (browser.android &&
+               ((change.from == sel.from && change.to == sel.to &&
+                   change.insert.length == 1 && change.insert.lines == 2 &&
+                   dispatchKey(view.contentDOM, "Enter", 13)) ||
+                   (change.from == sel.from - 1 && change.to == sel.to && change.insert.length == 0 &&
+                       dispatchKey(view.contentDOM, "Backspace", 8)) ||
+                   (change.from == sel.from && change.to == sel.to + 1 && change.insert.length == 0 &&
+                       dispatchKey(view.contentDOM, "Delete", 46))))
+               return true;
+           let text = change.insert.toString();
+           if (view.state.facet(inputHandler$1).some(h => h(view, change.from, change.to, text)))
+               return true;
+           if (view.inputState.composing >= 0)
+               view.inputState.composing++;
+           let tr;
+           if (change.from >= sel.from && change.to <= sel.to && change.to - change.from >= (sel.to - sel.from) / 3 &&
+               (!newSel || newSel.main.empty && newSel.main.from == change.from + change.insert.length) &&
+               view.inputState.composing < 0) {
+               let before = sel.from < change.from ? startState.sliceDoc(sel.from, change.from) : "";
+               let after = sel.to > change.to ? startState.sliceDoc(change.to, sel.to) : "";
+               tr = startState.replaceSelection(view.state.toText(before + change.insert.sliceString(0, undefined, view.state.lineBreak) + after));
+           }
+           else {
+               let changes = startState.changes(change);
+               let mainSel = newSel && !startState.selection.main.eq(newSel.main) && newSel.main.to <= changes.newLength
+                   ? newSel.main : undefined;
+               // Try to apply a composition change to all cursors
+               if (startState.selection.ranges.length > 1 && view.inputState.composing >= 0 &&
+                   change.to <= sel.to && change.to >= sel.to - 10) {
+                   let replaced = view.state.sliceDoc(change.from, change.to);
+                   let compositionRange = compositionSurroundingNode(view) || view.state.doc.lineAt(sel.head);
+                   let offset = sel.to - change.to, size = sel.to - sel.from;
+                   tr = startState.changeByRange(range => {
+                       if (range.from == sel.from && range.to == sel.to)
+                           return { changes, range: mainSel || range.map(changes) };
+                       let to = range.to - offset, from = to - replaced.length;
+                       if (range.to - range.from != size || view.state.sliceDoc(from, to) != replaced ||
+                           // Unfortunately, there's no way to make multiple
+                           // changes in the same node work without aborting
+                           // composition, so cursors in the composition range are
+                           // ignored.
+                           compositionRange && range.to >= compositionRange.from && range.from <= compositionRange.to)
+                           return { range };
+                       let rangeChanges = startState.changes({ from, to, insert: change.insert }), selOff = range.to - sel.to;
+                       return {
+                           changes: rangeChanges,
+                           range: !mainSel ? range.map(rangeChanges) :
+                               EditorSelection.range(Math.max(0, mainSel.anchor + selOff), Math.max(0, mainSel.head + selOff))
+                       };
+                   });
+               }
+               else {
+                   tr = {
+                       changes,
+                       selection: mainSel && startState.selection.replaceRange(mainSel)
+                   };
+               }
+           }
+           let userEvent = "input.type";
+           if (view.composing) {
+               userEvent += ".compose";
+               if (view.inputState.compositionFirstChange) {
+                   userEvent += ".start";
+                   view.inputState.compositionFirstChange = false;
+               }
+           }
+           view.dispatch(tr, { scrollIntoView: true, userEvent });
+           return true;
+       }
+       else if (newSel && !newSel.main.eq(sel)) {
+           let scrollIntoView = false, userEvent = "select";
+           if (view.inputState.lastSelectionTime > Date.now() - 50) {
+               if (view.inputState.lastSelectionOrigin == "select")
+                   scrollIntoView = true;
+               userEvent = view.inputState.lastSelectionOrigin;
+           }
+           view.dispatch({ selection: newSel, scrollIntoView, userEvent });
+           return true;
+       }
+       else {
+           return false;
+       }
+   }
+   function findDiff(a, b, preferredPos, preferredSide) {
+       let minLen = Math.min(a.length, b.length);
+       let from = 0;
+       while (from < minLen && a.charCodeAt(from) == b.charCodeAt(from))
+           from++;
+       if (from == minLen && a.length == b.length)
+           return null;
+       let toA = a.length, toB = b.length;
+       while (toA > 0 && toB > 0 && a.charCodeAt(toA - 1) == b.charCodeAt(toB - 1)) {
+           toA--;
+           toB--;
+       }
+       if (preferredSide == "end") {
+           let adjust = Math.max(0, from - Math.min(toA, toB));
+           preferredPos -= toA + adjust - from;
+       }
+       if (toA < from && a.length < b.length) {
+           let move = preferredPos <= from && preferredPos >= toA ? from - preferredPos : 0;
+           from -= move;
+           toB = from + (toB - toA);
+           toA = from;
+       }
+       else if (toB < from) {
+           let move = preferredPos <= from && preferredPos >= toB ? from - preferredPos : 0;
+           from -= move;
+           toA = from + (toA - toB);
+           toB = from;
+       }
+       return { from, toA, toB };
+   }
+   function selectionPoints(view) {
+       let result = [];
+       if (view.root.activeElement != view.contentDOM)
+           return result;
+       let { anchorNode, anchorOffset, focusNode, focusOffset } = view.observer.selectionRange;
+       if (anchorNode) {
+           result.push(new DOMPoint(anchorNode, anchorOffset));
+           if (focusNode != anchorNode || focusOffset != anchorOffset)
+               result.push(new DOMPoint(focusNode, focusOffset));
+       }
+       return result;
+   }
+   function selectionFromPoints(points, base) {
+       if (points.length == 0)
+           return null;
+       let anchor = points[0].pos, head = points.length == 2 ? points[1].pos : anchor;
+       return anchor > -1 && head > -1 ? EditorSelection.single(anchor + base, head + base) : null;
+   }
+
    const observeOptions = {
        childList: true,
        characterData: true,
@@ -9604,10 +9952,8 @@
    // DOMCharacterDataModified there
    const useCharData = browser.ie && browser.ie_version <= 11;
    class DOMObserver {
-       constructor(view, onChange, onScrollChanged) {
+       constructor(view) {
            this.view = view;
-           this.onChange = onChange;
-           this.onScrollChanged = onScrollChanged;
            this.active = false;
            // The known selection. Kept in our own object, as opposed to just
            // directly accessing the selection because:
@@ -9622,10 +9968,12 @@
            this.resizeTimeout = -1;
            this.queue = [];
            this.delayedAndroidKey = null;
+           this.flushingAndroidKey = -1;
            this.lastChange = 0;
            this.scrollTargets = [];
            this.intersection = null;
-           this.resize = null;
+           this.resizeScroll = null;
+           this.resizeContent = null;
            this.intersecting = false;
            this.gapIntersection = null;
            this.gaps = [];
@@ -9663,11 +10011,14 @@
            this.onPrint = this.onPrint.bind(this);
            this.onScroll = this.onScroll.bind(this);
            if (typeof ResizeObserver == "function") {
-               this.resize = new ResizeObserver(() => {
-                   if (this.view.docView.lastUpdate < Date.now() - 75)
+               this.resizeScroll = new ResizeObserver(() => {
+                   var _a;
+                   if (((_a = this.view.docView) === null || _a === void 0 ? void 0 : _a.lastUpdate) < Date.now() - 75)
                        this.onResize();
                });
-               this.resize.observe(view.scrollDOM);
+               this.resizeScroll.observe(view.scrollDOM);
+               this.resizeContent = new ResizeObserver(() => this.view.requestMeasure());
+               this.resizeContent.observe(view.contentDOM);
            }
            this.addWindowListeners(this.win = view.win);
            this.start();
@@ -9689,6 +10040,11 @@
            }
            this.listenForScroll();
            this.readSelectionRange();
+       }
+       onScrollChanged(e) {
+           this.view.inputState.runScrollHandlers(this.view, e);
+           if (this.intersecting)
+               this.view.measure();
        }
        onScroll(e) {
            if (this.intersecting)
@@ -9849,14 +10205,17 @@
        // them or, if that has no effect, dispatches the given key.
        delayAndroidKey(key, keyCode) {
            var _a;
-           if (!this.delayedAndroidKey)
-               this.view.win.requestAnimationFrame(() => {
+           if (!this.delayedAndroidKey) {
+               let flush = () => {
                    let key = this.delayedAndroidKey;
-                   this.delayedAndroidKey = null;
-                   this.delayedFlush = -1;
-                   if (!this.flush() && key.force)
-                       dispatchKey(this.dom, key.key, key.keyCode);
-               });
+                   if (key) {
+                       this.clearDelayedAndroidKey();
+                       if (!this.flush() && key.force)
+                           dispatchKey(this.dom, key.key, key.keyCode);
+                   }
+               };
+               this.flushingAndroidKey = this.view.win.requestAnimationFrame(flush);
+           }
            // Since backspace beforeinput is sometimes signalled spuriously,
            // Enter always takes precedence.
            if (!this.delayedAndroidKey || key == "Enter")
@@ -9868,6 +10227,11 @@
                    // be ignored if it returns the DOM to its previous state.
                    force: this.lastChange < Date.now() - 50 || !!((_a = this.delayedAndroidKey) === null || _a === void 0 ? void 0 : _a.force)
                };
+       }
+       clearDelayedAndroidKey() {
+           this.win.cancelAnimationFrame(this.flushingAndroidKey);
+           this.delayedAndroidKey = null;
+           this.flushingAndroidKey = -1;
        }
        flushSoon() {
            if (this.delayedFlush < 0)
@@ -9903,6 +10267,17 @@
            }
            return { from, to, typeOver };
        }
+       readChange() {
+           let { from, to, typeOver } = this.processRecords();
+           let newSel = this.selectionChanged && hasSelection(this.dom, this.selectionRange);
+           if (from < 0 && !newSel)
+               return null;
+           if (from > -1)
+               this.lastChange = Date.now();
+           this.view.inputState.lastFocusTime = 0;
+           this.selectionChanged = false;
+           return new DOMChange(this.view, from, to, typeOver);
+       }
        // Apply pending changes, if any
        flush(readSelection = true) {
            // Completely hold off flushing when pending keys are set—the code
@@ -9912,16 +10287,11 @@
                return false;
            if (readSelection)
                this.readSelectionRange();
-           let { from, to, typeOver } = this.processRecords();
-           let newSel = this.selectionChanged && hasSelection(this.dom, this.selectionRange);
-           if (from < 0 && !newSel)
+           let domChange = this.readChange();
+           if (!domChange)
                return false;
-           if (from > -1)
-               this.lastChange = Date.now();
-           this.view.inputState.lastFocusTime = 0;
-           this.selectionChanged = false;
            let startState = this.view.state;
-           let handled = this.onChange(from, to, typeOver);
+           let handled = applyDOMChange(this.view, domChange);
            // The view wasn't updated
            if (this.view.state == startState)
                this.view.update([]);
@@ -9967,16 +10337,19 @@
            win.document.removeEventListener("selectionchange", this.onSelectionChange);
        }
        destroy() {
-           var _a, _b, _c;
+           var _a, _b, _c, _d;
            this.stop();
            (_a = this.intersection) === null || _a === void 0 ? void 0 : _a.disconnect();
            (_b = this.gapIntersection) === null || _b === void 0 ? void 0 : _b.disconnect();
-           (_c = this.resize) === null || _c === void 0 ? void 0 : _c.disconnect();
+           (_c = this.resizeScroll) === null || _c === void 0 ? void 0 : _c.disconnect();
+           (_d = this.resizeContent) === null || _d === void 0 ? void 0 : _d.disconnect();
            for (let dom of this.scrollTargets)
                dom.removeEventListener("scroll", this.onScroll);
            this.removeWindowListeners(this.win);
            clearTimeout(this.parentCheck);
            clearTimeout(this.resizeTimeout);
+           this.win.cancelAnimationFrame(this.delayedFlush);
+           this.win.cancelAnimationFrame(this.flushingAndroidKey);
        }
    }
    function findChild(cView, dom, dir) {
@@ -10016,218 +10389,6 @@
        if (isEquivalentPosition(curAnchor.node, curAnchor.offset, focusNode, focusOffset))
            [anchorNode, anchorOffset, focusNode, focusOffset] = [focusNode, focusOffset, anchorNode, anchorOffset];
        return { anchorNode, anchorOffset, focusNode, focusOffset };
-   }
-
-   function applyDOMChange(view, start, end, typeOver) {
-       let change, newSel;
-       let sel = view.state.selection.main;
-       if (start > -1) {
-           let bounds = view.docView.domBoundsAround(start, end, 0);
-           if (!bounds || view.state.readOnly)
-               return false;
-           let { from, to } = bounds;
-           let selPoints = view.docView.impreciseHead || view.docView.impreciseAnchor ? [] : selectionPoints(view);
-           let reader = new DOMReader(selPoints, view.state);
-           reader.readRange(bounds.startDOM, bounds.endDOM);
-           let preferredPos = sel.from, preferredSide = null;
-           // Prefer anchoring to end when Backspace is pressed (or, on
-           // Android, when something was deleted)
-           if (view.inputState.lastKeyCode === 8 && view.inputState.lastKeyTime > Date.now() - 100 ||
-               browser.android && reader.text.length < to - from) {
-               preferredPos = sel.to;
-               preferredSide = "end";
-           }
-           let diff = findDiff(view.state.doc.sliceString(from, to, LineBreakPlaceholder), reader.text, preferredPos - from, preferredSide);
-           if (diff) {
-               // Chrome inserts two newlines when pressing shift-enter at the
-               // end of a line. This drops one of those.
-               if (browser.chrome && view.inputState.lastKeyCode == 13 &&
-                   diff.toB == diff.from + 2 && reader.text.slice(diff.from, diff.toB) == LineBreakPlaceholder + LineBreakPlaceholder)
-                   diff.toB--;
-               change = { from: from + diff.from, to: from + diff.toA,
-                   insert: Text.of(reader.text.slice(diff.from, diff.toB).split(LineBreakPlaceholder)) };
-           }
-           newSel = selectionFromPoints(selPoints, from);
-       }
-       else if (view.hasFocus || !view.state.facet(editable)) {
-           let domSel = view.observer.selectionRange;
-           let { impreciseHead: iHead, impreciseAnchor: iAnchor } = view.docView;
-           let head = iHead && iHead.node == domSel.focusNode && iHead.offset == domSel.focusOffset ||
-               !contains(view.contentDOM, domSel.focusNode)
-               ? view.state.selection.main.head
-               : view.docView.posFromDOM(domSel.focusNode, domSel.focusOffset);
-           let anchor = iAnchor && iAnchor.node == domSel.anchorNode && iAnchor.offset == domSel.anchorOffset ||
-               !contains(view.contentDOM, domSel.anchorNode)
-               ? view.state.selection.main.anchor
-               : view.docView.posFromDOM(domSel.anchorNode, domSel.anchorOffset);
-           if (head != sel.head || anchor != sel.anchor)
-               newSel = EditorSelection.single(anchor, head);
-       }
-       if (!change && !newSel)
-           return false;
-       if (!change && typeOver && !sel.empty && newSel && newSel.main.empty) {
-           // Heuristic to notice typing over a selected character
-           change = { from: sel.from, to: sel.to, insert: view.state.doc.slice(sel.from, sel.to) };
-       }
-       else if (change && change.from >= sel.from && change.to <= sel.to &&
-           (change.from != sel.from || change.to != sel.to) &&
-           (sel.to - sel.from) - (change.to - change.from) <= 4) {
-           // If the change is inside the selection and covers most of it,
-           // assume it is a selection replace (with identical characters at
-           // the start/end not included in the diff)
-           change = {
-               from: sel.from, to: sel.to,
-               insert: view.state.doc.slice(sel.from, change.from).append(change.insert).append(view.state.doc.slice(change.to, sel.to))
-           };
-       }
-       else if ((browser.mac || browser.android) && change && change.from == change.to && change.from == sel.head - 1 &&
-           /^\. ?$/.test(change.insert.toString())) {
-           // Detect insert-period-on-double-space Mac and Android behavior,
-           // and transform it into a regular space insert.
-           if (newSel && change.insert.length == 2)
-               newSel = EditorSelection.single(newSel.main.anchor - 1, newSel.main.head - 1);
-           change = { from: sel.from, to: sel.to, insert: Text.of([" "]) };
-       }
-       if (change) {
-           let startState = view.state;
-           if (browser.ios && view.inputState.flushIOSKey(view))
-               return true;
-           // Android browsers don't fire reasonable key events for enter,
-           // backspace, or delete. So this detects changes that look like
-           // they're caused by those keys, and reinterprets them as key
-           // events. (Some of these keys are also handled by beforeinput
-           // events and the pendingAndroidKey mechanism, but that's not
-           // reliable in all situations.)
-           if (browser.android &&
-               ((change.from == sel.from && change.to == sel.to &&
-                   change.insert.length == 1 && change.insert.lines == 2 &&
-                   dispatchKey(view.contentDOM, "Enter", 13)) ||
-                   (change.from == sel.from - 1 && change.to == sel.to && change.insert.length == 0 &&
-                       dispatchKey(view.contentDOM, "Backspace", 8)) ||
-                   (change.from == sel.from && change.to == sel.to + 1 && change.insert.length == 0 &&
-                       dispatchKey(view.contentDOM, "Delete", 46))))
-               return true;
-           let text = change.insert.toString();
-           if (view.state.facet(inputHandler$1).some(h => h(view, change.from, change.to, text)))
-               return true;
-           if (view.inputState.composing >= 0)
-               view.inputState.composing++;
-           let tr;
-           if (change.from >= sel.from && change.to <= sel.to && change.to - change.from >= (sel.to - sel.from) / 3 &&
-               (!newSel || newSel.main.empty && newSel.main.from == change.from + change.insert.length) &&
-               view.inputState.composing < 0) {
-               let before = sel.from < change.from ? startState.sliceDoc(sel.from, change.from) : "";
-               let after = sel.to > change.to ? startState.sliceDoc(change.to, sel.to) : "";
-               tr = startState.replaceSelection(view.state.toText(before + change.insert.sliceString(0, undefined, view.state.lineBreak) + after));
-           }
-           else {
-               let changes = startState.changes(change);
-               let mainSel = newSel && !startState.selection.main.eq(newSel.main) && newSel.main.to <= changes.newLength
-                   ? newSel.main : undefined;
-               // Try to apply a composition change to all cursors
-               if (startState.selection.ranges.length > 1 && view.inputState.composing >= 0 &&
-                   change.to <= sel.to && change.to >= sel.to - 10) {
-                   let replaced = view.state.sliceDoc(change.from, change.to);
-                   let compositionRange = compositionSurroundingNode(view) || view.state.doc.lineAt(sel.head);
-                   let offset = sel.to - change.to, size = sel.to - sel.from;
-                   tr = startState.changeByRange(range => {
-                       if (range.from == sel.from && range.to == sel.to)
-                           return { changes, range: mainSel || range.map(changes) };
-                       let to = range.to - offset, from = to - replaced.length;
-                       if (range.to - range.from != size || view.state.sliceDoc(from, to) != replaced ||
-                           // Unfortunately, there's no way to make multiple
-                           // changes in the same node work without aborting
-                           // composition, so cursors in the composition range are
-                           // ignored.
-                           compositionRange && range.to >= compositionRange.from && range.from <= compositionRange.to)
-                           return { range };
-                       let rangeChanges = startState.changes({ from, to, insert: change.insert }), selOff = range.to - sel.to;
-                       return {
-                           changes: rangeChanges,
-                           range: !mainSel ? range.map(rangeChanges) :
-                               EditorSelection.range(Math.max(0, mainSel.anchor + selOff), Math.max(0, mainSel.head + selOff))
-                       };
-                   });
-               }
-               else {
-                   tr = {
-                       changes,
-                       selection: mainSel && startState.selection.replaceRange(mainSel)
-                   };
-               }
-           }
-           let userEvent = "input.type";
-           if (view.composing) {
-               userEvent += ".compose";
-               if (view.inputState.compositionFirstChange) {
-                   userEvent += ".start";
-                   view.inputState.compositionFirstChange = false;
-               }
-           }
-           view.dispatch(tr, { scrollIntoView: true, userEvent });
-           return true;
-       }
-       else if (newSel && !newSel.main.eq(sel)) {
-           let scrollIntoView = false, userEvent = "select";
-           if (view.inputState.lastSelectionTime > Date.now() - 50) {
-               if (view.inputState.lastSelectionOrigin == "select")
-                   scrollIntoView = true;
-               userEvent = view.inputState.lastSelectionOrigin;
-           }
-           view.dispatch({ selection: newSel, scrollIntoView, userEvent });
-           return true;
-       }
-       else {
-           return false;
-       }
-   }
-   function findDiff(a, b, preferredPos, preferredSide) {
-       let minLen = Math.min(a.length, b.length);
-       let from = 0;
-       while (from < minLen && a.charCodeAt(from) == b.charCodeAt(from))
-           from++;
-       if (from == minLen && a.length == b.length)
-           return null;
-       let toA = a.length, toB = b.length;
-       while (toA > 0 && toB > 0 && a.charCodeAt(toA - 1) == b.charCodeAt(toB - 1)) {
-           toA--;
-           toB--;
-       }
-       if (preferredSide == "end") {
-           let adjust = Math.max(0, from - Math.min(toA, toB));
-           preferredPos -= toA + adjust - from;
-       }
-       if (toA < from && a.length < b.length) {
-           let move = preferredPos <= from && preferredPos >= toA ? from - preferredPos : 0;
-           from -= move;
-           toB = from + (toB - toA);
-           toA = from;
-       }
-       else if (toB < from) {
-           let move = preferredPos <= from && preferredPos >= toB ? from - preferredPos : 0;
-           from -= move;
-           toA = from + (toA - toB);
-           toB = from;
-       }
-       return { from, toA, toB };
-   }
-   function selectionPoints(view) {
-       let result = [];
-       if (view.root.activeElement != view.contentDOM)
-           return result;
-       let { anchorNode, anchorOffset, focusNode, focusOffset } = view.observer.selectionRange;
-       if (anchorNode) {
-           result.push(new DOMPoint(anchorNode, anchorOffset));
-           if (focusNode != anchorNode || focusOffset != anchorOffset)
-               result.push(new DOMPoint(focusNode, focusOffset));
-       }
-       return result;
-   }
-   function selectionFromPoints(points, base) {
-       if (points.length == 0)
-           return null;
-       let anchor = points[0].pos, head = points.length == 2 ? points[1].pos : anchor;
-       return anchor > -1 && head > -1 ? EditorSelection.single(anchor + base, head + base) : null;
    }
 
    // The editor's update state machine looks something like this:
@@ -10280,7 +10441,7 @@
            this.scrollDOM.className = "cm-scroller";
            this.scrollDOM.appendChild(this.contentDOM);
            this.announceDOM = document.createElement("div");
-           this.announceDOM.style.cssText = "position: absolute; top: -10000px";
+           this.announceDOM.style.cssText = "position: fixed; top: -10000px";
            this.announceDOM.setAttribute("aria-live", "polite");
            this.dom = document.createElement("div");
            this.dom.appendChild(this.announceDOM);
@@ -10292,13 +10453,7 @@
            this.plugins = this.state.facet(viewPlugin).map(spec => new PluginInstance(spec));
            for (let plugin of this.plugins)
                plugin.update(this);
-           this.observer = new DOMObserver(this, (from, to, typeOver) => {
-               return applyDOMChange(this, from, to, typeOver);
-           }, event => {
-               this.inputState.runScrollHandlers(this, event);
-               if (this.observer.intersecting)
-                   this.measure();
-           });
+           this.observer = new DOMObserver(this);
            this.inputState = new InputState(this);
            this.inputState.ensureHandlers(this, this.plugins);
            this.docView = new DocView(this);
@@ -10382,7 +10537,20 @@
                this.viewState.state = state;
                return;
            }
-           this.observer.clear();
+           // If there was a pending DOM change, eagerly read it and try to
+           // apply it after the given transactions.
+           let pendingKey = this.observer.delayedAndroidKey, domChange = null;
+           if (pendingKey) {
+               this.observer.clearDelayedAndroidKey();
+               domChange = this.observer.readChange();
+               // Only try to apply DOM changes if the transactions didn't
+               // change the doc or selection.
+               if (domChange && !this.state.doc.eq(state.doc) || !this.state.selection.eq(state.selection))
+                   domChange = null;
+           }
+           else {
+               this.observer.clear();
+           }
            // When the phrases change, redraw the editor
            if (state.facet(EditorState.phrases) != this.state.facet(EditorState.phrases))
                return this.setState(state);
@@ -10424,6 +10592,10 @@
            if (!update.empty)
                for (let listener of this.state.facet(updateListener))
                    listener(update);
+           if (domChange) {
+               if (!applyDOMChange(this, domChange) && pendingKey.force)
+                   dispatchKey(this.contentDOM, pendingKey.key, pendingKey.keyCode);
+           }
        }
        /**
        Reset the view to the given state. (This will cause the entire
@@ -10556,16 +10728,18 @@
                                logException(this.state, e);
                            }
                        }
-                   if (this.viewState.scrollTarget) {
-                       this.docView.scrollIntoView(this.viewState.scrollTarget);
-                       this.viewState.scrollTarget = null;
-                       scrolled = true;
-                   }
-                   else {
-                       let diff = this.viewState.lineBlockAt(refBlock.from).top - refBlock.top;
-                       if (diff > 1 || diff < -1) {
-                           this.scrollDOM.scrollTop += diff;
+                   if (this.viewState.editorHeight) {
+                       if (this.viewState.scrollTarget) {
+                           this.docView.scrollIntoView(this.viewState.scrollTarget);
+                           this.viewState.scrollTarget = null;
                            scrolled = true;
+                       }
+                       else {
+                           let diff = this.viewState.lineBlockAt(refBlock.from).top - refBlock.top;
+                           if (diff > 1 || diff < -1) {
+                               this.scrollDOM.scrollTop += diff;
+                               scrolled = true;
+                           }
                        }
                    }
                    if (redrawn)
@@ -11334,7 +11508,7 @@
        if (scopeObj) {
            if (runFor(scopeObj[prefix + modifiers(name, event, !isChar)]))
                return true;
-           if (isChar && (event.shiftKey || event.altKey || event.metaKey || charCode > 127) &&
+           if (isChar && (event.altKey || event.metaKey || event.ctrlKey) &&
                (baseName = base[event.keyCode]) && baseName != name) {
                if (runFor(scopeObj[prefix + modifiers(baseName, event, true)]))
                    return true;
@@ -11352,50 +11526,21 @@
        return fallthrough;
    }
 
-   const CanHidePrimary = !browser.ios; // FIXME test IE
-   const selectionConfig = /*@__PURE__*/Facet.define({
-       combine(configs) {
-           return combineConfig(configs, {
-               cursorBlinkRate: 1200,
-               drawRangeCursor: true
-           }, {
-               cursorBlinkRate: (a, b) => Math.min(a, b),
-               drawRangeCursor: (a, b) => a || b
-           });
-       }
-   });
    /**
-   Returns an extension that hides the browser's native selection and
-   cursor, replacing the selection with a background behind the text
-   (with the `cm-selectionBackground` class), and the
-   cursors with elements overlaid over the code (using
-   `cm-cursor-primary` and `cm-cursor-secondary`).
-
-   This allows the editor to display secondary selection ranges, and
-   tends to produce a type of selection more in line with that users
-   expect in a text editor (the native selection styling will often
-   leave gaps between lines and won't fill the horizontal space after
-   a line when the selection continues past it).
-
-   It does have a performance cost, in that it requires an extra DOM
-   layout cycle for many updates (the selection is drawn based on DOM
-   layout information that's only available after laying out the
-   content).
+   Implementation of [`LayerMarker`](https://codemirror.net/6/docs/ref/#view.LayerMarker) that creates
+   a rectangle at a given set of coordinates.
    */
-   function drawSelection(config = {}) {
-       return [
-           selectionConfig.of(config),
-           drawSelectionPlugin,
-           hideNativeSelection
-       ];
-   }
-   class Piece {
-       constructor(left, top, width, height, className) {
+   class RectangleMarker {
+       /**
+       Create a marker with the given class and dimensions. If `width`
+       is null, the DOM element will get no width style.
+       */
+       constructor(className, left, top, width, height) {
+           this.className = className;
            this.left = left;
            this.top = top;
            this.width = width;
            this.height = height;
-           this.className = className;
        }
        draw() {
            let elt = document.createElement("div");
@@ -11403,10 +11548,16 @@
            this.adjust(elt);
            return elt;
        }
+       update(elt, prev) {
+           if (prev.className != this.className)
+               return false;
+           this.adjust(elt);
+           return true;
+       }
        adjust(elt) {
            elt.style.left = this.left + "px";
            elt.style.top = this.top + "px";
-           if (this.width >= 0)
+           if (this.width != null)
                elt.style.width = this.width + "px";
            elt.style.height = this.height + "px";
        }
@@ -11414,82 +11565,26 @@
            return this.left == p.left && this.top == p.top && this.width == p.width && this.height == p.height &&
                this.className == p.className;
        }
+       /**
+       Create a set of rectangles for the given selection range,
+       assigning them theclass`className`. Will create a single
+       rectangle for empty ranges, and a set of selection-style
+       rectangles covering the range's content (in a bidi-aware
+       way) for non-empty ones.
+       */
+       static forRange(view, className, range) {
+           if (range.empty) {
+               let pos = view.coordsAtPos(range.head, range.assoc || 1);
+               if (!pos)
+                   return [];
+               let base = getBase(view);
+               return [new RectangleMarker(className, pos.left - base.left, pos.top - base.top, null, pos.bottom - pos.top)];
+           }
+           else {
+               return rectanglesForRange(view, className, range);
+           }
+       }
    }
-   const drawSelectionPlugin = /*@__PURE__*/ViewPlugin.fromClass(class {
-       constructor(view) {
-           this.view = view;
-           this.rangePieces = [];
-           this.cursors = [];
-           this.measureReq = { read: this.readPos.bind(this), write: this.drawSel.bind(this) };
-           this.selectionLayer = view.scrollDOM.appendChild(document.createElement("div"));
-           this.selectionLayer.className = "cm-selectionLayer";
-           this.selectionLayer.setAttribute("aria-hidden", "true");
-           this.cursorLayer = view.scrollDOM.appendChild(document.createElement("div"));
-           this.cursorLayer.className = "cm-cursorLayer";
-           this.cursorLayer.setAttribute("aria-hidden", "true");
-           view.requestMeasure(this.measureReq);
-           this.setBlinkRate();
-       }
-       setBlinkRate() {
-           this.cursorLayer.style.animationDuration = this.view.state.facet(selectionConfig).cursorBlinkRate + "ms";
-       }
-       update(update) {
-           let confChanged = update.startState.facet(selectionConfig) != update.state.facet(selectionConfig);
-           if (confChanged || update.selectionSet || update.geometryChanged || update.viewportChanged)
-               this.view.requestMeasure(this.measureReq);
-           if (update.transactions.some(tr => tr.scrollIntoView))
-               this.cursorLayer.style.animationName = this.cursorLayer.style.animationName == "cm-blink" ? "cm-blink2" : "cm-blink";
-           if (confChanged)
-               this.setBlinkRate();
-       }
-       readPos() {
-           let { state } = this.view, conf = state.facet(selectionConfig);
-           let rangePieces = state.selection.ranges.map(r => r.empty ? [] : measureRange(this.view, r)).reduce((a, b) => a.concat(b));
-           let cursors = [];
-           for (let r of state.selection.ranges) {
-               let prim = r == state.selection.main;
-               if (r.empty ? !prim || CanHidePrimary : conf.drawRangeCursor) {
-                   let piece = measureCursor(this.view, r, prim);
-                   if (piece)
-                       cursors.push(piece);
-               }
-           }
-           return { rangePieces, cursors };
-       }
-       drawSel({ rangePieces, cursors }) {
-           if (rangePieces.length != this.rangePieces.length || rangePieces.some((p, i) => !p.eq(this.rangePieces[i]))) {
-               this.selectionLayer.textContent = "";
-               for (let p of rangePieces)
-                   this.selectionLayer.appendChild(p.draw());
-               this.rangePieces = rangePieces;
-           }
-           if (cursors.length != this.cursors.length || cursors.some((c, i) => !c.eq(this.cursors[i]))) {
-               let oldCursors = this.cursorLayer.children;
-               if (oldCursors.length !== cursors.length) {
-                   this.cursorLayer.textContent = "";
-                   for (const c of cursors)
-                       this.cursorLayer.appendChild(c.draw());
-               }
-               else {
-                   cursors.forEach((c, idx) => c.adjust(oldCursors[idx]));
-               }
-               this.cursors = cursors;
-           }
-       }
-       destroy() {
-           this.selectionLayer.remove();
-           this.cursorLayer.remove();
-       }
-   });
-   const themeSpec = {
-       ".cm-line": {
-           "& ::selection": { backgroundColor: "transparent !important" },
-           "&::selection": { backgroundColor: "transparent !important" }
-       }
-   };
-   if (CanHidePrimary)
-       themeSpec[".cm-line"].caretColor = "transparent !important";
-   const hideNativeSelection = /*@__PURE__*/Prec.highest(/*@__PURE__*/EditorView.theme(themeSpec));
    function getBase(view) {
        let rect = view.scrollDOM.getBoundingClientRect();
        let left = view.textDirection == Direction.LTR ? rect.left : rect.right - view.scrollDOM.clientWidth;
@@ -11510,7 +11605,7 @@
            }
        return line;
    }
-   function measureRange(view, range) {
+   function rectanglesForRange(view, className, range) {
        if (range.to <= view.viewport.from || range.from >= view.viewport.to)
            return [];
        let from = Math.max(range.from, view.viewport.from), to = Math.min(range.to, view.viewport.to);
@@ -11542,7 +11637,7 @@
            return pieces(top).concat(between).concat(pieces(bottom));
        }
        function piece(left, top, right, bottom) {
-           return new Piece(left - base.left, top - base.top - 0.01 /* C.Epsilon */, right - left, bottom - top + 0.01 /* C.Epsilon */, "cm-selectionBackground");
+           return new RectangleMarker(className, left - base.left, top - base.top - 0.01 /* C.Epsilon */, right - left, bottom - top + 0.01 /* C.Epsilon */);
        }
        function pieces({ top, bottom, horizontal }) {
            let pieces = [];
@@ -11594,13 +11689,174 @@
            return { top: y, bottom: y, horizontal: [] };
        }
    }
-   function measureCursor(view, cursor, primary) {
-       let pos = view.coordsAtPos(cursor.head, cursor.assoc || 1);
-       if (!pos)
-           return null;
-       let base = getBase(view);
-       return new Piece(pos.left - base.left, pos.top - base.top, -1, pos.bottom - pos.top, primary ? "cm-cursor cm-cursor-primary" : "cm-cursor cm-cursor-secondary");
+   function sameMarker(a, b) {
+       return a.constructor == b.constructor && a.eq(b);
    }
+   class LayerView {
+       constructor(view, layer) {
+           this.view = view;
+           this.layer = layer;
+           this.drawn = [];
+           this.measureReq = { read: this.measure.bind(this), write: this.draw.bind(this) };
+           this.dom = view.scrollDOM.appendChild(document.createElement("div"));
+           this.dom.classList.add("cm-layer");
+           if (layer.above)
+               this.dom.classList.add("cm-layer-above");
+           if (layer.class)
+               this.dom.classList.add(layer.class);
+           this.dom.setAttribute("aria-hidden", "true");
+           this.setOrder(view.state);
+           view.requestMeasure(this.measureReq);
+           if (layer.mount)
+               layer.mount(this.dom, view);
+       }
+       update(update) {
+           if (update.startState.facet(layerOrder) != update.state.facet(layerOrder))
+               this.setOrder(update.state);
+           if (this.layer.update(update, this.dom) || update.geometryChanged)
+               update.view.requestMeasure(this.measureReq);
+       }
+       setOrder(state) {
+           let pos = 0, order = state.facet(layerOrder);
+           while (pos < order.length && order[pos] != this.layer)
+               pos++;
+           this.dom.style.zIndex = String((this.layer.above ? 150 : -1) - pos);
+       }
+       measure() {
+           return this.layer.markers(this.view);
+       }
+       draw(markers) {
+           if (markers.length != this.drawn.length || markers.some((p, i) => !sameMarker(p, this.drawn[i]))) {
+               let old = this.dom.firstChild, oldI = 0;
+               for (let marker of markers) {
+                   if (marker.update && old && marker.constructor && this.drawn[oldI].constructor &&
+                       marker.update(old, this.drawn[oldI])) {
+                       old = old.nextSibling;
+                       oldI++;
+                   }
+                   else {
+                       this.dom.insertBefore(marker.draw(), old);
+                   }
+               }
+               while (old) {
+                   let next = old.nextSibling;
+                   old.remove();
+                   old = next;
+               }
+               this.drawn = markers;
+           }
+       }
+       destroy() {
+           if (this.layer.destroy)
+               this.layer.destroy(this.dom, this.view);
+           this.dom.remove();
+       }
+   }
+   const layerOrder = /*@__PURE__*/Facet.define();
+   /**
+   Define a layer.
+   */
+   function layer(config) {
+       return [
+           ViewPlugin.define(v => new LayerView(v, config)),
+           layerOrder.of(config)
+       ];
+   }
+
+   const CanHidePrimary = !browser.ios; // FIXME test IE
+   const selectionConfig = /*@__PURE__*/Facet.define({
+       combine(configs) {
+           return combineConfig(configs, {
+               cursorBlinkRate: 1200,
+               drawRangeCursor: true
+           }, {
+               cursorBlinkRate: (a, b) => Math.min(a, b),
+               drawRangeCursor: (a, b) => a || b
+           });
+       }
+   });
+   /**
+   Returns an extension that hides the browser's native selection and
+   cursor, replacing the selection with a background behind the text
+   (with the `cm-selectionBackground` class), and the
+   cursors with elements overlaid over the code (using
+   `cm-cursor-primary` and `cm-cursor-secondary`).
+
+   This allows the editor to display secondary selection ranges, and
+   tends to produce a type of selection more in line with that users
+   expect in a text editor (the native selection styling will often
+   leave gaps between lines and won't fill the horizontal space after
+   a line when the selection continues past it).
+
+   It does have a performance cost, in that it requires an extra DOM
+   layout cycle for many updates (the selection is drawn based on DOM
+   layout information that's only available after laying out the
+   content).
+   */
+   function drawSelection(config = {}) {
+       return [
+           selectionConfig.of(config),
+           cursorLayer,
+           selectionLayer,
+           hideNativeSelection,
+           nativeSelectionHidden.of(true)
+       ];
+   }
+   function configChanged(update) {
+       return update.startState.facet(selectionConfig) != update.startState.facet(selectionConfig);
+   }
+   const cursorLayer = /*@__PURE__*/layer({
+       above: true,
+       markers(view) {
+           let { state } = view, conf = state.facet(selectionConfig);
+           let cursors = [];
+           for (let r of state.selection.ranges) {
+               let prim = r == state.selection.main;
+               if (r.empty ? !prim || CanHidePrimary : conf.drawRangeCursor) {
+                   let className = prim ? "cm-cursor cm-cursor-primary" : "cm-cursor cm-cursor-secondary";
+                   let cursor = r.empty ? r : EditorSelection.cursor(r.head, r.head > r.anchor ? -1 : 1);
+                   for (let piece of RectangleMarker.forRange(view, className, cursor))
+                       cursors.push(piece);
+               }
+           }
+           return cursors;
+       },
+       update(update, dom) {
+           if (update.transactions.some(tr => tr.scrollIntoView))
+               dom.style.animationName = dom.style.animationName == "cm-blink" ? "cm-blink2" : "cm-blink";
+           let confChange = configChanged(update);
+           if (confChange)
+               setBlinkRate(update.state, dom);
+           return update.docChanged || update.selectionSet || confChange;
+       },
+       mount(dom, view) {
+           setBlinkRate(view.state, dom);
+       },
+       class: "cm-cursorLayer"
+   });
+   function setBlinkRate(state, dom) {
+       dom.style.animationDuration = state.facet(selectionConfig).cursorBlinkRate + "ms";
+   }
+   const selectionLayer = /*@__PURE__*/layer({
+       above: false,
+       markers(view) {
+           return view.state.selection.ranges.map(r => r.empty ? [] : RectangleMarker.forRange(view, "cm-selectionBackground", r))
+               .reduce((a, b) => a.concat(b));
+       },
+       update(update, dom) {
+           return update.docChanged || update.selectionSet || update.viewportChanged || configChanged(update);
+       },
+       class: "cm-selectionLayer"
+   });
+   const themeSpec = {
+       ".cm-line": {
+           "& ::selection": { backgroundColor: "transparent !important" },
+           "&::selection": { backgroundColor: "transparent !important" }
+       }
+   };
+   if (CanHidePrimary)
+       themeSpec[".cm-line"].caretColor = "transparent !important";
+   const hideNativeSelection = /*@__PURE__*/Prec.highest(/*@__PURE__*/EditorView.theme(themeSpec));
 
    const setDropCursorPos = /*@__PURE__*/StateEffect.define({
        map(pos, mapping) { return pos == null ? null : mapping.mapPos(pos); }
@@ -12016,7 +12272,10 @@
            for (let i = startLine; i <= endLine; i++) {
                let line = state.doc.line(i);
                let start = findColumn(line.text, startCol, state.tabSize, true);
-               if (start > -1) {
+               if (start < 0) {
+                   ranges.push(EditorSelection.cursor(line.to));
+               }
+               else {
                    let end = findColumn(line.text, endCol, state.tabSize);
                    ranges.push(EditorSelection.range(line.from + start, line.from + end));
                }
@@ -12109,6 +12368,9 @@
                keyup(e) {
                    if (e.keyCode == code || !getter(e))
                        this.set(false);
+               },
+               mousemove(e) {
+                   this.set(getter(e));
                }
            }
        });
@@ -12128,6 +12390,7 @@
            this.tooltipViews = this.tooltips.map(createTooltipView);
        }
        update(update) {
+           var _a;
            let input = update.state.facet(this.facet);
            let tooltips = input.filter(x => x);
            if (input === this.input) {
@@ -12156,8 +12419,10 @@
                }
            }
            for (let t of this.tooltipViews)
-               if (tooltipViews.indexOf(t) < 0)
+               if (tooltipViews.indexOf(t) < 0) {
                    t.dom.remove();
+                   (_a = t.destroy) === null || _a === void 0 ? void 0 : _a.call(t);
+               }
            this.input = input;
            this.tooltips = tooltips;
            this.tooltipViews = tooltipViews;
@@ -12270,11 +12535,13 @@
            return tooltipView;
        }
        destroy() {
-           var _a;
+           var _a, _b;
            this.view.win.removeEventListener("resize", this.measureSoon);
-           for (let { dom } of this.manager.tooltipViews)
-               dom.remove();
-           (_a = this.intersectionObserver) === null || _a === void 0 ? void 0 : _a.disconnect();
+           for (let tooltipView of this.manager.tooltipViews) {
+               tooltipView.dom.remove();
+               (_a = tooltipView.destroy) === null || _a === void 0 ? void 0 : _a.call(tooltipView);
+           }
+           (_b = this.intersectionObserver) === null || _b === void 0 ? void 0 : _b.disconnect();
            clearTimeout(this.measureTimeout);
        }
        readMeasure() {
@@ -12317,6 +12584,17 @@
                    : pos.bottom + (size.bottom - size.top) + offset.y > space.bottom) &&
                    above == (space.bottom - pos.bottom > pos.top - space.top))
                    above = !above;
+               let spaceVert = (above ? pos.top - space.top : space.bottom - pos.bottom) - arrowHeight;
+               if (spaceVert < height && tView.resize !== false) {
+                   if (spaceVert < this.view.defaultLineHeight) {
+                       dom.style.top = Outside;
+                       continue;
+                   }
+                   dom.style.height = (height = spaceVert) + "px";
+               }
+               else if (dom.style.height) {
+                   dom.style.height = "";
+               }
                let top = above ? pos.top - height - arrowHeight - offset.y : pos.bottom + arrowHeight + offset.y;
                let right = left + width;
                if (tView.overlap !== true)
@@ -12338,7 +12616,7 @@
                dom.classList.toggle("cm-tooltip-above", above);
                dom.classList.toggle("cm-tooltip-below", !above);
                if (tView.positioned)
-                   tView.positioned();
+                   tView.positioned(measured.space);
            }
        }
        maybeMeasure() {
@@ -12360,7 +12638,8 @@
    });
    const baseTheme$4 = /*@__PURE__*/EditorView.baseTheme({
        ".cm-tooltip": {
-           zIndex: 100
+           zIndex: 100,
+           boxSizing: "border-box"
        },
        "&light .cm-tooltip": {
            border: "1px solid #bbb",
@@ -12454,10 +12733,10 @@
            }
            this.mounted = true;
        }
-       positioned() {
+       positioned(space) {
            for (let hostedView of this.manager.tooltipViews) {
                if (hostedView.positioned)
-                   hostedView.positioned();
+                   hostedView.positioned(space);
            }
        }
        update(update) {
@@ -12554,10 +12833,10 @@
                }
            }
        }
-       mouseleave() {
+       mouseleave(e) {
            clearTimeout(this.hoverTimeout);
            this.hoverTimeout = -1;
-           if (this.active)
+           if (this.active && !isInTooltip(e.relatedTarget))
                this.view.dispatch({ effects: this.setHover.of(null) });
        }
        destroy() {
@@ -23908,749 +24187,6 @@
        'extensions',
        '__includes',
    ];
-   const commands = [
-       '__apply',
-       '__bench',
-       '__change-topology',
-       '__done',
-       '__experimentstepend',
-       '__export-drawing',
-       '__foreverbuttonend',
-       '__ignore',
-       '__let',
-       '__linkcode',
-       '__make-preview',
-       '__mkdir',
-       '__observercode',
-       '__patchcode',
-       '__plot-pen-hide',
-       '__plot-pen-show',
-       '__pwd',
-       '__reload-extensions',
-       '__set-line-thickness',
-       '__stderr',
-       '__stdout',
-       '__thunk-did-finish',
-       '__turtlecode',
-       'ask',
-       'ask-concurrent',
-       'auto-plot-off',
-       'auto-plot-on',
-       'back',
-       'beep',
-       'bk',
-       'ca',
-       'carefully',
-       'cd',
-       'clear-all',
-       'clear-all-plots',
-       'clear-drawing',
-       'clear-globals',
-       'clear-links',
-       'clear-output',
-       'clear-patches',
-       'clear-plot',
-       'clear-ticks',
-       'clear-turtles',
-       'cp',
-       'create-link-from',
-       'create-link-to',
-       'create-link-with',
-       'create-links-from',
-       'create-links-to',
-       'create-links-with',
-       'create-ordered-turtles',
-       'create-temporary-plot-pen',
-       'create-turtles',
-       'cro',
-       'crt',
-       'ct',
-       'die',
-       'diffuse',
-       'diffuse4',
-       'display',
-       'downhill',
-       'downhill4',
-       'error',
-       'every',
-       'export-all-plots',
-       'export-interface',
-       'export-output',
-       'export-plot',
-       'export-view',
-       'export-world',
-       'face',
-       'facexy',
-       'fd',
-       'file-close',
-       'file-close-all',
-       'file-delete',
-       'file-flush',
-       'file-open',
-       'file-print',
-       'file-show',
-       'file-type',
-       'file-write',
-       'follow',
-       'follow-me',
-       'foreach',
-       'forward',
-       'hatch',
-       'hide-link',
-       'hide-turtle',
-       'histogram',
-       'home',
-       'help',
-       'ht',
-       'hubnet-broadcast',
-       'hubnet-broadcast-clear-output',
-       'hubnet-broadcast-message',
-       'hubnet-clear-override',
-       'hubnet-clear-overrides',
-       'hubnet-kick-all-clients',
-       'hubnet-kick-client',
-       'hubnet-fetch-message',
-       'hubnet-reset',
-       'hubnet-reset-perspective',
-       'hubnet-send',
-       'hubnet-send-clear-output',
-       'hubnet-send-follow',
-       'hubnet-send-message',
-       'hubnet-send-override',
-       'hubnet-send-watch',
-       'if',
-       'if-else',
-       'ifelse',
-       'import-drawing',
-       'import-pcolors',
-       'import-pcolors-rgb',
-       'import-world',
-       'inspect',
-       'jump',
-       'layout-circle',
-       'layout-radial',
-       'layout-spring',
-       'layout-tutte',
-       'left',
-       'let',
-       'loop',
-       'lt',
-       'move-to',
-       'no-display',
-       'output-print',
-       'output-show',
-       'output-type',
-       'output-write',
-       'pd',
-       'pe',
-       'pen-down',
-       'pen-erase',
-       'pen-up',
-       'pendown',
-       'penup',
-       'plot',
-       'plot-pen-down',
-       'plot-pen-reset',
-       'plot-pen-up',
-       'plotxy',
-       'print',
-       'pu',
-       'random-seed',
-       'repeat',
-       'report',
-       'reset-perspective',
-       'reset-ticks',
-       'reset-timer',
-       'resize-world',
-       'ride',
-       'ride-me',
-       'right',
-       'rp',
-       'rt',
-       'run',
-       'set',
-       'set-current-directory',
-       'set-current-plot',
-       'set-current-plot-pen',
-       'set-default-shape',
-       'set-histogram-num-bars',
-       'set-patch-size',
-       'set-plot-background-color',
-       'set-plot-pen-color',
-       'set-plot-pen-interval',
-       'set-plot-pen-mode',
-       'set-plot-x-range',
-       'set-plot-y-range',
-       'setup-plots',
-       'setxy',
-       'show',
-       'show-link',
-       'show-turtle',
-       'sprout',
-       'st',
-       'stamp',
-       'stamp-erase',
-       'stop',
-       'stop-inspecting',
-       'stop-inspecting-dead-agents',
-       'tick',
-       'tick-advance',
-       'tie',
-       'type',
-       'untie',
-       'update-plots',
-       'uphill',
-       'uphill4',
-       'user-message',
-       'wait',
-       'watch',
-       'watch-me',
-       'while',
-       'with-local-randomness',
-       'without-interruption',
-       'write',
-   ];
-   const extensionCommands = [
-       'array:set',
-       'matrix:set',
-       'matrix:set-row',
-       'matrix:set-column',
-       'matrix:swap-rows',
-       'matrix:swap-columns',
-       'table:clear',
-       'table:put',
-       'table:remove',
-       'dialog:user-input',
-       'dialog:user-message',
-       'dialog:user-one-of',
-       'dialog:user-yes-or-no?',
-       'tutorial:show-dialog',
-       'tutorial:minimize-dialog',
-       'tutorial:hide-dialog',
-       'tutorial:back-dialog',
-       'tutorial:submit-input',
-       'tutorial:get',
-       'tutorial:set',
-       'tutorial:activate',
-       'tutorial:survey',
-       'tutorial:activate',
-       'tutorial:deactivate',
-       'tutorial:back',
-       'tutorial:forward',
-       'tutorial:go',
-       'widget:show',
-       'widget:hide',
-       'widget:move',
-       'widget:toast',
-       'widget:set-title',
-       'widget:bind',
-       'widget:unbind',
-       'widget:set-group',
-       'widget:show-group',
-       'widget:hide-group',
-       'widget:move-group',
-       'widget:rename-group',
-       'widget:show-joystick',
-       'widget:hide-joystick',
-       'widget:bind-joystick',
-       'workspace:play',
-       'workspace:pause',
-       'workspace:show',
-       'workspace:hide',
-       'workspace:bind',
-       'workspace:unbind',
-       'workspace:unbind-all',
-       'workspace:trigger',
-       'workspace:set-speed',
-       'workspace:recompile',
-       'workspace:clear-commands',
-       'workspace:execute-command',
-       'plot:show',
-       'plot:hide',
-       'plot:activate',
-       'plot:move',
-       'plot:set-title',
-       'plot:bind',
-       'plot:unbind',
-       'nettango:recompile',
-       'nettango:activate',
-       'nettango:show',
-       'nettango:hide',
-       'nettango:show-blocks',
-       'nettango:show-blocks-except',
-       'nettango:hide-blocks',
-       'nettango:hide-blocks-except',
-       'nettango:highlight-blocks',
-       'nettango:highlight-blocks-except',
-       'nettango:switch-program',
-       'sound:play-drum',
-       'sound:play-note',
-       'sound:play-note-later',
-       'sound:start-note',
-       'sound:stop-note',
-       'sound:stop-instrument',
-       'sound:stop-music',
-       'tune:clear',
-       'tune:use',
-       'tune:tempo',
-       'tune:note',
-       'tune:rest',
-       'tune:loop',
-       'tune:once',
-       'tune:loop-then',
-       'tune:once-then',
-       'tune:volume',
-       'tune:moveto',
-       'tune:rewind',
-       'tune:forward',
-       'tune:stop',
-       'sensor:clear',
-       'sensor:bind-gesture',
-       'sensor:unbind-gesture',
-       'sensor:open',
-       'sensor:close',
-       'sensor:on-change',
-       'sensor:set-warning',
-       'phys:update',
-       'phys:clear-vectors',
-       'phys:show-vector',
-       'phys:show-orthogonal',
-       'phys:hide-vectors',
-       'phys:contact-begin',
-       'phys:contact-end',
-       'phys:contact-stay',
-       'phys:filter-contact',
-       'phys:raycast-all',
-       'phys:all-contacts',
-       'phys:set-gravity',
-       'phys:set-physical',
-       'phys:set-group',
-       'phys:set-friction',
-       'phys:set-restitution',
-       'phys:set-density',
-       'phys:set-type',
-       'phys:set-mass',
-       'phys:set-origin',
-       'phys:set-v',
-       'phys:set-angular-v',
-       'phys:set-linear-damping',
-       'phys:set-angular-damping',
-       'phys:push',
-       'phys:apply-force',
-       'phys:apply-torque',
-       'phys:make-box',
-       'phys:make-circle',
-       'phys:make-polygon',
-       'phys:make-edges',
-       'phys:add-box',
-       'phys:add-circle',
-       'phys:add-polygon',
-       'phys:add-edges',
-       'phys:detach-joint',
-       'phys:distance-joint',
-       'phys:distance-joint-anchored',
-       'phys:mouse-joint',
-       'phys:set-length',
-       'phys:set-lengths',
-       'phys:set-linear-stiffness',
-       'phys:set-damping',
-       'phys:set-stiffness',
-       'phys:set-max-force',
-       'phys:set-max-torque',
-       'phys:set-force',
-       'phys:set-torque',
-   ];
-   const extensions = [
-       'tutorial',
-       'widget',
-       'plot',
-       'workspace',
-       'sound',
-       'tune',
-       'sensor',
-       'phys',
-       'array',
-       'matrix',
-       'table',
-       'palette',
-   ];
-   const reporters = [
-       '!=',
-       '*',
-       '+',
-       '-',
-       '/',
-       '<',
-       '<=',
-       '=',
-       '>',
-       '>=',
-       '^',
-       '__apply-result',
-       '__boom',
-       '__check-syntax',
-       '__dump',
-       '__dump-extension-prims',
-       '__dump-extensions',
-       '__dump1',
-       '__hubnet-in-q-size',
-       '__hubnet-out-q-size',
-       '__nano-time',
-       '__patchcol',
-       '__patchrow',
-       '__processors',
-       '__random-state',
-       '__stack-trace',
-       '__to-string',
-       'abs',
-       'acos',
-       'all?',
-       'and',
-       'any?',
-       'approximate-hsb',
-       'approximate-rgb',
-       'asin',
-       'at-points',
-       'atan',
-       'autoplot?',
-       'base-colors',
-       'behaviorspace-experiment-name',
-       'behaviorspace-run-number',
-       'bf',
-       'bl',
-       'both-ends',
-       'but-first',
-       'but-last',
-       'butfirst',
-       'butlast',
-       'can-move?',
-       'ceiling',
-       'cos',
-       'count',
-       'date-and-time',
-       'distance',
-       'distance-nowrap',
-       'distancexy',
-       'distancexy-nowrap',
-       'dx',
-       'dy',
-       'empty?',
-       'end1',
-       'end2',
-       'error-message',
-       'exp',
-       'extract-hsb',
-       'extract-rgb',
-       'file-at-end?',
-       'file-exists?',
-       'file-read',
-       'file-read-characters',
-       'file-read-line',
-       'filter',
-       'first',
-       'floor',
-       'fput',
-       'hsb',
-       'hubnet-clients-list',
-       'hubnet-enter-message?',
-       'hubnet-exit-message?',
-       'hubnet-message',
-       'hubnet-message-source',
-       'hubnet-message-tag',
-       'hubnet-message-waiting?',
-       'ifelse-value',
-       'in-cone',
-       'in-cone-nowrap',
-       'in-link-from',
-       'in-link-neighbor?',
-       'in-link-neighbors',
-       'in-radius',
-       'in-radius-nowrap',
-       'insert-item',
-       'int',
-       'is-agent?',
-       'is-agentset?',
-       'is-anonymous-command?',
-       'is-anonymous-reporter?',
-       'is-boolean?',
-       'is-command-task?',
-       'is-directed-link?',
-       'is-link-set?',
-       'is-link?',
-       'is-list?',
-       'is-number?',
-       'is-patch-set?',
-       'is-patch?',
-       'is-reporter-task?',
-       'is-string?',
-       'is-turtle-set?',
-       'is-turtle?',
-       'is-undirected-link?',
-       'item',
-       'last',
-       'length',
-       'link',
-       'link-heading',
-       'link-length',
-       'link-neighbor?',
-       'link-neighbors',
-       'link-set',
-       'link-shapes',
-       'link-with',
-       'links',
-       'list',
-       'ln',
-       'log',
-       'lput',
-       'map',
-       'max',
-       'max-n-of',
-       'max-one-of',
-       'max-pxcor',
-       'max-pycor',
-       'mean',
-       'median',
-       'member?',
-       'min',
-       'min-n-of',
-       'min-one-of',
-       'min-pxcor',
-       'min-pycor',
-       'mod',
-       'modes',
-       'mouse-down?',
-       'mouse-inside?',
-       'mouse-xcor',
-       'mouse-ycor',
-       'movie-status',
-       'my-in-links',
-       'my-links',
-       'my-out-links',
-       'myself',
-       'n-of',
-       'n-values',
-       'neighbors',
-       'neighbors4',
-       'netlogo-applet?',
-       'netlogo-version',
-       'netlogo-web?',
-       'new-seed',
-       'no-links',
-       'no-patches',
-       'no-turtles',
-       'not',
-       'of',
-       'one-of',
-       'or',
-       'other',
-       'other-end',
-       'out-link-neighbor?',
-       'out-link-neighbors',
-       'out-link-to',
-       'patch',
-       'patch-ahead',
-       'patch-at',
-       'patch-at-heading-and-distance',
-       'patch-here',
-       'patch-left-and-ahead',
-       'patch-right-and-ahead',
-       'patch-set',
-       'patch-size',
-       'patches',
-       'plot-name',
-       'plot-pen-exists?',
-       'plot-x-max',
-       'plot-x-min',
-       'plot-y-max',
-       'plot-y-min',
-       'position',
-       'precision',
-       'random',
-       'random-exponential',
-       'random-float',
-       'random-gamma',
-       'random-normal',
-       'random-or-random-float',
-       'random-poisson',
-       'random-pxcor',
-       'random-pycor',
-       'random-xcor',
-       'random-ycor',
-       'range',
-       'read-from-string',
-       'reduce',
-       'remainder',
-       'remove',
-       'remove-duplicates',
-       'remove-item',
-       'replace-item',
-       'reverse',
-       'rgb',
-       'round',
-       'run-result',
-       'runresult',
-       'scale-color',
-       'se',
-       'self',
-       'sentence',
-       'shade-of?',
-       'shapes',
-       'shuffle',
-       'sin',
-       'sort',
-       'sort-by',
-       'sort-on',
-       'sqrt',
-       'standard-deviation',
-       'subject',
-       'sublist',
-       'substring',
-       'subtract-headings',
-       'sum',
-       'tan',
-       'task',
-       'ticks',
-       'timer',
-       'towards',
-       'towards-nowrap',
-       'towardsxy',
-       'towardsxy-nowrap',
-       'turtle',
-       'turtle-set',
-       'turtles',
-       'turtles-at',
-       'turtles-here',
-       'turtles-on',
-       'up-to-n-of',
-       'user-directory',
-       'user-file',
-       'user-input',
-       'user-new-file',
-       'user-one-of',
-       'user-yes-or-no?',
-       'value-from',
-       'values-from',
-       'variance',
-       'with',
-       'with-max',
-       'with-min',
-       'word',
-       'world-height',
-       'world-width',
-       'wrap-color',
-       'xor',
-   ];
-   const extensionReporters = [
-       'array:from-list',
-       'array:to-list',
-       'array:is-array?',
-       'array:length',
-       'array:item',
-       'csv:from-string',
-       'csv:from-row',
-       'csv:from-file',
-       'csv:to-string',
-       'csv:to-file',
-       'csv:to-row',
-       'matrix:is-matrix?',
-       'matrix:regress',
-       'matrix:forecast-continuous-growth',
-       'matrix:forecast-compound-growth',
-       'matrix:forecast-linear-growth',
-       'matrix:make-constant',
-       'matrix:dimensions',
-       'matrix:det',
-       'matrix:dimensions',
-       'matrix:rank',
-       'matrix:trace',
-       'matrix:make-identity',
-       'matrix:from-row-list',
-       'matrix:from-column-list',
-       'matrix:to-row-list',
-       'matrix:to-column-list',
-       'matrix:copy',
-       'matrix:pretty-print-text',
-       'matrix:solve',
-       'matrix:get',
-       'matrix:get-row',
-       'matrix:get-column',
-       'matrix:set-and-report',
-       'matrix:submatrix',
-       'matrix:map',
-       'matrix:times-scalar',
-       'matrix:times',
-       'matrix:times-element-wise',
-       'matrix:plus',
-       'matrix:plus-scalar',
-       'matrix:minus',
-       'matrix:inverse',
-       'matrix:transpose',
-       'matrix:real-eigenvalues',
-       'matrix:imaginary-eigenvalues',
-       'matrix:eigenvectors',
-       'table:is-table?',
-       'table:counts',
-       'table:group-agents',
-       'table:group-items',
-       'table:from-list',
-       'table:from-json',
-       'table:get',
-       'table:get-or-default',
-       'table:has-key?',
-       'table:keys',
-       'table:length',
-       'table:make',
-       'table:to-list',
-       'table:to-json',
-       'table:values',
-       'workspace:get-platform',
-       'tutorial:get',
-       'tutorial:in-tutorial?',
-       'tutorial:is-activated?',
-       'sound:drums',
-       'sound:instruments',
-       'tune:drums',
-       'tune:instruments',
-       'tune:who',
-       'sensor:touches',
-       'sensor:touch',
-       'sensor:touch-size',
-       'sensor:read-number',
-       'sensor:read-vector',
-       'sensor:is-available?',
-       'widget:joystick-x',
-       'widget:joystick-y',
-       'phys:get-gravity',
-       'phys:raycast',
-       'phys:pointcast',
-       'phys:query',
-       'phys:contacts',
-       'phys:turtles-here',
-       'phys:turtles-around',
-       'phys:is-physical?',
-       'phys:get-friction',
-       'phys:get-restitution',
-       'phys:get-type',
-       'phys:get-group',
-       'phys:get-density',
-       'phys:get-mass',
-       'phys:get-origin',
-       'phys:get-v',
-       'phys:get-vx',
-       'phys:get-vy',
-       'phys:get-a',
-       'phys:get-angular-v',
-       'phys:get-angular-a',
-       'phys:get-linear-damping',
-       'phys:get-angular-damping',
-       'phys:get-length',
-       'phys:get-damping',
-       'phys:get-stiffness',
-       'phys:get-max-force',
-       'phys:get-max-torque',
-       'phys:get-force',
-       'phys:get-torque',
-   ];
    const turtleVars = [
        'who',
        'color',
@@ -24664,6 +24200,7 @@
        'size',
        'pen-size',
        'pen-mode',
+       'breed',
    ];
    const patchVars = ['pxcor', 'pycor', 'pcolor', 'plabel', 'plabel-color'];
    const linkVars = [
@@ -24755,27 +24292,270 @@
    ];
 
    // This file was generated by lezer-generator. You probably shouldn't edit it.
-   const GlobalStr = 12,
-     ExtensionStr = 13,
-     BreedStr = 14,
-     BreedFirst = 15,
-     BreedLast = 16,
-     BreedMiddle = 17,
-     Own = 18,
-     Set$1 = 19,
-     Let = 20,
-     To = 21,
-     End = 22,
-     Identifier$1 = 23,
-     Directive = 24,
-     Command = 25,
-     Reporter = 26,
-     Extension = 27,
-     TurtleVar = 28,
-     PatchVar = 29,
-     LinkVar = 30,
-     Constant = 31,
-     Unsupported = 32;
+   const ReporterLeftArgs1 = 1,
+     ReporterLeftArgs2 = 2,
+     GlobalStr = 3,
+     ExtensionStr = 4,
+     BreedStr = 5,
+     PlusMinus = 6,
+     Own = 7,
+     Set$1 = 8,
+     Let = 9,
+     To = 10,
+     End = 11,
+     Identifier$1 = 14,
+     Directive = 15,
+     Command = 16,
+     Reporter = 17,
+     Extension = 18,
+     TurtleVar = 19,
+     PatchVar = 20,
+     LinkVar = 21,
+     Constant = 22,
+     Unsupported = 23,
+     SpecialReporter = 24,
+     SpecialCommand = 25,
+     BreedToken = 26,
+     AndOr = 27,
+     Reporter0Args = 28,
+     Reporter1Args = 29,
+     Reporter2Args = 30,
+     Reporter3Args = 31,
+     Reporter4Args = 32,
+     Reporter5Args = 33,
+     Reporter6Args = 34,
+     SpecialReporter0Args = 35,
+     SpecialReporter1Args = 36,
+     SpecialReporter2Args = 37,
+     SpecialReporter3Args = 38,
+     SpecialReporter4Args = 39,
+     SpecialReporter5Args = 40,
+     SpecialReporter6Args = 41;
+
+   /** StatePreprocess: Editor state for the NetLogo Language. */
+   class StatePreprocess {
+       constructor() {
+           /** Breeds: Breeds in the model. */
+           this.PluralBreeds = [];
+           this.SingularBreeds = [];
+           /** Procedures: Procedures in the model. */
+           this.Commands = {};
+           this.Reporters = {};
+       }
+       /** ParseState: Parse the state from an editor state. */
+       ParseState(State) {
+           this.PluralBreeds = [];
+           this.SingularBreeds = [];
+           this.Commands = {};
+           this.Reporters = {};
+           let doc = State.doc.toString();
+           // Breeds
+           let breeds = doc.matchAll(/breed\s*\[\s*([^\s]+)\s+([^\s]+)\s*\]/g);
+           let processedBreeds = this.processBreeds(breeds);
+           this.SingularBreeds = processedBreeds[0];
+           this.PluralBreeds = processedBreeds[1];
+           // Commands
+           let commands = doc.matchAll(/(^|\n)to\s+([^\s]+)(\s*\[([^\]]*)\])?/g);
+           this.Commands = this.processProcedures(commands);
+           // Reporters
+           let reporters = doc.matchAll(/(^|\n)to-report\s+([^\s]+)(\s*\[([^\]]*)\])?/g);
+           this.Reporters = this.processProcedures(reporters);
+           return this;
+       }
+       processProcedures(procedures) {
+           let matches = {};
+           for (var match of procedures) {
+               const name = match[2];
+               const args = match[4];
+               matches[name] = args == null ? 0 : [...args.matchAll(/([^\s])+/g)].length;
+           }
+           return matches;
+       }
+       processBreeds(breeds) {
+           let singularmatches = ['patch', 'turtle', 'link'];
+           let pluralmatches = ['patches', 'turtles', 'links'];
+           let count = 3;
+           for (var match of breeds) {
+               pluralmatches[count] = match[1];
+               singularmatches[count] = match[2];
+               count++;
+           }
+           return [singularmatches, pluralmatches];
+       }
+   }
+   /** StateExtension: Extension for managing the editor state.  */
+   const preprocessStateExtension = StateField.define({
+       create: (State) => new StatePreprocess().ParseState(State),
+       update: (Original, Transaction) => {
+           if (!Transaction.docChanged)
+               return Original;
+           Original.ParseState(Transaction.state);
+           console.log(Original);
+           return Original;
+       },
+   });
+
+   /** NetLogoType: Types that are available in NetLogo. */
+   // Maybe we need to add command blocks & anonymous procedures
+   var NetLogoType;
+   (function (NetLogoType) {
+       NetLogoType[NetLogoType["Unit"] = 0] = "Unit";
+       NetLogoType[NetLogoType["Wildcard"] = 1] = "Wildcard";
+       NetLogoType[NetLogoType["String"] = 2] = "String";
+       NetLogoType[NetLogoType["Number"] = 3] = "Number";
+       NetLogoType[NetLogoType["List"] = 4] = "List";
+       NetLogoType[NetLogoType["Boolean"] = 5] = "Boolean";
+       NetLogoType[NetLogoType["Agent"] = 6] = "Agent";
+       NetLogoType[NetLogoType["AgentSet"] = 7] = "AgentSet";
+       NetLogoType[NetLogoType["Nobody"] = 8] = "Nobody";
+       NetLogoType[NetLogoType["Turtle"] = 9] = "Turtle";
+       NetLogoType[NetLogoType["Patch"] = 10] = "Patch";
+       NetLogoType[NetLogoType["Link"] = 11] = "Link";
+       NetLogoType[NetLogoType["CommandBlock"] = 12] = "CommandBlock";
+       NetLogoType[NetLogoType["CodeBlock"] = 13] = "CodeBlock";
+       NetLogoType[NetLogoType["NumberBlock"] = 14] = "NumberBlock";
+       NetLogoType[NetLogoType["Reporter"] = 15] = "Reporter";
+       NetLogoType[NetLogoType["Symbol"] = 16] = "Symbol";
+       NetLogoType[NetLogoType["LinkSet"] = 17] = "LinkSet";
+       NetLogoType[NetLogoType["ReporterBlock"] = 18] = "ReporterBlock";
+       NetLogoType[NetLogoType["BooleanBlock"] = 19] = "BooleanBlock";
+       NetLogoType[NetLogoType["Command"] = 20] = "Command";
+       NetLogoType[NetLogoType["Other"] = 21] = "Other";
+   })(NetLogoType || (NetLogoType = {}));
+   /** Breed: Dynamic metadata of a single breed. */
+   class Breed {
+       /** Build a breed. */
+       constructor(Singular, Plural, Variables) {
+           this.Singular = Singular;
+           this.Plural = Plural;
+           this.Variables = Variables;
+       }
+   }
+   /** Procedure: Dynamic metadata of a procedure. */
+   class Procedure {
+       constructor() {
+           /** name: The name of the procedure. */
+           this.Name = '';
+           /** Arguments: The arguments of the procedure. */
+           this.Arguments = [];
+           /** Variables: local variables defined for the procedure. */
+           this.Variables = [];
+           /** AnonymousProcedures: anonymous procedures defined for the procedure. */
+           this.AnonymousProcedures = [];
+           /** PositionStart: The starting position of the procedure in the document. */
+           this.PositionStart = 0;
+           /** PositionEnd: The end position of the procedure in the document. */
+           this.PositionEnd = 0;
+           /** IsCommand: Is the procedure a command (to) instead of a reporter (to-report)? */
+           this.IsCommand = false;
+       }
+   }
+   /** Procedure: Dynamic metadata of an anonymous procedure. */
+   class AnonymousProcedure {
+       constructor() {
+           /** PositionStart: The position at the start of the procedure. */
+           this.PositionStart = 0;
+           /** PositionEnd: The position at the end of the procedure. */
+           this.PositionEnd = 0;
+           /** Arguments: The arguments of the procedure. */
+           this.Arguments = [];
+           /** Variables: local variables defined for the procedure. */
+           this.Variables = [];
+       }
+   }
+   /** LocalVariable: metadata for local variables */
+   class LocalVariable {
+       /** Build a local variable. */
+       constructor(Name, Type, CreationPos) {
+           this.Name = Name;
+           this.Type = Type;
+           this.CreationPos = CreationPos;
+       }
+   }
+
+   const Dataset = [{ "Extension": "", "Name": "link-shapes", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "standard-deviation", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [4], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "se", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": true, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "DefaultOption": 2, "MinimumOption": 0, "CanBeConcise": true }, { "Extension": "", "Name": "rgb", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "replace-item", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [2, 4], "CanRepeat": false, "Optional": false }, { "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [2, 4], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "file-read-characters", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [2], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "but-last", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2, 4], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [2, 4], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "__block", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [13], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [2], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "modes", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [4], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "random-pxcor", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "range", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": true, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "DefaultOption": 1, "MinimumOption": 1, "CanBeConcise": true }, { "Extension": "", "Name": "link-length", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "hubnet-exit-message?", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [5], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "ln", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "max", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [4], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "bl", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2, 4], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [2, 4], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "towardsxy", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "list", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": true, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "DefaultOption": 2, "MinimumOption": 0, "CanBeConcise": true }, { "Extension": "", "Name": "exp", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "__check-syntax", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [2], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "shade-of?", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [5], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "patch", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [10], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "with-max", "LeftArgumentType": { "Types": [7], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [14], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [7], "CanRepeat": false, "Optional": false }, "Precedence": 12, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "IntroducesContext": true, "CanBeConcise": true }, { "Extension": "", "Name": "is-turtle-set?", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [5], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "__apply-result", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [15], "CanRepeat": false, "Optional": false }, { "Types": [4], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [1], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "in-link-from", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [6], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [6], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "hsb", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "netlogo-version", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [2], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "random-normal", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "towards", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [9, 10], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "atan", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "mean", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [4], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "__random-state", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [2], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "patch-here", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [10], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "random", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "+", "LeftArgumentType": { "Types": [3], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 7, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "first", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2, 4], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [1], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "out-link-to", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [6], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [6], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "file-read-line", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [2], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "substring", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [2], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "plot-name", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [2], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "remove-duplicates", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [4], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "precision", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "turtles", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [7], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "is-agentset?", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [5], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "no-turtles", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [7], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "patch-set", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [4, 7, 10], "CanRepeat": true, "Optional": false }], "ReturnType": { "Types": [7], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "DefaultOption": 1, "MinimumOption": 0, "CanBeConcise": true }, { "Extension": "", "Name": "is-directed-link?", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [5], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "at-points", "LeftArgumentType": { "Types": [7, 7], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [4], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [7], "CanRepeat": false, "Optional": false }, "Precedence": 12, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "asin", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "remainder", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "in-cone", "LeftArgumentType": { "Types": [7, 7], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [7, 7], "CanRepeat": false, "Optional": false }, "Precedence": 12, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "butfirst", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2, 4], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [2, 4], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "/", "LeftArgumentType": { "Types": [3], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 8, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "is-agent?", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [5], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "remove", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }, { "Types": [2, 4], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [2, 4], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "and", "LeftArgumentType": { "Types": [5], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [5], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [5], "CanRepeat": false, "Optional": false }, "Precedence": 4, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "min", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [4], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "self", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [6], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": false, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "in-link-neighbor?", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [6], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [5], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "is-link-set?", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [5], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "distance", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [9, 10], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "plot-x-max", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "sentence", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": true, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "DefaultOption": 2, "MinimumOption": 0, "CanBeConcise": true }, { "Extension": "", "Name": "log", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "__reference", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [16], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "new-seed", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "mod", "LeftArgumentType": { "Types": [3], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 8, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "link-neighbors", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [7], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "min-one-of", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [7], "CanRepeat": false, "Optional": false }, { "Types": [14], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [6], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "IntroducesContext": true, "CanBeConcise": true }, { "Extension": "", "Name": "^", "LeftArgumentType": { "Types": [3], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 9, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "with-min", "LeftArgumentType": { "Types": [7], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [14], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [7], "CanRepeat": false, "Optional": false }, "Precedence": 12, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "IntroducesContext": true, "CanBeConcise": true }, { "Extension": "", "Name": "distancexy", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "sort-by", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [15], "CanRepeat": false, "Optional": false }, { "Types": [4, 7], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "IntroducesContext": true, "CanBeConcise": true }, { "Extension": "", "Name": "item", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [2, 4], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [1], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "*", "LeftArgumentType": { "Types": [3], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 8, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "filter", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [15], "CanRepeat": false, "Optional": false }, { "Types": [4], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "__symbol", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [16], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [2], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "random-ycor", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "variance", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [4], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "in-radius", "LeftArgumentType": { "Types": [7, 7], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [7, 7], "CanRepeat": false, "Optional": false }, "Precedence": 12, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "plot-x-min", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "no-patches", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [7], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "patch-right-and-ahead", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [10], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "random-exponential", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "<=", "LeftArgumentType": { "Types": [6, 3, 2], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [6, 3, 2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [5], "CanRepeat": false, "Optional": false }, "Precedence": 6, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "turtles-here", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [7], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "is-number?", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [5], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "error-message", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [2], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "not", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [5], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [5], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "__dump", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [2], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": false, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "user-input", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [2], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "patch-left-and-ahead", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [10], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "member?", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }, { "Types": [2, 4, 7], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [5], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "is-patch?", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [5], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "shuffle", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [4], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "mouse-xcor", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "min-n-of", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [7], "CanRepeat": false, "Optional": false }, { "Types": [14], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [7], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "IntroducesContext": true, "CanBeConcise": true }, { "Extension": "", "Name": "links", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [17], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "__stack-trace", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [2], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "__to-string", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [2], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "world-height", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "my-out-links", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [17], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "in-link-neighbors", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [7], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "one-of", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [4, 7], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [1], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "random-pycor", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "min-pycor", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "mouse-inside?", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [5], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "empty?", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2, 4], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [5], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "subject", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [6], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "n-values", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [15], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "neighbors4", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [7], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "is-anonymous-reporter?", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [5], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "scale-color", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "turtles-on", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [6, 7], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [7], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "patch-at", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [10], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "mouse-down?", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [5], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "other-end", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [6], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "ifelse-value", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [5], "CanRepeat": false, "Optional": false }, { "Types": [18], "CanRepeat": false, "Optional": false }, { "Types": [5, 18], "CanRepeat": true, "Optional": false }], "ReturnType": { "Types": [1], "CanRepeat": false, "Optional": false }, "Precedence": 3, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "DefaultOption": 3, "CanBeConcise": true }, { "Extension": "", "Name": "round", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "position", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }, { "Types": [2, 4], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3, 5], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "turtles-at", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [7], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "sort", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [4, 7], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "insert-item", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [2, 4], "CanRepeat": false, "Optional": false }, { "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [2, 4], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "max-one-of", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [7], "CanRepeat": false, "Optional": false }, { "Types": [14], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [6], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "IntroducesContext": true, "CanBeConcise": true }, { "Extension": "", "Name": "abs", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "file-at-end?", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [5], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "word", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": true, "Optional": false }], "ReturnType": { "Types": [2], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "DefaultOption": 2, "MinimumOption": 0, "CanBeConcise": true }, { "Extension": "", "Name": "mouse-ycor", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "up-to-n-of", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [4, 7], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [4, 7], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "ticks", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "min-pxcor", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "is-list?", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [5], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "my-in-links", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [17], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "link-with", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [6], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [11], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "subtract-headings", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "__processors", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "shapes", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "sin", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "butlast", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2, 4], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [2, 4], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "count", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [7], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "runresult", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2, 15], "CanRepeat": false, "Optional": false }, { "Types": [1], "CanRepeat": true, "Optional": false }], "ReturnType": { "Types": [1], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "DefaultOption": 1, "CanBeConcise": true }, { "Extension": "", "Name": "timer", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "patches", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [7], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "__nano-time", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "extract-hsb", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3, 4], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "run-result", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2, 15], "CanRepeat": false, "Optional": false }, { "Types": [1], "CanRepeat": true, "Optional": false }], "ReturnType": { "Types": [1], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "DefaultOption": 1, "CanBeConcise": true }, { "Extension": "", "Name": "ceiling", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "random-poisson", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "plot-pen-exists?", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [5], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "plot-y-min", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": ">", "LeftArgumentType": { "Types": [6, 3, 2], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [6, 3, 2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [5], "CanRepeat": false, "Optional": false }, "Precedence": 6, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "xor", "LeftArgumentType": { "Types": [5], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [5], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [5], "CanRepeat": false, "Optional": false }, "Precedence": 4, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "is-undirected-link?", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [5], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "bf", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2, 4], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [2, 4], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "dy", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "autoplot?", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [5], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "hubnet-clients-list", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "reduce", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [15], "CanRepeat": false, "Optional": false }, { "Types": [4], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [1], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "user-file", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [5, 2], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "extract-rgb", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3, 4], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "is-link?", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [5], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "user-yes-or-no?", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [5], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "is-string?", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [5], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "reverse", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2, 4], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [2, 4], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "plot-y-max", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "max-n-of", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [7], "CanRepeat": false, "Optional": false }, { "Types": [14], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [7], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "IntroducesContext": true, "CanBeConcise": true }, { "Extension": "", "Name": "hubnet-message", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [1], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "length", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2, 4], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "behaviorspace-run-number", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "behaviorspace-experiment-name", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [2], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "read-from-string", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3, 5, 2, 4, 8], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "__dump-extensions", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [2], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "netlogo-applet?", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [5], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "tan", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "other", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [7], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [7], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "neighbors", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [7], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "approximate-hsb", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "int", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "hubnet-message-tag", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [2], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "remove-item", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [2, 4], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [2, 4], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "out-link-neighbors", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [7], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "both-ends", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [7], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "dx", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "floor", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "patch-ahead", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [10], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "world-width", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "link-neighbor?", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [6], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [5], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "max-pycor", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "sum", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [4], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "my-links", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [17], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "approximate-rgb", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "user-new-file", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [5, 2], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "<", "LeftArgumentType": { "Types": [6, 3, 2], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [6, 3, 2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [5], "CanRepeat": false, "Optional": false }, "Precedence": 6, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "-", "LeftArgumentType": { "Types": [3], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 7, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "file-exists?", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [5], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "wrap-color", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "link", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [11], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "is-anonymous-command?", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [5], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "random-float", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "or", "LeftArgumentType": { "Types": [5], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [5], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [5], "CanRepeat": false, "Optional": false }, "Precedence": 4, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "netlogo-web?", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [5], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "cos", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "sort-on", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [18], "CanRepeat": false, "Optional": false }, { "Types": [7], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "IntroducesContext": true, "CanBeConcise": true }, { "Extension": "", "Name": "lput", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }, { "Types": [4], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "out-link-neighbor?", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [6], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [5], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "median", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [4], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "acos", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "=", "LeftArgumentType": { "Types": [1], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [5], "CanRepeat": false, "Optional": false }, "Precedence": 5, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "all?", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [7], "CanRepeat": false, "Optional": false }, { "Types": [19], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [5], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "IntroducesContext": true, "CanBeConcise": true }, { "Extension": "", "Name": "__dump-extension-prims", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [2], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "random-gamma", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "patch-size", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "user-one-of", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }, { "Types": [4], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [1], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "any?", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [7], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [5], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "turtle", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [9], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "hubnet-message-source", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [2], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "is-boolean?", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [5], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "__checksum", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [2], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": false, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "__dump1", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [2], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "n-of", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [4, 7], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [4, 7], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "date-and-time", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [2], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "can-move?", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [5], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "but-first", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2, 4], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [2, 4], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "base-colors", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": ">=", "LeftArgumentType": { "Types": [6, 3, 2], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [6, 3, 2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [5], "CanRepeat": false, "Optional": false }, "Precedence": 6, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "__boom", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [1], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "link-heading", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "is-patch-set?", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [5], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "is-turtle?", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [5], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "sqrt", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "link-set", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [4, 17, 11], "CanRepeat": true, "Optional": false }], "ReturnType": { "Types": [17], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "DefaultOption": 1, "MinimumOption": 0, "CanBeConcise": true }, { "Extension": "", "Name": "file-read", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [3, 5, 2, 4, 8], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "user-directory", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [5, 2], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "sublist", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [4], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "max-pxcor", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "turtle-set", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [4, 7, 9], "CanRepeat": true, "Optional": false }], "ReturnType": { "Types": [7], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "DefaultOption": 1, "MinimumOption": 0, "CanBeConcise": true }, { "Extension": "", "Name": "map", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [15], "CanRepeat": false, "Optional": false }, { "Types": [4], "CanRepeat": true, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "DefaultOption": 2, "CanBeConcise": true }, { "Extension": "", "Name": "hubnet-message-waiting?", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [5], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "!=", "LeftArgumentType": { "Types": [1], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [5], "CanRepeat": false, "Optional": false }, "Precedence": 5, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "fput", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }, { "Types": [4], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "no-links", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [17], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "last", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2, 4], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [1], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "myself", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [6], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": false, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "patch-at-heading-and-distance", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [10], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "random-xcor", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "with", "LeftArgumentType": { "Types": [7], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [19], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [7], "CanRepeat": false, "Optional": false }, "Precedence": 12, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "IntroducesContext": true, "CanBeConcise": true }, { "Extension": "", "Name": "of", "LeftArgumentType": { "Types": [18], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [6, 7], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [1], "CanRepeat": false, "Optional": false }, "Precedence": 11, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "IsRightAssociative": true, "IntroducesContext": true, "CanBeConcise": true }, { "Extension": "", "Name": "hubnet-enter-message?", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [5], "CanRepeat": false, "Optional": false }, "Precedence": 10, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "show", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "update-plots", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "clear-globals", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": false, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "display", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "ask", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [6, 7], "CanRepeat": false, "Optional": false }, { "Types": [12], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "IntroducesContext": true, "CanBeConcise": true }, { "Extension": "", "Name": "plot", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "create-links-from", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [7], "CanRepeat": false, "Optional": false }, { "Types": [12], "CanRepeat": false, "Optional": true }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "IntroducesContext": true, "CanBeConcise": true }, { "Extension": "", "Name": "carefully", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [12], "CanRepeat": false, "Optional": false }, { "Types": [12], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "IntroducesContext": true, "CanBeConcise": true }, { "Extension": "", "Name": "hubnet-broadcast", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }, { "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "forward", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "plot-pen-reset", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "__stdout", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "__linkcode", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true } }, { "Extension": "", "Name": "set-plot-x-range", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "create-temporary-plot-pen", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "hubnet-send", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2, 4], "CanRepeat": false, "Optional": false }, { "Types": [2], "CanRepeat": false, "Optional": false }, { "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "hubnet-broadcast-clear-output", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "output-print", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "hubnet-send-follow", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }, { "Types": [6], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "rp", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "cro", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [12], "CanRepeat": false, "Optional": true }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": false, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "IntroducesContext": true, "CanBeConcise": true }, { "Extension": "", "Name": "file-write", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3, 5, 2, 4, 8], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "ht", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "ct", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": false, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "set-plot-pen-color", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3, 4], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "__patchcode", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true } }, { "Extension": "", "Name": "error", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "output-show", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "reset-perspective", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "__pwd", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": false, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "if", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [5], "CanRepeat": false, "Optional": false }, { "Types": [12], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "uphill", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [16], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "plot-pen-down", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "set", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }, { "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "set-current-plot-pen", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "downhill", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [16], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "set-plot-y-range", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "stop", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "set-current-directory", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "__done", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true } }, { "Extension": "", "Name": "rt", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "import-pcolors", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": false, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "import-pcolors-rgb", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": false, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "__turtlecode", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true } }, { "Extension": "", "Name": "create-link-to", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [9], "CanRepeat": false, "Optional": false }, { "Types": [12], "CanRepeat": false, "Optional": true }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "IntroducesContext": true, "CanBeConcise": true }, { "Extension": "", "Name": "diffuse4", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [16], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": false, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "set-default-shape", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [7, 17], "CanRepeat": false, "Optional": false }, { "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": false, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "bk", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "clear-patches", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": false, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "tie", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "file-open", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "show-link", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "__experimentstepend", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": false, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "reset-timer", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "__apply", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [20], "CanRepeat": false, "Optional": false }, { "Types": [4], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "setxy", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "jump", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "hubnet-broadcast-message", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "ride", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [9], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": false, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "file-close-all", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "hubnet-send-message", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2, 4], "CanRepeat": false, "Optional": false }, { "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "downhill4", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [16], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "__stderr", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "hubnet-kick-client", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "__bench", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": false, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "pen-up", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "back", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "export-interface", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "set-plot-pen-interval", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "create-turtles", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [12], "CanRepeat": false, "Optional": true }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": false, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "IntroducesContext": true, "CanBeConcise": true }, { "Extension": "", "Name": "repeat", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [12], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "__plot-pen-hide", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "wait", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "follow-me", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "ride-me", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "__plot-pen-show", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "__set-line-thickness", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "file-type", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "lt", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "__reload-extensions", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "__foreverbuttonend", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true } }, { "Extension": "", "Name": "__ignore", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "import-world", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": false, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "plotxy", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "show-turtle", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "auto-plot-off", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "ca", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": false, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "print", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "create-ordered-turtles", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [12], "CanRepeat": false, "Optional": true }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": false, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "IntroducesContext": true, "CanBeConcise": true }, { "Extension": "", "Name": "left", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "st", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "pu", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "let", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }, { "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "random-seed", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "watch-me", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": false, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "hubnet-clear-overrides", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "clear-links", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": false, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "hubnet-send-override", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }, { "Types": [6, 7], "CanRepeat": false, "Optional": false }, { "Types": [2], "CanRepeat": false, "Optional": false }, { "Types": [18], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "IntroducesContext": true, "CanBeConcise": true }, { "Extension": "", "Name": "layout-tutte", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [7], "CanRepeat": false, "Optional": false }, { "Types": [17], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "tick-advance", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": false, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "hubnet-send-watch", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }, { "Types": [6], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "clear-output", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "hubnet-send-clear-output", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2, 4], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "clear-all", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": false, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "hubnet-reset", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": false, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "export-plot", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }, { "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "resize-world", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": false, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "clear-plot", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "hubnet-fetch-message", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "diffuse", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [16], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": false, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "while", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [19], "CanRepeat": false, "Optional": false }, { "Types": [12], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "user-message", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "fd", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "loop", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [12], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "__export-drawing", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "tick", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": false, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "__let", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }, { "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "hubnet-reset-perspective", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "export-world", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "reset-ticks", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": false, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "no-display", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "beep", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "stop-inspecting", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [6], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "follow", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [9], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": false, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "pen-erase", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "output-type", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "set-histogram-num-bars", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "type", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "__mkdir", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "set-patch-size", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": false, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "file-print", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "create-link-with", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [9], "CanRepeat": false, "Optional": false }, { "Types": [12], "CanRepeat": false, "Optional": true }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "IntroducesContext": true, "CanBeConcise": true }, { "Extension": "", "Name": "hide-turtle", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "inspect", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [6], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "every", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [12], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "output-write", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3, 5, 2, 4, 8], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "cp", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": false, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "right", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "clear-drawing", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": false, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "run", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2, 20], "CanRepeat": false, "Optional": false }, { "Types": [1], "CanRepeat": true, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "DefaultOption": 1, "CanBeConcise": true }, { "Extension": "", "Name": "plot-pen-up", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "report", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "clear-all-plots", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "file-close", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "create-links-with", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [7], "CanRepeat": false, "Optional": false }, { "Types": [12], "CanRepeat": false, "Optional": true }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "IntroducesContext": true, "CanBeConcise": true }, { "Extension": "", "Name": "auto-plot-on", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "pendown", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "hubnet-kick-all-clients", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "without-interruption", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [12], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "IntroducesContext": true, "CanBeConcise": true }, { "Extension": "", "Name": "import-drawing", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": false, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "home", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "__observercode", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": false, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true } }, { "Extension": "", "Name": "layout-radial", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [7], "CanRepeat": false, "Optional": false }, { "Types": [17], "CanRepeat": false, "Optional": false }, { "Types": [9], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "penup", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "write", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3, 5, 2, 4, 8], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "face", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [9, 10], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "ifelse", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [5], "CanRepeat": false, "Optional": false }, { "Types": [5, 12], "CanRepeat": true, "Optional": false }, { "Types": [12], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "DefaultOption": 3, "MinimumOption": 2, "CanBeConcise": true }, { "Extension": "", "Name": "pd", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "file-delete", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "create-link-from", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [9], "CanRepeat": false, "Optional": false }, { "Types": [12], "CanRepeat": false, "Optional": true }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "IntroducesContext": true, "CanBeConcise": true }, { "Extension": "", "Name": "watch", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [6], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": false, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "layout-circle", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [4, 7], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "ask-concurrent", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [7], "CanRepeat": false, "Optional": false }, { "Types": [12], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "IntroducesContext": true, "CanBeConcise": true }, { "Extension": "", "Name": "hide-link", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "create-links-to", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [7], "CanRepeat": false, "Optional": false }, { "Types": [12], "CanRepeat": false, "Optional": true }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "IntroducesContext": true, "CanBeConcise": true }, { "Extension": "", "Name": "setup-plots", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "facexy", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "stop-inspecting-dead-agents", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "clear-turtles", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": false, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "__thunk-did-finish", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "histogram", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [4], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "stamp-erase", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "layout-spring", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [7], "CanRepeat": false, "Optional": false }, { "Types": [17], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "stamp", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "file-flush", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "crt", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [12], "CanRepeat": false, "Optional": true }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": false, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "IntroducesContext": true, "CanBeConcise": true }, { "Extension": "", "Name": "die", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "foreach", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [4], "CanRepeat": true, "Optional": false }, { "Types": [20], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "DefaultOption": 2, "CanBeConcise": true }, { "Extension": "", "Name": "with-local-randomness", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [12], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "IntroducesContext": true, "CanBeConcise": true }, { "Extension": "", "Name": "set-current-plot", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "pe", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "export-view", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "cd", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": false, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "move-to", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [9, 10], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "if-else", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [5], "CanRepeat": false, "Optional": false }, { "Types": [5, 12], "CanRepeat": true, "Optional": false }, { "Types": [12], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "DefaultOption": 3, "MinimumOption": 2, "CanBeConcise": true }, { "Extension": "", "Name": "set-plot-pen-mode", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "uphill4", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [16], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "__change-topology", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [5], "CanRepeat": false, "Optional": false }, { "Types": [5], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "pen-down", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "clear-ticks", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": false, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "file-show", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "untie", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "export-all-plots", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "hubnet-clear-override", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }, { "Types": [6, 7], "CanRepeat": false, "Optional": false }, { "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "IntroducesContext": true, "CanBeConcise": true }, { "Extension": "", "Name": "sprout", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [12], "CanRepeat": false, "Optional": true }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "IntroducesContext": true, "CanBeConcise": true }, { "Extension": "", "Name": "export-output", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "BlockContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "CanBeConcise": true }, { "Extension": "", "Name": "hatch", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [12], "CanRepeat": false, "Optional": true }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "Precedence": 0, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "BlockContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "IntroducesContext": true, "CanBeConcise": true }, { "Extension": "array", "Name": "from-list", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [4], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [1], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "array", "Name": "to-list", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "array", "Name": "is-array?", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [5], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "array", "Name": "length", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "array", "Name": "item", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [1], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "array", "Name": "set", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "bitmap", "Name": "average-color", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "bitmap", "Name": "channel", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [1], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "bitmap", "Name": "copy-to-drawing", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "bitmap", "Name": "copy-to-pcolors", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }, { "Types": [5], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "bitmap", "Name": "difference-rgb", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }, { "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [1], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "bitmap", "Name": "export", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }, { "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "bitmap", "Name": "from-base64", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [1], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "bitmap", "Name": "to-base64", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [2], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "bitmap", "Name": "from-view", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [1], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "bitmap", "Name": "to-grayscale", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [1], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "bitmap", "Name": "height", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "bitmap", "Name": "import", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [1], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "bitmap", "Name": "scaled", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [1], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "bitmap", "Name": "width", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "codap", "Name": "init", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [20], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "codap", "Name": "call", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "csv", "Name": "from-string", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": true, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "csv", "Name": "from-row", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": true, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "csv", "Name": "from-file", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }, { "Types": [2], "CanRepeat": true, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "csv", "Name": "to-string", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [4], "CanRepeat": false, "Optional": false }, { "Types": [2], "CanRepeat": true, "Optional": false }], "ReturnType": { "Types": [2], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "csv", "Name": "to-row", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [4], "CanRepeat": false, "Optional": false }, { "Types": [2], "CanRepeat": true, "Optional": false }], "ReturnType": { "Types": [2], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "csv", "Name": "to-file", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }, { "Types": [4], "CanRepeat": false, "Optional": false }, { "Types": [2], "CanRepeat": true, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "dialog", "Name": "user-input", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }, { "Types": [2, 20], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "dialog", "Name": "user-message", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }, { "Types": [2, 20], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "dialog", "Name": "user-one-of", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }, { "Types": [4], "CanRepeat": false, "Optional": false }, { "Types": [2, 20], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "dialog", "Name": "user-yes-or-no?", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }, { "Types": [2, 20], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "encode", "Name": "base64-to-bytes", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "encode", "Name": "bytes-to-base64", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [4], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [2], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "encode", "Name": "bytes-to-string", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [4], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [2], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "encode", "Name": "string-to-bytes", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "export-the", "Name": "model", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [2], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "export-the", "Name": "output", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [2], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "export-the", "Name": "plot", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [2], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "export-the", "Name": "view", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [2], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "export-the", "Name": "world", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [2], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "fetch", "Name": "file", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [2], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "fetch", "Name": "file-async", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }, { "Types": [20], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "fetch", "Name": "url", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [2], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "fetch", "Name": "url-async", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }, { "Types": [20], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "fetch", "Name": "user-file", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [2], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "fetch", "Name": "user-file-async", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [20], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "fp", "Name": "take", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [4], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "fp", "Name": "drop", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [4], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "fp", "Name": "scan", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [15], "CanRepeat": false, "Optional": false }, { "Types": [4], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "fp", "Name": "compose", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [15], "CanRepeat": false, "Optional": false }, { "Types": [15], "CanRepeat": false, "Optional": false }, { "Types": [15], "CanRepeat": true, "Optional": false }], "ReturnType": { "Types": [15], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "fp", "Name": "pipe", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [15], "CanRepeat": false, "Optional": false }, { "Types": [15], "CanRepeat": false, "Optional": false }, { "Types": [15], "CanRepeat": true, "Optional": false }], "ReturnType": { "Types": [15], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "fp", "Name": "curry", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [15], "CanRepeat": false, "Optional": false }, { "Types": [1], "CanRepeat": true, "Optional": false }], "ReturnType": { "Types": [15], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "fp", "Name": "find-indices", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [15], "CanRepeat": false, "Optional": false }, { "Types": [4], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "fp", "Name": "find", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [15], "CanRepeat": false, "Optional": false }, { "Types": [4], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [1], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "fp", "Name": "zip", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [4], "CanRepeat": false, "Optional": false }, { "Types": [4], "CanRepeat": true, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "fp", "Name": "unzip", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [4], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "fp", "Name": "flatten", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [4], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "fp", "Name": "iterate", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [15], "CanRepeat": false, "Optional": false }, { "Types": [1], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "fp", "Name": "iterate-last", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [15], "CanRepeat": false, "Optional": false }, { "Types": [1], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [1], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "http-req", "Name": "get", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "http-req", "Name": "post", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }, { "Types": [2], "CanRepeat": false, "Optional": false }, { "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "import-a", "Name": "drawing", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "import-a", "Name": "pcolors", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "import-a", "Name": "pcolors-rgb", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "import-a", "Name": "world", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "logging", "Name": "all-logs", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "logging", "Name": "clear-logs", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "logging", "Name": "log-globals", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": true, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "logging", "Name": "log-message", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "matrix", "Name": "is-matrix?", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [5], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "matrix", "Name": "regress", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "matrix", "Name": "forecast-continuous-growth", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [4], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "matrix", "Name": "forecast-compound-growth", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [4], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "matrix", "Name": "forecast-linear-growth", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [4], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "matrix", "Name": "make-constant", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [1], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "matrix", "Name": "dimensions", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "matrix", "Name": "det", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "matrix", "Name": "rank", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "matrix", "Name": "trace", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "matrix", "Name": "make-identity", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [1], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "matrix", "Name": "from-row-list", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [4], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [1], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "matrix", "Name": "from-column-list", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [4], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [1], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "matrix", "Name": "to-row-list", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "matrix", "Name": "to-column-list", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "matrix", "Name": "copy", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [1], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "matrix", "Name": "pretty-print-text", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [2], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "matrix", "Name": "solve", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }, { "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [1], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "matrix", "Name": "get", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "matrix", "Name": "get-row", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "matrix", "Name": "get-column", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "matrix", "Name": "set", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "matrix", "Name": "set-row", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [4], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "matrix", "Name": "set-column", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [4], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "matrix", "Name": "swap-rows", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "matrix", "Name": "swap-columns", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "matrix", "Name": "set-and-report", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [1], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "matrix", "Name": "submatrix", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [1], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "matrix", "Name": "map", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [15], "CanRepeat": false, "Optional": false }, { "Types": [1], "CanRepeat": true, "Optional": false }], "ReturnType": { "Types": [1], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "matrix", "Name": "times-scalar", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [1], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "matrix", "Name": "times", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }, { "Types": [1], "CanRepeat": true, "Optional": false }], "ReturnType": { "Types": [1], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "matrix", "Name": "*", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }, { "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [1], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "matrix", "Name": "times-element-wise", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }, { "Types": [1], "CanRepeat": true, "Optional": false }], "ReturnType": { "Types": [1], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "matrix", "Name": "plus-scalar", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [1], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "matrix", "Name": "plus", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }, { "Types": [1], "CanRepeat": true, "Optional": false }], "ReturnType": { "Types": [1], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "matrix", "Name": "+", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }, { "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [1], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "matrix", "Name": "minus", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }, { "Types": [1], "CanRepeat": true, "Optional": false }], "ReturnType": { "Types": [1], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "matrix", "Name": "-", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }, { "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [1], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "matrix", "Name": "inverse", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [1], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "matrix", "Name": "transpose", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [1], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "matrix", "Name": "real-eigenvalues", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "matrix", "Name": "imaginary-eigenvalues", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "matrix", "Name": "eigenvectors", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [1], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "mini-csv", "Name": "from-string", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": true, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "mini-csv", "Name": "from-row", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": true, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "mini-csv", "Name": "to-string", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [4], "CanRepeat": false, "Optional": false }, { "Types": [2], "CanRepeat": true, "Optional": false }], "ReturnType": { "Types": [2], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "mini-csv", "Name": "to-row", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [4], "CanRepeat": false, "Optional": false }, { "Types": [2], "CanRepeat": true, "Optional": false }], "ReturnType": { "Types": [2], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "mini-csv", "Name": "__t-context-reporter", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "mini-csv", "Name": "__o-context-command", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": false, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "nettango", "Name": "activate", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "nettango", "Name": "show", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "nettango", "Name": "hide", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "nettango", "Name": "recompile", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "nettango", "Name": "show-blocks", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "nettango", "Name": "show-blocks-except", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "nettango", "Name": "hide-blocks", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "nettango", "Name": "hide-blocks-except", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "nettango", "Name": "highlight-blocks", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "nettango", "Name": "highlight-blocks-except", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "nettango", "Name": "switch-program", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "nlmap", "Name": "from-list", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [4], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [1], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "nlmap", "Name": "to-list", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "nlmap", "Name": "is-map?", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [5], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "nlmap", "Name": "get", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }, { "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [1], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "nlmap", "Name": "remove", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }, { "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [1], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "nlmap", "Name": "add", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }, { "Types": [2], "CanRepeat": false, "Optional": false }, { "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [1], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "nlmap", "Name": "to-json", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [2], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "nlmap", "Name": "to-urlenc", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [2], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "nlmap", "Name": "from-json", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [1], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "nt", "Name": "get", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [1], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "nt", "Name": "set", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }, { "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "palette", "Name": "alpha-of", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [4, 3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "palette", "Name": "transparency-of", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [4, 3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "palette", "Name": "with-alpha", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [4, 3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "palette", "Name": "alpha", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "palette", "Name": "transparency", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "palette", "Name": "set-alpha", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "palette", "Name": "set-transparency", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "palette", "Name": "with-transparency", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [4, 3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "palette", "Name": "hue-of", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [4, 3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "palette", "Name": "saturation-of", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [4, 3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "palette", "Name": "brightness-of", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [4, 3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "palette", "Name": "with-hue", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [4, 3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "palette", "Name": "with-saturation", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [4, 3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "palette", "Name": "with-brightness", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [4, 3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "palette", "Name": "hue", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "palette", "Name": "saturation", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "palette", "Name": "brightness", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "palette", "Name": "set-hue", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "palette", "Name": "set-saturation", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "palette", "Name": "set-brightness", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "palette", "Name": "r-of", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [4, 3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "palette", "Name": "g-of", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [4, 3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "palette", "Name": "b-of", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [4, 3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "palette", "Name": "with-r", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [4, 3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "palette", "Name": "with-g", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [4, 3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "palette", "Name": "with-b", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [4, 3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "palette", "Name": "r", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "palette", "Name": "g", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "palette", "Name": "b", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "palette", "Name": "set-r", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "palette", "Name": "set-g", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "palette", "Name": "set-b", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "palette", "Name": "scale-gradient-hsb", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [4], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "palette", "Name": "scale-gradient", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [4], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "palette", "Name": "scale-scheme", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }, { "Types": [2], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "palette", "Name": "scheme-colors", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }, { "Types": [2], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "update", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": false, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "raycast", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [7], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "raycast-all", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [2, 20], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "pointcast", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [7], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "query", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [7], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "turtles-around", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [7], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "turtles-here", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [7], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "contacts", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [7], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "all-contacts", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2, 20], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "contact-end", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2, 20], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "contact-begin", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2, 20], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "contact-end", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2, 20], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "filter-contact", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2, 20], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "show-vector", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3, 4], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "show-orthogonal", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3, 4], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [5], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "hide-vectors", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "clear-vectors", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "get-type", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "set-type", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "get-group", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "set-group", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "get-gravity", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "set-gravity", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "is-physical?", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [5], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "set-physical", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [5], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "get-friction", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "set-friction", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "get-restitution", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "set-restitution", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "get-mass", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "set-mass", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "get-density", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "set-density", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "get-origin", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "set-origin", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "get-v", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "get-vx", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "get-vy", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "get-a", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "set-v", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "get-angular-v", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "set-angular-v", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "get-angular-a", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "get-linear-damping", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "set-linear-damping", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "get-angular-damping", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "set-angular-damping", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "push", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "apply-force", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "apply-torque", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "make-circle", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [5], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "make-box", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [5], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "make-polygon", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [5], "CanRepeat": false, "Optional": false }, { "Types": [4], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "make-edges", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [5], "CanRepeat": false, "Optional": false }, { "Types": [4], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "add-circle", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [5], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "add-box", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [5], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "add-polygon", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [5], "CanRepeat": false, "Optional": false }, { "Types": [4], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "add-edges", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [5], "CanRepeat": false, "Optional": false }, { "Types": [4], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": true, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "detach-joint", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "distance-joint", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "distance-joint-anchored", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "mouse-joint", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "get-length", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "set-length", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "set-lengths", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "set-linear-stiffness", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "set-damping", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "get-damping", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "set-stiffness", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "get-stiffness", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "set-max-force", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "get-max-force", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "set-max-torque", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "get-max-torque", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "get-force", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "phys", "Name": "get-torque", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": false, "Turtle": false, "Patch": false, "Link": true }, "Precedence": 0 }, { "Extension": "plot", "Name": "show", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "plot", "Name": "hide", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "plot", "Name": "activate", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "plot", "Name": "move", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "plot", "Name": "set-title", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }, { "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "plot", "Name": "bind", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }, { "Types": [2], "CanRepeat": false, "Optional": false }, { "Types": [5], "CanRepeat": false, "Optional": false }, { "Types": [2, 20], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "plot", "Name": "unbind", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }, { "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "send-to", "Name": "file", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }, { "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "sensor", "Name": "clear", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "sensor", "Name": "bind-gesture", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }, { "Types": [2, 20], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "sensor", "Name": "unbind-gesture", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "sensor", "Name": "touches", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "sensor", "Name": "touch-size", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "sensor", "Name": "touch", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "sensor", "Name": "open", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "sensor", "Name": "close", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "sensor", "Name": "on-change", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }, { "Types": [2, 20], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "sensor", "Name": "read-number", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "sensor", "Name": "read-vector", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "sensor", "Name": "is-available?", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [5], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "sensor", "Name": "set-warning", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [5], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "sound", "Name": "drums", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "sound", "Name": "instruments", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "sound", "Name": "play-drum", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "sound", "Name": "play-note", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "sound", "Name": "play-note-later", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [2], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "sound", "Name": "start-note", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "sound", "Name": "stop-note", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "sound", "Name": "stop-instrument", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "sound", "Name": "stop-music", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "store", "Name": "list-stores", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [20], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "store", "Name": "switch-store", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "store", "Name": "delete-store", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "store", "Name": "put", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }, { "Types": [2], "CanRepeat": false, "Optional": false }, { "Types": [12], "CanRepeat": false, "Optional": true }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "store", "Name": "get", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }, { "Types": [20], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "store", "Name": "get-keys", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [20], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "store", "Name": "has-key", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }, { "Types": [20], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "store", "Name": "remove", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }, { "Types": [12], "CanRepeat": false, "Optional": true }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "store", "Name": "clear", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [12], "CanRepeat": false, "Optional": true }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "table", "Name": "is-table?", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [5], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "table", "Name": "clear", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "table", "Name": "counts", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [4], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [1], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "table", "Name": "group-agents", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [7], "CanRepeat": false, "Optional": false }, { "Types": [15], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [1], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "table", "Name": "group-items", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [4], "CanRepeat": false, "Optional": false }, { "Types": [15], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [1], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "table", "Name": "from-list", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [4], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [1], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "table", "Name": "get", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }, { "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [1], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "table", "Name": "get-or-default", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [4], "CanRepeat": false, "Optional": false }, { "Types": [1], "CanRepeat": false, "Optional": false }, { "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [1], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "table", "Name": "has-key?", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }, { "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [5], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "table", "Name": "keys", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "table", "Name": "length", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "table", "Name": "make", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [1], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "table", "Name": "put", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }, { "Types": [1], "CanRepeat": false, "Optional": false }, { "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "table", "Name": "remove", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }, { "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "table", "Name": "to-list", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "table", "Name": "values", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "table", "Name": "to-json", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [2], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "table", "Name": "from-json", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [1], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "tune", "Name": "drums", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "tune", "Name": "instruments", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [4], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "tune", "Name": "use", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2, 3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "tune", "Name": "tempo", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "tune", "Name": "note", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": true, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "tune", "Name": "rest", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "tune", "Name": "loop", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "tune", "Name": "once", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "tune", "Name": "loop-then", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2, 20], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "tune", "Name": "once-then", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2, 20], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "tune", "Name": "who", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "tune", "Name": "volume", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "tune", "Name": "moveto", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "tune", "Name": "rewind", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "tune", "Name": "forward", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "tune", "Name": "clear", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "tune", "Name": "stop", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "tutorial", "Name": "show-dialog", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }, { "Types": [5], "CanRepeat": true, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "tutorial", "Name": "minimize-dialog", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "tutorial", "Name": "hide-dialog", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": true, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "tutorial", "Name": "back-dialog", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "tutorial", "Name": "submit-input", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [5], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "tutorial", "Name": "set", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }, { "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "tutorial", "Name": "get", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [1], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "tutorial", "Name": "activate", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "tutorial", "Name": "deactivate", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "tutorial", "Name": "get-activated", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [5], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "tutorial", "Name": "is-activated?", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [5], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "tutorial", "Name": "go", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "tutorial", "Name": "forward", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "tutorial", "Name": "back", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "tutorial", "Name": "survey", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "tutorial", "Name": "in-tutorial?", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [5], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "widget", "Name": "toast", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "widget", "Name": "show", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "widget", "Name": "hide", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "widget", "Name": "move", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "widget", "Name": "set-title", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }, { "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "widget", "Name": "bind", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }, { "Types": [2], "CanRepeat": false, "Optional": false }, { "Types": [5], "CanRepeat": false, "Optional": false }, { "Types": [2, 20], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "widget", "Name": "unbind", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }, { "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "widget", "Name": "set-group", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }, { "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "widget", "Name": "show-group", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "widget", "Name": "hide-group", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "widget", "Name": "move-group", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }, { "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "widget", "Name": "rename-group", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }, { "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "widget", "Name": "show-joystick", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "widget", "Name": "hide-joystick", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "widget", "Name": "bind-joystick", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }, { "Types": [2], "CanRepeat": false, "Optional": false }, { "Types": [2], "CanRepeat": false, "Optional": false }, { "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "widget", "Name": "joystick-x", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "widget", "Name": "joystick-y", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [3], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "workspace", "Name": "pause", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "workspace", "Name": "play", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "workspace", "Name": "show", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "workspace", "Name": "hide", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "workspace", "Name": "set-speed", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [3], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "workspace", "Name": "get-platform", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [2], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "workspace", "Name": "recompile", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "workspace", "Name": "trigger", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }, { "Types": [1], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "workspace", "Name": "bind", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2, 3], "CanRepeat": false, "Optional": false }, { "Types": [2], "CanRepeat": false, "Optional": false }, { "Types": [5], "CanRepeat": false, "Optional": false }, { "Types": [2, 20], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "workspace", "Name": "unbind", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2, 3], "CanRepeat": false, "Optional": false }, { "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "workspace", "Name": "unbind-all", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "workspace", "Name": "clear-commands", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }, { "Extension": "workspace", "Name": "execute-command", "LeftArgumentType": { "Types": [0], "CanRepeat": false, "Optional": false }, "RightArgumentTypes": [{ "Types": [2], "CanRepeat": false, "Optional": false }], "ReturnType": { "Types": [0], "CanRepeat": false, "Optional": false }, "AgentContext": { "Observer": true, "Turtle": true, "Patch": true, "Link": true }, "Precedence": 0 }];
+
+   /** Primitives: Managing all primitives.  */
+   class Primitives {
+       constructor() {
+           /** Metadata: The dictionary for metadata. */
+           this.Metadata = new Map();
+           /** Extensions: The dictionary for extensions. */
+           this.Extensions = new Map();
+           /** ExtensionNames: The list for known extensions. */
+           this.ExtensionNames = [];
+       }
+       /** Register: Register a primitive information. */
+       Register(Extension, Source) {
+           var FullName = Extension == '' ? Source.Name : `${Extension}:${Source.Name}`;
+           if (!this.Metadata.has(FullName)) {
+               if (this.ExtensionNames.indexOf(Extension) == -1) {
+                   this.ExtensionNames.push(Extension);
+                   this.Extensions.set(Extension, []);
+               }
+               this.Extensions.get(Extension).push(Source);
+               this.Metadata.set(FullName, Source);
+           }
+       }
+       /** BuildInstance: Build a primitive manager instance. */
+       static BuildInstance() {
+           var Result = new Primitives();
+           Dataset.forEach((Primitive) => Result.Register(Primitive.Extension, Primitive));
+           return Result;
+       }
+       /** GetPrimitive: Get a primitive from an extension. */
+       GetPrimitive(Extension, Name) {
+           var _a;
+           var FullName = Extension == '' ? Name : `${Extension}:${Name}`;
+           return (_a = this.Metadata.get(FullName)) !== null && _a !== void 0 ? _a : null;
+       }
+       /** HasNPrimitive: Is there a named primitive. */
+       HasPrimitive(Extension, Name) {
+           var FullName = Extension == '' ? Name : `${Extension}:${Name}`;
+           return this.Metadata.has(FullName);
+       }
+       /** GetNamedPrimitive: Get a named primitive. */
+       GetNamedPrimitive(FullName) {
+           var _a;
+           return (_a = this.Metadata.get(FullName)) !== null && _a !== void 0 ? _a : null;
+       }
+       /** HasNamedPrimitive: Is there a named primitive. */
+       HasNamedPrimitive(FullName) {
+           return this.Metadata.has(FullName);
+       }
+       /** IsReporter: Is the primitive a reporter. */
+       IsReporter(Source) {
+           return Source.ReturnType.Types[0] != NetLogoType.Unit;
+       }
+       /** GetExtensions: Get the names of extensions. */
+       GetExtensions() {
+           return this.ExtensionNames;
+       }
+       /** GetCompletions: Get a proper completion list for primitives. */
+       GetCompletions(Extensions) {
+           var Results = [];
+           for (var Primitive of this.Metadata.values()) {
+               if (Primitive.Extension == '' ||
+                   Extensions.indexOf(Primitive.Extension) != -1) {
+                   var Name = Primitive.Name;
+                   if (Primitive.Extension != "")
+                       Name = `${Primitive.Extension}:${Name}`;
+                   Results.push({
+                       label: Name,
+                       type: this.IsReporter(Primitive) ? 'Reporter' : 'Command',
+                   });
+               }
+           }
+           return Results;
+       }
+   }
+   /** PrimitiveManager: The Singleton Instance. */
+   const PrimitiveManager = Primitives.BuildInstance();
+   /** Export classes globally. */
+   try {
+       window.PrimitiveManager = Primitives;
+   }
+   catch (error) { }
 
    // Keyword tokenizer
    const keyword = new ExternalTokenizer((input) => {
@@ -24789,9 +24569,6 @@
            return;
        token = token.toLowerCase();
        // Find if the token belongs to any category
-       // Check if token is a breed reporter/command
-       // JC: Match should be done only when needed to booster the performance.
-       const match = matchBreed(token);
        // When these were under the regular tokenizer, they matched to word parts rather than whole words
        if (token == 'set') {
            input.acceptToken(Set$1);
@@ -24805,22 +24582,52 @@
        else if (token == 'end') {
            input.acceptToken(End);
        }
+       else if (token == 'and' || token == 'or') {
+           input.acceptToken(AndOr);
+       }
        else if (token == 'globals') {
            input.acceptToken(GlobalStr);
        }
        else if (token == 'extensions') {
            input.acceptToken(ExtensionStr);
        }
-       else if (token == 'breed' ||
-           token == 'directed-link-breed' ||
+       else if ([
+           '+',
+           '-',
+           '*',
+           '/',
+           '^',
+           '=',
+           '!=',
+           '>',
+           '<',
+           '<=',
+           '>=',
+           'and',
+           'or',
+           'mod',
+           'in-radius',
+           'at-points',
+           'of',
+           'with',
+       ].indexOf(token) > -1) {
+           input.acceptToken(ReporterLeftArgs1);
+       }
+       else if (token == 'in-cone') {
+           input.acceptToken(ReporterLeftArgs2);
+       }
+       else if (token == '-' || token == '+') {
+           input.acceptToken(PlusMinus);
+       }
+       else if (token == 'breed') {
+           input.acceptToken(BreedToken);
+       }
+       else if (token == 'directed-link-breed' ||
            token == 'undirected-link-breed') {
            input.acceptToken(BreedStr);
        }
        else if (directives.indexOf(token) != -1) {
            input.acceptToken(Directive);
-       }
-       else if (extensions.indexOf(token) != -1) {
-           input.acceptToken(Extension);
        }
        else if (turtleVars.indexOf(token) != -1) {
            input.acceptToken(TurtleVar);
@@ -24837,17 +24644,35 @@
        else if (unsupported.indexOf(token) != -1) {
            input.acceptToken(Unsupported);
        }
-       else if (commands.indexOf(token) != -1) {
-           input.acceptToken(Command);
-       }
-       else if (reporters.indexOf(token) != -1) {
-           input.acceptToken(Reporter);
-       }
-       else if (match != 0) {
-           input.acceptToken(match);
+       else if (PrimitiveManager.GetExtensions().indexOf(token) != -1) {
+           input.acceptToken(Extension);
        }
        else {
-           input.acceptToken(Identifier$1);
+           // Check if token is a reporter/commander
+           const primitive = PrimitiveManager.GetNamedPrimitive(token);
+           if (primitive != null) {
+               if (PrimitiveManager.IsReporter(primitive)) {
+                   input.acceptToken(Reporter);
+               }
+               else {
+                   input.acceptToken(Command);
+               }
+               return;
+           }
+           // Check if token is a breed reporter/command
+           const match = matchBreed(token);
+           if (match != 0) {
+               input.acceptToken(match);
+               return;
+           }
+           // Check if token is a custom procedure
+           const customMatch = matchCustomProcedure(token);
+           if (customMatch != 0) {
+               input.acceptToken(customMatch);
+           }
+           else {
+               input.acceptToken(Identifier$1);
+           }
        }
    });
    // Check if the character is valid for a keyword.
@@ -24876,162 +24701,197 @@
    // JC: Two issues with this approach: first, CJK breed names won't work; second, you can potentially do /\w+-(own|at|here)/ without doing many times
    // checks if token is a breed command/reporter. For some reason 'or' didn't work here, so they're all separate
    function matchBreed(token) {
+       var _a;
        let tag = 0;
-       if (token.match(/\w+-own/)) {
+       let parseContext = ParseContext.get();
+       let breedNames = (_a = parseContext === null || parseContext === void 0 ? void 0 : parseContext.state.field(preprocessStateExtension).PluralBreeds.concat(parseContext === null || parseContext === void 0 ? void 0 : parseContext.state.field(preprocessStateExtension).SingularBreeds)) !== null && _a !== void 0 ? _a : [];
+       let foundMatch = false;
+       for (let b of breedNames) {
+           if (token.includes(b)) {
+               foundMatch = true;
+           }
+       }
+       if (!foundMatch) {
+           return tag;
+       }
+       if (parseContext === null || parseContext === void 0 ? void 0 : parseContext.state.field(preprocessStateExtension).SingularBreeds.includes(token)) {
+           tag = SpecialReporter;
+       }
+       else if (token.match(/[^\s]+-own/)) {
            tag = Own;
        }
-       else if (token.match(/\w+-at$/)) {
-           tag = BreedFirst;
+       else if (token.match(/[^\s]+-(at|here|on|with|neighbor\\?|neighbors)$/)) {
+           tag = SpecialReporter;
        }
-       else if (token.match(/\w+-here$/)) {
-           tag = BreedFirst;
+       else if (token.match(/^(my-in|my-out)-[^\s]+/)) {
+           tag = SpecialReporter;
        }
-       else if (token.match(/\w+-on$/)) {
-           tag = BreedFirst;
+       else if (token.match(/^(hatch|sprout|create|create-ordered)-[^\s]+/)) {
+           tag = SpecialCommand;
        }
-       else if (token.match(/\w+-with$/)) {
-           tag = BreedFirst;
+       else if (token.match(/^is-[^\s]+\\?$/)) {
+           tag = SpecialReporter;
        }
-       else if (token.match(/\w+-neighbor\\?$/)) {
-           tag = BreedFirst;
+       else if (token.match(/^in-[^\s]+-from$/)) {
+           tag = SpecialReporter;
        }
-       else if (token.match(/\w+-neighbors$/)) {
-           tag = BreedFirst;
+       else if (token.match(/^(in|out)-[^\s]+-(neighbor\\?|neighbors)$/)) {
+           tag = SpecialReporter;
        }
-       else if (token.match(/^create-\w+/)) {
-           tag = BreedLast;
+       else if (token.match(/^out-[^\s]+-to$/)) {
+           tag = SpecialReporter;
        }
-       else if (token.match(/^my-in-\w+/)) {
-           tag = BreedLast;
-       }
-       else if (token.match(/^my-out-\w+/)) {
-           tag = BreedLast;
-       }
-       else if (token.match(/^create-ordered-\w+/)) {
-           tag = BreedLast;
-       }
-       else if (token.match(/^hatch-\w+/)) {
-           tag = BreedLast;
-       }
-       else if (token.match(/^sprout-\w+/)) {
-           tag = BreedLast;
-       }
-       else if (token.match(/^is-\w+\\?$/)) {
-           tag = BreedLast;
-       }
-       else if (token.match(/^in-\w+-neighbor\\?$/)) {
-           tag = BreedMiddle;
-       }
-       else if (token.match(/^in-\w+-neighbors$/)) {
-           tag = BreedMiddle;
-       }
-       else if (token.match(/^in-\w+-from$/)) {
-           tag = BreedMiddle;
-       }
-       else if (token.match(/^out-\w+-neighbor\\?$/)) {
-           tag = BreedMiddle;
-       }
-       else if (token.match(/^out-\w+-neighbors$/)) {
-           tag = BreedMiddle;
-       }
-       else if (token.match(/^out-\w+-to$/)) {
-           tag = BreedMiddle;
-       }
-       else if (token.match(/^create-\w+-to$/)) {
-           tag = BreedMiddle;
-       }
-       else if (token.match(/^create-\w+-from$/)) {
-           tag = BreedMiddle;
-       }
-       else if (token.match(/^create-\w+-with$/)) {
-           tag = BreedMiddle;
+       else if (token.match(/^create-[^\s]+-(to|from|with)$/)) {
+           tag = SpecialCommand;
        }
        return tag;
    }
+   function matchCustomProcedure(token) {
+       var _a, _b;
+       let parseContext = ParseContext.get();
+       let commands = (_a = parseContext === null || parseContext === void 0 ? void 0 : parseContext.state.field(preprocessStateExtension).Commands) !== null && _a !== void 0 ? _a : {};
+       let reporters = (_b = parseContext === null || parseContext === void 0 ? void 0 : parseContext.state.field(preprocessStateExtension).Reporters) !== null && _b !== void 0 ? _b : {};
+       // console.log(commands, reporters, token);
+       if (commands[token] >= 0) {
+           // console.log("found special command")
+           return SpecialCommand;
+       }
+       if (reporters[token] >= 0) {
+           return SpecialReporter;
+       }
+       return 0;
+   }
+
+   let primitives = PrimitiveManager;
+   const specializeReporter = function (token) {
+       token = token.toLowerCase();
+       let reporter = primitives.GetPrimitive('', token);
+       if (reporter) {
+           let args = reporter === null || reporter === void 0 ? void 0 : reporter.RightArgumentTypes.length;
+           reporter.RightArgumentTypes.map((arg) => {
+               if (arg.CanRepeat) {
+                   if (reporter === null || reporter === void 0 ? void 0 : reporter.DefaultOption) {
+                       args = reporter === null || reporter === void 0 ? void 0 : reporter.DefaultOption;
+                   }
+               }
+           });
+           // if (repeats) {
+           //     return ReporterVarArgs
+           // }
+           if (args == 0) {
+               return Reporter0Args;
+           }
+           else if (args == 1) {
+               return Reporter1Args;
+           }
+           else if (args == 2) {
+               return Reporter2Args;
+           }
+           else if (args == 3) {
+               return Reporter3Args;
+           }
+           else if (args == 4) {
+               return Reporter4Args;
+           }
+           else if (args == 5) {
+               return Reporter5Args;
+           }
+           else if (args == 6) {
+               return Reporter6Args;
+           }
+       }
+       else {
+           return -1;
+       }
+   };
+   const specializeSpecialReporter = function (token) {
+       var _a, _b;
+       token = token.toLowerCase();
+       let parseContext = ParseContext.get();
+       let reporters = (_a = parseContext === null || parseContext === void 0 ? void 0 : parseContext.state.field(preprocessStateExtension).Reporters) !== null && _a !== void 0 ? _a : {};
+       if (reporters[token] >= 0) {
+           let args = reporters[token];
+           if (args == 0) {
+               return SpecialReporter0Args;
+           }
+           else if (args == 1) {
+               return SpecialReporter1Args;
+           }
+           else if (args == 2) {
+               return SpecialReporter2Args;
+           }
+           else if (args == 3) {
+               return SpecialReporter3Args;
+           }
+           else if (args == 4) {
+               return SpecialReporter4Args;
+           }
+           else if (args == 5) {
+               return SpecialReporter5Args;
+           }
+           else if (args == 6) {
+               return SpecialReporter6Args;
+           }
+           else {
+               return -1;
+           }
+       }
+       let singularBreedNames = (_b = parseContext === null || parseContext === void 0 ? void 0 : parseContext.state.field(preprocessStateExtension).SingularBreeds) !== null && _b !== void 0 ? _b : [];
+       if (singularBreedNames.includes(token)) {
+           return SpecialReporter1Args;
+       }
+       if (token.match(/[^\s]+-(at)/)) {
+           return SpecialReporter2Args;
+       }
+       else if (token.match(/[^\s]+-(here|neighbors)/)) {
+           return SpecialReporter0Args;
+       }
+       else if (token.match(/[^\s]+-(on|with|neighbor\\?)/)) {
+           return SpecialReporter1Args;
+       }
+       else if (token.match(/^(my-in|my-out)-[^\s]+/)) {
+           return SpecialReporter0Args;
+       }
+       else if (token.match(/^is-[^\s]+\\?$/)) {
+           return SpecialReporter1Args;
+       }
+       else if (token.match(/^in-[^\s]+-from$/)) {
+           return SpecialReporter1Args;
+       }
+       else if (token.match(/^(in|out)-[^\s]+-(neighbors)$/)) {
+           return SpecialReporter0Args;
+       }
+       else if (token.match(/^(in|out)-[^\s]+-(neighbor\\?)$/)) {
+           return SpecialReporter1Args;
+       }
+       else if (token.match(/^out-[^\s]+-to$/)) {
+           return SpecialReporter1Args;
+       }
+       else {
+           return -1;
+       }
+   };
 
    // This file was generated by lezer-generator. You probably shouldn't edit it.
    const parser$3 = LRParser.deserialize({
      version: 14,
-     states: "1^QYQROOO!^QPO'#DQO!cQPO'#DSO!hQPO'#DTO!mQPO'#DWOOQQ'#Dy'#DyOiQRO'#DzOOQQ'#Dz'#DzOOQQ'#DY'#DYOOQQ'#Do'#DoQYQROOO!rQRO'#D]OOQQ'#Ds'#DsQ#QQROOO#VQRO,59lO#_QRO,59nO#gQRO,59oO#lQRO,59rO#}QPO,5:fOOQQ-E7m-E7mOOQQ'#D_'#D_OOQQ'#D^'#D^O%sQRO,59wOOQQ-E7q-E7qOOQQ'#Dp'#DpO%}QRO1G/WOOQQ1G/W1G/WOOQQ'#Dq'#DqO&VQRO1G/YOOQQ1G/Y1G/YOOQQ'#DU'#DUO&_QRO1G/ZOOQQ'#DX'#DXOOQQ'#Dr'#DrO&dQRO1G/^OOQQ1G/^1G/^OOQQ1G0Q1G0QO(fQRO'#D`OOQQ'#Dj'#DjO(pQRO'#DjO(pQRO'#DjO(pQRO'#DjO(pQRO'#DjOOQQ'#Df'#DfO+}QRO'#DfOOQQ'#De'#DeO,UQRO'#DeO(pQRO'#DeO(pQRO'#DeO(pQRO'#DeO(pQRO'#DeO,ZQRO'#DkOOQQ'#Dk'#DkO(pQRO'#DdO,bQRO'#DaOOQQ'#Dd'#DdO,iQRO'#DcO,nQRO'#DnOOQQ'#Db'#DbOOQQ'#Da'#DaOOQQ'#Dt'#DtO,|QRO1G/cOOQQ1G/c1G/cO,|QRO1G/cOOQQ-E7n-E7nOOQQ7+$r7+$rOOQQ-E7o-E7oOOQQ7+$t7+$tOOQO'#DV'#DVO-WQPO7+$uOOQQ-E7p-E7pOOQQ7+$x7+$xO/YQRO'#DqO/dQRO,59zO/lQRO,59zOOQO'#Dh'#DhO1iQPO,5:RO1nQRO,5:TO1xQRO'#DmOOQO'#Du'#DuO2WQPO,5:WO2cQRO'#DiO2mQRO,5:UO4mQRO,5:UO4mQRO,5:UO4mQRO,5:UO(pQRO,5:POOQQ,5:P,5:PO4mQRO,5:PO4mQRO,5:PO4mQRO,5:PO4tQRO,5:OO(pQRO,59}O(pQRO,5:YOOQQ-E7r-E7rOOQQ7+$}7+$}O4|QRO7+$}OOQQ<<Ha<<HaOOQQ1G/f1G/fO5WQRO1G/mOOQQ1G/o1G/oOOQO'#Dm'#DmOOQO-E7s-E7sOOQQ1G/r1G/rO-]QRO'#DhOOQQ,5:T,5:TO5bQRO1G/pO4mQRO1G/pO4mQRO1G/pOOQQ1G/k1G/kO4mQRO1G/kO4mQRO1G/kOOQQ1G/j1G/jO7bQRO1G/iO9_QRO1G/tOOQQ<<Hi<<HiOOQQ7+%X7+%XO;[QRO7+%XO;fQRO7+%[O4mQRO7+%[OOQQ7+%V7+%VO4mQRO7+%VOOQQ<<Hs<<HsO=fQRO<<HvOOQQ<<Hq<<Hq",
-     stateData: "?f~O!lOSqOS~O[QO]PO^RObSOeZOgVOiVOjVOlVOmVOnVOoVOpVO}VO!OVO!oUO~Ou^O~Ou_O~Ou`O~OuaO~O_dO`dOadOgeO~OeZO~OkhOsjO~OgkOsmO~OgnO~O_pO`pOapOgpOssO~O!ptO~OPvOQwORxOSyOTzOV}OW!POX!QOY!ROZ!SO_dO`dOadOc!ZOd!YOg!TOivOj}Ol!UOm!UOn!UOo!XO}!XO!O!XO!o!VO~Of!`OuuO~P$SOkhOs!cO~OgkOs!eO~Og!fO~O_pO`pOapOgpOs!iO~OPvOQwORxOSyOTzOV}OW!POX!QOY!ROZ!SO_dO`dOadOc!ZOd!YOivOj}Ol!UOm!UOn!UOo!XOuuO}!pO!O!pO!o!VO~Og!jOs!lO~P&uOPvOQwORxOSyOTzOV}OW!POX!QOY!ROZ!SOg!UOivOj}Ol!UOm!UOn!UOo!XOu!sO}!XO!O!XO!o!VO~OP!TXQ!TXR!TXS!TXT!TXV!TXW!TXX!TXY!TXZ!TX_!TX`!TXa!TXc!TXd!TXf!TXg!TXi!TXj!TXl!TXm!TXn!TXo!TXu!TX}!TX!O!TX!o!TXs!TX~OU!YX~P*TOU!xO~OU!_X~P*TOU!WX~P*TOg#OO~Og!UOl!UOm!UOn!UO~Of#ROu!sO~P$SOs#TO~OP!TXQ!TXR!TXS!TXT!TXU!_XV!TXW!TXX!TXY!TXZ!TX_!TX`!TXa!TXc!TXd!TXg!TXi!TXj!TXl!TXm!TXn!TXo!TXs!TXu!TX}!TX!O!TX!o!TX!q![X~Og!eXs!eX~P-]OgkOs#UO~OP!SaQ!SaR!SaS!SaT!SaU!]aV!SaW!SaX!SaY!SaZ!Sa_!Sa`!Saa!Sac!Sad!Saf!Sag!Sai!Saj!Sal!Sam!San!Sao!Sau!Sa}!Sa!O!Sa!o!Sa!q!Sa~O!q#VO~Os#WOu!sO~P$SOU!WXs!aX}!aX!O!aX~Os#ZO}#XO!O#XO~Og#[Os#]O~P&uOU!xOP!^aQ!^aR!^aS!^aT!^aV!^aW!^aX!^aY!^aZ!^a_!^a`!^aa!^ac!^ad!^af!^ag!^ai!^aj!^al!^am!^an!^ao!^au!^a}!^a!O!^a!o!^as!^a!p!^a~OU!xO~P(pO!p#dOU!YX~Of#gOu!sO~P$SOs#hOu!sO~P$SOU!xOP!^iQ!^iR!^iS!^iT!^iV!^iW!^iX!^iY!^iZ!^i_!^i`!^ia!^ic!^id!^if!^ig!^ii!^ij!^il!^im!^in!^io!^iu!^i}!^i!O!^i!o!^is!^i!p!^i~OP!ViQ!ViR!ViS!ViT!ViU!YXV!ViW!ViX!ViY!ViZ!Vi_!Vi`!Via!Vic!Vid!Vif!Vig!Vii!Vij!Vil!Vim!Vin!Vio!Viu!Vi}!Vi!O!Vi!o!Vis!Vi~OP!biQ!biR!biS!biT!biU!YXV!biW!biX!biY!biZ!bi_!bi`!bia!bic!bid!bif!big!bii!bij!bil!bim!bin!bio!biu!bi}!bi!O!bi!o!bis!bi~Os#nOu!sO~P$SOU!xOP!^qQ!^qR!^qS!^qT!^qV!^qW!^qX!^qY!^qZ!^q_!^q`!^qa!^qc!^qd!^qf!^qg!^qi!^qj!^ql!^qm!^qn!^qo!^qu!^q}!^q!O!^q!o!^qs!^q!p!^q~OU!xOP!^yQ!^yR!^yS!^yT!^yV!^yW!^yX!^yY!^yZ!^y_!^y`!^ya!^yc!^yd!^yf!^yg!^yi!^yj!^yl!^ym!^yn!^yo!^yu!^y}!^y!O!^y!o!^ys!^y!p!^y~O",
-     goto: ",`!oPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP!pP!p!p!t!w!p!z#OPP#S#X#[#j#q#_#|$X%S%y'h(]'h(a)W*O*s#|*x+O+U+`+f+m,QPPP#O,XTTOYRo`R!goTqarTXOYV[OY]RfZQeZc!]fu!_!a!o!s#S#V#iQ!afT!mu!sc!^fu!_!a!o!s#S#V#ic![fu!_!a!o!s#S#V#i!^{fuwxyz!P!Q!R!S!_!a!o!s!u!v!w!x!z!{!|#S#V#_#`#b#c#i#k#mQ!}!VQ#e#OR#f#Pb!Wfu!_!a!o!s#S#V#i!R!Xwxyz!P!Q!R!S!V!u!v!w!x!z!{!|#O#P#_#`#b#c#k#mh!Ofu!V!_!a!o!s#O#P#S#V#iQ!twQ!uxQ!vyQ!wzQ!y!PQ!z!QQ!{!RQ!|!SQ#^!uQ#_!vQ#`!wS#a!x!zQ#b!{Q#c!|Q#j#_Q#k#`Q#l#bQ#m#cQ#o#kR#p#m!e{fuwxyz!P!Q!R!S!V!_!a!o!s!u!v!w!x!z!{!|#O#P#S#V#_#`#b#c#i#k#mT!nu!s!Q{wxyz!P!Q!R!S!V!u!v!w!x!z!{!|#O#P#_#`#b#c#k#mc|fu!_!a!o!s#S#V#i!d!Xfuwxyz!P!Q!R!S!V!_!a!o!s!u!v!w!x!z!{!|#O#P#S#V#_#`#b#c#i#k#mR#P!Z!e!Xfuwxyz!P!Q!R!S!V!_!a!o!s!u!v!w!x!z!{!|#O#P#S#V#_#`#b#c#i#k#mV!qu!r!sQYORcYQi^R!biQl_S!dl!kR!kuQraR!hrS]OYRg]Q!_fS!ou!sW#Q!_!o#S#iQ#S!aR#i#VS!ru!sR#Y!rSWOYRbU",
-     nodeNames: "⚠ Command0Args Command1Args Command2Args Command3Args Command4Args Reporter11Args Reporter0Args Reporter1Args Reporter2Args Reporter3Args Reporter4Args GlobalStr ExtensionStr BreedStr BreedFirst BreedLast BreedMiddle Own Set Let To End Identifier Directive Command Reporter Extension TurtleVar PatchVar LinkVar Constant Unsupported LineComment Program CloseBracket Extensions OpenBracket Globals Breed BreedPlural BreedSingular BreedsOwn BreedVars Unrecognized Numeric String Procedure ProcedureName BreedProceduresReporters Arguments ProcedureContent VariableDeclaration NewVariableDeclaration Value Reporters Arg AnonymousProcedure AnonArguments CodeBlock Commands VariableName List SimpleVal SetVariable",
-     maxTerm: 79,
+     states: "!'jQYQROOO!aQPO'#DZO!fQPO'#D]OOQO'#D_'#D_O!kQPO'#D^O!pQPO'#DbOOQQ'#EW'#EWO!uQRO'#EXOOQQ'#EX'#EXOOQQ'#Dc'#DcOOQQ'#D|'#D|QYQROOO#jQRO'#DhOOQQ'#EP'#EPQ$XQROOO$^QRO,59uO$fQRO,59wO$nQRO,59xO$sQRO,59|O${QPO,5:sOOQQ-E7z-E7zOOQQ'#Di'#DiO%fQRO,5:SOOQQ-E7}-E7}OOQQ'#D}'#D}O%pQRO1G/aOOQQ1G/a1G/aOOQQ'#EO'#EOO%xQRO1G/cOOQQ1G/c1G/cOOQQ'#D`'#D`O&QQRO1G/dO&YQRO1G/hOOQQ1G/h1G/hOOQQ1G0_1G0_O&bQRO'#DjO&jQRO'#DzO&oQRO'#D{OOQQ'#Dy'#DyO'QQRO'#DlOOQQ'#Dl'#DlOOQQ'#Dk'#DkO(vQRO'#DkOOQQ'#EQ'#EQO)XQRO1G/nOOQQ1G/n1G/nO)XQRO1G/nOOQQ-E7{-E7{OOQQ7+${7+${OOQQ-E7|-E7|OOQQ7+$}7+$}OOQO'#Da'#DaO)`QPO7+%OOOQQ7+%S7+%SO)eQRO,5:UOOQQ,5:U,5:UO)mQRO,5:fOOQQ'#Dq'#DqO)mQRO,5:gO,|QRO'#DnO.qQRO'#EROOQQ'#Dp'#DpO/eQRO'#DpO/eQRO'#DpO/eQRO'#DpO/eQRO'#DpO/eQRO'#DpO/eQRO'#DpO/eQRO'#DpO/eQRO'#DpO/eQRO'#DpO/eQRO'#DpO/eQRO'#DpO/eQRO'#DpO0tQRO'#DoOOQQ'#Do'#DoOOQQ'#Dm'#DmO2TQRO,5:WO3yQPO,5:VOOQQ-E8O-E8OOOQQ7+%Y7+%YO4OQRO7+%YOOQQ<<Hj<<HjOOQQ1G/p1G/pO4VQRO'#DpO4bQRO1G0QO5YQRO1G0RO6QQRO'#EOO6fQRO'#DuO8kQRO'#DjO<dQRO,5:YO=dQRO,5:YO=kQRO'#DsOOQQ'#ES'#ESO>SQRO,5:^OOQO'#Du'#DuO>bQPO,5:`O>gQRO'#DoO@VQRO,5:cO@eQRO,5:dO/eQRO,5:[O/eQRO,5:[O/eQRO,5:[OBdQRO,5:[OCTQRO,5:[OCTQRO,5:[OCTQRO,5:[OCTQRO,5:[OCTQRO,5:[OOQQ,5:[,5:[OCTQRO,5:[OCTQRO,5:[OCTQRO,5:[OCTQRO,5:[OCTQRO,5:[ODmQRO,5:ZOOQQ-E8P-E8POOQQ1G/q1G/qOOQQ<<Ht<<HtOD{QRO,5:[OFzQRO,5:UOGkQRO,5:UOOQQ1G/t1G/tOOQQ'#Ds'#DsOOQQ-E8Q-E8QOOQQ1G/x1G/xOGrQRO1G/zOOQQ1G/}1G/}OOQQ1G0O1G0OOOQQ1G/v1G/vOCTQRO1G/vOIjQRO1G/vOCTQRO1G/vOCTQRO1G/vOCTQRO1G/vOCTQRO1G/vOCTQRO1G/vOCTQRO1G/vOCTQRO1G/vOCTQRO1G/vOOQQ1G/u1G/uOJZQRO1G/vOOQQ7+%f7+%fOLYQRO7+%fOOQQ7+%b7+%bONQQRO7+%bOCTQRO7+%bOCTQRO7+%bOCTQRO7+%bOCTQRO7+%bOCTQRO7+%bOCTQRO7+%bONqQRO7+%bOOQQ<<IQ<<IQO!$aQRO<<H|OCTQRO<<H|OCTQRO<<H|OOQQ<<H|<<H|OCTQRO<<H|OCTQRO<<H|O!%QQRO<<H|O!(pQROAN>hOCTQROAN>hOOQQAN>hAN>hOCTQROAN>hO!)aQROAN>hO!-PQROG24SOOQQG24SG24SO!-pQROG24SO!/oQRO'#DlO/eQRO'#DpO!1RQRO,5:WO!2eQRO'#EOO!2lQRO,5:YO!3`QRO,5:YO!3gQRO,5:[O!3gQRO,5:[O!4vQRO,5:[O!5kQRO,5:[OCTQRO,5:[O!7TQRO,5:[O!5kQRO1G/vO!8pQRO1G/vO!5kQRO1G/vOCTQRO1G/vO!9eQRO1G/vO!;QQRO7+%bO!5kQRO7+%bOCTQRO7+%bO!;uQRO7+%bO!=bQRO<<H|O!5kQRO<<H|OCTQRO<<H|O!>VQRO<<H|O!?rQROAN>hO!5kQROAN>hOCTQROAN>hO!@gQROAN>hO!BSQROG24SO!BwQROG24SO!DdQRO'#DnO!DkQRO'#DnO!3gQRO'#DpO!DrQRO'#DpO!FRQRO'#DpO/eQRO'#DpO!FRQRO'#DpO/eQRO'#DpO!FRQRO,5:[O/eQRO,5:[O!FRQRO,5:[O!GbQRO,5:[O!GoQRO,5:[OCTQRO,5:[O!GoQRO,5:[OCTQRO,5:[O!GoQRO1G/vO!IXQRO1G/vO!GoQRO1G/vOCTQRO1G/vO!GoQRO1G/vOCTQRO1G/vO!IfQRO7+%bO!GoQRO7+%bOCTQRO7+%bO!GoQRO7+%bOCTQRO7+%bO!IsQRO<<H|O!GoQRO<<H|OCTQRO<<H|O!GoQRO<<H|OCTQRO<<H|O!JQQROAN>hO!GoQROAN>hO!GoQROAN>hO!J_QROG24SO/eQRO'#DpO!FRQRO'#DpO!JlQRO,5:[O!DrQRO,5:[O!JlQRO,5:[O!DrQRO,5:[O!K{QRO,5:[O!LZQRO,5:[O!LiQRO,5:[O!NRQRO,5:[OCTQRO,5:[O!GoQRO,5:[O# kQRO,5:[O!LiQRO1G/vO!NRQRO1G/vO##WQRO1G/vO##fQRO1G/vO!LiQRO1G/vO!NRQRO1G/vOCTQRO1G/vO!GoQRO1G/vO##tQRO1G/vO#%aQRO7+%bO#%oQRO7+%bO!LiQRO7+%bO!NRQRO7+%bOCTQRO7+%bO!GoQRO7+%bO#%}QRO7+%bO#'jQRO<<H|O#'xQRO<<H|O!LiQRO<<H|O!NRQRO<<H|OCTQRO<<H|O!GoQRO<<H|O#(WQRO<<H|O#)sQROAN>hO#*RQROAN>hO!LiQROAN>hO!NRQROAN>hOCTQROAN>hO!GoQROAN>hO#*aQROAN>hO#+|QROG24SO#,[QROG24SO#,jQROG24SO0tQRO,5:fO0tQRO,5:gO#.VQRO'#ERO/eQRO'#DpO/eQRO'#DpO/eQRO'#DpO/eQRO'#DpO#.gQRO'#DpO#.rQRO'#DpO/eQRO,5:[OCTQRO,5:[OCTQRO,5:[OCTQRO,5:[OCTQRO,5:[OCTQRO1G/vOCTQRO1G/vOCTQRO1G/vOCTQRO1G/vOCTQRO7+%bOCTQRO7+%bOCTQRO7+%bOCTQRO7+%bOCTQRO<<H|OCTQRO<<H|O!JlQRO'#DpO/eQRO'#DpO/eQRO'#DpO/eQRO'#DpO/eQRO'#DpO/eQRO,5:[O/eQRO,5:[OCTQRO,5:[OCTQRO,5:[OCTQRO,5:[OCTQRO,5:[OCTQRO1G/vOCTQRO1G/vOCTQRO1G/vOCTQRO1G/vOCTQRO7+%bOCTQRO7+%bOCTQRO7+%bOCTQRO7+%bOCTQRO<<H|OCTQRO<<H|OCTQRO<<H|OCTQRO<<H|O#.}QRO'#DzO&oQRO'#D{O/eQRO'#DpO/eQRO'#DpO/eQRO'#DpO/eQRO'#DpOCTQRO,5:[OCTQRO,5:[OCTQRO,5:[OCTQRO,5:[OCTQRO1G/vOCTQRO1G/vOCTQRO1G/vOCTQRO1G/vOCTQRO7+%bOCTQRO7+%bO/eQRO'#DpO/eQRO'#DpO/eQRO'#DpO/eQRO'#DpOCTQRO,5:[OCTQRO,5:[OCTQRO,5:[OCTQRO,5:[OCTQRO1G/vOCTQRO1G/vOCTQRO1G/vOCTQRO1G/vOCTQRO7+%bOCTQRO7+%bOCTQRO7+%bOCTQRO7+%bO/eQRO'#DpO/eQRO'#DpO/eQRO'#DpO/eQRO'#DpOCTQRO,5:[OCTQRO,5:[OCTQRO,5:[OCTQRO,5:[OCTQRO1G/vOCTQRO1G/vO/eQRO'#DpO/eQRO'#DpO/eQRO'#DpO/eQRO'#DpOCTQRO,5:[OCTQRO,5:[OCTQRO,5:[OCTQRO,5:[OCTQRO1G/vOCTQRO1G/vOCTQRO1G/vOCTQRO1G/vO/eQRO'#DpO/eQRO'#DpO/eQRO'#DpO/eQRO'#DpOCTQRO,5:[OCTQRO,5:[O/eQRO'#DpO/eQRO'#DpO/eQRO'#DpO/eQRO'#DpOCTQRO,5:[OCTQRO,5:[OCTQRO,5:[OCTQRO,5:[O/eQRO'#DpO/eQRO'#DpO/eQRO'#DpO/eQRO'#DpO/eQRO'#DpO/eQRO'#Dp",
+     stateData: "#/S~O!yOSzOS~ORQOSPOTROVTOY[O^WO`WOaWOcWOdWOeWOfWOgWOjRO!WVO!YWO!ZWO~O!O_O~O!O`O~O!OaO~O!ObO~O^WO`WOaWOcWOdWOeWOfWOgWO!WVO!YWO!ZWO~O^eOieOseOteOueOveOweOxeOyeO~OY[O~ObhO|jO~O^kO|mO~O^nO~O^kO|qO~O!XrO~OWuOXtO`wOgxOiwO!WzO~OZ}O!OsO~P%QObhO|!QO~O^kO|!SO~O^!TOt!TO~O^kO|!VO~O^kO|!XO~O^!YO~O^!ZOc!ZOd!ZOe!ZOj!ZO~Of!mOl!_Om!fOn!gOo!hOp!iOq!jOr!kOs!_Ot!`Ou!aOv!bOw!cOx!dOy!eO!O!]O!Y!mO!Z!mOW!`XX!`XZ!`X`!`Xg!`Xi!`X!W!`X|!`X~P&oOW(WOX(VO`$oOgxOi$oO~OZ!rO~P%QO|!tO~O^kO|!uO~Of!mOl!_Om$pOn%gOo'[Op([Oq(zOr)bOs!_Ot%bOu%eOv'YOw(YOx(xOy)`O!O%`O!W!lO!Y!mO!Z!mO~P&oOWuOXtO^!yO`wOc!ZOd!ZOe!ZOf#OOgxOiwOj!ZOl!_Om&UOn'qOo(iOp)TOq)gOr)qOs!_Ot'nOu'oOv(gOw)ROx)eOy)oO!O!{O!W#TO!Y#OO!Z#OO!j!iP~O|!|O~P*|O^!uXc!uXd!uXe!uXf!uXj!uXl!uXm!uXn!uXo!uXp!uXq!uXr!uXs!uXt!uXu!uXv!uXw!uXx!uXy!uX!O!uX!W!uX!Y!uX!Z!uX~OP#WOQ#XOk#YOW!uXX!uXZ!uX`!uXg!uXi!uX|!uX~P-TOf!mOl!_Om!fOn!gOo!hOp!iOq!jOr!kOs!_Ot!`Ou!aOv!bOw!cOx!dOy!eO!O!]O!W!lO!Y!mO!Z!mO~P&oOf!mOl!_Om&VOn'rOo(jOp)UOq)hOr)rOs!_Ot%cOu'pOv(hOw)SOx)fOy)pO!O!]O!W!lO!Y!mO!Z!mO~P&oOf!mOl!_Om!fOn!gOo!hOp!iOq!jOr!kOs!_Ot!`Ou!aOv!bOw!cOx!dOy!eO!O!]O!Y!mO!Z!mOW!`aX!`aZ!`a`!`ag!`ai!`a!W!`a|!`a~P&oO!X#iO~OZ#jO~P%QOP$uOQ%iOk$vO~OP!aXQ!aXW!niX!niZ!ni`!nig!nii!nik!aX!W!ni!X!ni|!ni~OP!aXQ!aXW!oiX!oiZ!oi`!oig!oii!oik!aX!W!oi!X!oi|!oi~OP!eXQ!eX^!rXk!eX|!eX!j!rX~O^kO!j!iX~OWuOXtO`wOc!ZOd!ZOe!ZOf#OOgxOiwOj!ZOl!_Om&UOn'qOo(iOp)TOq)gOr)qOs!_Ot'nOu'oOv(gOw)ROx)eOy)oO!O!{O!W#TO!Y#OO!Z#OO!j!iP~O^$rO|#mO~P6nOP!baP!faQ!baQ!fa^!ba^!fac!bac!fad!bad!fae!bae!faf!baf!faj!baj!fak!bak!fal!bal!fam!bam!fan!ban!fao!bao!fap!bap!faq!baq!far!bar!fas!bas!fat!bat!fau!bau!fav!bav!faw!baw!fax!bax!fay!bay!fa!O!ba!O!fa!W!ba!W!fa!Y!ba!Y!fa!Z!ba!Z!fa!X!fa~OW!baW!faX!baX!faZ!baZ!fa`!ba`!fag!bag!fai!bai!fa|!ba|!fa~P8uO|#nO~P%QOP!cXQ!cXf!gXk!cX|!gX!Y!gX!Z!gX~Of#oO|#qO!Y#oO!Z#oO~O!j#rO~OW(WOX(VO`$oOf!mOgxOi$oOl!_Om&VOn'rOo(jOp)UOq)hOr)rOs!_Ot%cOu'pOv(hOw)SOx)fOy)pO!O!]O!W!lO!Y!mO!Z!mO~P&oO|#sOP!cXQ!cXk!cX~O|#tOP!cXQ!cXk!cX~O^!dac!dad!dae!daf!daj!dak!dal!dam!dan!dao!dap!daq!dar!das!dat!dau!dav!daw!dax!day!da!O!da!W!da!Y!da!Z!da~OP#WOQ#XOW!daX!daZ!da`!dag!dai!da|!da~P@sOP#WOQ#XOf!mOk#YOl!_Om!fOn!gOo!hOp!iOq!jOr!kOs!_Ot!`Ou!aOv!bOw!cOx!dOy!eO!O!]O!W!lO!Y!mO!Z!mO~P&oO!X$QOP!aXQ!aXk!aX~Of!mOl!_Om!fOn!gOo!hOp!iOq!jOr!kOs!_Ot!`Ou!aOv!bOw!cOx!dOy!eO!O!]O!Y!mO!Z!mOP!daQ!daW!daX!daZ!da`!dag!dai!dak!da!W!da|!da~P&oO^kO|!uO!j!iX~OP!baP!faQ!baQ!fak!bak!fa~O!j!^a~PGVO|$SO~P%QO^!dic!did!die!dif!dij!dik!dil!dim!din!dio!dip!diq!dir!dis!dit!diu!div!diw!dix!diy!di!O!di!W!di!Y!di!Z!di~OP#WOQ#XOW!diX!diZ!di`!dig!dii!di|!di~PGyOf!mOl!_Om!fOn!gOo!hOp!iOq!jOr!kOs!_Ot!`Ou!aOv!bOw!cOx!dOy!eO!O!]O!Y!mO!Z!mOP!diQ!diW!diX!diZ!di`!dig!dii!dik!di!W!di|!di~P&oO|$_O~P%QO^!dqc!dqd!dqe!dqf!dqj!dqk!dql!dqm!dqn!dqo!dqp!dqq!dqr!dqs!dqt!dqu!dqv!dqw!dqx!dqy!dq!O!dq!W!dq!Y!dq!Z!dq~OP#WOQ#XOW!dqX!dqZ!dq`!dqg!dqi!dq|!dq~PLaOf!mOl!_Om!fOn!gOo!hOp!iOq!jOr!kOs!_Ot!`Ou!aOv!bOw!cOx!dOy!eO!O!]O!Y!mO!Z!mOP!dqQ!dqW!dqX!dqZ!dq`!dqg!dqi!dqk!dq!W!dq|!dq~P&oO^!dyc!dyd!dye!dyf!dyj!dyk!dyl!dym!dyn!dyo!dyp!dyq!dyr!dys!dyt!dyu!dyv!dyw!dyx!dyy!dy!O!dy!W!dy!Y!dy!Z!dy~OP#WOQ#XOW!dyX!dyZ!dy`!dyg!dyi!dy|!dy~P!!pOf!mOl!_Om!fOn!gOo!hOp!iOq!jOr!kOs!_Ot!`Ou!aOv!bOw!cOx!dOy!eO!O!]O!Y!mO!Z!mOP!dyQ!dyW!dyX!dyZ!dy`!dyg!dyi!dyk!dy!W!dy|!dy~P&oO^!d!Rc!d!Rd!d!Re!d!Rf!d!Rj!d!Rk!d!Rl!d!Rm!d!Rn!d!Ro!d!Rp!d!Rq!d!Rr!d!Rs!d!Rt!d!Ru!d!Rv!d!Rw!d!Rx!d!Ry!d!R!O!d!R!W!d!R!Y!d!R!Z!d!R~OP#WOQ#XOW!d!RX!d!RZ!d!R`!d!Rg!d!Ri!d!R|!d!R~P!'POf!mOl!_Om!fOn!gOo!hOp!iOq!jOr!kOs!_Ot!`Ou!aOv!bOw!cOx!dOy!eO!O!]O!Y!mO!Z!mOP!d!RQ!d!RW!d!RX!d!RZ!d!R`!d!Rg!d!Ri!d!Rk!d!R!W!d!R|!d!R~P&oO^!d!Zc!d!Zd!d!Ze!d!Zf!d!Zj!d!Zk!d!Zl!d!Zm!d!Zn!d!Zo!d!Zp!d!Zq!d!Zr!d!Zs!d!Zt!d!Zu!d!Zv!d!Zw!d!Zx!d!Zy!d!Z!O!d!Z!W!d!Z!Y!d!Z!Z!d!Z~OP#WOQ#XOW!d!ZX!d!ZZ!d!Z`!d!Zg!d!Zi!d!Z|!d!Z~P!+`Of!mOl!_Om!fOn!gOo!hOp!iOq!jOr!kOs!_Ot!`Ou!aOv!bOw!cOx!dOy!eO!O!]O!Y!mO!Z!mOP!d!ZQ!d!ZW!d!ZX!d!ZZ!d!Z`!d!Zg!d!Zi!d!Zk!d!Z!W!d!Z|!d!Z~P&oOf!mOl!_Om%fOn'ZOo(ZOp(yOq)aOr)nOs!_Ot%dOu'XOv(XOw(wOx)_Oy)mO!O%aO!W!lO!Y!mO!Z!mO!X!`X~P&oOf!mOl!_Om%fOn'ZOo(ZOp(yOq)aOr)nOs!_Ot%dOu'XOv(XOw(wOx)_Oy)mO!O%aO!W!lO!Y!mO!Z!mO!X!`a~P&oO|!rX~P6QOW!faX!faZ!fa`!fag!fai!fa!W!fa!X!ba!X!fa|!fa~PGVO!X!ba~P8uOf!mOl!_Om$pOn%gOo'[Op([Oq(zOr)bOs!_Ot%bOu%eOv'YOw(YOx(xOy)`O!O!]O!W!lO!Y!mO!Z!mO~P&oOP$uOQ%iOW!daX!daZ!da`!dag!dai!dak!da!W!da|!da~OP#WOQ#XOf!mOk#YOl!_Om$pOn%gOo'[Op([Oq(zOr)bOs!_Ot%bOu%eOv'YOw(YOx(xOy)`O!O!]O!W!lO!Y!mO!Z!mO~P&oOf!mOl!_Om!fOn!gOo!hOp!iOq!jOr!kOs!_Ot!`Ou!aOv!bOw!cOx!dOy!eO!O!]O!W!lO!Y!mO!Z!mOP!daQ!dak!da|!da~P&oOP$uOQ%iOW!diX!diZ!di`!dig!dii!dik!di!W!di|!di~Of!mOl!_Om!fOn!gOo!hOp!iOq!jOr!kOs!_Ot!`Ou!aOv!bOw!cOx!dOy!eO!O!]O!W!lO!Y!mO!Z!mOP!diQ!dik!di|!di~P&oOP$uOQ%iOW!dqX!dqZ!dq`!dqg!dqi!dqk!dq!W!dq|!dq~Of!mOl!_Om!fOn!gOo!hOp!iOq!jOr!kOs!_Ot!`Ou!aOv!bOw!cOx!dOy!eO!O!]O!W!lO!Y!mO!Z!mOP!dqQ!dqk!dq|!dq~P&oOP$uOQ%iOW!dyX!dyZ!dy`!dyg!dyi!dyk!dy!W!dy|!dy~Of!mOl!_Om!fOn!gOo!hOp!iOq!jOr!kOs!_Ot!`Ou!aOv!bOw!cOx!dOy!eO!O!]O!W!lO!Y!mO!Z!mOP!dyQ!dyk!dy|!dy~P&oOP$uOQ%iOW!d!RX!d!RZ!d!R`!d!Rg!d!Ri!d!Rk!d!R!W!d!R|!d!R~Of!mOl!_Om!fOn!gOo!hOp!iOq!jOr!kOs!_Ot!`Ou!aOv!bOw!cOx!dOy!eO!O!]O!W!lO!Y!mO!Z!mOP!d!RQ!d!Rk!d!R|!d!R~P&oOP$uOQ%iOW!d!ZX!d!ZZ!d!Z`!d!Zg!d!Zi!d!Zk!d!Z!W!d!Z|!d!Z~Of!mOl!_Om!fOn!gOo!hOp!iOq!jOr!kOs!_Ot!`Ou!aOv!bOw!cOx!dOy!eO!O!]O!W!lO!Y!mO!Z!mOP!d!ZQ!d!Zk!d!Z|!d!Z~P&oO|$sO~P*|O|$tO~P*|Of!mOl!_Om&VOn'rOo(jOp)UOq)hOr)rOs!_Ot%cOu'pOv(hOw)SOx)fOy)pO!O%`O!W!lO!Y!mO!Z!mO~P&oOf!mOl!_Om%fOn'ZOo(ZOp(yOq)aOr)nOs!_Ot%dOu'XOv(XOw(wOx)_Oy)mO!O%aO!W!lO!Y!mO!Z!mO~P&oOP%hOQ'_O!X!da~P@sOP#WOQ#XOf!mOk#YOl!_Om%fOn'ZOo(ZOp(yOq)aOr)nOs!_Ot%dOu'XOv(XOw(wOx)_Oy)mO!O%aO!W!lO!Y!mO!Z!mO~P&oOP%hOQ'_O!X!di~PGyOP%hOQ'_O!X!dq~PLaOP%hOQ'_O!X!dy~P!!pOP%hOQ'_O!X!d!R~P!'POP%hOQ'_O!X!d!Z~P!+`Of!mOl!_Om&UOn'qOo(iOp)TOq)gOr)qOs!_Ot'nOu'oOv(gOw)ROx)eOy)oO!O!]O!W!lO!Y!mO!Z!mO~P&oOP&WOQ'sOk!da|!da~OP&XOQ'tOk!da!X!da~OP#WOQ#XOf!mOk#YOl!_Om&UOn'qOo(iOp)TOq)gOr)qOs!_Ot'nOu'oOv(gOw)ROx)eOy)oO!O!]O!W!lO!Y!mO!Z!mO~P&oOP#WOQ#XOf!mOk#YOl!_Om&VOn'rOo(jOp)UOq)hOr)rOs!_Ot%cOu'pOv(hOw)SOx)fOy)pO!O%`O!W!lO!Y!mO!Z!mO~P&oOf!mOl!_Om%fOn'ZOo(ZOp(yOq)aOr)nOs!_Ot%dOu'XOv(XOw(wOx)_Oy)mO!O%aO!W!lO!Y!mO!Z!mOP!daQ!dak!da!X!da~P&oOP&WOQ'sOk!di|!di~OP&XOQ'tOk!di!X!di~Of!mOl!_Om%fOn'ZOo(ZOp(yOq)aOr)nOs!_Ot%dOu'XOv(XOw(wOx)_Oy)mO!O%aO!W!lO!Y!mO!Z!mOP!diQ!dik!di!X!di~P&oOP&WOQ'sOk!dq|!dq~OP&XOQ'tOk!dq!X!dq~Of!mOl!_Om%fOn'ZOo(ZOp(yOq)aOr)nOs!_Ot%dOu'XOv(XOw(wOx)_Oy)mO!O%aO!W!lO!Y!mO!Z!mOP!dqQ!dqk!dq!X!dq~P&oOP&WOQ'sOk!dy|!dy~OP&XOQ'tOk!dy!X!dy~Of!mOl!_Om%fOn'ZOo(ZOp(yOq)aOr)nOs!_Ot%dOu'XOv(XOw(wOx)_Oy)mO!O%aO!W!lO!Y!mO!Z!mOP!dyQ!dyk!dy!X!dy~P&oOP&WOQ'sOk!d!R|!d!R~OP&XOQ'tOk!d!R!X!d!R~Of!mOl!_Om%fOn'ZOo(ZOp(yOq)aOr)nOs!_Ot%dOu'XOv(XOw(wOx)_Oy)mO!O%aO!W!lO!Y!mO!Z!mOP!d!RQ!d!Rk!d!R!X!d!R~P&oOP&WOQ'sOk!d!Z|!d!Z~OP&XOQ'tOk!d!Z!X!d!Z~Of!mOl!_Om%fOn'ZOo(ZOp(yOq)aOr)nOs!_Ot%dOu'XOv(XOw(wOx)_Oy)mO!O%aO!W!lO!Y!mO!Z!mOP!d!ZQ!d!Zk!d!Z!X!d!Z~P&oOP%hOQ'_Ok%jO!X!uX~P-TOP&WOQ'sOk&YO~OP&XOQ'tOk&ZO~O^'UO~O",
+     goto: "!&e!|PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP!}P!}!}#R#V#Y!}#]PPPP#a#f#i#r$P$b2d8W>QCvIr! fIr! mP2d2d! s!!S!!S!!c!!i!!o!#X!#`!#u!&TPPP#]!&^TUOZTSOZRoaR!UoTYOZV]OZ^Rf[Q!OfX#R!]!{%`%ag{f|!O!]!s!{!}#r$T%`%afyf|!O!]!s!{!}#r$T%`%aT!pz#T!b!^w!f!o#b#k#|$R$Z$^$d$f$j$k$n$p$y$z%O%P%S%T%W%X%[%]%_&U&`&i&p&w'OS!v!Y![Q#Z!`Q#[!aQ#]!bQ#^!cQ#_!dQ#`!eQ#b!gQ#c!hQ#d!iQ#e!jQ#f!kY#u#W$u%h&W&XQ#v#XS#w#Y#[Q#x#]Q#y#^Q#z#_Q#{#`Q#|#cQ#}#dQ$O#eQ$P#fY$U#v${%p&c&dQ$V#xQ$W#yQ$X#zQ$Y#{Q$Z#}Q$[$OQ$]$PQ$`$WQ$a$XQ$b$YQ$d$[Q$e$]Q$g$aQ$h$bQ$j$eQ$l$hQ$w%bQ$x%eQ$y%gQ${%iS$|$v$xQ$}%mQ%O%oQ%Q$}Q%R%sQ%S%uQ%U%RQ%V%xQ%W%zQ%Y%VQ%Z%}Q%[&PQ%^%ZQ%k%dQ%l'XQ%m'YQ%n'ZQ%o'[Q%p'_S%q%j%lQ%r'`Q%s'aQ%t'bQ%u'cQ%v%rQ%w'dQ%x'eQ%y'fQ%z'gQ%{%wQ%|'hQ%}'iQ&O'jQ&P'kQ&Q%|Q&R'lQ&S'mQ&T&RQ&['nQ&]%cQ&^'oQ&_'pQ&`'qQ&a'rQ&c'sQ&d'tS&e&Y&^S&f&Z&_Q&g'uQ&h'vQ&i'wQ&j'xQ&l&gQ&m&hQ&n'yQ&o'zQ&p'{Q&q'|Q&s&nQ&t&oQ&u'}Q&v(OQ&w(PQ&x(QQ&z&uQ&{&vQ&|(RQ&}(SQ'O(TQ'P(UQ'R&|Q'S&}x'W$o$q%f%n%t%y&O&S&V&a&b&j&k&q&r&x&y'P'Q'TW']!]!{%`%aW'^!l#T'U'VQ'`(XQ'a(YQ'b(ZQ'c([Q'd(]Q'e(^Q'f(_Q'g(`Q'h(aQ'i(bQ'j(cQ'k(dQ'l(eQ'm(fQ'u(gQ'v(hQ'w(iQ'x(jQ'y(kQ'z(lQ'{(mQ'|(nQ'}(oQ(O(pQ(P(qQ(Q(rQ(R(sQ(S(tQ(T(uQ(U(vQ(](wQ(^(xQ(_(yQ(`(zQ(a({Q(b(|Q(c(}Q(d)OQ(e)PQ(f)QQ(k)RQ(l)SQ(m)TQ(n)UQ(o)VQ(p)WQ(q)XQ(r)YQ(s)ZQ(t)[Q(u)]Q(v)^Q({)_Q(|)`Q(})aQ)O)bQ)P)cQ)Q)dQ)V)eQ)W)fQ)X)gQ)Y)hQ)Z)iQ)[)jQ)])kQ)^)lQ)c)mQ)d)nQ)i)oQ)j)pQ)k)qR)l)r,c!nw!Y![!]!`!a!b!c!d!e!f!g!h!i!j!k!l!o!{#T#W#X#Y#[#]#^#_#`#b#c#d#e#f#k#v#x#y#z#{#|#}$O$P$R$W$X$Y$Z$[$]$^$a$b$d$e$f$h$j$k$n$o$p$q$u$v$x$y$z${$}%O%P%R%S%T%V%W%X%Z%[%]%_%`%a%b%c%d%e%f%g%h%i%j%l%m%n%o%p%r%s%t%u%w%x%y%z%|%}&O&P&R&S&U&V&W&X&Y&Z&^&_&`&a&b&c&d&g&h&i&j&k&n&o&p&q&r&u&v&w&x&y&|&}'O'P'Q'T'U'V'X'Y'Z'['_'`'a'b'c'd'e'f'g'h'i'j'k'l'm'n'o'p'q'r's't'u'v'w'x'y'z'{'|'}(O(P(Q(R(S(T(U(X(Y(Z([(](^(_(`(a(b(c(d(e(f(g(h(i(j(k(l(m(n(o(p(q(r(s(t(u(v(w(x(y(z({(|(})O)P)Q)R)S)T)U)V)W)X)Y)Z)[)])^)_)`)a)b)c)d)e)f)g)h)i)j)k)l)m)n)o)p)q)r,U!nw!]!`!a!b!c!d!e!f!g!h!i!j!k!o!{#W#X#Y#[#]#^#_#`#b#c#d#e#f#k#v#x#y#z#{#|#}$O$P$R$W$X$Y$Z$[$]$^$a$b$d$e$f$h$j$k$n$o$p$q$u$v$x$y$z${$}%O%P%R%S%T%V%W%X%Z%[%]%_%`%a%b%c%d%e%f%g%h%i%j%l%m%n%o%p%r%s%t%u%w%x%y%z%|%}&O&P&R&S&U&V&W&X&Y&Z&^&_&`&a&b&c&d&g&h&i&j&k&n&o&p&q&r&u&v&w&x&y&|&}'O'P'Q'T'X'Y'Z'['_'`'a'b'c'd'e'f'g'h'i'j'k'l'm'n'o'p'q'r's't'u'v'w'x'y'z'{'|'}(O(P(Q(R(S(T(U(X(Y(Z([(](^(_(`(a(b(c(d(e(f(g(h(i(j(k(l(m(n(o(p(q(r(s(t(u(v(w(x(y(z({(|(})O)P)Q)R)S)T)U)V)W)X)Y)Z)[)])^)_)`)a)b)c)d)e)f)g)h)i)j)k)l)m)n)o)p)q)rS!w!Y'US!x!['VT#g!l#T,Y!mw!Y![!`!a!b!c!d!e!f!g!h!i!j!k!l!o#T#W#X#Y#[#]#^#_#`#b#c#d#e#f#k#v#x#y#z#{#|#}$O$P$R$W$X$Y$Z$[$]$^$a$b$d$e$f$h$j$k$n$o$p$q$u$v$x$y$z${$}%O%P%R%S%T%V%W%X%Z%[%]%_%b%c%d%e%f%g%h%i%j%l%m%n%o%p%r%s%t%u%w%x%y%z%|%}&O&P&R&S&U&V&W&X&Y&Z&^&_&`&a&b&c&d&g&h&i&j&k&n&o&p&q&r&u&v&w&x&y&|&}'O'P'Q'T'U'V'X'Y'Z'['_'`'a'b'c'd'e'f'g'h'i'j'k'l'm'n'o'p'q'r's't'u'v'w'x'y'z'{'|'}(O(P(Q(R(S(T(U(X(Y(Z([(](^(_(`(a(b(c(d(e(f(g(h(i(j(k(l(m(n(o(p(q(r(s(t(u(v(w(x(y(z({(|(})O)P)Q)R)S)T)U)V)W)X)Y)Z)[)])^)_)`)a)b)c)d)e)f)g)h)i)j)k)l)m)n)o)p)q)rX#U!]!{%`%aQ![u,Y!mw!Y![!`!a!b!c!d!e!f!g!h!i!j!k!l!o#T#W#X#Y#[#]#^#_#`#b#c#d#e#f#k#v#x#y#z#{#|#}$O$P$R$W$X$Y$Z$[$]$^$a$b$d$e$f$h$j$k$n$o$p$q$u$v$x$y$z${$}%O%P%R%S%T%V%W%X%Z%[%]%_%b%c%d%e%f%g%h%i%j%l%m%n%o%p%r%s%t%u%w%x%y%z%|%}&O&P&R&S&U&V&W&X&Y&Z&^&_&`&a&b&c&d&g&h&i&j&k&n&o&p&q&r&u&v&w&x&y&|&}'O'P'Q'T'U'V'X'Y'Z'['_'`'a'b'c'd'e'f'g'h'i'j'k'l'm'n'o'p'q'r's't'u'v'w'x'y'z'{'|'}(O(P(Q(R(S(T(U(X(Y(Z([(](^(_(`(a(b(c(d(e(f(g(h(i(j(k(l(m(n(o(p(q(r(s(t(u(v(w(x(y(z({(|(})O)P)Q)R)S)T)U)V)W)X)Y)Z)[)])^)_)`)a)b)c)d)e)f)g)h)i)j)k)l)m)n)o)p)q)rW#V!]!{%`%aR'V(W,c!mw!Y![!]!`!a!b!c!d!e!f!g!h!i!j!k!l!o!{#T#W#X#Y#[#]#^#_#`#b#c#d#e#f#k#v#x#y#z#{#|#}$O$P$R$W$X$Y$Z$[$]$^$a$b$d$e$f$h$j$k$n$o$p$q$u$v$x$y$z${$}%O%P%R%S%T%V%W%X%Z%[%]%_%`%a%b%c%d%e%f%g%h%i%j%l%m%n%o%p%r%s%t%u%w%x%y%z%|%}&O&P&R&S&U&V&W&X&Y&Z&^&_&`&a&b&c&d&g&h&i&j&k&n&o&p&q&r&u&v&w&x&y&|&}'O'P'Q'T'U'V'X'Y'Z'['_'`'a'b'c'd'e'f'g'h'i'j'k'l'm'n'o'p'q'r's't'u'v'w'x'y'z'{'|'}(O(P(Q(R(S(T(U(X(Y(Z([(](^(_(`(a(b(c(d(e(f(g(h(i(j(k(l(m(n(o(p(q(r(s(t(u(v(w(x(y(z({(|(})O)P)Q)R)S)T)U)V)W)X)Y)Z)[)])^)_)`)a)b)c)d)e)f)g)h)i)j)k)l)m)n)o)p)q)rZ#P!]!{#Q%`%aX#S!]!{%`%akxfz|!O!]!s!{!}#T#r$T%`%akvfz|!O!]!s!{!}#T#r$T%`%aQZORdZQi_R!PiQl`QpbY!Rlp!W!z#lQ!WsU!z!]%`%aR#l!{S^OZRg^Q|fW!q|!s!}$TQ!s!OW!}!]!{%`%aR$T#rQ!owS#a!f%fx#h!o#k$R$^$f$k$n$q$z%P%T%X%]%_&b&k&r&y'Q'TQ#k$pS#u#b%nQ$R$yS$U#|%tQ$^%OS$c$Z%yQ$f%SS$i$d&OQ$k%WS$m$j&SQ$n%[Q$q$oQ$z&UQ%P&`Q%T&iQ%X&pQ%]&wQ%_'OQ&b&VQ&k&aQ&r&jQ&y&qQ'Q&xR'T'PW#Q!]!{%`%aR#p#QSXOZRcV",
+     nodeNames: "⚠ ReporterLeftArgs1 ReporterLeftArgs2 GlobalStr ExtensionStr BreedStr PlusMinus Own Set Let To End And Or Identifier Directive Command Reporter Extension TurtleVar PatchVar LinkVar Constant Unsupported SpecialReporter SpecialCommand BreedToken AndOr Reporter0Args Reporter1Args Reporter2Args Reporter3Args Reporter4Args Reporter5Args Reporter6Args SpecialReporter0Args SpecialReporter1Args SpecialReporter2Args SpecialReporter3Args SpecialReporter4Args SpecialReporter5Args SpecialReporter6Args LineComment Program CloseBracket Extensions OpenBracket Globals Breed BreedDeclarative BreedPlural BreedSingular BreedsOwn Unrecognized OpenParen CloseParen Numeric String Procedure ProcedureName Arguments ProcedureContent CommandStatement Arg CodeBlock Value Reporters VariableName List Literal AnonymousProcedure AnonArguments Arrow ReporterBlock Property VariableDeclaration NewVariableDeclaration SetVariable",
+     maxTerm: 89,
      nodeProps: [
-       ["openedBy", 35,"OpenBracket"],
-       ["closedBy", 37,"CloseBracket"]
+       ["openedBy", 44,"OpenBracket"],
+       ["closedBy", 46,"CloseBracket"]
      ],
-     skippedNodes: [0,24,33],
+     skippedNodes: [0,6,12,13,15,24,42],
      repeatNodeCount: 7,
-     tokenData: "$Z~R[XYwYZw]^wpqwrs!Yxy!wyz!|}!O#R!Q![#[!]!^#t!}#O$P#P#Q$U~|S!l~XYwYZw]^wpqw~!]TOr!Yrs!ls#O!Y#O#P!q#P~!Y~!qO!O~~!tPO~!Y~!|O!o~~#RO!p~~#UQ!Q![#[!`!a#o~#aQ}~!O!P#g!Q![#[~#lP}~!Q![#g~#tO!q~~#yQq~OY#tZ~#t~$UOu~~$ZOs~",
+     tokenData: "%S~R^XY}YZ}]^}pq}rs!`wx!}xy#gyz#l}!O#q!O!P#}!Q![$]!]!^$m!}#O$x#P#Q$}~!SS!y~XY}YZ}]^}pq}~!cTOr!`rs!rs#O!`#O#P!w#P~!`~!wO!Z~~!zPO~!`~#QTOw!}wx!rx#O!}#O#P#a#P~!}~#dPO~!}~#lO!W~~#qO!X~~#tR!O!P#}!Q![$]!`!a$h~$QP!Q![$T~$YP!Y~!Q![$T~$bQ!Y~!O!P$T!Q![$]~$mO!j~~$rQz~OY$mZ~$m~$}O!O~~%SO|~",
      tokenizers: [0, keyword],
-     topRules: {"Program":[0,34]},
+     topRules: {"Program":[0,43]},
+     specialized: [{term: 17, get: (value, stack) => (specializeReporter(value) << 1), external: specializeReporter},{term: 24, get: (value, stack) => (specializeSpecialReporter(value) << 1), external: specializeSpecialReporter}],
      tokenPrec: 0
    });
-
-   /** NetLogoType: Types that are available in NetLogo. */
-   // Maybe we need to add command blocks & anonymous procedures
-   var NetLogoType;
-   (function (NetLogoType) {
-       NetLogoType[NetLogoType["Unit"] = 0] = "Unit";
-       NetLogoType[NetLogoType["Wildcard"] = 1] = "Wildcard";
-       NetLogoType[NetLogoType["String"] = 2] = "String";
-       NetLogoType[NetLogoType["Number"] = 3] = "Number";
-       NetLogoType[NetLogoType["List"] = 4] = "List";
-       NetLogoType[NetLogoType["Boolean"] = 5] = "Boolean";
-       NetLogoType[NetLogoType["Agent"] = 6] = "Agent";
-       NetLogoType[NetLogoType["AgentSet"] = 7] = "AgentSet";
-       NetLogoType[NetLogoType["Nobody"] = 8] = "Nobody";
-       NetLogoType[NetLogoType["Turtle"] = 9] = "Turtle";
-       NetLogoType[NetLogoType["Patch"] = 10] = "Patch";
-       NetLogoType[NetLogoType["Link"] = 11] = "Link";
-       NetLogoType[NetLogoType["CommandBlock"] = 12] = "CommandBlock";
-       NetLogoType[NetLogoType["CodeBlock"] = 13] = "CodeBlock";
-       NetLogoType[NetLogoType["NumberBlock"] = 14] = "NumberBlock";
-       NetLogoType[NetLogoType["Reporter"] = 15] = "Reporter";
-       NetLogoType[NetLogoType["Symbol"] = 16] = "Symbol";
-       NetLogoType[NetLogoType["Other"] = 17] = "Other";
-   })(NetLogoType || (NetLogoType = {}));
-   /** Breed: Dynamic metadata of a single breed. */
-   class Breed {
-       /** Build a breed. */
-       constructor(Singular, Plural, Variables) {
-           this.Singular = Singular;
-           this.Plural = Plural;
-           this.Variables = Variables;
-       }
-   }
-   /** Procedure: Dynamic metadata of a procedure. */
-   class Procedure {
-       /** Build a procedure. */
-       constructor(Name, Arguments, Variables, AnonymousProcedures, PositionStart, PositionEnd) {
-           this.Name = Name;
-           this.Arguments = Arguments;
-           this.Variables = Variables;
-           this.AnonymousProcedures = AnonymousProcedures;
-           this.PositionStart = PositionStart;
-           this.PositionEnd = PositionEnd;
-       }
-   }
-   /** Procedure: Dynamic metadata of an anonymous procedure. */
-   class AnonymousProcedure {
-       /** Build an anonymous procedure. */
-       constructor(From, To, Arguments, Variables) {
-           this.From = From;
-           this.To = To;
-           this.Arguments = Arguments;
-           this.Variables = Variables;
-       }
-   }
-   /** LocalVariable: metadata for local variables */
-   class LocalVariable {
-       /** Build a local variable. */
-       constructor(Name, Type, CreationPos) {
-           this.Name = Name;
-           this.Type = Type;
-           this.CreationPos = CreationPos;
-       }
-   }
 
    /** StateNetLogo: Editor state for the NetLogo Language. */
    class StateNetLogo {
@@ -25154,19 +25014,26 @@
                }
                // get procedures
                if (Cursor.node.name == 'Procedure') {
-                   // TODO: From & To.
-                   let procedure = new Procedure('', [], [], [], 0, 0);
+                   let procedure = new Procedure();
+                   procedure.PositionStart = Cursor.node.from;
+                   procedure.PositionEnd = Cursor.node.to;
+                   procedure.IsCommand =
+                       this.getText(State, Cursor.node.getChildren('To')[0].node).toLowerCase() == 'to';
                    Cursor.node.getChildren('ProcedureName').map((node) => {
                        procedure.Name = this.getText(State, node);
                    });
                    procedure.Arguments = this.getArgs(Cursor.node, State);
                    procedure.Variables = this.getLocalVars(Cursor.node, State, false);
+                   // Anonymous procedure
                    Cursor.node.cursor().iterate((noderef) => {
                        if (noderef.node.to > Cursor.node.to) {
                            return false;
                        }
                        if (noderef.name == 'AnonymousProcedure') {
-                           let anonProc = new AnonymousProcedure(noderef.from, noderef.to, [], procedure.Variables);
+                           let anonProc = new AnonymousProcedure();
+                           anonProc.PositionStart = Cursor.node.from;
+                           anonProc.PositionEnd = Cursor.node.to;
+                           anonProc.Variables = procedure.Variables;
                            let args = [];
                            let Node = noderef.node;
                            Node.getChildren('AnonArguments').map((node) => {
@@ -25199,7 +25066,7 @@
                if (noderef.node.to > Node.to) {
                    return false;
                }
-               if (noderef.name == 'ProcedureContent') {
+               if (noderef.name == 'CommandStatement') {
                    noderef.node.getChildren('VariableDeclaration').map((node) => {
                        node.getChildren('NewVariableDeclaration').map((subnode) => {
                            subnode.getChildren('Identifier').map((subsubnode) => {
@@ -25258,28 +25125,40 @@
    });
 
    /** AutoCompletion: Auto completion service for a NetLogo model. */
+   /* Possible Types of Autocompletion Tokens:
+   Directive; Constant; Extension;
+   Variable-Builtin; Variable-Global; Variable-Breed;
+   Breed;
+   Command; Command-Custom; Reporter; Reporter-Custom.
+   */
    class AutoCompletion {
        constructor() {
-           /** allIdentifiers: All built-in identifiers. */
-           this.allIdentifiers = [
-               'end',
-               ...commands,
-               ...reporters,
-               ...turtleVars,
-               ...patchVars,
-               ...linkVars,
-               ...constants,
+           /** BuiltinVariables: The completion list of built-in variables. */
+           this.BuiltinVariables = this.KeywordsToCompletions([...turtleVars, ...patchVars, ...linkVars], 'Variable-Builtin');
+           /** SharedIdentifiers: Shared built-in completions. */
+           this.SharedIdentifiers = [
+               { label: 'end', type: 'Directive' },
+               ...this.BuiltinVariables,
+               ...this.KeywordsToCompletions(constants, 'Constant'),
            ];
+           /** LastExtensions: Cached extension list. */
+           this.LastExtensions = '$NIL$';
+           /** LastPrimitives: Cached primitive list. */
+           this.LastPrimitives = [];
            /** ParentMaps: Maps of keywords to parents.  */
            this.ParentMaps = {
-               Extensions: this.KeywordsToCompletions(extensions, 'Extension'),
-               Program: this.KeywordsToCompletions(directives, 'Extension'),
+               Extensions: this.KeywordsToCompletions(PrimitiveManager.GetExtensions(), 'Extension'),
+               Program: this.KeywordsToCompletions(directives, 'Directive'),
                Globals: [],
                BreedsOwn: [],
                Breed: [],
                ProcedureName: [],
-               Arguments: [],
-               VariableName: this.KeywordsToCompletions([...turtleVars, ...patchVars, ...linkVars], 'Variables'), // built-in variable names
+               Arguments: [], // Arguments of procedures
+               /* VariableName: this.KeywordsToCompletions(
+                 [...turtleVars, ...patchVars, ...linkVars],
+                 'Variable-Builtin'
+               ), // Built-in variable names*/
+               // Temporary fix
            };
            /** ParentTypes: Types of keywords.  */
            this.ParentTypes = Object.keys(this.ParentMaps);
@@ -25298,7 +25177,10 @@
                    results = results.filter((ext) => !State.Extensions.includes(ext.label));
                    break;
                case 'VariableName':
-                   results = results.concat(this.KeywordsToCompletions(State.Globals, 'Variables'));
+                   results = results.concat(this.KeywordsToCompletions(State.Globals, 'Variable'));
+                   break;
+               case 'Program':
+                   results = results.concat(this.KeywordsToCompletions([...State.Breeds.values()].map((breed) => breed.Plural), 'Directive'));
                    break;
            }
            return results;
@@ -25309,63 +25191,58 @@
            // Preparation
            const node = syntaxTree(Context.state).resolveInner(Context.pos, -1);
            const from = /\./.test(node.name) ? node.to : node.from;
+           const nodeName = node.type.name;
            const parentName = (_b = (_a = node.parent) === null || _a === void 0 ? void 0 : _a.type.name) !== null && _b !== void 0 ? _b : '';
            const grandparentName = (_e = (_d = (_c = node.parent) === null || _c === void 0 ? void 0 : _c.parent) === null || _d === void 0 ? void 0 : _d.type.name) !== null && _e !== void 0 ? _e : '';
-           const nodeName = node.type.name;
            const state = Context.state.field(stateExtension);
-           console.log(grandparentName + ' / ' + parentName + ' / ' + nodeName);
-           let curr = node;
+           // Debug output
+           /* let curr = node;
            let parents = [];
            while (curr.parent) {
-               parents.push(curr.parent.name);
-               curr = curr.parent;
+             parents.push(curr.parent.name);
+             curr = curr.parent;
            }
-           console.log(node.name, parents);
+           console.log(node.name, parents); */
+           console.log(grandparentName + ' / ' + parentName + ' / ' + nodeName);
            // If the parent/grand parent node is of a type specified in this.maps
-           if (this.ParentTypes.indexOf(parentName) > -1) {
-               return {
-                   from,
-                   options: this.GetParentKeywords(parentName, state),
-               };
-           }
-           else if (this.ParentTypes.indexOf(grandparentName) > -1 &&
-               (parentName != 'Procedure' || nodeName == 'To')) {
-               return {
-                   from,
-                   options: this.GetParentKeywords(grandparentName, state),
-               };
-           }
-           else if (nodeName == 'Identifier') {
-               let results = this.allIdentifiers;
+           if (this.ParentTypes.indexOf(parentName) > -1)
+               return { from, options: this.GetParentKeywords(parentName, state) };
+           if (this.ParentTypes.indexOf(grandparentName) > -1 &&
+               (parentName != 'Procedure' || nodeName == 'To'))
+               return { from, options: this.GetParentKeywords(grandparentName, state) };
+           // Otherwise, try to build a full list
+           if (nodeName == 'Identifier') {
+               let results = this.SharedIdentifiers;
                // Extensions
-               const extensions = Context.state.field(stateExtension).Extensions;
-               if (extensions.length > 0) {
-                   results = results.concat(this.FilterExtensions(extensionCommands.concat(extensionReporters), extensions));
+               const extensionNames = state.Extensions.join(',');
+               if (this.LastExtensions != extensionNames) {
+                   this.LastPrimitives = PrimitiveManager.GetCompletions(state.Extensions);
+                   this.LastExtensions = extensionNames;
                }
+               results = results.concat(this.LastPrimitives);
                // Breeds
-               const breeds = Context.state.field(stateExtension).Breeds;
-               if (breeds.size > 0) {
-                   for (const breed of breeds.values()) {
-                       results.push(breed.Plural + '-own');
-                   }
+               if (state.Breeds.size > 0) {
+                   results.push(...this.KeywordsToCompletions(state.GetBreedNames(), 'Breed'));
+                   results.push(...this.KeywordsToCompletions(state.GetBreedVariables(), 'Variable-Breed'));
                }
-               // Mappings
-               return {
-                   from,
-                   options: this.KeywordsToCompletions(results, 'Identifier'),
-               };
+               // Global Variables
+               results.push(...this.KeywordsToCompletions(state.Globals, 'Variable-Global'));
+               results.push(...this.KeywordsToCompletions(state.WidgetGlobals, 'Variable-Global'));
+               // Custom Procedures
+               for (var Procedure of state.Procedures.values()) {
+                   results.push({
+                       label: Procedure.Name,
+                       type: Procedure.IsCommand ? 'Command-Custom' : 'Reporter-Custom',
+                   });
+               }
+               return { from, options: results };
            }
-           else
-               return null;
+           // Failed
+           return null;
        }
        /** GetCompletionSource: Get the completion source for a NetLogo model. */
        GetCompletionSource() {
            return (Context) => this.GetCompletion(Context);
-       }
-       /** FilterExtensions: Filter keywords for extensions. */
-       FilterExtensions(Keyword, Extensions) {
-           Extensions = Extensions.map((Extension) => Extension + ':');
-           return Keyword.filter((Current) => Extensions.findIndex((Extension) => Current.startsWith(Extension)) != -1);
        }
    }
 
@@ -25378,6 +25255,7 @@
                String: tags$1.string,
                LineComment: tags$1.lineComment,
                '[ ]': tags$1.paren,
+               BreedDirective: tags$1.strong,
                Directive: tags$1.strong,
                Numeric: tags$1.string,
                Extension: tags$1.bool,
@@ -25474,6 +25352,7 @@
        'Unrecognized identifier _': (Name) => `Nothing called "${Name}" was found. Did you spell it correctly?`,
        'Unrecognized global statement _': (Name) => `Cannot recognize "${Name}" as a proper statement here. Did you spell it correctly?`,
        'Unrecognized statement _': (Name) => `Cannot recognize "${Name}" as a piece of NetLogo code. Did you put it in the correct place?`,
+       'Unsupported statement _': (Name) => `"${Name}" is not supported in NetLogo Web`,
        '~VariableName': (Name) => `A variable. `,
        '~ProcedureName': (Name) => `The name of a procedure. `,
        '~Arguments/Identifier': (Name) => `The name of an argument. `,
@@ -25682,8 +25561,11 @@
    }
 
    const lightTheme = EditorView.theme({
-       '&': {
+       '&.cm-editor': {
            height: '100%',
+           '&.cm-focused': {
+               outline: 'none',
+           },
        },
        '.cm-diagnostic': {
            fontSize: '0.9em',
@@ -25695,7 +25577,7 @@
        '.cm-tooltip.cm-tooltip-explain': {
            fontSize: '0.9em',
            backgroundColor: '#FFFFF0',
-           padding: '0.2em 0.3em',
+           padding: '0.3em 0.5em',
            '& .cm-tooltip-arrow:before': {
                borderTopColor: '#FFFFF0',
                backgroundColor: '#FFFFF0',
@@ -25704,6 +25586,9 @@
                borderTopColor: 'transparent',
                borderBottomColor: '#FFFFF0',
            },
+       },
+       '.cm-editor.cm-focused': {
+           outline: 'none',
        },
    });
 
@@ -27356,25 +27241,17 @@
        syntaxTree(view.state)
            .cursor()
            .iterate((noderef) => {
-           if (noderef.name == 'Identifier') {
-               const Node = noderef.node;
-               const value = view.state.sliceDoc(noderef.from, noderef.to);
-               if (!checkValid(Node, value, view.state, parseState, breedNames, breedVars)) {
-                   diagnostics.push({
-                       from: noderef.from,
-                       to: noderef.to,
-                       severity: 'warning',
-                       message: Localized.Get('Unrecognized identifier _', value),
-                       /* actions: [
-                         {
-                           name: 'Remove',
-                           apply(view, from, to) {
-                             view.dispatch({ changes: { from, to } });
-                           },
-                         },
-                       ], */
-                   });
-               }
+           if (noderef.name != 'Identifier')
+               return;
+           const Node = noderef.node;
+           const value = view.state.sliceDoc(noderef.from, noderef.to);
+           if (!checkValid(Node, value, view.state, parseState, breedNames, breedVars)) {
+               diagnostics.push({
+                   from: noderef.from,
+                   to: noderef.to,
+                   severity: 'warning',
+                   message: Localized.Get('Unrecognized identifier _', value),
+               });
            }
        });
        return diagnostics;
@@ -27422,23 +27299,21 @@
        let procedureVars = [];
        if (procedureName != '') {
            let procedure = parseState.Procedures.get(procedureName.toLowerCase());
-           let vars = [];
            procedure === null || procedure === void 0 ? void 0 : procedure.Variables.map((variable) => {
                // makes sure the variable has already been created
                if (variable.CreationPos < Node.from) {
-                   vars.push(variable.Name);
+                   procedureVars.push(variable.Name);
                }
            });
            procedure === null || procedure === void 0 ? void 0 : procedure.AnonymousProcedures.map((anonProc) => {
-               if (Node.from >= anonProc.From && Node.to <= anonProc.To) {
-                   anonProc.Variables.map((variable) => {
-                       vars.push(variable.Name);
-                   });
-                   vars = vars.concat(anonProc.Arguments);
+               if (Node.from >= anonProc.PositionStart &&
+                   Node.to <= anonProc.PositionEnd) {
+                   anonProc.Variables.map((variable) => variable.Name).forEach((name) => procedureVars.push(name));
+                   procedureVars.push(...anonProc.Arguments);
                }
            });
            if (procedure === null || procedure === void 0 ? void 0 : procedure.Arguments) {
-               procedureVars = vars.concat(procedure.Arguments);
+               procedureVars.push(...procedure.Arguments);
            }
        }
        return procedureVars.includes(value);
@@ -27475,7 +27350,7 @@
    const BreedLinter = buildLinter((view, parseState) => {
        const diagnostics = [];
        const breedNames = parseState.GetBreedNames();
-       parseState.GetBreedVariables();
+       const breedVars = parseState.GetBreedVariables();
        syntaxTree(view.state)
            .cursor()
            .iterate((noderef) => {
@@ -27486,7 +27361,7 @@
                const value = view.state
                    .sliceDoc(noderef.from, noderef.to)
                    .toLowerCase();
-               if (!checkValidBreed(Node, value, view.state, parseState, breedNames)) {
+               if (!checkValidBreed(Node, value, view.state, parseState, breedNames, breedVars)) {
                    diagnostics.push({
                        from: noderef.from,
                        to: noderef.to,
@@ -27545,42 +27420,12 @@
                isValid = true;
            }
        }
+       if (!isValid) {
+           // Why do we need this one? We need it to check if it is actually a valid identifier
+           isValid = checkValid(node, value, state, parseState, breedNames, breedVars);
+       }
        return isValid;
    };
-
-   // UnrecognizedLinter: Checks if something at the top layer isn't a procedure, global, etc.
-   const UnrecognizedLinter = buildLinter((view, parseState) => {
-       const diagnostics = [];
-       syntaxTree(view.state)
-           .cursor()
-           .iterate((node) => {
-           if (node.name == '⚠' && node.to != node.from) {
-               // let curr = node.node
-               // let parents: string []=[]
-               // while (curr.parent){
-               //   parents.push(curr.parent.name)
-               //   curr = curr.parent
-               // }
-               // console.log(parents)
-               const value = view.state.sliceDoc(node.from, node.to);
-               diagnostics.push({
-                   from: node.from,
-                   to: node.to,
-                   severity: 'warning',
-                   message: Localized.Get('Unrecognized statement _', value),
-                   /* actions: [
-                     {
-                       name: 'Remove',
-                       apply(view, from, to) {
-                         view.dispatch({ changes: { from, to } });
-                       },
-                     },
-                   ], */
-               });
-           }
-       });
-       return diagnostics;
-   });
 
    // CompilerLinter: Present all linting results from the compiler.
    const CompilerLinter = linter((view) => {
@@ -27607,13 +27452,49 @@
        });
    });
 
+   // UnrecognizedLinter: Checks if something at the top layer isn't a procedure, global, etc.
+   const UnsupportedLinter = buildLinter((view, parseState) => {
+       const diagnostics = [];
+       syntaxTree(view.state)
+           .cursor()
+           .iterate((node) => {
+           if (node.name == 'Unsupported') {
+               // let curr = node.node
+               // let parents: string []=[]
+               // while (curr.parent){
+               //   parents.push(curr.parent.name)
+               //   curr = curr.parent
+               // }
+               // console.log(parents)
+               const value = view.state.sliceDoc(node.from, node.to);
+               diagnostics.push({
+                   from: node.from,
+                   to: node.to,
+                   severity: 'warning',
+                   message: Localized.Get('Unsupported statement _', value),
+                   /* actions: [
+                     {
+                       name: 'Remove',
+                       apply(view, from, to) {
+                         view.dispatch({ changes: { from, to } });
+                       },
+                     },
+                   ], */
+               });
+           }
+       });
+       return diagnostics;
+   });
+
    const netlogoLinters = [
        CompilerLinter,
        RuntimeLinter,
-       UnrecognizedLinter,
+       // UnrecognizedLinter,
        UnrecognizedGlobalLinter,
        IdentifierLinter,
        BreedLinter,
+       // ArgumentLinter,
+       UnsupportedLinter,
    ];
 
    /** GalapagosEditor: The editor component for NetLogo Web / Turtle Universe. */
@@ -27650,6 +27531,7 @@
                    break;
                default:
                    this.Language = NetLogo();
+                   Extensions.push(preprocessStateExtension);
                    Extensions.push(stateExtension);
                    Dictionary.ClickHandler = Options.OnDictionaryClick;
                    if (!this.Options.OneLine) {
@@ -27741,6 +27623,10 @@
        /** GetState: Get the current parser state of the NetLogo code. */
        GetState() {
            return this.CodeMirror.state.field(stateExtension);
+       }
+       /** GetPreprocessState: Get the preprocess parser state of the NetLogo code. */
+       GetPreprocessState() {
+           return this.CodeMirror.state.field(preprocessStateExtension);
        }
        /** SetCursorPosition: Set the cursor position of the editor. */
        SetCursorPosition(position) {

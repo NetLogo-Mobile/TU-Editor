@@ -140,11 +140,11 @@ Editor = function() {
 		var List = Dialog.children("ul").empty();
 		Dialog.children("h4").text(Localized.Get("更多功能"));
 		var Features = {};
-		Features[Localized.Get("选择全部")] = Editor.Galapagos.SelectAll;
-		Features[Localized.Get("撤销操作")] = Editor.Galapagos.Undo;
-		Features[Localized.Get("重做操作")] = Editor.Galapagos.Redo;
-		Features[Localized.Get("跳转到行")] = Editor.Galapagos.ShowJumpTo;
-		Features[Localized.Get("重置代码")] = Editor.Reset;
+		Features[Localized.Get("选择全部")] = () => Editor.Galapagos.SelectAll();
+		Features[Localized.Get("撤销操作")] = () => Editor.Galapagos.Undo();
+		Features[Localized.Get("重做操作")] = () => Editor.Galapagos.Redo();
+		Features[Localized.Get("跳转到行")] = () => Editor.Galapagos.ShowJumpTo();
+		Features[Localized.Get("重置代码")] = () => Editor.Reset();
 		for (var Feature in Features) {
 			$(`<li>${Feature}</li>`).attr("Tag", Feature).appendTo(List).click(function() {
 				Features[$(this).attr("Tag")]();
@@ -312,7 +312,7 @@ Commands = function() {
 		Commands.Container.css("display", "none");
 		Commands.Visible = false;
 		bodyScrollLock.clearAllBodyScrollLocks();
-		bodyScrollLock.disableBodyScroll(document.querySelector('.CodeMirror-scroll'), { allowTouchMove: () => true });
+		bodyScrollLock.disableBodyScroll(document.querySelector('.cm-scroller'), { allowTouchMove: () => true });
 		if (Editor.CodeRefreshed) Galapagos.SetCursorPosition(0);
 	}
 

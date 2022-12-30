@@ -486,9 +486,8 @@ Commands = function() {
 				`);
 				break;
 			case "RuntimeError":
-				Output = $(`
-					<p class="RuntimeError output">${Localized.Get(Content)}</p>
-				`);
+				Output = $(`<p class="RuntimeError output"></p>`);
+				Output.get(0).innerText = Localized.Get(Content);
 				break;
 			case "Succeeded":
 				Output = $(`

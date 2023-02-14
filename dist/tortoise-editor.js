@@ -144,6 +144,7 @@ Editor = function() {
 		Features[Localized.Get("撤销操作")] = () => Editor.Galapagos.Undo();
 		Features[Localized.Get("重做操作")] = () => Editor.Galapagos.Redo();
 		Features[Localized.Get("跳转到行")] = () => Editor.Galapagos.ShowJumpTo();
+		Features[Localized.Get("整理代码")] = () => Editor.Galapagos.PrettifyAll();
 		Features[Localized.Get("重置代码")] = () => Editor.Reset();
 		for (var Feature in Features) {
 			$(`<li>${Feature}</li>`).attr("Tag", Feature).appendTo(List).click(function() {

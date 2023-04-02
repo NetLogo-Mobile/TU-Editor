@@ -59,7 +59,7 @@ p {
 }
 
 /** Editor Stylesheet **/
-#Main-Editor {
+.editor {
 	width: 100%;
 	height: 100%;
 	line-height: 1.3;
@@ -67,7 +67,7 @@ p {
 	flex-direction: column;
 }
 
-#Main-Editor .CodeMirror {
+.editor .CodeMirror {
 	width: 100%;
 	height: 100%;
 	/* font-size: 0.95em; some devices have a larger font =_= */
@@ -134,7 +134,7 @@ p {
 }
 
 /* Overlays */
-.Overlays div {
+.overlays div {
 	top: 50%;
 	left: 50%;
 	z-index: 255;
@@ -144,12 +144,12 @@ p {
 	transform: translate(-50%, -50%) translateZ(0) !important;
 }
 
-.Backdrop {
+.backdrop {
 	background: rgba(234, 234, 234, 0.9);
 }
 
 @supports ((-webkit-backdrop-filter: blur(2em)) or (backdrop-filter: blur(2em))) {
-	.Backdrop {
+	.backdrop {
 		backdrop-filter: blur(3px);
 		-webkit-backdrop-filter: blur(3px);
 		background: rgba(234, 234, 234, 0.6);
@@ -157,21 +157,21 @@ p {
 }
 
 /* Dialog: Rotate Screen */
-#Rotate-Screen {
+.rotate-screen {
 	width: 16em;
 	cursor: pointer;
 	padding: 0.75em;
 	line-height: 1.4;
 }
 
-#Rotate-Screen img {
+.rotate-screen img {
 	float: left;
 	width: 2.3em;
 	height: 2.3em;
 	margin: 0 0.5em 0 0;
 }
 
-#Rotate-Screen p {
+.rotate-screen p {
 	font-size: 0.9em;
 }
 
@@ -432,7 +432,7 @@ div.command {
 	appearance: none;
 }
 
-.command-line #Command-Input {
+.command-line .command-input {
 	flex: 1 auto;
 	flex-grow: 1;
 	width: 1.4em;
@@ -440,21 +440,21 @@ div.command {
 	height: 2rem;
 }
 
-.command-line #Command-Input .cm-editor {
+.command-line .command-input .cm-editor {
 	height: auto;
 	font-size: 1em;
 	background: #FFF;
 	border-radius: 0.24rem;
 }
 
-.command-line #Command-Input .cm-editor .cm-gutters {
+.command-line .command-input .cm-editor .cm-gutters {
 	display: none;
 }
 
-.command-line #Command-Input .cm-editor .cm-scroller {
+.command-line .command-input .cm-editor .cm-scroller {
 	line-height: 1.7;
 }
 
-.command-line #Command-Input .cm-editor .cm-activeLine {
+.command-line .command-input .cm-editor .cm-activeLine {
 	background: transparent;
 }

@@ -17,7 +17,7 @@
 </head>
 <body>
 	<div id="Container">
-		<div id="Command-Center" class="command">
+		<div class="command">
 			<div class="command-output">
 				<p class="Comment output Keep">; <span class="Localized">你可以在这里输入 NetLogo 代码，试试会发生什么。</span></p>
 				<p class="Comment output Keep">; <span class="Localized">不同的主语决定了代码会“由谁执行”。例如，“海龟”的意思是让所有海龟一起执行。你也可以由“观察者”向海龟发布命令：</span> <code>ask turtles [ fd 1 ]</code></p>
@@ -38,23 +38,23 @@
 				<ul class="SeeAlso"></ul>
 				<p><a href="javascript:void(0)" onclick="Commands.HideFullText(true);"><span class="Localized">返回上一页……</span></a></p>
 			</div>
-			<div id="Command-Line" class="command-line">
+			<div class="command-line">
 				<div class="wrapper">
-					<select name="objectives" class="darkmode-ignore" id="Command-Objective">
+					<select name="objectives" class="darkmode-ignore">
 						<option class="Localized" value="observer">观察者</option>
 						<option class="Localized" value="turtles">所有海龟</option>
 						<option class="Localized" value="patches">所有格子</option>
 						<option class="Localized" value="links">所有链接</option>
 					</select>
-					<div id="Command-Input"></div>
+					<div class="command-input"></div>
 				</div>
 			</div>
 		</div>
-		<div id="Main-Editor">
-			<div id="Main-Tips"></div>
-			<div id="Main-CodeMirror"></div>
-			<div class="Overlays">
-				<div id="Rotate-Screen" class="Backdrop">
+		<div class="editor">
+			<div class="codemirror-tips"></div>
+			<div class="codemirror"></div>
+			<div class="overlays">
+				<div class="rotate-screen backdrop">
 					<img src="images/rotate.png" />
 					<p class="Localized">编辑器支持竖屏使用。旋转屏幕获得最佳体验！</p>
 				</div>
@@ -73,21 +73,17 @@
 				Element.src = Name + "?" + Date.now();
 				document.body.appendChild(Element);
 			};
+
 			// Basic scripts
 			window.modelConfig = {};
-			LoadScript("tortoise-editor.js");
-			// Load event
-			window.addEventListener("load", function () {
-				Editor.Initialize();
-				Commands.Initialize();
-				PostMessage(navigator.userAgent);
-			})
+			LoadScript("tortuga-editor.js");
+
 			// Messenger
 			if (navigator.userAgent.indexOf("ZFBrowser") != -1) {
 				window.PostMessage = function(Data) {
 					if (typeof ZFCallback != "undefined") ZFCallback(Data);
 				};
-			} else {
+			} else if (window.location.href.indexOf("localhost") == -1) {
 				if (window && window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.unityControl) {
 					window.PostMessage = function (Result) {
 						window.webkit.messageHandlers.unityControl.postMessage(Result);
@@ -99,12 +95,16 @@
 						return Result;
 					}
 				}
+			} else {
+				window.PostMessage = null;
 			}
 
-			// Command Center
-			window.addEventListener("load", function() {
-				const scrollHeight = document.querySelector('.command-output').scrollHeight;
-				document.querySelector('.command-output').scrollTop = scrollHeight;
+			// Initialize
+			window.addEventListener("load", function () {
+				window.Editor = new TurtleEditor(document.getElementById("Container"), PostMessage);
+				window.EditorTab = window.Editor.EditorTabs[0];
+				window.Commands = window.Editor.CommandTab;
+				if (PostMessage != null) PostMessage(navigator.userAgent);
 			});
 		})();
 	</script>

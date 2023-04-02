@@ -1,4 +1,10 @@
 /package-lock.json
+/dist/*.exe
+/dist/Caddyfile
+/dist/*.d.ts
+/dist/*/*.d.ts
+/dist/*/*/*.d.ts
+/dist/*/*/*/*.d.ts
 node_modules
 .DS_Store
 src/.DS_Store

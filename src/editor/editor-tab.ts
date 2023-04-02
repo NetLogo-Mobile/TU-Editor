@@ -5,7 +5,7 @@ import { Localized } from "src/legacy";
 declare const { GalapagosEditor }: any;
 type GalapagosEditor = any;
 
-/** EditorTab: A tab for the code this. */
+/** EditorTab: A tab for the code editor. */
 export class EditorTab extends Tab {
     // #region "Foundational Interfaces"
 	// Galapagos: Refers to the main editor. 
@@ -13,7 +13,7 @@ export class EditorTab extends Tab {
 	// Show: Show the editor tab. 
     public Show() {
         super.Show();
-		// if (this.CodeRefreshed) this.Galapagos.SetCursorPosition(0);
+		if (this.CodeRefreshed) this.Galapagos.SetCursorPosition(0);
     }
 	// Hide: Hide the editor tab. 
     public Hide() {
@@ -24,7 +24,6 @@ export class EditorTab extends Tab {
         super.Blur();
         this.Galapagos.Blur();
     }
-
 	// Constructor: Initialize the editor.
 	constructor(Container: HTMLElement, Editor: TurtleEditor) {
         super(Container, Editor);
@@ -45,17 +44,16 @@ export class EditorTab extends Tab {
     /** TipsElement: The HTML element for tips. */
     private TipsElement: JQuery<HTMLElement>;
 	// Show the tips
-	ShowTips = function(Content, Callback?) {
+	public ShowTips(Content, Callback?) {
 		if (!Callback) Callback = () => { this.HideTips(); };
 		this.TipsElement.off("click").text(Content).on("click", Callback).show();
 	}
 	// Hide the tips
-	HideTips = function() {
+	public HideTips() {
 		this.TipsElement.hide();
 	}
-
 	// SetCompilerErrors: Show the compiler error linting messages.
-	SetCompilerErrors(Errors) {
+	public SetCompilerErrors(Errors) {
 		if (Errors.length == 0) this.HideTips();
 		// Temp hack: the Galapagos does not support unknown position errors yet.
 		if (Errors.length > 0 && Errors[0].start == 2147483647) {
@@ -68,9 +66,8 @@ export class EditorTab extends Tab {
 			this.Galapagos.SetCompilerErrors(Errors);
 		}
 	}
-
 	// SetRuntimeErrors: Show the runtime error linting messages.
-	SetRuntimeErrors(Errors) {
+	public SetRuntimeErrors(Errors) {
 		if (Errors.length > 0 && Errors[0].start == 2147483647) {
 			this.ShowTips(Errors[0].message);
 			this.Galapagos.SetRuntimeErrors([]);
@@ -81,12 +78,11 @@ export class EditorTab extends Tab {
 			this.Galapagos.SetRuntimeErrors(Errors);
 		}
 	}
-	// Editor support
 	private IgnoreUpdate = false;
 	// CodeRefreshed: Did we refresh the code on the background?
 	private CodeRefreshed = false;
 	// SetCode: Set the content of the this.
-	SetCode(Content, Unapplied) {
+	public SetCode(Content, Unapplied) {
 		// Set the content
 		if (Content != this.Galapagos.GetCode()) {
 			this.IgnoreUpdate = true;
@@ -101,29 +97,30 @@ export class EditorTab extends Tab {
 		// Mark clean or show tips
 		if (!Unapplied) this.SetApplied();
 	}
-
 	// GetCode: Get the content of the this.
-	GetCode() {
+	public GetCode() {
 		return this.Galapagos.GetCode();
 	}
 	// SetApplied: Set applied status.
-	SetApplied() {
-		// Generation = this.Galapagos.doc.changeGeneration();
-		this.HideTips();
+	public SetApplied() {
+		this.SetCompilerErrors([]);
 	}
+	// #endregion
+
+	// #region "Editor Features"
 	// JumpToNetTango: Jump to the NetTango portion.
-	JumpToNetTango() {
+	public JumpToNetTango() {
 		var Index = this.GetCode().indexOf("; --- NETTANGO BEGIN ---");
 		if (Index == -1) return;
 		this.Galapagos.SetCursorPosition(Index);
 	}
 	// Reset: Show the reset dialog.
-	Reset() {
+	public Reset() {
 		ShowConfirm("重置代码", "是否将代码重置到最后一次成功编译的状态？",
 		    () => this.Editor.Call({ Type: "CodeReset" }));
 	}
 	// ShowMenu: Show a feature menu.
-	ShowMenu() {
+	public ShowMenu() {
 		var Dialog = $("#Dialog-Procedures")
 		var List = Dialog.children("ul").empty();
 		Dialog.children("h4").text(Localized.Get("更多功能"));
@@ -143,7 +140,7 @@ export class EditorTab extends Tab {
 		(Dialog as any).modal({});
 	}
 	// ShowProcedures: List all procedures in the code.
-	ShowProcedures = function() {
+	public ShowProcedures = function() {
 		var Procedures = this.GetProcedures();
 		if (Object.keys(Procedures).length == 0) {
 			this.Toast("warning", Localized.Get("代码中还没有任何子程序。"));
@@ -164,7 +161,7 @@ export class EditorTab extends Tab {
 		}
 	}
 	// GetProcedures: Get all procedures from the code.
-	GetProcedures = function() {
+	public GetProcedures = function() {
 		var Rule = /^\s*(?:to|to-report)\s(?:\s*;.*\n)*\s*(\w\S*)/gm // From NLW
 		var Content = this.GetCode(); 
         var Names = [];

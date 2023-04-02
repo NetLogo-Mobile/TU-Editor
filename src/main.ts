@@ -22,7 +22,6 @@ export class TurtleEditor {
     this.CommandTab = new CommandTab($(Container).children("div.command").get(0)!, this);
     this.EditorTabs = [new EditorTab($(Container).children("div.editor").get(0)!, this)];
     this.CommandTab.Show();
-    this.CommandTab.ScrollToBottom();
 		this.Darkmode = new Darkmode();
   }
   /** Call: Call the facilitator (by default, the Unity Engine). */

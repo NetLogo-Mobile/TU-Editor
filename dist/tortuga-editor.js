@@ -1,6 +1,30 @@
 (function (exports) {
     'use strict';
 
+    /** Tab: A tab in the code editor. */
+    class Tab {
+        /** Constructor: Create an editor tab. */
+        constructor(Container, Editor) {
+            this.Editor = Editor;
+            this.Container = Container;
+        }
+        /** Show: Show the tab. */
+        Show() {
+            this.Editor.CurrentTab = this;
+            this.Editor.HideAllTabs();
+            this.Container.style.display = "block";
+            this.Visible = true;
+        }
+        /** Hide: Hide the tab. */
+        Hide() {
+            this.Container.style.display = "none";
+            this.Visible = false;
+        }
+        /** Blur: Blur the tab's editor. */
+        Blur() {
+        }
+    }
+
     // Localized: Localized support.
     const Localized = function () {
         var Localized = {};
@@ -38,30 +62,6 @@
         return RotateScreen;
     };
 
-    /** Tab: A tab in the code editor. */
-    class Tab {
-        /** Constructor: Create an editor tab. */
-        constructor(Container, Editor) {
-            this.Editor = Editor;
-            this.Container = Container;
-        }
-        /** Show: Show the tab. */
-        Show() {
-            this.Editor.CurrentTab = this;
-            this.Editor.HideAllTabs();
-            this.Container.style.display = "block";
-            this.Visible = true;
-        }
-        /** Hide: Hide the tab. */
-        Hide() {
-            this.Container.style.display = "none";
-            this.Visible = false;
-        }
-        /** Blur: Blur the tab's editor. */
-        Blur() {
-        }
-    }
-
     // TransformLinks: Transform the embedded links.
     function TransformLinks(Element) {
         if (TurtleEditor.PostMessage != null)
@@ -73,136 +73,142 @@
             Link.on("click", function () { this.Call({ Type: "Visit", Target: Href }); });
         });
     }
+    // LinkCommand: Generate a link for another command.
+    function LinkCommand(Query) {
+        Query.each((Index, Item) => {
+            var Current = $(Item);
+            var Target = Current.attr("target");
+            if (Target == null)
+                Target = Current.text();
+            var Objective = Current.attr("objective");
+            if (!Objective)
+                Objective = "null";
+            Current.attr("href", "javascript:void(0)");
+            Current.attr("onclick", `this.Execute(${Objective}, '${Target}')`);
+        });
+        return Query;
+    }
+    // RenderAgent: Render tips for an agent type.
+    function RenderAgent(Agent) {
+        var Message = Agent;
+        switch (Agent) {
+            case "turtles":
+                Message = `${Localized.Get("海龟")}🐢`;
+                break;
+            case "patches":
+                Message = `${Localized.Get("格子")}🔲`;
+                break;
+            case "links":
+                Message = `${Localized.Get("链接")}🔗`;
+                break;
+            case "observer":
+                Message = `${Localized.Get("观察者")}🔎`;
+                break;
+            case "utilities":
+                Message = `${Localized.Get("工具")}🔨`;
+                break;
+        }
+        return Message;
+    }
 
-    /** CommandTab: A tab for the command center. */
-    class CommandTab extends Tab {
-        // Show: Show the command tab. 
-        Show() {
-            super.Show();
-            bodyScrollLock.clearAllBodyScrollLocks();
-            bodyScrollLock.disableBodyScroll(this.Outputs.get(0));
-            bodyScrollLock.disableBodyScroll(this.Fulltext.get(0));
-            this.HideFullText();
+    /** FullTextDisplay: Display the full-text help information. */
+    class FullTextDisplay {
+        // Constructor: Create a new full-text display.
+        constructor(Tab) {
+            // RequestedTab: The tab that requested the full text.
+            this.RequestedTab = null;
+            this.Tab = Tab;
+            this.Container = $(Tab.Container).find(".command-fulltext");
         }
-        // Hide: Hide the command tab.
-        Hide() {
-            super.Hide();
-            bodyScrollLock.clearAllBodyScrollLocks();
-            bodyScrollLock.disableBodyScroll(document.querySelector('.cm-scroller'), { allowTouchMove: () => true });
-            this.HideFullText();
+        // ShowFullText: Show the full text of a command.
+        ShowFullText(Data) {
+            this.RequestedTab = this.Tab.Editor.CurrentTab;
+            if (!this.Tab.Visible)
+                this.Tab.Show();
+            // Change the status
+            this.Container.show();
+            // Render the subject
+            this.Container.find("h2 strong").text(Data["display_name"]);
+            this.Container.find("h2 span").text(`(${Data["agents"].map((Agent) => `${RenderAgent(Agent)}`).join(", ")})`);
+            // Render the list
+            var SeeAlso = this.Container.find("ul.SeeAlso").empty();
+            for (var Primitive in Data["see_also"])
+                LinkCommand($(`<li><a class="command" target="help ${Primitive}">${Primitive}</a> - ${Data["see_also"][Primitive]}</li>`).appendTo(SeeAlso).find("a"));
+            // Machine-translation
+            var Translator = this.Container.find(".translator");
+            if (Data["translation"] != null && Data["verified"] != true)
+                Translator.show();
+            else
+                Translator.hide();
+            var Original = Translator.find("a.Original").bind("click", () => {
+                Original.hide();
+                Translation.show();
+                SetCode(Data["content"]);
+            }).parent().show();
+            var Translation = Translator.find("a.Translation").bind("click", () => {
+                Translation.hide();
+                Original.show();
+                SetCode(Data["translation"]);
+            }).parent().hide();
+            // Render the full text
+            var SetCode = (Content) => {
+                if (Content != null)
+                    this.Container.find("div.fulltext")
+                        .html(new showdown.Converter().makeHtml(Content));
+                this.Tab.AnnotateCode(this.Container.find("code"), null, true);
+                this.Container.scrollTop(0);
+            };
+            SetCode(Data["translation"] != null ? Data["translation"] : Data["content"]);
+            // Acknowledge
+            TransformLinks(this.Container.find(".Acknowledge").html(Data["acknowledge"]));
         }
-        /** Blur: Blur the tab's editor. */
-        Blur() {
-            super.Blur();
-            this.Galapagos.Blur();
+        // HideFullText: Hide the full text mode.
+        HideFullText() {
+            var _a;
+            if (!this.Container.is(":visible"))
+                return;
+            this.Container.hide();
+            (_a = this.RequestedTab) === null || _a === void 0 ? void 0 : _a.Show();
         }
-        // Constructor: Initialize the command center.
-        constructor(Container, Editor) {
-            super(Container, Editor);
-            // #region "Foundational Interfaces"
-            // Command center would be disabled before compile output come out.
-            this.Disabled = false;
-            // Following three variables are used for command histrory.
-            this.CommandStack = [];
-            this.CurrentCommand = [];
-            this.CurrentCommandIndex = 0;
+    }
+
+    /** OutputDisplay: Display the output section. */
+    class OutputDisplay {
+        // Constructor: Create a new output section.
+        constructor(Tab) {
+            // #region "Batch Printing Support"
             // Fragment: Batch printing support for batch printing.
             this.Fragment = null;
             // BufferSize: Buffer size for batch printing.
             this.BufferSize = 1000;
             // KeepSize: The number of messages that are kept forever. 
             this.KeepSize = -1;
-            // RequestedTab: The tab that requested the full text.
-            this.RequestedTab = null;
-            // Get the elements
-            this.Outputs = $(Container).find(".command-output");
-            this.Fulltext = $(Container).find(".command-fulltext");
-            this.CommandLine = $(Container).find(".command-line");
-            this.TargetSelect = this.CommandLine.find("select");
-            this.KeepSize = this.Outputs.children(".Keep").length;
-            // CodeMirror Editor
-            this.Galapagos = new GalapagosEditor(this.CommandLine.find(".command-input").get(0), {
-                OneLine: true,
-                OnKeyUp: (Event) => {
-                    const Key = Event.key;
-                    const Code = Event.code;
-                    // After press key `Enter`, excute command
-                    if (Key == "Enter" || Code == "Enter") {
-                        const Content = this.Galapagos.GetCode();
-                        this.ClearInput();
-                        if (!Content || this.Disabled)
-                            return;
-                        const Objective = this.TargetSelect.val();
-                        if (TurtleEditor.PostMessage != null)
-                            this.Disabled = true;
-                        this.Execute(Objective, Content);
-                        this.CommandStack.push([Objective, Content]);
-                        this.CurrentCommandIndex = 0;
-                        this.CurrentCommand = [];
-                        this.Galapagos.CloseCompletion();
-                    }
-                    // After press key `ArrowUp`, get previous command from command history
-                    else if (Key == "ArrowUp" || Code == "ArrowUp") {
-                        if (this.CurrentCommandIndex >= this.CommandStack.length)
-                            return;
-                        this.CurrentCommandIndex += 1;
-                        const index = this.CommandStack.length - this.CurrentCommandIndex;
-                        this.SetCode(this.CommandStack[index][0], this.CommandStack[index][1]);
-                    }
-                    // After press key `ArrowDown`, get next command from command history
-                    else if (Key == "ArrowDown" || Code == "ArrowDown") {
-                        if (this.CurrentCommandIndex <= 1) {
-                            this.CurrentCommandIndex = 0;
-                            if (this.CurrentCommand.length == 0) {
-                                this.ClearInput();
-                            }
-                            else {
-                                this.SetCode(this.CurrentCommand[0], this.CurrentCommand[1]);
-                            }
-                            return;
-                        }
-                        const index = this.CommandStack.length - this.CurrentCommandIndex;
-                        this.SetCode(this.CommandStack[index][0], this.CommandStack[index][1]);
-                        this.CurrentCommandIndex -= 1;
-                    }
-                    else if (this.CurrentCommandIndex == 0) {
-                        const Content = this.Galapagos.GetCode();
-                        const Objective = this.TargetSelect.val();
-                        this.CurrentCommand = [Objective, Content];
-                        this.CurrentCommandIndex = 0;
-                    }
-                },
-                OnDictionaryClick: (Text) => this.ExplainFull(Text)
-            });
+            this.Tab = Tab;
+            this.Container = $(Tab.Container).find(".command-output");
             // Annotate by default
-            this.AnnotateCode(this.Outputs.find(".keep code"), null, true);
-            // Listen to the sizing
-            if (window.visualViewport)
-                window.visualViewport.addEventListener("resize", () => {
-                    if (navigator.userAgent.indexOf("Macintosh") == -1 && navigator.userAgent.indexOf("Mac OS X") == -1) {
-                        var Height = window.visualViewport.height;
-                        $(this.Editor.Container).css("height", `${Height}px`);
-                    }
-                    else {
-                        setTimeout(() => this.Outputs.add(this.Fulltext)
-                            .css("padding-top", `calc(0.5em + ${document.body.scrollHeight - window.visualViewport.height}px)`), 100);
-                    }
-                    if (this.Visible)
-                        this.Outputs.scrollTop(100000);
-                });
+            this.KeepSize = this.Container.children(".Keep").length;
+            this.Tab.AnnotateCode(this.Container.find(".keep code"), null, true);
         }
-        // Print to a batch.
+        // Clear the output region of Command Center
+        ClearOutput() {
+            this.Container.children().slice(this.KeepSize).remove();
+        }
+        // After user entered input, screen view should scroll down to the botom line
+        ScrollToBottom() {
+            this.Container.scrollTop(this.Container.get(0).scrollHeight);
+        }
+        // WriteOutput: Print to a batch.
         WriteOutput(Element) {
             if (this.Fragment == null)
-                this.Outputs.append(Element);
+                this.Container.append(Element);
             else
                 this.Fragment.append(Element);
         }
-        // Open a printing batch.
+        // OpenBatch: Open a printing batch.
         OpenBatch() {
             this.Fragment = $(document.createDocumentFragment());
         }
-        // Close a printing batch.
+        // CloseBatch: Close a printing batch.
         CloseBatch() {
             if (this.Fragment == null)
                 return;
@@ -210,24 +216,27 @@
             var Length = this.Fragment.children().length;
             if (Length > this.BufferSize) {
                 this.Fragment.children().slice(0, Length - this.BufferSize).remove();
-                this.Outputs.children().slice(this.KeepSize).remove();
+                this.Container.children().slice(this.KeepSize).remove();
             }
             else {
-                var NewLength = this.Outputs.children().length - this.KeepSize + Length;
+                var NewLength = this.Container.children().length - this.KeepSize + Length;
                 if (NewLength > this.BufferSize)
-                    this.Outputs.children().slice(this.KeepSize, NewLength - this.BufferSize + this.KeepSize).remove();
+                    this.Container.children().slice(this.KeepSize, NewLength - this.BufferSize + this.KeepSize).remove();
             }
             // Append to the display
-            this.Outputs.append(this.Fragment);
+            this.Container.append(this.Fragment);
             this.Fragment = null;
             this.ScrollToBottom();
         }
-        // Print a line of input to the screen
+        // #endregion
+        // #region "Single Printing Support"
+        // PrintInput: Print a line of input to the screen
         PrintInput(Objective, Content, Embedded) {
+            // Change the objective
             if (Objective == null)
-                Objective = this.TargetSelect.val();
+                Objective = this.Tab.TargetSelect.val();
             else
-                this.TargetSelect.val(Objective);
+                this.Tab.TargetSelect.val(Objective);
             // CodeMirror Content
             var Wrapper = $(`
 			<div class="command-wrapper">
@@ -239,17 +248,18 @@
 				</div>
 			</div>
 		`);
-            if (!Embedded)
-                this.WriteOutput(Wrapper);
+            // Standalone mode
             Wrapper.attr("objective", Objective);
             Wrapper.attr("content", Content);
             // Click to copy
             Wrapper.children(".icon").on("click", () => {
-                this.SetCode(Wrapper.attr("objective"), Wrapper.attr("content"));
-                this.Editor.Call({ Type: "ClipboardWrite", Content: `${Wrapper.attr("objective")}: ${Wrapper.attr("content")}` });
+                this.Tab.SetCode(Wrapper.attr("objective"), Wrapper.attr("content"));
+                this.Tab.Editor.Call({ Type: "ClipboardWrite", Content: `${Wrapper.attr("objective")}: ${Wrapper.attr("content")}` });
             });
             // Run CodeMirror
-            this.AnnotateCode(Wrapper.children(".content").children(".Code").children("span"), Content, false);
+            this.Tab.AnnotateCode(Wrapper.children(".content").children(".Code").children("span"), Content, false);
+            if (!Embedded)
+                this.WriteOutput(Wrapper);
             return Wrapper;
         }
         // Provide for Unity to print compiled output
@@ -293,21 +303,23 @@
 					`);
                     }
                     else if (Content.Parameter == "-full") {
-                        this.ShowFullText(Content);
+                        Output = $(`<p class="Output output">${Localized.Get("显示 {0} 的帮助信息。")
+                        .replace("{0}", `<a class='command' target='help ${Content["display_name"]} -full'">${Content["display_name"]}</a>`)}</p>`);
+                        this.Tab.ShowFullText(Content);
                     }
                     else {
                         Output = $(`
 						<div class="block">
-							<p class="${Class} output"><code>${Content["display_name"]}</code> - ${Content["agents"].map((Agent) => `${this.RenderAgent(Agent)}`).join(", ")}</p>
+							<p class="${Class} output"><code>${Content["display_name"]}</code> - ${Content["agents"].map((Agent) => `${RenderAgent(Agent)}`).join(", ")}</p>
 							<p class="${Class} output">${Content["short_description"]} (<a class='command' target='help ${Content["display_name"]} -full'">${Localized.Get("阅读全文")}</a>)</p>
 							<p class="${Class} output">${Localized.Get("参见")}: ${Content["see_also"].map((Name) => `<a class='command' target='help ${Name}'>${Name}</a>`).join(", ")}</p>
 						</div>
 					`);
                     }
                     if (Output != null) {
-                        this.LinkCommand(Output.find("a.command"));
+                        LinkCommand(Output.find("a.command"));
                         this.AnnotateInput(Output.find("div.command"));
-                        this.AnnotateCode(Output.find("code"));
+                        this.Tab.AnnotateCode(Output.find("code"));
                     }
                     break;
                 default:
@@ -320,8 +332,173 @@
             if (this.Fragment == null)
                 this.ScrollToBottom();
         }
-        /* Rendering stuff */
-        // Annotate some code snippets.
+        // AnnotateInput: Annotate some code inputs.
+        AnnotateInput(Query) {
+            Query.each((Index, Item) => {
+                var Current = $(Item);
+                Current.replaceWith(this.PrintInput(Current.attr("objective"), Current.attr("target"), true));
+            });
+        }
+    }
+
+    /** CommandTab: A tab for the command center. */
+    class CommandTab extends Tab {
+        // Show: Show the command tab. 
+        Show() {
+            super.Show();
+            bodyScrollLock.clearAllBodyScrollLocks();
+            bodyScrollLock.disableBodyScroll(this.Outputs.Container.get(0));
+            bodyScrollLock.disableBodyScroll(this.FullText.Container.get(0));
+            this.HideFullText();
+            this.Outputs.ScrollToBottom();
+        }
+        // Hide: Hide the command tab.
+        Hide() {
+            super.Hide();
+            bodyScrollLock.clearAllBodyScrollLocks();
+            bodyScrollLock.disableBodyScroll(document.querySelector('.cm-scroller'), { allowTouchMove: () => true });
+            this.HideFullText();
+        }
+        // Blur: Blur the tab's editor.
+        Blur() {
+            super.Blur();
+            this.Galapagos.Blur();
+        }
+        // ShowFullText: Show the full-text help area.
+        ShowFullText(Data) {
+            this.FullText.ShowFullText(Data);
+            this.Outputs.Container.hide();
+        }
+        // HideFullText: Hide the full-text help area.
+        HideFullText() {
+            this.FullText.HideFullText();
+            this.Outputs.Container.show();
+            this.Outputs.ScrollToBottom();
+        }
+        // Constructor: Initialize the command center.
+        constructor(Container, Editor) {
+            super(Container, Editor);
+            // #region "Foundational Interfaces"
+            // Command center would be disabled before compile output come out.
+            this.Disabled = false;
+            // CommandStack: Store the command history.
+            this.CommandStack = [];
+            // CurrentCommand: Store the current command.
+            this.CurrentCommand = [];
+            // CurrentCommandIndex: Store the current command index.
+            this.CurrentCommandIndex = 0;
+            // Get the elements
+            this.CommandLine = $(Container).find(".command-line");
+            this.TargetSelect = this.CommandLine.find("select");
+            // CodeMirror Editor
+            this.Galapagos = new GalapagosEditor(this.CommandLine.find(".command-input").get(0), {
+                OneLine: true,
+                OnKeyUp: (Event) => this.InputKeyHandler(Event),
+                OnDictionaryClick: (Text) => this.ExplainFull(Text)
+            });
+            // Listen to the sizing
+            if (window.visualViewport)
+                window.visualViewport.addEventListener("resize", () => {
+                    if (navigator.userAgent.indexOf("Macintosh") == -1 && navigator.userAgent.indexOf("Mac OS X") == -1) {
+                        var Height = window.visualViewport.height;
+                        $(this.Editor.Container).css("height", `${Height}px`);
+                    }
+                    else {
+                        setTimeout(() => this.Outputs.Container.add(this.FullText.Container)
+                            .css("padding-top", `calc(0.5em + ${document.body.scrollHeight - window.visualViewport.height}px)`), 100);
+                    }
+                    if (this.Visible)
+                        this.Outputs.Container.scrollTop(100000);
+                });
+            // Set up sections
+            this.Outputs = new OutputDisplay(this);
+            this.FullText = new FullTextDisplay(this);
+        }
+        // InputKeyHandler: Handle the key input.
+        InputKeyHandler(Event) {
+            const Key = Event.key;
+            const Code = Event.code;
+            // After press key `Enter`, excute command
+            if (Key == "Enter" || Code == "Enter") {
+                const Content = this.Galapagos.GetCode();
+                this.Galapagos.CloseCompletion();
+                if (!Content || this.Disabled)
+                    return;
+                this.ClearInput();
+                const Objective = this.TargetSelect.val();
+                if (TurtleEditor.PostMessage != null)
+                    this.Disabled = true;
+                this.SendCommand(Objective, Content);
+                this.CommandStack.push([Objective, Content]);
+                this.CurrentCommandIndex = 0;
+                this.CurrentCommand = [];
+            }
+            // After press key `ArrowUp`, get previous command from command history
+            else if (Key == "ArrowUp" || Code == "ArrowUp") {
+                if (this.CurrentCommandIndex >= this.CommandStack.length)
+                    return;
+                this.CurrentCommandIndex += 1;
+                const index = this.CommandStack.length - this.CurrentCommandIndex;
+                this.SetCode(this.CommandStack[index][0], this.CommandStack[index][1]);
+            }
+            // After press key `ArrowDown`, get next command from command history
+            else if (Key == "ArrowDown" || Code == "ArrowDown") {
+                if (this.CurrentCommandIndex <= 1) {
+                    this.CurrentCommandIndex = 0;
+                    if (this.CurrentCommand.length == 0) {
+                        this.ClearInput();
+                    }
+                    else {
+                        this.SetCode(this.CurrentCommand[0], this.CurrentCommand[1]);
+                    }
+                    return;
+                }
+                const index = this.CommandStack.length - this.CurrentCommandIndex;
+                this.SetCode(this.CommandStack[index][0], this.CommandStack[index][1]);
+                this.CurrentCommandIndex -= 1;
+            }
+            else if (this.CurrentCommandIndex == 0) {
+                const Content = this.Galapagos.GetCode();
+                const Objective = this.TargetSelect.val();
+                this.CurrentCommand = [Objective, Content];
+                this.CurrentCommandIndex = 0;
+            }
+        }
+        // SendCommand: Send command to either execute or as a chat message.
+        SendCommand(Objective, Content) {
+            this.HideFullText();
+            this.Execute(Objective, Content);
+        }
+        // ClearInput: Clear the input box of Command Center
+        ClearInput() {
+            this.Galapagos.SetCode("");
+        }
+        // Set the content of command input
+        SetCode(Objective, Content) {
+            this.TargetSelect.val(Objective.toLowerCase());
+            this.Galapagos.SetCode(Content);
+            setTimeout(() => this.Galapagos.SetCursorPosition(Content.length), 1);
+        }
+        // FinishExecution: Notify the completion of the command
+        FinishExecution(Status, Message) {
+            this.Outputs.PrintOutput(Message, Status);
+            this.Disabled = false;
+        }
+        // Execute: Execute a command from the user
+        Execute(Objective, Content) {
+            this.Editor.Call({ Type: "CommandExecute", Source: Objective, Command: Content });
+            this.Outputs.PrintInput(Objective, Content, false);
+            this.Outputs.ScrollToBottom();
+        }
+        // ExplainFull: ExplainFull: Explain the selected text in the command center in full.
+        ExplainFull(Command) {
+            if (!EditorDictionary.Check(Command))
+                return false;
+            this.Outputs.ScrollToBottom();
+            this.Execute("observer", `help ${Command} -full`);
+        }
+        // #endregion
+        // AnnotateCode: Annotate some code snippets.
         AnnotateCode(Target, Content, Copyable) {
             for (var Item of Target.get()) {
                 var Snippet = $(Item);
@@ -334,140 +511,6 @@
                         this.SetCode("observer", Snippet.text());
                     });
             }
-        }
-        // Annotate some code inputs.
-        AnnotateInput(Query) {
-            Query.each((Index, Item) => {
-                Item = $(Item);
-                Item.replaceWith(this.PrintInput(Item.attr("objective"), Item.attr("target"), true));
-            });
-        }
-        // Generate a link for another command.
-        LinkCommand(Query) {
-            Query.each((Index, Item) => {
-                Item = $(Item);
-                var Target = Item.attr("target");
-                if (Target == null)
-                    Target = Item.text();
-                var Objective = Item.attr("objective");
-                if (!Objective)
-                    Objective = "null";
-                Item.attr("href", "javascript:void(0)");
-                Item.attr("onclick", `this.Execute(${Objective}, '${Target}')`);
-            });
-            return Query;
-        }
-        // Render tips for an agent type.
-        RenderAgent(Agent) {
-            var Message = Agent;
-            switch (Agent) {
-                case "turtles":
-                    Message = `${Localized.Get("海龟")}🐢`;
-                    break;
-                case "patches":
-                    Message = `${Localized.Get("格子")}🔲`;
-                    break;
-                case "links":
-                    Message = `${Localized.Get("链接")}🔗`;
-                    break;
-                case "observer":
-                    Message = `${Localized.Get("观察者")}🔎`;
-                    break;
-                case "utilities":
-                    Message = `${Localized.Get("工具")}🔨`;
-                    break;
-            }
-            return Message;
-        }
-        // Clear the input box of Command Center
-        ClearInput() {
-            this.Galapagos.SetCode("");
-        }
-        // Clear the output region of Command Center
-        ClearOutput() {
-            this.Outputs.children().slice(this.KeepSize).remove();
-        }
-        // After user entered input, screen view should scroll down to the botom line
-        ScrollToBottom() {
-            this.Outputs.scrollTop(this.Outputs.get(0).scrollHeight);
-        }
-        // Execute a command from the user
-        Execute(Objective, Content) {
-            this.Editor.Call({ Type: "CommandExecute", Source: Objective, Command: Content });
-            this.PrintInput(Objective, Content, false);
-            this.ScrollToBottom();
-        }
-        // Set the content of command input
-        SetCode(Objective, Content) {
-            this.TargetSelect.val(Objective.toLowerCase());
-            this.Galapagos.SetCode(Content);
-            setTimeout(() => this.Galapagos.SetCursorPosition(Content.length), 1);
-        }
-        // Provide for Unity to notify completion of the command
-        FinishExecution(Status, Message) {
-            this.HideFullText();
-            this.PrintOutput(Message, Status);
-            this.Disabled = false;
-        }
-        // Show the full text of a command.
-        ShowFullText(Data) {
-            this.RequestedTab = this.Editor.CurrentTab;
-            if (!this.Visible)
-                this.Show();
-            // Change the status
-            this.Fulltext.show();
-            this.Outputs.hide();
-            // Render the subject
-            this.Fulltext.find("h2 strong").text(Data["display_name"]);
-            this.Fulltext.find("h2 span").text(`(${Data["agents"].map((Agent) => `${this.RenderAgent(Agent)}`).join(", ")})`);
-            // Render the list
-            var SeeAlso = this.Fulltext.find("ul.SeeAlso").empty();
-            for (var Primitive in Data["see_also"])
-                this.LinkCommand($(`<li><a class="command" target="help ${Primitive}">${Primitive}</a> - ${Data["see_also"][Primitive]}</li>`).appendTo(SeeAlso).find("a"));
-            // Machine-translation
-            var Translator = this.Fulltext.find(".translator");
-            if (Data["translation"] != null && Data["verified"] != true)
-                Translator.show();
-            else
-                Translator.hide();
-            var Original = Translator.find("a.Original").bind("click", () => {
-                Original.hide();
-                Translation.show();
-                SetCode(Data["content"]);
-            }).parent().show();
-            var Translation = Translator.find("a.Translation").bind("click", () => {
-                Translation.hide();
-                Original.show();
-                SetCode(Data["translation"]);
-            }).parent().hide();
-            // Render the full text
-            var SetCode = (Content) => {
-                if (Content != null)
-                    this.Fulltext.find("div.fulltext")
-                        .html(new showdown.Converter().makeHtml(Content));
-                this.AnnotateCode(this.Fulltext.find("code"), null, true);
-                this.Fulltext.scrollTop(0);
-            };
-            SetCode(Data["translation"] != null ? Data["translation"] : Data["content"]);
-            // Acknowledge
-            TransformLinks(this.Fulltext.find(".Acknowledge").html(Data["acknowledge"]));
-        }
-        // Hide the full text mode.
-        HideFullText() {
-            var _a;
-            if (!this.Fulltext.is(":visible"))
-                return;
-            this.Fulltext.hide();
-            this.Outputs.show();
-            this.ScrollToBottom();
-            (_a = this.RequestedTab) === null || _a === void 0 ? void 0 : _a.Show();
-        }
-        // ExplainFull: Explain the selected text in the command center in full.
-        ExplainFull(Command) {
-            if (!EditorDictionary.Check(Command))
-                return false;
-            this.ScrollToBottom();
-            this.Execute("observer", `help ${Command} -full`);
         }
     }
 
@@ -675,7 +718,6 @@
             this.CommandTab = new CommandTab($(Container).children("div.command").get(0), this);
             this.EditorTabs = [new EditorTab($(Container).children("div.editor").get(0), this)];
             this.CommandTab.Show();
-            this.CommandTab.ScrollToBottom();
             this.Darkmode = new Darkmode();
         }
         /** Call: Call the facilitator (by default, the Unity Engine). */

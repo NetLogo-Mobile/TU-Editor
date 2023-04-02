@@ -1,5 +1,10 @@
 /* TU-Editor Stylesheet */
 /* Layout */
+body, 
+div {
+	overscroll-behavior: none;
+}
+
 html,
 body,
 select {

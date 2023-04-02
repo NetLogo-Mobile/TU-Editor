@@ -20,6 +20,7 @@ export class CommandTab extends Tab {
 		bodyScrollLock.clearAllBodyScrollLocks();
 		bodyScrollLock.disableBodyScroll(this.Outputs.get(0)!);
 		bodyScrollLock.disableBodyScroll(this.Fulltext.get(0)!);
+		EditorDictionary.ClickHandler = (Text) => this.ShowFullText(Text);
 	}
 	// Hide: Hide the command tab.
 	public Hide() {
@@ -402,6 +403,7 @@ export class CommandTab extends Tab {
 
 	// Hide the full text mode.
 	HideFullText() {
+		if (!this.Fulltext.is(":visible")) return;
 		this.Fulltext.hide();
 		this.Outputs.show();
 		this.ScrollToBottom();

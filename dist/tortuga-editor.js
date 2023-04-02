@@ -82,6 +82,7 @@
             bodyScrollLock.clearAllBodyScrollLocks();
             bodyScrollLock.disableBodyScroll(this.Outputs.get(0));
             bodyScrollLock.disableBodyScroll(this.Fulltext.get(0));
+            EditorDictionary.ClickHandler = (Text) => this.ShowFullText(Text);
         }
         // Hide: Hide the command tab.
         Hide() {
@@ -454,6 +455,8 @@
         // Hide the full text mode.
         HideFullText() {
             var _a;
+            if (!this.Fulltext.is(":visible"))
+                return;
             this.Fulltext.hide();
             this.Outputs.show();
             this.ScrollToBottom();
@@ -717,6 +720,7 @@
     /** Export classes globally. */
     try {
         window.TurtleEditor = TurtleEditor;
+        window.TurtleLocalized = Localized;
         window.RotateScreen = RotateScreen();
     }
     catch (error) { }

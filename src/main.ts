@@ -1,6 +1,6 @@
 import { CommandTab } from "./command/command-tab";
 import { EditorTab } from "./editor/editor-tab";
-import { RotateScreen } from "./legacy";
+import { Localized, RotateScreen } from "./legacy";
 import { Tab } from "./tab";
 
 declare const { Darkmode, toastr }: any;
@@ -82,5 +82,6 @@ export class TurtleEditor {
 /** Export classes globally. */
 try {
   (window as any).TurtleEditor = TurtleEditor;
+  (window as any).TurtleLocalized = Localized;
   (window as any).RotateScreen = RotateScreen();
 } catch (error) { }

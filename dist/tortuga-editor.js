@@ -82,7 +82,6 @@
             bodyScrollLock.clearAllBodyScrollLocks();
             bodyScrollLock.disableBodyScroll(this.Outputs.get(0));
             bodyScrollLock.disableBodyScroll(this.Fulltext.get(0));
-            EditorDictionary.ClickHandler = (Text) => this.ShowFullText(Text);
         }
         // Hide: Hide the command tab.
         Hide() {
@@ -567,7 +566,8 @@
                     if (Changed && !this.IgnoreUpdate) {
                         this.Editor.Call({ Type: "CodeChanged" });
                     }
-                }
+                },
+                OnDictionaryClick: this.Editor.CommandTab.ExplainFull
             });
         }
         // SetCompilerErrors: Show the compiler error linting messages.

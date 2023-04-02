@@ -82,6 +82,7 @@
             bodyScrollLock.clearAllBodyScrollLocks();
             bodyScrollLock.disableBodyScroll(this.Outputs.get(0));
             bodyScrollLock.disableBodyScroll(this.Fulltext.get(0));
+            this.HideFullText();
         }
         // Hide: Hide the command tab.
         Hide() {

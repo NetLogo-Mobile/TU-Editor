@@ -35,7 +35,8 @@ export class EditorTab extends Tab {
 				if (Changed && !this.IgnoreUpdate) {
 					this.Editor.Call({ Type: "CodeChanged" });
 				}
-			}
+			},
+			OnDictionaryClick: (Text) => this.Editor.CommandTab.ExplainFull(Text)
 		});
 	}
     // #endregion

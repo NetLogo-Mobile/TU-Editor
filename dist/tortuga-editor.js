@@ -171,7 +171,7 @@
                         this.CurrentCommandIndex = 0;
                     }
                 },
-                OnDictionaryClick: this.ExplainFull
+                OnDictionaryClick: (Text) => this.ExplainFull(Text)
             });
             // Annotate by default
             this.AnnotateCode(this.Outputs.find(".keep code"), null, true);
@@ -248,7 +248,7 @@
                 this.Editor.Call({ Type: "ClipboardWrite", Content: `${Wrapper.attr("objective")}: ${Wrapper.attr("content")}` });
             });
             // Run CodeMirror
-            this.AnnotateCode(Wrapper.children(".content").children(".Code").children("span"), Content, true);
+            this.AnnotateCode(Wrapper.children(".content").children(".Code").children("span"), Content, false);
             return Wrapper;
         }
         // Provide for Unity to print compiled output
@@ -567,7 +567,7 @@
                         this.Editor.Call({ Type: "CodeChanged" });
                     }
                 },
-                OnDictionaryClick: this.Editor.CommandTab.ExplainFull
+                OnDictionaryClick: (Text) => this.Editor.CommandTab.ExplainFull(Text)
             });
         }
         // SetCompilerErrors: Show the compiler error linting messages.

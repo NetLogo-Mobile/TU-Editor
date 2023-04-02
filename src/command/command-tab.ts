@@ -20,7 +20,6 @@ export class CommandTab extends Tab {
 		bodyScrollLock.clearAllBodyScrollLocks();
 		bodyScrollLock.disableBodyScroll(this.Outputs.get(0)!);
 		bodyScrollLock.disableBodyScroll(this.Fulltext.get(0)!);
-		EditorDictionary.ClickHandler = (Text) => this.ShowFullText(Text);
 	}
 	// Hide: Hide the command tab.
 	public Hide() {
@@ -96,7 +95,7 @@ export class CommandTab extends Tab {
 					this.CurrentCommandIndex = 0;
 				}
 			},
-			OnDictionaryClick: this.ExplainFull
+			OnDictionaryClick: (Text) => this.ExplainFull(Text)
 		});
 
 		// Annotate by default
@@ -189,7 +188,7 @@ export class CommandTab extends Tab {
 		});
 
 		// Run CodeMirror
-		this.AnnotateCode(Wrapper.children(".content").children(".Code").children("span"), Content, true);
+		this.AnnotateCode(Wrapper.children(".content").children(".Code").children("span"), Content, false);
 		return Wrapper;
 	}
 

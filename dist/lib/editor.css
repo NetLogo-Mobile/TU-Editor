@@ -449,6 +449,7 @@ div.command {
 	height: auto;
 	font-size: 1em;
 	background: #FFF;
+	max-height: 2rem;
 	border-radius: 0.24rem;
 }
 

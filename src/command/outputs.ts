@@ -67,12 +67,12 @@ export class OutputDisplay {
 	public PrintInput(Objective: string | null, Content: string, Embedded: boolean) {
 		// Change the objective
 		if (Objective == null) Objective = this.Tab.TargetSelect.val() as string;
-		else this.Tab.TargetSelect.val(Objective);
+		else if (Objective != "assistant" && Objective != "you") this.Tab.TargetSelect.val(Objective);
 		// CodeMirror Content
 		var Wrapper = $(`
 			<div class="command-wrapper">
 				<div class="content">
-					<p class="input Code">${Objective}&gt;<span></span></p>
+					<p class="input Code">${Objective}&gt;&nbsp;<span></span></p>
 				</div>
 				<div class="icon">
 					<img class="copy-icon" src="images/copy.png"/>

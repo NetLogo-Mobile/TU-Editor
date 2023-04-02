@@ -8,18 +8,18 @@ type GalapagosEditor = any;
 
 /** CommandTab: A tab for the command center. */
 export class CommandTab extends Tab {
-    // #region "Foundational Interfaces"
+	// #region "Foundational Interfaces"
 	// Command center would be disabled before compile output come out.
 	public Disabled: boolean = false;
 	/** Galapagos: Refers to the main this.Editor. */
 	public readonly Galapagos: GalapagosEditor;
 	/** FullText: The full-text help area. */
 	public readonly FullText: FullTextDisplay;
-    /** Outputs: The outputs area.  */
+	/** Outputs: The outputs area.  */
 	public readonly Outputs: OutputDisplay;
 	/** Show: Show the command tab.  */
 	public Show() {
-        super.Show();
+		super.Show();
 		bodyScrollLock.clearAllBodyScrollLocks();
 		bodyScrollLock.disableBodyScroll(this.Outputs.Container.get(0)!);
 		bodyScrollLock.disableBodyScroll(this.FullText.Container.get(0)!);
@@ -28,16 +28,16 @@ export class CommandTab extends Tab {
 	}
 	/** Hide: Hide the command tab. */
 	public Hide() {
-        super.Hide();
+		super.Hide();
 		bodyScrollLock.clearAllBodyScrollLocks();
 		bodyScrollLock.disableBodyScroll(document.querySelector('.cm-scroller'), { allowTouchMove: () => true });
 		this.HideFullText();
 	}
-    /** Blur: Blur the tab's editor. */
-    public Blur() {
-        super.Blur();
-        this.Galapagos.Blur();
-    }
+	/** Blur: Blur the tab's editor. */
+	public Blur() {
+		super.Blur();
+		this.Galapagos.Blur();
+	}
 	/** ShowFullText: Show the full-text help area. */
 	public ShowFullText(Data) {
 		this.FullText.ShowFullText(Data);
@@ -51,13 +51,14 @@ export class CommandTab extends Tab {
 	}
 	/** Constructor: Initialize the command center. */
 	constructor(Container: HTMLElement, Editor: TurtleEditor) {
-        super(Container, Editor);
+		super(Container, Editor);
 		// Get the elements
 		this.CommandLine = $(Container).find(".command-line");
-        this.TargetSelect = this.CommandLine.find("select");
+		this.TargetSelect = this.CommandLine.find("select");
 		// CodeMirror Editor
 		this.Galapagos = new GalapagosEditor(this.CommandLine.find(".command-input").get(0)!, {
-			OneLine: true, 
+			OneLine: true,
+			ParseMode: "Oneline",
 			OnKeyUp: (Event) => this.InputKeyHandler(Event),
 			OnDictionaryClick: (Text) => this.ExplainFull(Text)
 		});
@@ -69,7 +70,7 @@ export class CommandTab extends Tab {
 					$(this.Editor.Container).css("height", `${Height}px`);
 				} else {
 					setTimeout(() => this.Outputs.Container.add(this.FullText.Container)
-                        .css("padding-top", `calc(0.5em + ${document.body.scrollHeight - window.visualViewport!.height}px)`), 100);
+						.css("padding-top", `calc(0.5em + ${document.body.scrollHeight - window.visualViewport!.height}px)`), 100);
 				}
 				if (this.Visible) this.Outputs.Container.scrollTop(100000);
 			});
@@ -77,12 +78,12 @@ export class CommandTab extends Tab {
 		this.Outputs = new OutputDisplay(this);
 		this.FullText = new FullTextDisplay(this);
 	}
-    // #endregion
-    
-    // #region "Command Input"
-    /** CommandLine: The input area.  */
+	// #endregion
+
+	// #region "Command Input"
+	/** CommandLine: The input area.  */
 	public readonly CommandLine: JQuery<HTMLElement>;
-    /** TargetSelect: The input area.  */
+	/** TargetSelect: The input area.  */
 	public readonly TargetSelect: JQuery<HTMLSelectElement>;
 	/** CommandStack: Store the command history. */
 	private CommandStack: [string, string][] = [];
@@ -99,9 +100,9 @@ export class CommandTab extends Tab {
 			const Content = this.Galapagos.GetCode();
 			this.Galapagos.CloseCompletion();
 			if (!Content || this.Disabled) return;
-			this.ClearInput();
 			const Objective = this.TargetSelect.val() as string;
 			if (TurtleEditor.PostMessage != null) this.Disabled = true;
+			this.HideFullText();
 			this.SendCommand(Objective, Content);
 			this.CommandStack.push([Objective, Content]);
 			this.CurrentCommandIndex = 0;
@@ -136,9 +137,35 @@ export class CommandTab extends Tab {
 		}
 	}
 	/** SendCommand: Send command to either execute or as a chat message. */
-	private SendCommand(Objective: string, Content: string) {
-		this.HideFullText();
-		this.Execute(Objective, Content);
+	private async SendCommand(Objective: string, Content: string) {
+		// Parse and lint
+		this.Galapagos.ForceParse();
+		let Diagnostics = await this.Galapagos.ForceLintAsync();
+		let Mode = this.Galapagos.GetRecognizedMode();
+		// Check linting issues
+		if (Diagnostics.length == 0) {
+			// If there is no linting issues, assume it is code snippet
+			if (Mode == "Reporter") Content = `show ${Content}`;
+			this.Outputs.PrintInput(Objective, Content, false);
+			switch (Objective.toLowerCase()) {
+				case "turtles":
+					Content = `ask turtles [ ${Content} ]`;
+					break;
+				case "patches":
+					Content = `ask patches [ ${Content} ]`;
+					break;
+				case "links":
+					Content = `ask links [ ${Content} ]`;
+					break;
+			}
+			this.Editor.Call({ Type: "CommandExecute", Source: Objective, Command: Content });
+			this.Outputs.ScrollToBottom();
+		} else {
+			// Otherwise, assume it is a chat message
+			this.Outputs.PrintInput("you", Content, false);
+			this.Outputs.ScrollToBottom();
+		}
+		this.ClearInput();
 	}
 	/** ClearInput: Clear the input box of Command Center. */
 	public ClearInput() {
@@ -156,7 +183,7 @@ export class CommandTab extends Tab {
 		this.Disabled = false;
 	}
 	/** Execute: Execute a command from the user. */
-	public Execute(Objective, Content) {
+	public Execute(Objective: string, Content: string) {
 		this.Editor.Call({ Type: "CommandExecute", Source: Objective, Command: Content });
 		this.Outputs.PrintInput(Objective, Content, false);
 		this.Outputs.ScrollToBottom();
@@ -167,7 +194,7 @@ export class CommandTab extends Tab {
 		this.Outputs.ScrollToBottom();
 		this.Execute("observer", `help ${Command} -full`);
 	}
-    // #endregion
+	// #endregion
 
 	/** AnnotateCode: Annotate some code snippets. */
 	public AnnotateCode(Target: JQuery<HTMLElement>, Content?: string, Copyable?: boolean) {

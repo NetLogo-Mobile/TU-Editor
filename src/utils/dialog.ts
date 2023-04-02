@@ -1,6 +1,6 @@
 import { Localized } from "src/legacy";
 
-// ShowConfirm: Show a confirm dialog.
+/** ShowConfirm: Show a confirm dialog. */
 const ShowConfirm = function(Subject, Content, OK, Cancel?) {
 	($ as any).confirm({
 		title: Localized.Get(Subject),

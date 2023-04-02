@@ -62,7 +62,7 @@
         return RotateScreen;
     };
 
-    // TransformLinks: Transform the embedded links.
+    /** TransformLinks: Transform the embedded links. */
     function TransformLinks(Element) {
         if (TurtleEditor.PostMessage != null)
             return;
@@ -73,7 +73,7 @@
             Link.on("click", function () { this.Call({ Type: "Visit", Target: Href }); });
         });
     }
-    // LinkCommand: Generate a link for another command.
+    /** LinkCommand: Generate a link for another command. */
     function LinkCommand(Query) {
         Query.each((Index, Item) => {
             var Current = $(Item);
@@ -88,7 +88,7 @@
         });
         return Query;
     }
-    // RenderAgent: Render tips for an agent type.
+    /** RenderAgent: Render tips for an agent type. */
     function RenderAgent(Agent) {
         var Message = Agent;
         switch (Agent) {
@@ -113,14 +113,14 @@
 
     /** FullTextDisplay: Display the full-text help information. */
     class FullTextDisplay {
-        // Constructor: Create a new full-text display.
+        /** Constructor: Create a new full-text display. */
         constructor(Tab) {
-            // RequestedTab: The tab that requested the full text.
+            /** RequestedTab: The tab that requested the full text. */
             this.RequestedTab = null;
             this.Tab = Tab;
             this.Container = $(Tab.Container).find(".command-fulltext");
         }
-        // ShowFullText: Show the full text of a command.
+        /** ShowFullText: Show the full text of a command. */
         ShowFullText(Data) {
             this.RequestedTab = this.Tab.Editor.CurrentTab;
             if (!this.Tab.Visible)
@@ -162,7 +162,7 @@
             // Acknowledge
             TransformLinks(this.Container.find(".Acknowledge").html(Data["acknowledge"]));
         }
-        // HideFullText: Hide the full text mode.
+        /** HideFullText: Hide the full text mode. */
         HideFullText() {
             var _a;
             if (!this.Container.is(":visible"))
@@ -174,14 +174,14 @@
 
     /** OutputDisplay: Display the output section. */
     class OutputDisplay {
-        // Constructor: Create a new output section.
+        /** Constructor: Create a new output section. */
         constructor(Tab) {
             // #region "Batch Printing Support"
-            // Fragment: Batch printing support for batch printing.
+            /** Fragment: Batch printing support for batch printing. */
             this.Fragment = null;
-            // BufferSize: Buffer size for batch printing.
+            /** BufferSize: Buffer size for batch printing. */
             this.BufferSize = 1000;
-            // KeepSize: The number of messages that are kept forever. 
+            /** KeepSize: The number of messages that are kept forever.  */
             this.KeepSize = -1;
             this.Tab = Tab;
             this.Container = $(Tab.Container).find(".command-output");
@@ -189,26 +189,26 @@
             this.KeepSize = this.Container.children(".Keep").length;
             this.Tab.AnnotateCode(this.Container.find(".keep code"), null, true);
         }
-        // Clear the output region of Command Center
+        /** ClearOutput: Clear the output region of Command Center */
         ClearOutput() {
             this.Container.children().slice(this.KeepSize).remove();
         }
-        // After user entered input, screen view should scroll down to the botom line
+        /** ScrollToBottom: After user entered input, screen view should scroll down to the botom line */
         ScrollToBottom() {
             this.Container.scrollTop(this.Container.get(0).scrollHeight);
         }
-        // WriteOutput: Print to a batch.
+        /** WriteOutput: Print to a batch. */
         WriteOutput(Element) {
             if (this.Fragment == null)
                 this.Container.append(Element);
             else
                 this.Fragment.append(Element);
         }
-        // OpenBatch: Open a printing batch.
+        /** OpenBatch: Open a printing batch. */
         OpenBatch() {
             this.Fragment = $(document.createDocumentFragment());
         }
-        // CloseBatch: Close a printing batch.
+        /** CloseBatch: Close a printing batch. */
         CloseBatch() {
             if (this.Fragment == null)
                 return;
@@ -230,7 +230,7 @@
         }
         // #endregion
         // #region "Single Printing Support"
-        // PrintInput: Print a line of input to the screen
+        /** PrintInput: Print a line of input to the screen. */
         PrintInput(Objective, Content, Embedded) {
             // Change the objective
             if (Objective == null)
@@ -262,7 +262,7 @@
                 this.WriteOutput(Wrapper);
             return Wrapper;
         }
-        // Provide for Unity to print compiled output
+        /** PrintOutput: Provide for Unity to print compiled output. */
         PrintOutput(Content, Class) {
             var Output = null;
             switch (Class) {
@@ -332,7 +332,7 @@
             if (this.Fragment == null)
                 this.ScrollToBottom();
         }
-        // AnnotateInput: Annotate some code inputs.
+        /** AnnotateInput: Annotate some code inputs. */
         AnnotateInput(Query) {
             Query.each((Index, Item) => {
                 var Current = $(Item);
@@ -343,7 +343,7 @@
 
     /** CommandTab: A tab for the command center. */
     class CommandTab extends Tab {
-        // Show: Show the command tab. 
+        /** Show: Show the command tab.  */
         Show() {
             super.Show();
             bodyScrollLock.clearAllBodyScrollLocks();
@@ -352,40 +352,40 @@
             this.HideFullText();
             this.Outputs.ScrollToBottom();
         }
-        // Hide: Hide the command tab.
+        /** Hide: Hide the command tab. */
         Hide() {
             super.Hide();
             bodyScrollLock.clearAllBodyScrollLocks();
             bodyScrollLock.disableBodyScroll(document.querySelector('.cm-scroller'), { allowTouchMove: () => true });
             this.HideFullText();
         }
-        // Blur: Blur the tab's editor.
+        /** Blur: Blur the tab's editor. */
         Blur() {
             super.Blur();
             this.Galapagos.Blur();
         }
-        // ShowFullText: Show the full-text help area.
+        /** ShowFullText: Show the full-text help area. */
         ShowFullText(Data) {
             this.FullText.ShowFullText(Data);
             this.Outputs.Container.hide();
         }
-        // HideFullText: Hide the full-text help area.
+        /** HideFullText: Hide the full-text help area. */
         HideFullText() {
             this.FullText.HideFullText();
             this.Outputs.Container.show();
             this.Outputs.ScrollToBottom();
         }
-        // Constructor: Initialize the command center.
+        /** Constructor: Initialize the command center. */
         constructor(Container, Editor) {
             super(Container, Editor);
             // #region "Foundational Interfaces"
             // Command center would be disabled before compile output come out.
             this.Disabled = false;
-            // CommandStack: Store the command history.
+            /** CommandStack: Store the command history. */
             this.CommandStack = [];
-            // CurrentCommand: Store the current command.
+            /** CurrentCommand: Store the current command. */
             this.CurrentCommand = [];
-            // CurrentCommandIndex: Store the current command index.
+            /** CurrentCommandIndex: Store the current command index. */
             this.CurrentCommandIndex = 0;
             // Get the elements
             this.CommandLine = $(Container).find(".command-line");
@@ -414,7 +414,7 @@
             this.Outputs = new OutputDisplay(this);
             this.FullText = new FullTextDisplay(this);
         }
-        // InputKeyHandler: Handle the key input.
+        /** InputKeyHandler: Handle the key input. */
         InputKeyHandler(Event) {
             const Key = Event.key;
             const Code = Event.code;
@@ -464,33 +464,33 @@
                 this.CurrentCommandIndex = 0;
             }
         }
-        // SendCommand: Send command to either execute or as a chat message.
+        /** SendCommand: Send command to either execute or as a chat message. */
         SendCommand(Objective, Content) {
             this.HideFullText();
             this.Execute(Objective, Content);
         }
-        // ClearInput: Clear the input box of Command Center
+        /** ClearInput: Clear the input box of Command Center. */
         ClearInput() {
             this.Galapagos.SetCode("");
         }
-        // Set the content of command input
+        // Set the content of command input.
         SetCode(Objective, Content) {
             this.TargetSelect.val(Objective.toLowerCase());
             this.Galapagos.SetCode(Content);
             setTimeout(() => this.Galapagos.SetCursorPosition(Content.length), 1);
         }
-        // FinishExecution: Notify the completion of the command
+        /** FinishExecution: Notify the completion of the command. */
         FinishExecution(Status, Message) {
             this.Outputs.PrintOutput(Message, Status);
             this.Disabled = false;
         }
-        // Execute: Execute a command from the user
+        /** Execute: Execute a command from the user. */
         Execute(Objective, Content) {
             this.Editor.Call({ Type: "CommandExecute", Source: Objective, Command: Content });
             this.Outputs.PrintInput(Objective, Content, false);
             this.Outputs.ScrollToBottom();
         }
-        // ExplainFull: ExplainFull: Explain the selected text in the command center in full.
+        /** ExplainFull: ExplainFull: Explain the selected text in the command center in full. */
         ExplainFull(Command) {
             if (!EditorDictionary.Check(Command))
                 return false;
@@ -498,7 +498,7 @@
             this.Execute("observer", `help ${Command} -full`);
         }
         // #endregion
-        // AnnotateCode: Annotate some code snippets.
+        /** AnnotateCode: Annotate some code snippets. */
         AnnotateCode(Target, Content, Copyable) {
             for (var Item of Target.get()) {
                 var Snippet = $(Item);
@@ -514,7 +514,7 @@
         }
     }
 
-    // ShowConfirm: Show a confirm dialog.
+    /** ShowConfirm: Show a confirm dialog. */
     const ShowConfirm = function (Subject, Content, OK, Cancel) {
         $.confirm({
             title: Localized.Get(Subject),
@@ -536,14 +536,15 @@
         });
     };
 
-    /** EditorTab: A tab for the code this. */
+    /** EditorTab: A tab for the code editor. */
     class EditorTab extends Tab {
-        // Show: Show the editor tab. 
+        /** Show: Show the editor tab.  */
         Show() {
             super.Show();
-            // if (this.CodeRefreshed) this.Galapagos.SetCursorPosition(0);
+            if (this.CodeRefreshed)
+                this.Galapagos.SetCursorPosition(0);
         }
-        // Hide: Hide the editor tab. 
+        /** Hide: Hide the editor tab.  */
         Hide() {
             super.Hide();
         }
@@ -552,24 +553,13 @@
             super.Blur();
             this.Galapagos.Blur();
         }
-        // Constructor: Initialize the editor.
+        /** Constructor: Initialize the editor. */
         constructor(Container, Editor) {
             super(Container, Editor);
-            // Show the tips
-            this.ShowTips = function (Content, Callback) {
-                if (!Callback)
-                    Callback = () => { this.HideTips(); };
-                this.TipsElement.off("click").text(Content).on("click", Callback).show();
-            };
-            // Hide the tips
-            this.HideTips = function () {
-                this.TipsElement.hide();
-            };
-            // Editor support
             this.IgnoreUpdate = false;
-            // CodeRefreshed: Did we refresh the code on the background?
+            /** CodeRefreshed: Did we refresh the code on the background? */
             this.CodeRefreshed = false;
-            // ShowProcedures: List all procedures in the code.
+            /** ShowProcedures: List all procedures in the code. */
             this.ShowProcedures = function () {
                 var Procedures = this.GetProcedures();
                 if (Object.keys(Procedures).length == 0) {
@@ -591,7 +581,7 @@
                     Dialog.modal({});
                 }
             };
-            // GetProcedures: Get all procedures from the code.
+            /** GetProcedures: Get all procedures from the code. */
             this.GetProcedures = function () {
                 var Rule = /^\s*(?:to|to-report)\s(?:\s*;.*\n)*\s*(\w\S*)/gm; // From NLW
                 var Content = this.GetCode();
@@ -614,11 +604,21 @@
                 OnDictionaryClick: (Text) => this.Editor.CommandTab.ExplainFull(Text)
             });
         }
-        // SetCompilerErrors: Show the compiler error linting messages.
+        // Show the tips
+        ShowTips(Content, Callback) {
+            if (!Callback)
+                Callback = () => { this.HideTips(); };
+            this.TipsElement.off("click").text(Content).on("click", Callback).show();
+        }
+        // Hide the tips
+        HideTips() {
+            this.TipsElement.hide();
+        }
+        /** SetCompilerErrors: Show the compiler error linting messages. */
         SetCompilerErrors(Errors) {
             if (Errors.length == 0)
                 this.HideTips();
-            // Temp hack: the Galapagos does not support unknown position errors yet.
+            /** Temp hack: the Galapagos does not support unknown position errors yet. */
             if (Errors.length > 0 && Errors[0].start == 2147483647) {
                 this.ShowTips(Errors[0].message);
                 this.Galapagos.SetCompilerErrors([]);
@@ -630,7 +630,7 @@
                 this.Galapagos.SetCompilerErrors(Errors);
             }
         }
-        // SetRuntimeErrors: Show the runtime error linting messages.
+        /** SetRuntimeErrors: Show the runtime error linting messages. */
         SetRuntimeErrors(Errors) {
             if (Errors.length > 0 && Errors[0].start == 2147483647) {
                 this.ShowTips(Errors[0].message);
@@ -643,7 +643,7 @@
                 this.Galapagos.SetRuntimeErrors(Errors);
             }
         }
-        // SetCode: Set the content of the this.
+        /** SetCode: Set the content of the this. */
         SetCode(Content, Unapplied) {
             // Set the content
             if (Content != this.Galapagos.GetCode()) {
@@ -661,27 +661,30 @@
             if (!Unapplied)
                 this.SetApplied();
         }
-        // GetCode: Get the content of the this.
+        /** GetCode: Get the content of the this. */
         GetCode() {
             return this.Galapagos.GetCode();
         }
-        // SetApplied: Set applied status.
+        /** SetApplied: Set applied status. */
         SetApplied() {
-            // Generation = this.Galapagos.doc.changeGeneration();
-            this.HideTips();
+            this.SetCompilerErrors([]);
         }
-        // JumpToNetTango: Jump to the NetTango portion.
+        // #endregion
+        // #region "Editor Interfaces"
+        // #endregion
+        // #region "Editor Functionalities"
+        /** JumpToNetTango: Jump to the NetTango portion. */
         JumpToNetTango() {
             var Index = this.GetCode().indexOf("; --- NETTANGO BEGIN ---");
             if (Index == -1)
                 return;
             this.Galapagos.SetCursorPosition(Index);
         }
-        // Reset: Show the reset dialog.
+        /** Reset: Show the reset dialog. */
         Reset() {
             ShowConfirm("重置代码", "是否将代码重置到最后一次成功编译的状态？", () => this.Editor.Call({ Type: "CodeReset" }));
         }
-        // ShowMenu: Show a feature menu.
+        /** ShowMenu: Show a feature menu. */
         ShowMenu() {
             var Dialog = $("#Dialog-Procedures");
             var List = Dialog.children("ul").empty();
@@ -709,7 +712,7 @@
         constructor(Container, PostMessage) {
             /** EditorTabs: The editor tabs. */
             this.EditorTabs = [];
-            // Toast: Show a toast.
+            /** Toast: Show a toast. */
             this.Toast = function (Type, Content, Subject) {
                 toastr[Type](Content, Subject);
             };
@@ -741,21 +744,21 @@
         }
         // #endregion
         // #region "Editor Statuses"
-        // Resize: Resize the viewport width (on mobile platforms)
+        /** Resize: Resize the viewport width (on mobile platforms) */
         Resize(Ratio) {
             $("body").addClass("Mobile");
             $("#viewport").attr("content", `width=device-width,initial-scale=${Ratio},maximum-scale=${Ratio},minimum-scale=${Ratio},user-scalable=no,viewport-fit=cover`);
         }
-        // SetDesktop: Set the desktop mode.
+        /** SetDesktop: Set the desktop mode. */
         SetFontsize(Status) {
             $("html").css("font-size", Status + "px");
         }
-        // ToggleDark: Toggle the dark mode.
+        /** ToggleDark: Toggle the dark mode. */
         ToggleDark(Status) {
             if (Status != this.Darkmode.isActivated())
                 this.Darkmode.toggle();
         }
-        // SetPlatform: Set the platform of the editor.
+        /** SetPlatform: Set the platform of the editor. */
         SetPlatform(Platform) {
             $("body").addClass(Platform);
         }

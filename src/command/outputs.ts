@@ -4,11 +4,11 @@ import { Localized } from "src/legacy";
 
 /** OutputDisplay: Display the output section. */
 export class OutputDisplay {
-    // Tab: The related command tab.
+    /** Tab: The related command tab. */
     public readonly Tab: CommandTab;
-    // Container: The output help area. 
+    /** Container: The output help area.  */
 	public readonly Container: JQuery<HTMLElement>;
-    // Constructor: Create a new output section.
+    /** Constructor: Create a new output section. */
     constructor(Tab: CommandTab) {
         this.Tab = Tab;
         this.Container = $(Tab.Container).find(".command-output");
@@ -16,33 +16,33 @@ export class OutputDisplay {
 		this.KeepSize = this.Container.children(".Keep").length;
 		this.Tab.AnnotateCode(this.Container.find(".keep code"), null, true);
     }
-	// Clear the output region of Command Center
+	/** ClearOutput: Clear the output region of Command Center */
 	public ClearOutput() {
 		this.Container.children().slice(this.KeepSize).remove();
 	}
-	// After user entered input, screen view should scroll down to the botom line
+	/** ScrollToBottom: After user entered input, screen view should scroll down to the botom line */
 	public ScrollToBottom() {
 		this.Container.scrollTop(this.Container.get(0)!.scrollHeight);
 	}
 
     // #region "Batch Printing Support"
-	// Fragment: Batch printing support for batch printing.
+	/** Fragment: Batch printing support for batch printing. */
 	private Fragment: JQuery<DocumentFragment> | null = null;
-	// BufferSize: Buffer size for batch printing.
+	/** BufferSize: Buffer size for batch printing. */
 	private BufferSize = 1000;
-	// KeepSize: The number of messages that are kept forever. 
+	/** KeepSize: The number of messages that are kept forever.  */
 	private KeepSize = -1;
-	// WriteOutput: Print to a batch.
+	/** WriteOutput: Print to a batch. */
 	private WriteOutput(Element: JQuery<HTMLElement>) {
 		if (this.Fragment == null)
 			this.Container.append(Element);
 		else this.Fragment.append(Element);
 	}
-	// OpenBatch: Open a printing batch.
+	/** OpenBatch: Open a printing batch. */
 	public OpenBatch() {
 		this.Fragment = $(document.createDocumentFragment());
 	}
-	// CloseBatch: Close a printing batch.
+	/** CloseBatch: Close a printing batch. */
 	public CloseBatch() {
 		if (this.Fragment == null) return;
 		// Trim the buffer (should refactor later) & the display
@@ -63,7 +63,7 @@ export class OutputDisplay {
     // #endregion
 
     // #region "Single Printing Support"
-	// PrintInput: Print a line of input to the screen
+	/** PrintInput: Print a line of input to the screen. */
 	public PrintInput(Objective: string | null, Content: string, Embedded: boolean) {
 		// Change the objective
 		if (Objective == null) Objective = this.Tab.TargetSelect.val() as string;
@@ -92,8 +92,8 @@ export class OutputDisplay {
 		if (!Embedded) this.WriteOutput(Wrapper);
 		return Wrapper;
 	}
-	// Provide for Unity to print compiled output
-	PrintOutput(Content, Class) {
+	/** PrintOutput: Provide for Unity to print compiled output. */ 
+	public PrintOutput(Content, Class: string) {
 	    var Output: JQuery<HTMLElement> | null = null;
 		switch (Class) {
 			case "CompilationError":
@@ -157,7 +157,7 @@ export class OutputDisplay {
 		this.WriteOutput(Output);
 		if (this.Fragment == null) this.ScrollToBottom();
 	}
-	// AnnotateInput: Annotate some code inputs.
+	/** AnnotateInput: Annotate some code inputs. */ 
 	private AnnotateInput(Query: JQuery<HTMLElement>) {
 		Query.each((Index, Item) => {
 			var Current = $(Item);

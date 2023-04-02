@@ -1,7 +1,7 @@
 import { Localized } from "src/legacy";
 import { TurtleEditor } from "../main";
 
-  // TransformLinks: Transform the embedded links.
+  /** TransformLinks: Transform the embedded links. */
  export function TransformLinks(Element) {
     if (TurtleEditor.PostMessage != null) return;
     Element.find("a").each((Index, Link) => {
@@ -12,7 +12,7 @@ import { TurtleEditor } from "../main";
     });
 }
 
-// LinkCommand: Generate a link for another command.
+/** LinkCommand: Generate a link for another command. */
 export function LinkCommand(Query: JQuery<HTMLElement>) {
     Query.each((Index, Item) => {
         var Current = $(Item);
@@ -26,7 +26,7 @@ export function LinkCommand(Query: JQuery<HTMLElement>) {
     return Query;
 }
 
-// RenderAgent: Render tips for an agent type.
+/** RenderAgent: Render tips for an agent type. */
 export function RenderAgent(Agent) {
     var Message = Agent;
     switch (Agent) {

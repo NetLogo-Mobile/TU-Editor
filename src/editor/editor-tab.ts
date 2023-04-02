@@ -8,14 +8,14 @@ type GalapagosEditor = any;
 /** EditorTab: A tab for the code editor. */
 export class EditorTab extends Tab {
     // #region "Foundational Interfaces"
-	// Galapagos: Refers to the main editor. 
+	/** Galapagos: Refers to the main editor.  */
 	public readonly Galapagos: GalapagosEditor;
-	// Show: Show the editor tab. 
+	/** Show: Show the editor tab.  */
     public Show() {
         super.Show();
 		if (this.CodeRefreshed) this.Galapagos.SetCursorPosition(0);
     }
-	// Hide: Hide the editor tab. 
+	/** Hide: Hide the editor tab.  */
     public Hide() {
         super.Hide();
     }
@@ -24,7 +24,7 @@ export class EditorTab extends Tab {
         super.Blur();
         this.Galapagos.Blur();
     }
-	// Constructor: Initialize the editor.
+	/** Constructor: Initialize the editor. */
 	constructor(Container: HTMLElement, Editor: TurtleEditor) {
         super(Container, Editor);
         this.TipsElement = $(Container).children(".codemirror-tips");
@@ -52,10 +52,10 @@ export class EditorTab extends Tab {
 	public HideTips() {
 		this.TipsElement.hide();
 	}
-	// SetCompilerErrors: Show the compiler error linting messages.
+	/** SetCompilerErrors: Show the compiler error linting messages. */
 	public SetCompilerErrors(Errors) {
 		if (Errors.length == 0) this.HideTips();
-		// Temp hack: the Galapagos does not support unknown position errors yet.
+		/** Temp hack: the Galapagos does not support unknown position errors yet. */
 		if (Errors.length > 0 && Errors[0].start == 2147483647) {
 			this.ShowTips(Errors[0].message);
 			this.Galapagos.SetCompilerErrors([]);
@@ -66,7 +66,7 @@ export class EditorTab extends Tab {
 			this.Galapagos.SetCompilerErrors(Errors);
 		}
 	}
-	// SetRuntimeErrors: Show the runtime error linting messages.
+	/** SetRuntimeErrors: Show the runtime error linting messages. */
 	public SetRuntimeErrors(Errors) {
 		if (Errors.length > 0 && Errors[0].start == 2147483647) {
 			this.ShowTips(Errors[0].message);
@@ -79,9 +79,9 @@ export class EditorTab extends Tab {
 		}
 	}
 	private IgnoreUpdate = false;
-	// CodeRefreshed: Did we refresh the code on the background?
+	/** CodeRefreshed: Did we refresh the code on the background? */
 	private CodeRefreshed = false;
-	// SetCode: Set the content of the this.
+	/** SetCode: Set the content of the this. */
 	public SetCode(Content, Unapplied) {
 		// Set the content
 		if (Content != this.Galapagos.GetCode()) {
@@ -97,29 +97,32 @@ export class EditorTab extends Tab {
 		// Mark clean or show tips
 		if (!Unapplied) this.SetApplied();
 	}
-	// GetCode: Get the content of the this.
+	/** GetCode: Get the content of the this. */
 	public GetCode() {
 		return this.Galapagos.GetCode();
 	}
-	// SetApplied: Set applied status.
+	/** SetApplied: Set applied status. */
 	public SetApplied() {
 		this.SetCompilerErrors([]);
 	}
 	// #endregion
 
-	// #region "Editor Features"
-	// JumpToNetTango: Jump to the NetTango portion.
+	// #region "Editor Interfaces"
+	// #endregion
+
+	// #region "Editor Functionalities"
+	/** JumpToNetTango: Jump to the NetTango portion. */
 	public JumpToNetTango() {
 		var Index = this.GetCode().indexOf("; --- NETTANGO BEGIN ---");
 		if (Index == -1) return;
 		this.Galapagos.SetCursorPosition(Index);
 	}
-	// Reset: Show the reset dialog.
+	/** Reset: Show the reset dialog. */
 	public Reset() {
 		ShowConfirm("重置代码", "是否将代码重置到最后一次成功编译的状态？",
 		    () => this.Editor.Call({ Type: "CodeReset" }));
 	}
-	// ShowMenu: Show a feature menu.
+	/** ShowMenu: Show a feature menu. */
 	public ShowMenu() {
 		var Dialog = $("#Dialog-Procedures")
 		var List = Dialog.children("ul").empty();
@@ -139,7 +142,7 @@ export class EditorTab extends Tab {
 		}
 		(Dialog as any).modal({});
 	}
-	// ShowProcedures: List all procedures in the code.
+	/** ShowProcedures: List all procedures in the code. */
 	public ShowProcedures = function() {
 		var Procedures = this.GetProcedures();
 		if (Object.keys(Procedures).length == 0) {
@@ -160,7 +163,7 @@ export class EditorTab extends Tab {
             (Dialog as any).modal({});
 		}
 	}
-	// GetProcedures: Get all procedures from the code.
+	/** GetProcedures: Get all procedures from the code. */
 	public GetProcedures = function() {
 		var Rule = /^\s*(?:to|to-report)\s(?:\s*;.*\n)*\s*(\w\S*)/gm // From NLW
 		var Content = this.GetCode(); 

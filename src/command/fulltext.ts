@@ -5,18 +5,18 @@ declare const { showdown }: any;
 
 /** FullTextDisplay: Display the full-text help information. */
 export class FullTextDisplay {
-    // Tab: The related command tab.
+    /** Tab: The related command tab. */
     public readonly Tab: CommandTab;
-    // Container: The full-text help area. 
+    /** Container: The full-text help area.  */
 	public readonly Container: JQuery<HTMLElement>;
-    // RequestedTab: The tab that requested the full text.
+    /** RequestedTab: The tab that requested the full text. */
 	private RequestedTab: Tab | null = null;
-    // Constructor: Create a new full-text display.
+    /** Constructor: Create a new full-text display. */
     constructor(Tab: CommandTab) {
         this.Tab = Tab;
         this.Container = $(Tab.Container).find(".command-fulltext");
     }
-	// ShowFullText: Show the full text of a command.
+	/** ShowFullText: Show the full text of a command. */
 	public ShowFullText(Data) {
 		this.RequestedTab = this.Tab.Editor.CurrentTab;
 		if (!this.Tab.Visible) this.Tab.Show();
@@ -55,7 +55,7 @@ export class FullTextDisplay {
 		// Acknowledge
 		TransformLinks(this.Container.find(".Acknowledge").html(Data["acknowledge"]));
 	}
-	// HideFullText: Hide the full text mode.
+	/** HideFullText: Hide the full text mode. */
 	public HideFullText() {
 		if (!this.Container.is(":visible")) return;
 		this.Container.hide();

@@ -11,13 +11,13 @@ export class CommandTab extends Tab {
     // #region "Foundational Interfaces"
 	// Command center would be disabled before compile output come out.
 	public Disabled: boolean = false;
-	// Galapagos: Refers to the main this.Editor.
+	/** Galapagos: Refers to the main this.Editor. */
 	public readonly Galapagos: GalapagosEditor;
-	// FullText: The full-text help area.
+	/** FullText: The full-text help area. */
 	public readonly FullText: FullTextDisplay;
-    // Outputs: The outputs area. 
+    /** Outputs: The outputs area.  */
 	public readonly Outputs: OutputDisplay;
-	// Show: Show the command tab. 
+	/** Show: Show the command tab.  */
 	public Show() {
         super.Show();
 		bodyScrollLock.clearAllBodyScrollLocks();
@@ -26,30 +26,30 @@ export class CommandTab extends Tab {
 		this.HideFullText();
 		this.Outputs.ScrollToBottom();
 	}
-	// Hide: Hide the command tab.
+	/** Hide: Hide the command tab. */
 	public Hide() {
         super.Hide();
 		bodyScrollLock.clearAllBodyScrollLocks();
 		bodyScrollLock.disableBodyScroll(document.querySelector('.cm-scroller'), { allowTouchMove: () => true });
 		this.HideFullText();
 	}
-    // Blur: Blur the tab's editor.
+    /** Blur: Blur the tab's editor. */
     public Blur() {
         super.Blur();
         this.Galapagos.Blur();
     }
-	// ShowFullText: Show the full-text help area.
+	/** ShowFullText: Show the full-text help area. */
 	public ShowFullText(Data) {
 		this.FullText.ShowFullText(Data);
 		this.Outputs.Container.hide();
 	}
-	// HideFullText: Hide the full-text help area.
+	/** HideFullText: Hide the full-text help area. */
 	public HideFullText() {
 		this.FullText.HideFullText();
 		this.Outputs.Container.show();
 		this.Outputs.ScrollToBottom();
 	}
-	// Constructor: Initialize the command center.
+	/** Constructor: Initialize the command center. */
 	constructor(Container: HTMLElement, Editor: TurtleEditor) {
         super(Container, Editor);
 		// Get the elements
@@ -80,17 +80,17 @@ export class CommandTab extends Tab {
     // #endregion
     
     // #region "Command Input"
-    // CommandLine: The input area. 
+    /** CommandLine: The input area.  */
 	public readonly CommandLine: JQuery<HTMLElement>;
-    // TargetSelect: The input area. 
+    /** TargetSelect: The input area.  */
 	public readonly TargetSelect: JQuery<HTMLSelectElement>;
-	// CommandStack: Store the command history.
+	/** CommandStack: Store the command history. */
 	private CommandStack: [string, string][] = [];
-	// CurrentCommand: Store the current command.
+	/** CurrentCommand: Store the current command. */
 	private CurrentCommand: string[] = [];
-	// CurrentCommandIndex: Store the current command index.
+	/** CurrentCommandIndex: Store the current command index. */
 	private CurrentCommandIndex = 0;
-	// InputKeyHandler: Handle the key input.
+	/** InputKeyHandler: Handle the key input. */
 	private InputKeyHandler(Event: KeyboardEvent) {
 		const Key = Event.key;
 		const Code = Event.code;
@@ -135,12 +135,12 @@ export class CommandTab extends Tab {
 			this.CurrentCommandIndex = 0;
 		}
 	}
-	// SendCommand: Send command to either execute or as a chat message.
+	/** SendCommand: Send command to either execute or as a chat message. */
 	private SendCommand(Objective: string, Content: string) {
 		this.HideFullText();
 		this.Execute(Objective, Content);
 	}
-	// ClearInput: Clear the input box of Command Center.
+	/** ClearInput: Clear the input box of Command Center. */
 	public ClearInput() {
 		this.Galapagos.SetCode("");
 	}
@@ -150,18 +150,18 @@ export class CommandTab extends Tab {
 		this.Galapagos.SetCode(Content);
 		setTimeout(() => this.Galapagos.SetCursorPosition(Content.length), 1);
 	}
-	// FinishExecution: Notify the completion of the command.
+	/** FinishExecution: Notify the completion of the command. */
 	public FinishExecution(Status: string, Message: string) {
 		this.Outputs.PrintOutput(Message, Status);
 		this.Disabled = false;
 	}
-	// Execute: Execute a command from the user.
+	/** Execute: Execute a command from the user. */
 	public Execute(Objective, Content) {
 		this.Editor.Call({ Type: "CommandExecute", Source: Objective, Command: Content });
 		this.Outputs.PrintInput(Objective, Content, false);
 		this.Outputs.ScrollToBottom();
 	}
-	// ExplainFull: ExplainFull: Explain the selected text in the command center in full.
+	/** ExplainFull: ExplainFull: Explain the selected text in the command center in full. */
 	public ExplainFull(Command: string) {
 		if (!EditorDictionary.Check(Command)) return false;
 		this.Outputs.ScrollToBottom();
@@ -169,7 +169,7 @@ export class CommandTab extends Tab {
 	}
     // #endregion
 
-	// AnnotateCode: Annotate some code snippets.
+	/** AnnotateCode: Annotate some code snippets. */
 	public AnnotateCode(Target: JQuery<HTMLElement>, Content?: string, Copyable?: boolean) {
 		for (var Item of Target.get()) {
 			var Snippet = $(Item);

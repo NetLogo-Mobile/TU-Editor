@@ -54,24 +54,24 @@ export class TurtleEditor {
   // #endregion
 
   // #region "Editor Statuses"
-  // Resize: Resize the viewport width (on mobile platforms)
+  /** Resize: Resize the viewport width (on mobile platforms) */
   Resize(Ratio) {
     $("body").addClass("Mobile");
     $("#viewport").attr("content", `width=device-width,initial-scale=${Ratio},maximum-scale=${Ratio},minimum-scale=${Ratio},user-scalable=no,viewport-fit=cover`);
   }
-  // SetDesktop: Set the desktop mode.
+  /** SetDesktop: Set the desktop mode. */
   SetFontsize(Status) {
     $("html").css("font-size", Status + "px");
   }
-  // ToggleDark: Toggle the dark mode.
+  /** ToggleDark: Toggle the dark mode. */
   ToggleDark(Status) {
     if (Status != this.Darkmode.isActivated()) this.Darkmode.toggle();
   }
-  // SetPlatform: Set the platform of the editor.
+  /** SetPlatform: Set the platform of the editor. */
   SetPlatform(Platform) {
     $("body").addClass(Platform);
   }
-	// Toast: Show a toast.
+	/** Toast: Show a toast. */
 	Toast = function(Type, Content, Subject) {
 		toastr[Type](Content, Subject);
 	}

@@ -156,6 +156,7 @@ export class OutputDisplay {
 		}
 		this.WriteOutput(Output);
 		if (this.Fragment == null) this.ScrollToBottom();
+		return Output;
 	}
 	/** AnnotateInput: Annotate some code inputs. */ 
 	private AnnotateInput(Query: JQuery<HTMLElement>) {

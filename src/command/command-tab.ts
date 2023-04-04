@@ -2,6 +2,7 @@ import { TurtleEditor } from "../main";
 import { Tab } from '../tab';
 import { FullTextDisplay } from "./fulltext";
 import { OutputDisplay } from "./outputs";
+import { ChatInterface } from '../chat/chat';
 
 declare const { bodyScrollLock, EditorDictionary, GalapagosEditor }: any;
 type GalapagosEditor = any;
@@ -17,6 +18,8 @@ export class CommandTab extends Tab {
 	public readonly FullText: FullTextDisplay;
 	/** Outputs: The outputs area.  */
 	public readonly Outputs: OutputDisplay;
+	/** ChatInterface: The chat interface to the backend. */
+	public readonly ChatInterface: ChatInterface;
 	/** Show: Show the command tab.  */
 	public Show() {
 		super.Show();
@@ -77,6 +80,7 @@ export class CommandTab extends Tab {
 		// Set up sections
 		this.Outputs = new OutputDisplay(this);
 		this.FullText = new FullTextDisplay(this);
+		this.ChatInterface = new ChatInterface(this);
 	}
 	// #endregion
 
@@ -137,34 +141,39 @@ export class CommandTab extends Tab {
 		}
 	}
 	/** SendCommand: Send command to either execute or as a chat message. */
-	private async SendCommand(Objective: string, Content: string) {
-		// Parse and lint
-		this.Galapagos.ForceParse();
-		let Diagnostics = await this.Galapagos.ForceLintAsync();
-		let Mode = this.Galapagos.GetRecognizedMode();
-		// Check linting issues
-		if (Diagnostics.length == 0) {
-			// If there is no linting issues, assume it is code snippet
-			if (Mode == "Reporter") Content = `show ${Content}`;
-			this.Outputs.PrintInput(Objective, Content, false);
-			switch (Objective.toLowerCase()) {
-				case "turtles":
-					Content = `ask turtles [ ${Content} ]`;
-					break;
-				case "patches":
-					Content = `ask patches [ ${Content} ]`;
-					break;
-				case "links":
-					Content = `ask links [ ${Content} ]`;
-					break;
+	public async SendCommand(Objective: string, Content: string) {
+		this.Outputs.ScrollToBottom();
+		// If there is no linting issues, assume it is code snippet
+		if (Objective != "chat") {
+			this.Galapagos.ForceParse();
+			let Diagnostics = await this.Galapagos.ForceLintAsync();
+			let Mode = this.Galapagos.GetRecognizedMode();
+			// Check linting issues
+			if (Diagnostics.length == 0) {
+				console.log("Mode: " + Mode);
+				if (Mode == "Reporter" || Mode == "Unknown") Content = `show ${Content}`;
+				this.Outputs.PrintInput(Objective, Content, false);
+				switch (Objective.toLowerCase()) {
+					case "turtles":
+						Content = `ask turtles [ ${Content} ]`;
+						break;
+					case "patches":
+						Content = `ask patches [ ${Content} ]`;
+						break;
+					case "links":
+						Content = `ask links [ ${Content} ]`;
+						break;
+				}
+				this.Editor.Call({ Type: "CommandExecute", Source: Objective, Command: Content });
+				this.ClearInput();
+				return;
 			}
-			this.Editor.Call({ Type: "CommandExecute", Source: Objective, Command: Content });
-			this.Outputs.ScrollToBottom();
-		} else {
-			// Otherwise, assume it is a chat message
-			this.Outputs.PrintInput("you", Content, false);
-			this.Outputs.ScrollToBottom();
 		}
+		// Otherwise, assume it is a chat message
+		$(`<p class="output"><span class="you">you&gt;</span>&nbsp;<span></span>`).appendTo(this.Outputs.Container)
+			.children("span:eq(1)").text(Content);
+		this.ChatInterface.SendMessage(Objective, Content);
+		this.Disabled = true;
 		this.ClearInput();
 	}
 	/** ClearInput: Clear the input box of Command Center. */
@@ -198,16 +207,19 @@ export class CommandTab extends Tab {
 
 	/** AnnotateCode: Annotate some code snippets. */
 	public AnnotateCode(Target: JQuery<HTMLElement>, Content?: string, Copyable?: boolean) {
+		var This = this;
 		for (var Item of Target.get()) {
 			var Snippet = $(Item);
 			// Render the code
-			var Output = this.Galapagos.Highlight(Content ? Content : Item.innerText);
+			Content = Content ? Content : Item.innerText;
+			var Output = this.Galapagos.Highlight(Content);
 			Snippet.empty().append($(Output));
 			// Copy support
-			if (Copyable && Item.innerText.trim().indexOf(" ") >= 0 && Snippet.parent("pre").length == 0)
-				Snippet.addClass("copyable").append($(`<img class="copy-icon" src="images/copy.png"/>`)).on("click", () => {
-					this.SetCode("observer", Snippet.text());
-				});
+			if (Copyable && Content.trim().indexOf(" ") >= 0 && Content.trim().indexOf("\n") == 0 && Snippet.parent("pre").length == 0)
+				Snippet.data("Code", Content).addClass("copyable").append($(`<img class="copy-icon" src="images/copy.png"/>`))
+					.on("click", function() {
+						This.SetCode("observer", $(this).data("Code"));
+					});
 		}
 	}
 }

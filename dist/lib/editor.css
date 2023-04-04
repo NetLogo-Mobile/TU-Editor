@@ -15,6 +15,10 @@ select {
 	scroll-behavior: smooth;
 }
 
+pre {
+	margin: 0;
+}
+
 html {
 	font-size: 15px;
 }
@@ -351,6 +355,10 @@ div.command {
 	padding: 0 1rem;
 }
 
+.command-output img.copy-icon {
+	float: right;
+}
+
 .command-wrapper {
 	padding: 0 1rem;
 	display: flex;
@@ -374,6 +382,14 @@ div.command {
 
 .command-wrapper .icon img {
 	width: 100%;
+}
+
+.command-output .assistant {
+	color: #2881e0;
+}
+
+.command-output .you {
+	color: #cc2200;
 }
 
 .command-output .Comment {
@@ -458,7 +474,12 @@ div.command {
 }
 
 .command-line .command-input .cm-editor .cm-scroller {
-	line-height: 1.7;
+	line-height: 1.5;
+	overflow-y: hidden;
+}
+
+.command-line .command-input .cm-editor .cm-scroller ::-webkit-scrollbar {
+	display: none;
 }
 
 .command-line .command-input .cm-editor .cm-activeLine {

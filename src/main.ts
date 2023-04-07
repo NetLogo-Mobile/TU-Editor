@@ -57,7 +57,9 @@ export class TurtleEditor {
 	// #region "Editor Interfaces"
 	/** GetContext: Get the NetLogo context. */
 	public GetContext(): NetLogoContext {
-		var State = this.EditorTabs[0].Galapagos.GetState();
+    var Galapagos = this.EditorTabs[0].Galapagos;
+    Galapagos.ForceParse();
+		var State = Galapagos.GetState();
 		// Create the procedures map
 		var Procedures: Procedure[] = [];
 		for (var [Name, Procedure] of State.Procedures) {

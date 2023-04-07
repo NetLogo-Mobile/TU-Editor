@@ -1074,7 +1074,9 @@ Do not report information that does not exist.`;
         // #region "Editor Interfaces"
         /** GetContext: Get the NetLogo context. */
         GetContext() {
-            var State = this.EditorTabs[0].Galapagos.GetState();
+            var Galapagos = this.EditorTabs[0].Galapagos;
+            Galapagos.ForceParse();
+            var State = Galapagos.GetState();
             // Create the procedures map
             var Procedures = [];
             for (var [Name, Procedure] of State.Procedures) {

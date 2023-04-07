@@ -107,9 +107,6 @@ export class EditorTab extends Tab {
 	}
 	// #endregion
 
-	// #region "Editor Interfaces"
-	// #endregion
-
 	// #region "Editor Functionalities"
 	/** JumpToNetTango: Jump to the NetTango portion. */
 	public JumpToNetTango() {

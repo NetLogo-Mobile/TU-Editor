@@ -24,6 +24,11 @@ export class OutputDisplay {
 	public ScrollToBottom() {
 		this.Container.scrollTop(this.Container.get(0)!.scrollHeight);
 	}
+	/** IsAtBottom: Whether the container is scrolled to bottom. */
+	public IsAtBottom(): boolean {
+		var Element = this.Container.get(0)!;
+		return Math.abs(Element.scrollHeight - Element.clientHeight - Element.scrollTop) < 1;
+	}
 
     // #region "Batch Printing Support"
 	/** Fragment: Batch printing support for batch printing. */
@@ -45,6 +50,7 @@ export class OutputDisplay {
 	/** CloseBatch: Close a printing batch. */
 	public CloseBatch() {
 		if (this.Fragment == null) return;
+		var AtBottom = this.IsAtBottom();
 		// Trim the buffer (should refactor later) & the display
 		var Length = this.Fragment.children().length;
 		if (Length > this.BufferSize) {
@@ -58,7 +64,7 @@ export class OutputDisplay {
 		// Append to the display
 		this.Container.append(this.Fragment);
 		this.Fragment = null;
-		this.ScrollToBottom();
+		if (AtBottom) this.ScrollToBottom();
 	}
     // #endregion
 
@@ -94,6 +100,7 @@ export class OutputDisplay {
 	}
 	/** PrintOutput: Provide for Unity to print compiled output. */ 
 	public PrintOutput(Content, Class: string) {
+		var AtBottom = this.Fragment == null && this.IsAtBottom();
 	    var Output: JQuery<HTMLElement> | null = null;
 		switch (Class) {
 			case "CompilationError":
@@ -155,7 +162,7 @@ export class OutputDisplay {
 				break;
 		}
 		this.WriteOutput(Output);
-		if (this.Fragment == null) this.ScrollToBottom();
+		if (AtBottom) this.ScrollToBottom();
 		return Output;
 	}
 	/** AnnotateInput: Annotate some code inputs. */ 

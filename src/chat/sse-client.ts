@@ -55,6 +55,8 @@ export class SSEClient {
                         onMessage(data);
                     }
                 });
+            } else {
+                onError.call(this.Request, null);
             }
         };
 

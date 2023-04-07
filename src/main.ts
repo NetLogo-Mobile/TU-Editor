@@ -2,6 +2,7 @@ import { CommandTab } from "./command/command-tab";
 import { EditorTab } from "./editor/editor-tab";
 import { Localized, RotateScreen } from "./legacy";
 import { Tab } from "./tab";
+import { Breed, NetLogoContext, Procedure } from "./editor/netlogo-context";
 
 declare const { Darkmode, toastr }: any;
 type Darkmode = any;
@@ -52,6 +53,30 @@ export class TurtleEditor {
     this.GetAllTabs().forEach(Tab => Tab.Blur());
   }
   // #endregion
+
+	// #region "Editor Interfaces"
+	/** GetContext: Get the NetLogo context. */
+	public GetContext(): NetLogoContext {
+		var State = this.EditorTabs[0].Galapagos.GetState();
+		// Create the procedures map
+		var Procedures: Procedure[] = [];
+		for (var [Name, Procedure] of State.Procedures) {
+			Procedures.push({ Name: Name, Arguments: [...Procedure.Arguments], IsCommand: Procedure.IsCommand });
+		}
+		// Create the breeds map
+		var Breeds: Breed[] = [];
+		for (var [Name, Breed] of State.Breeds) {
+			Breeds.push({ Singular: Breed.Singular, Plural: Breed.Plural, Variables: [...Breed.Variables], IsLinkBreed: Breed.IsLinkBreed });
+		}
+		return {
+			Extensions: [...State.Extensions],
+			Globals: [...State.Globals],
+			WidgetGlobals: [...State.WidgetGlobals],
+			Procedures: Procedures,
+			Breeds: Breeds
+		}
+	}
+	// #endregion
 
   // #region "Editor Statuses"
   /** Resize: Resize the viewport width (on mobile platforms) */

@@ -172,6 +172,7 @@ export class CommandTab extends Tab {
 		// Otherwise, assume it is a chat message
 		$(`<p class="output"><span class="you">you&gt;</span>&nbsp;<span></span>`).appendTo(this.Outputs.Container)
 			.children("span:eq(1)").text(Content);
+		this.Outputs.ScrollToBottom();
 		this.ChatInterface.SendMessage(Objective, Content);
 		this.Disabled = true;
 		this.ClearInput();

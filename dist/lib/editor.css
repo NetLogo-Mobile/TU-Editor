@@ -413,6 +413,10 @@ div.command {
 	color: #cc2200;
 }
 
+.command-output .RuntimeError a {
+	margin: 0 0 0 0.5em;
+}
+
 .command-output .Succeeded {
 	color: #007F69;
 }

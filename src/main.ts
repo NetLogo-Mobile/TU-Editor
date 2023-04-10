@@ -20,10 +20,11 @@ export class TurtleEditor {
   public constructor(Container: HTMLElement, PostMessage: (Message: string) => void | null) {
     this.Container = Container;
     TurtleEditor.PostMessage = PostMessage;
-    this.CommandTab = new CommandTab($(Container).children("div.command").get(0)!, this);
-    this.EditorTabs = [new EditorTab($(Container).children("div.editor").get(0)!, this)];
-    this.CommandTab.Show();
 		this.Darkmode = new Darkmode();
+    this.EditorTabs = [new EditorTab($(Container).children("div.editor").get(0)!, this)];
+    this.CommandTab = new CommandTab($(Container).children("div.command").get(0)!, this);
+    this.CommandTab.Show();
+    this.EditorTabs[0].Galapagos.AddChild(this.CommandTab.Galapagos);
   }
   /** Call: Call the facilitator (by default, the Unity Engine). */
   Call(Message) {

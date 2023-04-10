@@ -144,7 +144,7 @@ export class CommandTab extends Tab {
 	public async SendCommand(Objective: string, Content: string) {
 		this.Outputs.ScrollToBottom();
 		// If there is no linting issues, assume it is code snippet
-		if (Objective != "chat") {
+		if (Objective != "chat" && !/^[\d\.]+$/.test(Content)) {
 			this.Galapagos.ForceParse();
 			let Diagnostics = await this.Galapagos.ForceLintAsync();
 			let Mode = this.Galapagos.GetRecognizedMode();

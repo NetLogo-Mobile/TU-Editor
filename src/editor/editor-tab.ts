@@ -82,13 +82,14 @@ export class EditorTab extends Tab {
 	/** CodeRefreshed: Did we refresh the code on the background? */
 	private CodeRefreshed = false;
 	/** SetCode: Set the content of the this. */
-	public SetCode(Content, Unapplied) {
+	public SetCode(Content: string, Unapplied: boolean) {
 		// Set the content
 		if (Content != this.Galapagos.GetCode()) {
 			this.IgnoreUpdate = true;
-			this.SetCompilerErrors([]);
 			this.Galapagos.ClearHistory();
 			this.Galapagos.SetCode(Content);
+			this.SetCompilerErrors([]);
+			this.Galapagos.UpdateContext();
 			if (!this.Visible) this.CodeRefreshed = true;
 			this.Galapagos.SetCursorPosition(0);
 			this.HideTips();

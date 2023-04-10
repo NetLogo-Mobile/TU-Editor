@@ -978,9 +978,10 @@ Do not report information that does not exist.`;
             // Set the content
             if (Content != this.Galapagos.GetCode()) {
                 this.IgnoreUpdate = true;
-                this.SetCompilerErrors([]);
                 this.Galapagos.ClearHistory();
                 this.Galapagos.SetCode(Content);
+                this.SetCompilerErrors([]);
+                this.Galapagos.UpdateContext();
                 if (!this.Visible)
                     this.CodeRefreshed = true;
                 this.Galapagos.SetCursorPosition(0);

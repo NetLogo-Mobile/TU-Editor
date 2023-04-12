@@ -103,6 +103,11 @@ export class TurtleEditor {
 	Toast = function(Type, Content, Subject) {
 		toastr[Type](Content, Subject);
 	}
+  /** Reset: Reset the editor. */
+  Reset() {
+    this.CommandTab.Reset();
+    this.EditorTabs.forEach(Tab => Tab.Reset());
+  }
   // #endregion
 }
 

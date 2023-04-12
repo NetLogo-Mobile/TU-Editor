@@ -10,6 +10,10 @@ export class ChatInterface {
     Commands: CommandTab;
     /** Outputs: The outputs area. */
     Outputs: OutputDisplay;
+    /** APIToken: The API token (temporary). */
+    APIToken: string = "";
+    /** Available: Whether the chat backend is available. */
+    Available: boolean = false;
     /** Constructor: Create a chat interface. */
     public constructor(Tab: CommandTab) {
         this.Commands = Tab;
@@ -17,6 +21,11 @@ export class ChatInterface {
     }
     /** Messages: Previous messages (temporary). */
     Messages: any[] = [];
+    /** SetToken: Set the API token. */
+    public SetToken(Token: string) {
+        this.APIToken = Token;
+        this.Available = true;
+    }
     /** SendMessage: Send a message to the chat backend. */
     public SendMessage(Objective: string, Content: string) {
         this.Request([
@@ -86,7 +95,7 @@ Do not report information that does not exist.`;
         var FullMessage = ""; var Restarting = false;
         // Send the request
         var Client = new SSEClient("https://api.openai.com/v1/chat/completions",
-            "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",
+            this.APIToken,
             {
                 "model": "gpt-3.5-turbo",
                 "messages": Body,

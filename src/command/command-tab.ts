@@ -41,6 +41,14 @@ export class CommandTab extends Tab {
 		super.Blur();
 		this.Galapagos.Blur();
 	}
+	/** Reset: Reset the command center. */
+	public Reset() {
+		super.Reset();
+		this.ClearInput();
+		this.Outputs.ClearOutput();
+		this.ChatInterface.Messages = [];
+		this.HideFullText();
+	}
 	/** ShowFullText: Show the full-text help area. */
 	public ShowFullText(Data) {
 		this.FullText.ShowFullText(Data);
@@ -108,9 +116,6 @@ export class CommandTab extends Tab {
 			if (TurtleEditor.PostMessage != null) this.Disabled = true;
 			this.HideFullText();
 			this.SendCommand(Objective, Content);
-			this.CommandStack.push([Objective, Content]);
-			this.CurrentCommandIndex = 0;
-			this.CurrentCommand = [];
 		}
 		// After press key `ArrowUp`, get previous command from command history
 		else if (Key == "ArrowUp" || Code == "ArrowUp") {
@@ -143,29 +148,28 @@ export class CommandTab extends Tab {
 	/** SendCommand: Send command to either execute or as a chat message. */
 	public async SendCommand(Objective: string, Content: string) {
 		this.Outputs.ScrollToBottom();
-		// If there is no linting issues, assume it is code snippet
+		// API Token input: temporary
+		if (/^sk-[0-9a-zA-Z]{48}$/.test(Content)) {
+			this.ChatInterface.SetToken(Content);
+			this.Outputs.PrintOutput("OpenAI API Token set.", "Output");
+			this.ClearInput();
+			return;
+		}
+		// Chatable or not
+		var Chatable = this.ChatInterface.Available;
+		if (!Chatable) {
+			this.ExecuteUserCommand(Objective, Content);
+			return;
+		}
+		// Check if it is a command
 		if (Objective != "chat" && !/^[\d\.]+$/.test(Content)) {
+			// If there is no linting issues, assume it is code snippet
 			this.Galapagos.ForceParse();
 			let Diagnostics = await this.Galapagos.ForceLintAsync();
 			let Mode = this.Galapagos.GetRecognizedMode();
-			// Check linting issues
 			if (Diagnostics.length == 0) {
-				console.log("Mode: " + Mode);
 				if (Mode == "Reporter" || Mode == "Unknown") Content = `show ${Content}`;
-				this.Outputs.PrintInput(Objective, Content, false);
-				switch (Objective.toLowerCase()) {
-					case "turtles":
-						Content = `ask turtles [ ${Content} ]`;
-						break;
-					case "patches":
-						Content = `ask patches [ ${Content} ]`;
-						break;
-					case "links":
-						Content = `ask links [ ${Content} ]`;
-						break;
-				}
-				this.Editor.Call({ Type: "CommandExecute", Source: Objective, Command: Content });
-				this.ClearInput();
+				this.ExecuteUserCommand(Objective, Content);
 				return;
 			}
 		}
@@ -175,6 +179,29 @@ export class CommandTab extends Tab {
 		this.Outputs.ScrollToBottom();
 		this.ChatInterface.SendMessage(Objective, Content);
 		this.Disabled = true;
+		this.ClearInput();
+	}
+	/** ExecuteUserCommand: Execute a human-sent command. */
+	private ExecuteUserCommand(Objective: string, Content: string) {
+		// Record command history
+		this.Outputs.PrintInput(Objective, Content, false);
+		this.CommandStack.push([Objective, Content]);
+		this.CurrentCommandIndex = 0;
+		this.CurrentCommand = [];
+		// Transform command
+		switch (Objective.toLowerCase()) {
+			case "turtles":
+				Content = `ask turtles [ ${Content} ]`;
+				break;
+			case "patches":
+				Content = `ask patches [ ${Content} ]`;
+				break;
+			case "links":
+				Content = `ask links [ ${Content} ]`;
+				break;
+		}
+		// Execute command
+		this.Editor.Call({ Type: "CommandExecute", Source: Objective, Command: Content });
 		this.ClearInput();
 	}
 	/** ClearInput: Clear the input box of Command Center. */
@@ -192,8 +219,8 @@ export class CommandTab extends Tab {
 		this.Outputs.PrintOutput(Message, Status);
 		this.Disabled = false;
 	}
-	/** Execute: Execute a command from the user. */
-	public Execute(Objective: string, Content: string) {
+	/** ExecuteCommand: Execute a command. */
+	public ExecuteCommand(Objective: string, Content: string) {
 		this.Editor.Call({ Type: "CommandExecute", Source: Objective, Command: Content });
 		this.Outputs.PrintInput(Objective, Content, false);
 		this.Outputs.ScrollToBottom();
@@ -202,7 +229,7 @@ export class CommandTab extends Tab {
 	public ExplainFull(Command: string) {
 		if (!EditorDictionary.Check(Command)) return false;
 		this.Outputs.ScrollToBottom();
-		this.Execute("observer", `help ${Command} -full`);
+		this.ExecuteCommand("observer", `help ${Command} -full`);
 	}
 	// #endregion
 

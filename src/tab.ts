@@ -29,4 +29,8 @@ export class Tab {
     Blur() {
 
     }
+    /** Reset: Reset the status. */
+    Reset() {
+
+    }
 }

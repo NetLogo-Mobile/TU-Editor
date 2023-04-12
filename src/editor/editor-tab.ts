@@ -115,8 +115,8 @@ export class EditorTab extends Tab {
 		if (Index == -1) return;
 		this.Galapagos.SetCursorPosition(Index);
 	}
-	/** Reset: Show the reset dialog. */
-	public Reset() {
+	/** ResetCode: Show the reset dialog. */
+	public ResetCode() {
 		ShowConfirm("重置代码", "是否将代码重置到最后一次成功编译的状态？",
 		    () => this.Editor.Call({ Type: "CodeReset" }));
 	}
@@ -131,7 +131,7 @@ export class EditorTab extends Tab {
 		Features[Localized.Get("重做操作")] = () => this.Galapagos.Redo();
 		Features[Localized.Get("跳转到行")] = () => this.Galapagos.ShowJumpTo();
 		Features[Localized.Get("整理代码")] = () => this.Galapagos.PrettifyAll();
-		Features[Localized.Get("重置代码")] = () => this.Reset();
+		Features[Localized.Get("重置代码")] = () => this.ResetCode();
 		for (var Feature in Features) {
 			$(`<li>${Feature}</li>`).attr("Tag", Feature).appendTo(List).click(function() {
 				Features[$(this).attr("Tag")]();

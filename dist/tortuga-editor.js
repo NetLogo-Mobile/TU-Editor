@@ -39,12 +39,12 @@
             this.Editor.HideAllTabs();
             this.Container.style.display = "block";
             this.Visible = true;
-            this.SyncSize();
         }
         /** Hide: Hide the tab. */
         Hide() {
             this.Container.style.display = "none";
             this.Visible = false;
+            this.Blur();
         }
         /** Blur: Blur the tab's editor. */
         Blur() {
@@ -706,12 +706,12 @@ Do not report information that does not exist.`;
                 this.Outputs.ScrollToBottom();
             }
             else {
-                clearTimeout(this.TimeoutHandler);
-                this.TimeoutHandler = setTimeout(() => {
-                    this.Outputs.Container.add(this.FullText.Container)
-                        .css("padding-top", `calc(0.5em + ${ScrollHeight - ViewportHeight}px)`);
-                    this.Outputs.ScrollToBottom();
-                }, 100);
+                //clearTimeout(this.TimeoutHandler);
+                //this.TimeoutHandler = setTimeout(() => {
+                this.Outputs.Container.add(this.FullText.Container)
+                    .css("padding-top", `calc(0.5em + ${ScrollHeight - ViewportHeight}px)`);
+                this.Outputs.ScrollToBottom();
+                //}, 100);
             }
             return true;
         }
@@ -957,6 +957,18 @@ Do not report information that does not exist.`;
         Blur() {
             super.Blur();
             this.Galapagos.Blur();
+        }
+        Resize(ViewportHeight, ScrollHeight) {
+            if (super.Resize(ViewportHeight, ScrollHeight)) {
+                this.Galapagos.CodeMirror.requestMeasure();
+            }
+            else {
+                clearTimeout(this.TimeoutHandler);
+                this.TimeoutHandler = setTimeout(() => {
+                    this.Galapagos.CodeMirror.requestMeasure();
+                }, 100);
+            }
+            return true;
         }
         /** Constructor: Initialize the editor. */
         constructor(Container, Editor) {

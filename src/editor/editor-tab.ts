@@ -24,6 +24,19 @@ export class EditorTab extends Tab {
         super.Blur();
         this.Galapagos.Blur();
     }
+	/** Resize: Resize the tab. */
+	private TimeoutHandler: any;
+	public Resize(ViewportHeight: number, ScrollHeight: number) {
+		if (super.Resize(ViewportHeight, ScrollHeight)) {
+			this.Galapagos.CodeMirror.requestMeasure();
+		} else {
+			clearTimeout(this.TimeoutHandler);
+			this.TimeoutHandler = setTimeout(() => {
+				this.Galapagos.CodeMirror.requestMeasure();
+			}, 100);
+		}
+		return true;
+	}
 	/** Constructor: Initialize the editor. */
 	constructor(Container: HTMLElement, Editor: TurtleEditor) {
         super(Container, Editor);

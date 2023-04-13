@@ -19,12 +19,12 @@ export class Tab {
         this.Editor.HideAllTabs();
         this.Container.style.display = "block";
         this.Visible = true;
-        this.SyncSize();
     }
     /** Hide: Hide the tab. */
     Hide() {
         this.Container.style.display = "none";
         this.Visible = false;
+        this.Blur();
     }
     /** Blur: Blur the tab's editor. */
     Blur() {

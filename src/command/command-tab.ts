@@ -47,12 +47,12 @@ export class CommandTab extends Tab {
 		if (super.Resize(ViewportHeight, ScrollHeight)) {
 			this.Outputs.ScrollToBottom();
 		} else {
-			clearTimeout(this.TimeoutHandler);
-			this.TimeoutHandler = setTimeout(() => {
+			//clearTimeout(this.TimeoutHandler);
+			//this.TimeoutHandler = setTimeout(() => {
 				this.Outputs.Container.add(this.FullText.Container)
 					.css("padding-top", `calc(0.5em + ${ScrollHeight - ViewportHeight}px)`)
 				this.Outputs.ScrollToBottom();
-			}, 100);
+			//}, 100);
 		}
 		return true;
 	}

@@ -19,6 +19,7 @@ export class Tab {
         this.Editor.HideAllTabs();
         this.Container.style.display = "block";
         this.Visible = true;
+        this.SyncSize();
     }
     /** Hide: Hide the tab. */
     Hide() {
@@ -32,5 +33,16 @@ export class Tab {
     /** Reset: Reset the status. */
     Reset() {
 
+    }
+    /** SyncSize: Resize the visible region. */
+    SyncSize() {
+        this.Resize(window.visualViewport.height, document.body.scrollHeight);
+    }
+    /** Resize: Resize the visible region. */
+    Resize(ViewportHeight: number, ScrollHeight: number): boolean {
+		if (navigator.userAgent.indexOf("Macintosh") == -1 && navigator.userAgent.indexOf("Mac OS X") == -1) {
+			$(this.Editor.Container).css("height", `${ViewportHeight}px`);
+            return true;
+        }
     }
 }

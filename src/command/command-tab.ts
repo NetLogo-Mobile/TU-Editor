@@ -41,6 +41,21 @@ export class CommandTab extends Tab {
 		super.Blur();
 		this.Galapagos.Blur();
 	}
+	/** Resize: Resize the tab. */
+	private TimeoutHandler: any;
+	public Resize(ViewportHeight: number, ScrollHeight: number) {
+		if (super.Resize(ViewportHeight, ScrollHeight)) {
+			this.Outputs.ScrollToBottom();
+		} else {
+			clearTimeout(this.TimeoutHandler);
+			this.TimeoutHandler = setTimeout(() => {
+				this.Outputs.Container.add(this.FullText.Container)
+					.css("padding-top", `calc(0.5em + ${ScrollHeight - ViewportHeight}px)`)
+				this.Outputs.ScrollToBottom();
+			}, 100);
+		}
+		return true;
+	}
 	/** Reset: Reset the command center. */
 	public Reset() {
 		super.Reset();
@@ -73,18 +88,6 @@ export class CommandTab extends Tab {
 			OnKeyUp: (Event) => this.InputKeyHandler(Event),
 			OnDictionaryClick: (Text) => this.ExplainFull(Text)
 		});
-		// Listen to the sizing
-		if (window.visualViewport)
-			window.visualViewport.addEventListener("resize", () => {
-				if (navigator.userAgent.indexOf("Macintosh") == -1 && navigator.userAgent.indexOf("Mac OS X") == -1) {
-					var Height = window.visualViewport!.height;
-					$(this.Editor.Container).css("height", `${Height}px`);
-				} else {
-					setTimeout(() => this.Outputs.Container.add(this.FullText.Container)
-						.css("padding-top", `calc(0.5em + ${document.body.scrollHeight - window.visualViewport!.height}px)`), 100);
-				}
-				if (this.Visible) this.Outputs.Container.scrollTop(100000);
-			});
 		// Set up sections
 		this.Outputs = new OutputDisplay(this);
 		this.FullText = new FullTextDisplay(this);
@@ -153,6 +156,7 @@ export class CommandTab extends Tab {
 			this.ChatInterface.SetToken(Content);
 			this.Outputs.PrintOutput("OpenAI API Token set.", "Output");
 			this.ClearInput();
+			this.Disabled = false;
 			return;
 		}
 		// Chatable or not

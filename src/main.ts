@@ -20,11 +20,16 @@ export class TurtleEditor {
   public constructor(Container: HTMLElement, PostMessage: (Message: string) => void | null) {
     this.Container = Container;
     TurtleEditor.PostMessage = PostMessage;
+    // Initialize the darkmode
 		this.Darkmode = new Darkmode();
+    // Initialize the tabs
     this.EditorTabs = [new EditorTab($(Container).children("div.editor").get(0)!, this)];
     this.CommandTab = new CommandTab($(Container).children("div.command").get(0)!, this);
     this.CommandTab.Show();
     this.EditorTabs[0].Galapagos.AddChild(this.CommandTab.Galapagos);
+		// Listen to the sizing
+		if (window.visualViewport)
+			window.visualViewport.addEventListener("resize", () => this.CurrentTab.SyncSize());
   }
   /** Call: Call the facilitator (by default, the Unity Engine). */
   Call(Message) {

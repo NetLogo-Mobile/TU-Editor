@@ -39,6 +39,7 @@
             this.Editor.HideAllTabs();
             this.Container.style.display = "block";
             this.Visible = true;
+            this.SyncSize();
         }
         /** Hide: Hide the tab. */
         Hide() {
@@ -50,6 +51,17 @@
         }
         /** Reset: Reset the status. */
         Reset() {
+        }
+        /** SyncSize: Resize the visible region. */
+        SyncSize() {
+            this.Resize(window.visualViewport.height, document.body.scrollHeight);
+        }
+        /** Resize: Resize the visible region. */
+        Resize(ViewportHeight, ScrollHeight) {
+            if (navigator.userAgent.indexOf("Macintosh") == -1 && navigator.userAgent.indexOf("Mac OS X") == -1) {
+                $(this.Editor.Container).css("height", `${ViewportHeight}px`);
+                return true;
+            }
         }
     }
 
@@ -689,6 +701,20 @@ Do not report information that does not exist.`;
             super.Blur();
             this.Galapagos.Blur();
         }
+        Resize(ViewportHeight, ScrollHeight) {
+            if (super.Resize(ViewportHeight, ScrollHeight)) {
+                this.Outputs.ScrollToBottom();
+            }
+            else {
+                clearTimeout(this.TimeoutHandler);
+                this.TimeoutHandler = setTimeout(() => {
+                    this.Outputs.Container.add(this.FullText.Container)
+                        .css("padding-top", `calc(0.5em + ${ScrollHeight - ViewportHeight}px)`);
+                    this.Outputs.ScrollToBottom();
+                }, 100);
+            }
+            return true;
+        }
         /** Reset: Reset the command center. */
         Reset() {
             super.Reset();
@@ -730,20 +756,6 @@ Do not report information that does not exist.`;
                 OnKeyUp: (Event) => this.InputKeyHandler(Event),
                 OnDictionaryClick: (Text) => this.ExplainFull(Text)
             });
-            // Listen to the sizing
-            if (window.visualViewport)
-                window.visualViewport.addEventListener("resize", () => {
-                    if (navigator.userAgent.indexOf("Macintosh") == -1 && navigator.userAgent.indexOf("Mac OS X") == -1) {
-                        var Height = window.visualViewport.height;
-                        $(this.Editor.Container).css("height", `${Height}px`);
-                    }
-                    else {
-                        setTimeout(() => this.Outputs.Container.add(this.FullText.Container)
-                            .css("padding-top", `calc(0.5em + ${document.body.scrollHeight - window.visualViewport.height}px)`), 100);
-                    }
-                    if (this.Visible)
-                        this.Outputs.Container.scrollTop(100000);
-                });
             // Set up sections
             this.Outputs = new OutputDisplay(this);
             this.FullText = new FullTextDisplay(this);
@@ -805,6 +817,7 @@ Do not report information that does not exist.`;
                     this.ChatInterface.SetToken(Content);
                     this.Outputs.PrintOutput("OpenAI API Token set.", "Output");
                     this.ClearInput();
+                    this.Disabled = false;
                     return;
                 }
                 // Chatable or not
@@ -1109,11 +1122,16 @@ Do not report information that does not exist.`;
             };
             this.Container = Container;
             TurtleEditor.PostMessage = PostMessage;
+            // Initialize the darkmode
             this.Darkmode = new Darkmode();
+            // Initialize the tabs
             this.EditorTabs = [new EditorTab($(Container).children("div.editor").get(0), this)];
             this.CommandTab = new CommandTab($(Container).children("div.command").get(0), this);
             this.CommandTab.Show();
             this.EditorTabs[0].Galapagos.AddChild(this.CommandTab.Galapagos);
+            // Listen to the sizing
+            if (window.visualViewport)
+                window.visualViewport.addEventListener("resize", () => this.CurrentTab.SyncSize());
         }
         /** Call: Call the facilitator (by default, the Unity Engine). */
         Call(Message) {

@@ -44,16 +44,8 @@ export class CommandTab extends Tab {
 	/** Resize: Resize the tab. */
 	private TimeoutHandler: any;
 	public Resize(ViewportHeight: number, ScrollHeight: number) {
-		if (super.Resize(ViewportHeight, ScrollHeight)) {
-			this.Outputs.ScrollToBottom();
-		} else {
-			//clearTimeout(this.TimeoutHandler);
-			//this.TimeoutHandler = setTimeout(() => {
-				this.Outputs.Container.add(this.FullText.Container)
-					.css("padding-top", `calc(0.5em + ${ScrollHeight - ViewportHeight}px)`)
-				this.Outputs.ScrollToBottom();
-			//}, 100);
-		}
+		super.Resize(ViewportHeight, ScrollHeight);
+		this.Outputs.ScrollToBottom();
 		return true;
 	}
 	/** Reset: Reset the command center. */
@@ -86,7 +78,9 @@ export class CommandTab extends Tab {
 			OneLine: true,
 			ParseMode: "Oneline",
 			OnKeyUp: (Event) => this.InputKeyHandler(Event),
-			OnDictionaryClick: (Text) => this.ExplainFull(Text)
+			OnDictionaryClick: (Text) => this.ExplainFull(Text),
+			OnFocused: () => { console.log("Focused!"); this.OnEditorFocus() },
+			OnBlurred: () => { console.log("Blurred!"); }
 		});
 		// Set up sections
 		this.Outputs = new OutputDisplay(this);

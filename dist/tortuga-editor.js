@@ -58,9 +58,23 @@
         }
         /** Resize: Resize the visible region. */
         Resize(ViewportHeight, ScrollHeight) {
-            if (navigator.userAgent.indexOf("Macintosh") == -1 && navigator.userAgent.indexOf("Mac OS X") == -1) {
-                $(this.Editor.Container).css("height", `${ViewportHeight}px`);
-                return true;
+            $(this.Editor.Container).css("height", `${ViewportHeight}px`);
+            return true;
+        }
+        /** OnEditorFocus: Called when the editor is focused. */
+        OnEditorFocus() {
+            if (navigator.userAgent.indexOf("Macintosh") != -1 || navigator.userAgent.indexOf("Mac OS X") != -1) {
+                var I = 0;
+                var RefreshScroll = () => {
+                    if (window.scrollY != 0) {
+                        window.scrollTo(0, 0);
+                    }
+                    else if (I <= 100) {
+                        window.requestAnimationFrame(RefreshScroll);
+                    }
+                    I++;
+                };
+                RefreshScroll();
             }
         }
     }
@@ -702,17 +716,8 @@ Do not report information that does not exist.`;
             this.Galapagos.Blur();
         }
         Resize(ViewportHeight, ScrollHeight) {
-            if (super.Resize(ViewportHeight, ScrollHeight)) {
-                this.Outputs.ScrollToBottom();
-            }
-            else {
-                //clearTimeout(this.TimeoutHandler);
-                //this.TimeoutHandler = setTimeout(() => {
-                this.Outputs.Container.add(this.FullText.Container)
-                    .css("padding-top", `calc(0.5em + ${ScrollHeight - ViewportHeight}px)`);
-                this.Outputs.ScrollToBottom();
-                //}, 100);
-            }
+            super.Resize(ViewportHeight, ScrollHeight);
+            this.Outputs.ScrollToBottom();
             return true;
         }
         /** Reset: Reset the command center. */
@@ -754,7 +759,9 @@ Do not report information that does not exist.`;
                 OneLine: true,
                 ParseMode: "Oneline",
                 OnKeyUp: (Event) => this.InputKeyHandler(Event),
-                OnDictionaryClick: (Text) => this.ExplainFull(Text)
+                OnDictionaryClick: (Text) => this.ExplainFull(Text),
+                OnFocused: () => { console.log("Focused!"); this.OnEditorFocus(); },
+                OnBlurred: () => { console.log("Blurred!"); }
             });
             // Set up sections
             this.Outputs = new OutputDisplay(this);
@@ -959,15 +966,9 @@ Do not report information that does not exist.`;
             this.Galapagos.Blur();
         }
         Resize(ViewportHeight, ScrollHeight) {
-            if (super.Resize(ViewportHeight, ScrollHeight)) {
-                this.Galapagos.CodeMirror.requestMeasure();
-            }
-            else {
-                clearTimeout(this.TimeoutHandler);
-                this.TimeoutHandler = setTimeout(() => {
-                    this.Galapagos.CodeMirror.requestMeasure();
-                }, 100);
-            }
+            super.Resize(ViewportHeight, ScrollHeight);
+            this.Galapagos.CodeMirror.requestMeasure();
+            this.Galapagos.RefreshCursor();
             return true;
         }
         /** Constructor: Initialize the editor. */
@@ -1018,7 +1019,9 @@ Do not report information that does not exist.`;
                         this.Editor.Call({ Type: "CodeChanged" });
                     }
                 },
-                OnDictionaryClick: (Text) => this.Editor.CommandTab.ExplainFull(Text)
+                OnDictionaryClick: (Text) => this.Editor.CommandTab.ExplainFull(Text),
+                OnFocused: () => { console.log("Focused!"); this.OnEditorFocus(); },
+                OnBlurred: () => { console.log("Blurred!"); }
             });
         }
         // Show the tips

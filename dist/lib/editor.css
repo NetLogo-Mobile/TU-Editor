@@ -12,7 +12,7 @@ select {
 	padding: 0;
 	font-size: 1em;
 	overflow: hidden;
-	scroll-behavior: smooth;
+	scroll-behavior: auto;
 }
 
 pre {

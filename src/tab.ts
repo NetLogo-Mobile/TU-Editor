@@ -6,8 +6,8 @@ export class Tab {
     public readonly Editor: TurtleEditor;
     /** Container: The container HTMLElement. */
     public readonly Container: HTMLElement;
-	// Whether it is visible.
-	public Visible: boolean;
+    // Whether it is visible.
+    public Visible: boolean;
     /** Constructor: Create an editor tab. */
     constructor(Container: HTMLElement, Editor: TurtleEditor) {
         this.Editor = Editor;
@@ -40,9 +40,22 @@ export class Tab {
     }
     /** Resize: Resize the visible region. */
     Resize(ViewportHeight: number, ScrollHeight: number): boolean {
-		if (navigator.userAgent.indexOf("Macintosh") == -1 && navigator.userAgent.indexOf("Mac OS X") == -1) {
-			$(this.Editor.Container).css("height", `${ViewportHeight}px`);
-            return true;
+        $(this.Editor.Container).css("height", `${ViewportHeight}px`);
+        return true;
+    }
+    /** OnEditorFocus: Called when the editor is focused. */
+    protected OnEditorFocus() {
+        if (navigator.userAgent.indexOf("Macintosh") != -1 || navigator.userAgent.indexOf("Mac OS X") != -1) {
+            var I = 0;
+            var RefreshScroll = () => {
+                if (window.scrollY != 0) {
+                    window.scrollTo(0, 0);
+                } else if (I <= 100) {
+                    window.requestAnimationFrame(RefreshScroll);
+                };
+                I++;
+            };
+            RefreshScroll();
         }
     }
 }

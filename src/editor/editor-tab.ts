@@ -27,14 +27,9 @@ export class EditorTab extends Tab {
 	/** Resize: Resize the tab. */
 	private TimeoutHandler: any;
 	public Resize(ViewportHeight: number, ScrollHeight: number) {
-		if (super.Resize(ViewportHeight, ScrollHeight)) {
-			this.Galapagos.CodeMirror.requestMeasure();
-		} else {
-			clearTimeout(this.TimeoutHandler);
-			this.TimeoutHandler = setTimeout(() => {
-				this.Galapagos.CodeMirror.requestMeasure();
-			}, 100);
-		}
+		super.Resize(ViewportHeight, ScrollHeight);
+		this.Galapagos.CodeMirror.requestMeasure();
+		this.Galapagos.RefreshCursor();
 		return true;
 	}
 	/** Constructor: Initialize the editor. */
@@ -48,7 +43,9 @@ export class EditorTab extends Tab {
 					this.Editor.Call({ Type: "CodeChanged" });
 				}
 			},
-			OnDictionaryClick: (Text) => this.Editor.CommandTab.ExplainFull(Text)
+			OnDictionaryClick: (Text) => this.Editor.CommandTab.ExplainFull(Text),
+			OnFocused: () => { console.log("Focused!"); this.OnEditorFocus() },
+			OnBlurred: () => { console.log("Blurred!"); }
 		});
 	}
     // #endregion

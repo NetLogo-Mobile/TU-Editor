@@ -48,11 +48,9 @@ export class Tab {
         if (navigator.userAgent.indexOf("Macintosh") != -1 || navigator.userAgent.indexOf("Mac OS X") != -1) {
             var I = 0;
             var RefreshScroll = () => {
-                if (window.scrollY != 0) {
-                    window.scrollTo(0, 0);
-                } else if (I <= 100) {
+                if (window.scrollY == 0 || I <= 100)
                     window.requestAnimationFrame(RefreshScroll);
-                };
+                window.scrollTo(0, 0);
                 I++;
             };
             RefreshScroll();

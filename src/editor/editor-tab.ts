@@ -43,9 +43,7 @@ export class EditorTab extends Tab {
 					this.Editor.Call({ Type: "CodeChanged" });
 				}
 			},
-			OnDictionaryClick: (Text) => this.Editor.CommandTab.ExplainFull(Text),
-			OnFocused: () => { console.log("Focused!"); this.OnEditorFocus() },
-			OnBlurred: () => { console.log("Blurred!"); }
+			OnDictionaryClick: (Text) => this.Editor.CommandTab.ExplainFull(Text)
 		});
 	}
     // #endregion

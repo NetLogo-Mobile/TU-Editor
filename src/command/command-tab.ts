@@ -78,9 +78,7 @@ export class CommandTab extends Tab {
 			OneLine: true,
 			ParseMode: "Oneline",
 			OnKeyUp: (Event) => this.InputKeyHandler(Event),
-			OnDictionaryClick: (Text) => this.ExplainFull(Text),
-			OnFocused: () => { console.log("Focused!"); this.OnEditorFocus() },
-			OnBlurred: () => { console.log("Blurred!"); }
+			OnDictionaryClick: (Text) => this.ExplainFull(Text)
 		});
 		// Set up sections
 		this.Outputs = new OutputDisplay(this);

@@ -24,7 +24,7 @@ export class SSEClient {
         this.url = url;
         this.authorization = authorization;
         this.lastEventId = '';
-        this.payload = payload;
+        this.payload = JSON.stringify(payload);
         this.Request = new XMLHttpRequest();
     }
 
@@ -64,7 +64,7 @@ export class SSEClient {
 
         // Handle errors
         this.Request.onerror = onError;
-        this.Request.send(JSON.stringify(this.payload));
+        this.Request.send(this.payload);
     }
 
     /** Close: Stop listening to the SSE stream. */

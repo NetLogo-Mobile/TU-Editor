@@ -22,8 +22,8 @@ export interface LanguageContext {
 
 /** ChatMessage: A previous message in a chat context. */
 export interface ChatMessage {
-    /** Message: The message. */
-    Message: string;
+    /** Text: The message. */
+    Text: string;
     /** Role: The role of the speaker. */
     Role: ChatRole;
 }

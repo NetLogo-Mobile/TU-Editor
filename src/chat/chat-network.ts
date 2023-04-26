@@ -18,16 +18,20 @@ export class ChatNetwork {
         console.log(RealRequest);
         // Do the request
         return new Promise<ChatRecord>((Resolve, Reject) => {
+            var Section: ChatResponseSection = { Content: "" };
+            var Client = new SSEClient("http://localhost:3000/request", "", RealRequest);
             // Build the record
             var Record: ChatRecord = RealRequest as ChatRecord;
             Record.Response = { Sections: [] };
             Record.RequestTimestamp = Date.now();
             // Send the request
-            var Section: ChatResponseSection = { Content: "" };
-            var Client = new SSEClient("http://localhost:3000/request", "", Request);
             Client.Listen((Data) => {
-                // console.log(Data.data);
-                var Update = JSON.parse(Data.data) as ChatResponseSection;
+                try {
+                    var Update = JSON.parse(Data.data) as ChatResponseSection;
+                } catch (Exception) {
+                    console.log(Data.data);
+                    return;
+                }
                 // Handle the update
                 switch (Update.Type) {
                     case ChatResponseType.ServerError:
@@ -45,16 +49,21 @@ export class ChatNetwork {
                         }
                         return;
                     case ChatResponseType.Finish:
-                        if (Section.Type !== undefined)
+                        if (Section.Type !== undefined) {
+                            Record.Response.Sections.push(Section);
+                            Thread.Records[Record.ID] = Record;
                             FinishSection(Section);
+                        }
                         Record.ResponseTimestamp = Date.now();
                         Resolve(Record);
                         return;
                     case undefined:
                         break;
                     default:
-                        if (Section.Type !== undefined)
+                        if (Section.Type !== undefined) {
+                            Record.Response.Sections.push(Section);
                             FinishSection(Section);
+                        }
                         Section = Update;
                         Section.Options = Section.Options ?? [];
                         NewSection(Section);

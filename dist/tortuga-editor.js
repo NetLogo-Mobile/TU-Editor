@@ -410,6 +410,10 @@
 
     /** ChatThread: Record a conversation between human-AI. */
     class ChatThread {
+        constructor() {
+            /** Records: The chat records of the thread. */
+            this.Records = {};
+        }
     }
 
     /** SSEClient: A simple client for handling Server-Sent Events. */
@@ -419,7 +423,7 @@
             this.url = url;
             this.authorization = authorization;
             this.lastEventId = '';
-            this.payload = payload;
+            this.payload = JSON.stringify(payload);
             this.Request = new XMLHttpRequest();
         }
         /**
@@ -456,7 +460,7 @@
             };
             // Handle errors
             this.Request.onerror = onError;
-            this.Request.send(JSON.stringify(this.payload));
+            this.Request.send(this.payload);
         }
         /** Close: Stop listening to the SSE stream. */
         Close() {
@@ -508,17 +512,22 @@
                 console.log(RealRequest);
                 // Do the request
                 return new Promise((Resolve, Reject) => {
+                    var Section = { Content: "" };
+                    var Client = new SSEClient("http://localhost:3000/request", "", RealRequest);
                     // Build the record
                     var Record = RealRequest;
                     Record.Response = { Sections: [] };
                     Record.RequestTimestamp = Date.now();
                     // Send the request
-                    var Section = { Content: "" };
-                    var Client = new SSEClient("http://localhost:3000/request", "", Request);
                     Client.Listen((Data) => {
                         var _a;
-                        // console.log(Data.data);
-                        var Update = JSON.parse(Data.data);
+                        try {
+                            var Update = JSON.parse(Data.data);
+                        }
+                        catch (Exception) {
+                            console.log(Data.data);
+                            return;
+                        }
                         // Handle the update
                         switch (Update.Type) {
                             case ChatResponseType.ServerError:
@@ -537,16 +546,21 @@
                                 }
                                 return;
                             case ChatResponseType.Finish:
-                                if (Section.Type !== undefined)
+                                if (Section.Type !== undefined) {
+                                    Record.Response.Sections.push(Section);
+                                    Thread.Records[Record.ID] = Record;
                                     FinishSection(Section);
+                                }
                                 Record.ResponseTimestamp = Date.now();
                                 Resolve(Record);
                                 return;
                             case undefined:
                                 break;
                             default:
-                                if (Section.Type !== undefined)
+                                if (Section.Type !== undefined) {
+                                    Record.Response.Sections.push(Section);
                                     FinishSection(Section);
+                                }
                                 Section = Update;
                                 Section.Options = (_a = Section.Options) !== null && _a !== void 0 ? _a : [];
                                 NewSection(Section);
@@ -570,27 +584,67 @@
         }
     }
 
+    /** ChatRole: The role of the speaker. */
+    var ChatRole;
+    (function (ChatRole) {
+        /** System: The system. */
+        ChatRole["System"] = "system";
+        /** User: The user. */
+        ChatRole["User"] = "user";
+        /** Assistant: The assistant. */
+        ChatRole["Assistant"] = "assistant";
+    })(ChatRole || (ChatRole = {}));
+
+    /** ContextMessage: How to segment a message for the context. */
+    var ContextMessage;
+    (function (ContextMessage) {
+        /** Nothing: Nothing should be retained. */
+        ContextMessage[ContextMessage["Nothing"] = 0] = "Nothing";
+        /** Section: Only the current section should be retained. */
+        ContextMessage[ContextMessage["Section"] = 1] = "Section";
+        /** EntireMessage: The entire message should be retained. */
+        ContextMessage[ContextMessage["EntireMessage"] = 2] = "EntireMessage";
+    })(ContextMessage || (ContextMessage = {}));
+    /** ContextInheritance: How to inherit the parent context. */
+    var ContextInheritance;
+    (function (ContextInheritance) {
+        /** Drop: Drop the context. */
+        ContextInheritance[ContextInheritance["Drop"] = 0] = "Drop";
+        /** InheritOne: Only inherit the current message segment. */
+        ContextInheritance[ContextInheritance["InheritOne"] = 1] = "InheritOne";
+        /** InheritParent: Only inherit the current message segment and its parent context. */
+        ContextInheritance[ContextInheritance["InheritParent"] = 2] = "InheritParent";
+        /** InheritRecursive: Inherit the current message segment and its parent context, recursively based on the parent's strategy. */
+        ContextInheritance[ContextInheritance["InheritRecursive"] = 3] = "InheritRecursive";
+        /** InheritEntire: Inherit the entire context. */
+        ContextInheritance[ContextInheritance["InheritEntire"] = 4] = "InheritEntire";
+    })(ContextInheritance || (ContextInheritance = {}));
+
     /** ChatManager: The interface for connecting to a chat backend. */
     class ChatManager {
         /** Reset: Reset the chat interface. */
         Reset() {
             this.Thread = new ChatThread();
+            this.PendingRequest = null;
         }
         /** SendMessage: Send a direct message to the chat backend. */
         SendMessage(Content) {
-            var Request = {
-                Input: Content,
-            };
-            this.SendRequest(Request);
+            var _a;
+            this.PendingRequest = (_a = this.PendingRequest) !== null && _a !== void 0 ? _a : { Input: "" };
+            this.PendingRequest.Input = Content;
+            this.PendingRequest.Language = this.Thread.Language;
+            this.SendRequest(this.PendingRequest);
+            this.PendingRequest = null;
         }
         /** SendRequest: Send a request to the chat backend and handle its outputs. */
         SendRequest(Request) {
             // UI stuff
-            var Renderer = $("<div></div>").addClass("chat-response").appendTo(this.Outputs.Container);
+            var Renderer = $(`<div class="chat-response"></div>`).appendTo(this.Outputs.Container);
             var CurrentRenderer;
             this.Commands.HideInput();
             this.Commands.ClearInput();
             // Send the request
+            var Options = 0;
             ChatNetwork.SendRequest(Request, this.Thread, (Section) => {
                 // Create the section
                 CurrentRenderer = this.Render(CurrentRenderer, Renderer, Section, false);
@@ -600,11 +654,14 @@
             }, (Section) => {
                 // Finish the section
                 console.log(Section);
+                Options += Section.Options.length;
                 this.Render(CurrentRenderer, Renderer, Section, true);
                 CurrentRenderer = null;
             }).then((Record) => {
                 console.log(Record);
-                this.Commands.ShowInput();
+                Renderer.data("record", Record);
+                if (Options == 0)
+                    this.Commands.ShowInput();
             }).catch((Error) => {
                 if (!this.Commands.Disabled)
                     return;
@@ -615,6 +672,50 @@
                 }));
                 this.Commands.ShowInput();
             });
+        }
+        // #endregion
+        // #region " Options and Contexts "
+        /** RequestOption: Choose a chat option and send the request. */
+        RequestOption(Option, Section, Record) {
+            // Construct the request
+            this.PendingRequest = {
+                Input: Option.Label,
+                Option: Option.Label,
+                Operation: Option.Operation,
+                SubOperation: Option.SubOperation
+            };
+            // Construct the context
+            var Context = { PreviousMessages: [] };
+            // Inherit the context
+            switch (Option.Inheritance) {
+                case ContextInheritance.Drop:
+                    break;
+            }
+            // Inherit the last message
+            switch (Option.MessageInContext) {
+                case ContextMessage.Nothing:
+                    break;
+                case ContextMessage.Section:
+                    Context.PreviousMessages.push({
+                        Text: Section.Content,
+                        Role: ChatRole.Assistant
+                    });
+                    break;
+                case ContextMessage.EntireMessage:
+                default:
+                    Context.PreviousMessages.push({
+                        Text: Record.Response.Sections.map(Section => Section.Content).join("\n"),
+                        Role: ChatRole.Assistant
+                    });
+            }
+            this.PendingRequest.Context = Context;
+            // Send request or unlock the input
+            if (Option.AskInput) {
+                this.Commands.ShowInput();
+            }
+            else {
+                this.SendRequest(this.PendingRequest);
+            }
         }
         /** Constructor: Create a chat interface. */
         constructor(Tab) {
@@ -635,6 +736,9 @@
                 Output = $(`<div class="chat-section output"></div>`).appendTo(Renderer);
             if (Output == null)
                 return;
+            Output.data("section", Section);
+            // Clear the output
+            var ChatManager = this;
             var AtBottom = this.Outputs.IsAtBottom();
             Output.empty();
             // Render the section
@@ -684,14 +788,19 @@
                     var Link = $(`<p class="output option">- <a href="javascript:void(0)"></a></p>`);
                     Link.appendTo(Output);
                     Link.find("a").data("option", Option).text((_a = Option.LocalizedLabel) !== null && _a !== void 0 ? _a : Option.Label)
-                        .on("click", function () {
-                        console.log($(this).data("option"));
-                    });
+                        .on("click", function () { ChatManager.OptionHandler($(this)); });
                 }
             }
             if (AtBottom)
                 this.Commands.Outputs.ScrollToBottom();
             return Output;
+        }
+        /** OptionHandler: Handling an option. */
+        OptionHandler(OptionElement) {
+            var Option = OptionElement.data("option");
+            var Section = OptionElement.parents(".chat-section").data("section");
+            var Record = OptionElement.parents(".chat-response").data("record");
+            this.RequestOption(Option, Section, Record);
         }
     }
 

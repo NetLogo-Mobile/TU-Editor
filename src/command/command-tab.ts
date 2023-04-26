@@ -79,9 +79,7 @@ export class CommandTab extends Tab {
 			OneLine: true,
 			ParseMode: "Oneline",
 			OnKeyUp: (Event) => this.InputKeyHandler(Event),
-			OnDictionaryClick: (Text) => this.ExplainFull(Text),
-			OnFocused: () => { this.OnEditorFocus() },
-			OnBlurred: () => { }
+			OnDictionaryClick: (Text) => this.ExplainFull(Text)
 		});
 		// Set up sections
 		this.Outputs = new OutputDisplay(this);
@@ -205,6 +203,7 @@ export class CommandTab extends Tab {
 	/** HideInput: Hide the input box of Command Center. */
 	public HideInput() {
 		this.CommandLine.hide();
+		this.Disabled = true;
 	}
 	// Set the content of command input.
 	public SetCode(Objective: string, Content: string) {

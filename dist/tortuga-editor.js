@@ -61,19 +61,6 @@
             $(this.Editor.Container).css("height", `${ViewportHeight}px`);
             return true;
         }
-        /** OnEditorFocus: Called when the editor is focused. */
-        OnEditorFocus() {
-            if (navigator.userAgent.indexOf("Macintosh") != -1 || navigator.userAgent.indexOf("Mac OS X") != -1) {
-                var I = 0;
-                var RefreshScroll = () => {
-                    if (window.scrollY == 0 || I <= 100)
-                        window.requestAnimationFrame(RefreshScroll);
-                    window.scrollTo(0, 0);
-                    I++;
-                };
-                RefreshScroll();
-            }
-        }
     }
 
     // Localized: Localized support.
@@ -776,9 +763,7 @@
                 OneLine: true,
                 ParseMode: "Oneline",
                 OnKeyUp: (Event) => this.InputKeyHandler(Event),
-                OnDictionaryClick: (Text) => this.ExplainFull(Text),
-                OnFocused: () => { this.OnEditorFocus(); },
-                OnBlurred: () => { }
+                OnDictionaryClick: (Text) => this.ExplainFull(Text)
             });
             // Set up sections
             this.Outputs = new OutputDisplay(this);
@@ -897,6 +882,7 @@
         /** HideInput: Hide the input box of Command Center. */
         HideInput() {
             this.CommandLine.hide();
+            this.Disabled = true;
         }
         // Set the content of command input.
         SetCode(Objective, Content) {
@@ -1037,9 +1023,7 @@
                         this.Editor.Call({ Type: "CodeChanged" });
                     }
                 },
-                OnDictionaryClick: (Text) => this.Editor.CommandTab.ExplainFull(Text),
-                OnFocused: () => { this.OnEditorFocus(); },
-                OnBlurred: () => { }
+                OnDictionaryClick: (Text) => this.Editor.CommandTab.ExplainFull(Text)
             });
         }
         // Show the tips

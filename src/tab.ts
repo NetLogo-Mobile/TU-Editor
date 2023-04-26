@@ -1,7 +1,7 @@
 import { TurtleEditor } from "./main";
 
 /** Tab: A tab in the code editor. */
-export class Tab {
+export abstract class Tab {
     /** Editor: The editor instance. */
     public readonly Editor: TurtleEditor;
     /** Container: The container HTMLElement. */

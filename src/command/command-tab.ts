@@ -2,7 +2,7 @@ import { TurtleEditor } from "../main";
 import { Tab } from '../tab';
 import { FullTextDisplay } from "./fulltext";
 import { OutputDisplay } from "./outputs";
-import { ChatInterface } from '../chat/chat';
+import { ChatManager } from '../chat/chat-manager';
 
 declare const { bodyScrollLock, EditorDictionary, GalapagosEditor }: any;
 type GalapagosEditor = any;
@@ -18,8 +18,8 @@ export class CommandTab extends Tab {
 	public readonly FullText: FullTextDisplay;
 	/** Outputs: The outputs area.  */
 	public readonly Outputs: OutputDisplay;
-	/** ChatInterface: The chat interface to the backend. */
-	public readonly ChatInterface: ChatInterface;
+	/** ChatManager: The chat interface to the backend. */
+	public readonly ChatManager: ChatManager;
 	/** Show: Show the command tab.  */
 	public Show() {
 		super.Show();
@@ -51,9 +51,10 @@ export class CommandTab extends Tab {
 	/** Reset: Reset the command center. */
 	public Reset() {
 		super.Reset();
+		this.ShowInput();
 		this.ClearInput();
 		this.Outputs.ClearOutput();
-		this.ChatInterface.Messages = [];
+		this.ChatManager.Reset();
 		this.HideFullText();
 	}
 	/** ShowFullText: Show the full-text help area. */
@@ -79,13 +80,13 @@ export class CommandTab extends Tab {
 			ParseMode: "Oneline",
 			OnKeyUp: (Event) => this.InputKeyHandler(Event),
 			OnDictionaryClick: (Text) => this.ExplainFull(Text),
-			OnFocused: () => { console.log("Focused!"); this.OnEditorFocus() },
-			OnBlurred: () => { console.log("Blurred!"); }
+			OnFocused: () => { this.OnEditorFocus() },
+			OnBlurred: () => { }
 		});
 		// Set up sections
 		this.Outputs = new OutputDisplay(this);
 		this.FullText = new FullTextDisplay(this);
-		this.ChatInterface = new ChatInterface(this);
+		this.ChatManager = new ChatManager(this);
 	}
 	// #endregion
 
@@ -145,16 +146,8 @@ export class CommandTab extends Tab {
 	/** SendCommand: Send command to either execute or as a chat message. */
 	public async SendCommand(Objective: string, Content: string) {
 		this.Outputs.ScrollToBottom();
-		// API Token input: temporary
-		if (/^sk-[0-9a-zA-Z]{48}$/.test(Content)) {
-			this.ChatInterface.SetToken(Content);
-			this.Outputs.PrintOutput("OpenAI API Token set.", "Output");
-			this.ClearInput();
-			this.Disabled = false;
-			return;
-		}
 		// Chatable or not
-		var Chatable = this.ChatInterface.Available;
+		var Chatable = this.ChatManager.Available;
 		if (!Chatable) {
 			this.ExecuteUserCommand(Objective, Content);
 			return;
@@ -175,9 +168,7 @@ export class CommandTab extends Tab {
 		$(`<p class="output"><span class="you">you&gt;</span>&nbsp;<span></span>`).appendTo(this.Outputs.Container)
 			.children("span:eq(1)").text(Content);
 		this.Outputs.ScrollToBottom();
-		this.ChatInterface.SendMessage(Objective, Content);
-		this.Disabled = true;
-		this.ClearInput();
+		this.ChatManager.SendMessage(Content);
 	}
 	/** ExecuteUserCommand: Execute a human-sent command. */
 	private ExecuteUserCommand(Objective: string, Content: string) {
@@ -206,12 +197,24 @@ export class CommandTab extends Tab {
 	public ClearInput() {
 		this.Galapagos.SetCode("");
 	}
+	/** ShowInput: Show and enable the input box of Command Center. */
+	public ShowInput() {
+		this.CommandLine.show();
+		this.Disabled = false;
+	}
+	/** HideInput: Hide the input box of Command Center. */
+	public HideInput() {
+		this.CommandLine.hide();
+	}
 	// Set the content of command input.
 	public SetCode(Objective: string, Content: string) {
 		this.TargetSelect.val(Objective.toLowerCase());
 		this.Galapagos.SetCode(Content);
 		setTimeout(() => this.Galapagos.SetCursorPosition(Content.length), 1);
 	}
+	// #endregion
+
+	// #region "Command Execution"
 	/** FinishExecution: Notify the completion of the command. */
 	public FinishExecution(Status: string, Message: string) {
 		this.Outputs.PrintOutput(Message, Status);

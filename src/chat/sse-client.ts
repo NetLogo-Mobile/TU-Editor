@@ -45,9 +45,11 @@ export class SSEClient {
         }
 
         // Handle the received message
+        var responseCursor = 0;
         this.Request.onreadystatechange = () => {
             if (this.Request.status === 200) {
-                const messages = this.Request.responseText.trim().split('\n\n');
+                const messages = this.Request.responseText.substring(responseCursor).trim().split('\n\n');
+                responseCursor = this.Request.responseText.length;
                 messages.forEach((message) => {
                     const data = this.parseMessage(message);
                     if (data) {

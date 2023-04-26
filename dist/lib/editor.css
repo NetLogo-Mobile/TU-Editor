@@ -351,7 +351,7 @@ div.command {
 	background: #F5F5F5;
 }
 
-.command-output p.output {
+.command-output .output {
 	padding: 0 1rem;
 }
 

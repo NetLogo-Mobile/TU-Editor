@@ -1,5 +1,7 @@
-/** NetLogoContext: Storing (a brief) metadata about a NetLogo model. */
-export interface NetLogoContext {
+import { LanguageContext } from "../chat-context";
+
+/** NetLogoContext: The context information of the NetLogo model. */
+export interface NetLogoContext extends LanguageContext {
     /** Extensions: Extensions in the code. */
     Extensions: string[];
     /** Globals: Globals in the code. */

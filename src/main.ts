@@ -1,8 +1,8 @@
+import { NetLogoContext, Procedure, Breed } from "./chat/client/languages/netlogo-context";
 import { CommandTab } from "./command/command-tab";
 import { EditorTab } from "./editor/editor-tab";
 import { Localized, RotateScreen } from "./legacy";
 import { Tab } from "./tab";
-import { Breed, NetLogoContext, Procedure } from "./editor/netlogo-context";
 
 declare const { Darkmode, toastr }: any;
 type Darkmode = any;
@@ -77,6 +77,7 @@ export class TurtleEditor {
 			Breeds.push({ Singular: Breed.Singular, Plural: Breed.Plural, Variables: [...Breed.Variables], IsLinkBreed: Breed.IsLinkBreed });
 		}
 		return {
+      Language: "NetLogo",
 			Extensions: [...State.Extensions],
 			Globals: [...State.Globals],
 			WidgetGlobals: [...State.WidgetGlobals],

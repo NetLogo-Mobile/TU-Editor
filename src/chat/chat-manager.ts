@@ -1,10 +1,10 @@
 import { CommandTab } from "src/command/command-tab";
 import { OutputDisplay } from "src/command/outputs";
-import { ChatRequest, ClientChatRequest } from "./client/chat-request";
+import { ClientChatRequest } from "./client/chat-request";
 import { ChatResponseSection, ChatResponseType } from "./client/chat-response";
 import { ChatThread } from "./client/chat-thread";
 import { ChatNetwork } from "./chat-network";
-import { ChatContext, ChatRole } from "./client/chat-context";
+import { ChatRole } from "./client/chat-context";
 import { ChatResponseOption, ContextInheritance, ContextMessage } from "./client/chat-option";
 import { ChatRecord } from "./client/chat-record";
 declare const { EditorLocalized }: any;
@@ -15,7 +15,7 @@ export class ChatManager {
     /** Thread: The current chat thread. */
     private Thread: ChatThread;
     /** PendingRequest: The pending chat request. */
-    private PendingRequest: ChatRequest;
+    private PendingRequest: ClientChatRequest;
     /** Reset: Reset the chat interface. */
     public Reset() {
         this.Thread = new ChatThread();
@@ -30,7 +30,7 @@ export class ChatManager {
         this.PendingRequest = null;
     }
     /** SendRequest: Send a request to the chat backend and handle its outputs. */
-    private SendRequest(Request: ChatRequest) {
+    private SendRequest(Request: ClientChatRequest) {
         // UI stuff
         var Renderer = $(`<div class="chat-response"></div>`).appendTo(this.Outputs.Container);
         var CurrentRenderer: JQuery<HTMLElement> | null;
@@ -73,41 +73,72 @@ export class ChatManager {
         // Construct the request
         this.PendingRequest = {
             Input: Option.Label,
-            Option: Option.Label,
+            Option: Option,
             Operation: Option.Operation,
-            SubOperation: Option.SubOperation
+            SubOperation: Option.SubOperation,
+            ParentID: Record.ID,
+            SectionIndex: Section.Index,
         };
-        // Construct the context
-        var Context: ChatContext = { PreviousMessages: [] };
         // Inherit the context
-        switch (Option.Inheritance) {
-            case ContextInheritance.Drop:
-                break;
-        }
-        // Inherit the last message
-        switch (Option.MessageInContext) {
-            case ContextMessage.Nothing:
-                break;
-            case ContextMessage.Section:
-                Context.PreviousMessages.push({ 
-                    Text: Section.Content, 
-                    Role: ChatRole.Assistant
-                });
-                break;
-            case ContextMessage.EntireMessage:
-            default:
-                Context.PreviousMessages.push({ 
-                    Text: Record.Response.Sections.map(Section => Section.Content).join("\n"), 
-                    Role: ChatRole.Assistant
-                });
-        }
-        this.PendingRequest.Context = Context;
+        this.PendingRequest.Context = { PreviousMessages: [] };
+        this.InheritContext(Option, Section, Record, -1);
         // Send request or unlock the input
         if (Option.AskInput) {
             this.Commands.ShowInput();
         } else {
             this.SendRequest(this.PendingRequest);
         }
+    }
+    /** InheritContext: Inherit the context from the previous request. */
+    private InheritContext(Option: ChatResponseOption, Section: ChatResponseSection, Record: ChatRecord, Layers: number = -1) {
+        var Context = this.PendingRequest.Context;
+        if (Layers == -1) {
+            switch (Option.Inheritance) {
+                case ContextInheritance.Drop:
+                    // Stop right here
+                    return;
+                case ContextInheritance.InheritOne:
+                    // Stop after this
+                    Layers = -2;
+                    break;
+                case ContextInheritance.InheritParent:
+                    // Stop after the parent
+                    Layers = 0;
+                    break;
+                case ContextInheritance.InheritRecursive:
+                    // Continue until the root
+                    Layers = -1;
+                    break;
+            }
+        }
+        // Inherit the last action (from new to old)
+        this.PendingRequest.Operation = this.PendingRequest.Operation ?? Record.Operation;
+        // Inherit the last text message (from new to old)
+        switch (Option.TextInContext) {
+            case ContextMessage.Nothing:
+                break;
+            case ContextMessage.Section:
+                Context.PreviousMessages.unshift({ 
+                    Text: Section.Content, 
+                    Role: ChatRole.Assistant
+                });
+                break;
+            case ContextMessage.EntireMessage:
+            default:
+                Context.PreviousMessages.unshift({ 
+                    Text: Record.Response.Sections.filter(Section => Section.Type != ChatResponseType.Code)
+                        .map(Section => Section.Content).join("\n"), 
+                    Role: ChatRole.Assistant
+                });
+        }
+        // Inherit the last code message (from new to old)
+        if ((Option.CodeInContext ?? true) === true && Context.CodeSnippet === undefined) {
+            var Code = Record.Response.Sections.find(Section => Section.Type == ChatResponseType.Code);
+            if (Code != null) Context.CodeSnippet = Code.Content;
+        }
+        // Inherit previous messages
+        if (Layers == -2) return;
+
     }
     // #endregion
     
@@ -131,7 +162,7 @@ export class ChatManager {
     // #region " Message Rendering "
     /** Render: Render an AI response section onto the screen element. */
     private Render(Output: JQuery<HTMLElement> | null, Renderer: JQuery<HTMLElement>, Section: ChatResponseSection, Finalize: boolean): JQuery<HTMLElement> | null {
-        if (Output == null && Section.Content != "")
+        if (Output == null && (Section.Content != "" || Section.Options?.length > 0))
             Output = $(`<div class="chat-section output"></div>`).appendTo(Renderer);
         if (Output == null) return;
         Output.data("section", Section);
@@ -144,17 +175,22 @@ export class ChatManager {
             case ChatResponseType.Text:
                 // Filter the content
                 var Content = Section.Content;
-                if (!this.ThinkProcess && (Content.startsWith("Parameters:") || Content.startsWith("Thoughts:"))) {
-                    var OutputIndex = Content.indexOf("\nOutput: ");
+                if (!this.ThinkProcess && 
+                    (Content.startsWith("Parameters:") || Content.startsWith("Thoughts:") || Content.startsWith("Input:"))) {
+                    var OutputIndex = Content.indexOf("\nOutput:");
                     if (OutputIndex == -1) {
                         if (!Finalize) Content = EditorLocalized.Get("I am planning for the answer...");
                         else Content = "";
-                    } else Content = Content.substring(OutputIndex + 9);
+                    } else Content = Content.substring(OutputIndex + 8).trim();
                 }
+                if (Content.startsWith("Output: "))
+                    Content = Content.substring(8).trim();
                 // Create the paragraph
-                var Paragraph = $(`<p><span class="assistant">assistant&gt;</span>&nbsp;<span></span><p>`);
-                Paragraph.appendTo(Output);
-                Paragraph.children("span:eq(1)").text(Content);
+                if (Section.Index == 0 || Content != "") {
+                    var Paragraph = $(`<p><span class="assistant">assistant&gt;</span>&nbsp;<span></span><p>`);
+                    Paragraph.appendTo(Output);
+                    Paragraph.children("span:eq(1)").text(Content);
+                }
                 break;
             case ChatResponseType.Code:
                 var Code = Section.Content.trim();
@@ -177,7 +213,7 @@ export class ChatManager {
         // Render the options
         if (Section.Options != null) {
             for (var Option of Section.Options) {
-                var Link = $(`<p class="output option">- <a href="javascript:void(0)"></a></p>`);
+                var Link = $(`<p class="output option ${Option.Style ?? "generated"}">- <a href="javascript:void(0)"></a></p>`);
                 Link.appendTo(Output);
                 Link.find("a").data("option", Option).text(Option.LocalizedLabel ?? Option.Label)
                     .on("click", function() { ChatManager.OptionHandler($(this)); });

@@ -8,14 +8,18 @@ export interface ChatResponseOption {
     Style?: string;
     /** Operation: The operation to perform if the option is chosen. Default is Inherit. */
     Operation?: string;
-    /** SubOperation: The sub-operation to perform if the option is chosen. Default is Inherit.*/
+    /** SubOperation: The sub-operation to perform if the option is chosen. Default is Empty. */
     SubOperation?: string;
     /** AskInput: Whether the user should be asked for input. Default is false. */
     AskInput?: boolean;
-    /** CodeInContext: Whether the code should be retained in the context. Default is true. */
+    /** InputInContext: Whether the input should be retained in the context. Default is true. */
+    InputInContext?: boolean;
+    /** CodeInContext: Whether the code output should be retained in the context. Default is true. */
     CodeInContext?: boolean;
-    /** Segment: How the text message should be retained in the following context. Default is EntireMessage. */
-    MessageInContext?: ContextMessage,
+    /** TextInContext: How the the text output should be retained in the following context. Default is EntireMessage. */
+    TextInContext?: ContextMessage,
+    /** Transparent: Whether this record should be transparent in the context. Will not impact input. Default is false. */
+    Transparent?: boolean;
     /** Inheritance: How to inherit the parent context if the option is chosen. Default is InheritEntire. */
     Inheritance?: ContextInheritance;
 }

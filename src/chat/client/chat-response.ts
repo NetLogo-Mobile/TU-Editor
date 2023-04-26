@@ -15,6 +15,8 @@ export function NewChatResponse(): ChatResponse {
 export interface ChatResponseSection {
     /** Type: The type of the section. */
     Type?: ChatResponseType;
+    /** Index: The index of the section. */
+    Index?: number;
     /** Content: The content of the section. */
     Content: string;
     /** Summary: The summary of the section. */

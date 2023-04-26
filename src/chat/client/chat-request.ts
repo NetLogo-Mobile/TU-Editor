@@ -1,11 +1,14 @@
 import { ChatContext } from "./chat-context"
+import { ChatResponseOption } from "./chat-option";
 
 /** ChatRequest: A chat request. */
 export interface ChatRequest {
     /** Input: The requested message. */
     Input: string;
     /** Option: The option chosen. */
-    Option?: string;
+    Option?: ChatResponseOption;
+    /** SectionIndex: The section index of the request. */
+    SectionIndex?: number;
     /** Operation: The requested operation. */
     Operation?: string;
     /** SubOperation: The requested sub-operation. */
@@ -22,4 +25,6 @@ export interface ClientChatRequest extends ChatRequest {
     UserID?: string;
     /** ThreadID: The related thread ID. */
     ThreadID?: string;
+    /** ParentID: The parent response ID. */
+    ParentID?: string;
 }

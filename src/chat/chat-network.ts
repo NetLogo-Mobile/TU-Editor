@@ -7,21 +7,20 @@ import { SSEClient } from "./sse-client";
 /** ChatNetwork: Class that handles the network communication for the chat. */
 export class ChatNetwork {
     /** SendRequest: Send a request to the chat backend and handle its outputs. */
-    public static async SendRequest(Request: ChatRequest, Thread: ChatThread, 
+    public static async SendRequest(Request: ClientChatRequest, Thread: ChatThread, 
         NewSection: (Section: ChatResponseSection) => void, 
         UpdateSection: (Section: ChatResponseSection) => void, 
         FinishSection: (Section: ChatResponseSection) => void): Promise<ChatRecord> {
         // Build the request
-        var RealRequest = Request as ClientChatRequest;
-        RealRequest.UserID = Thread.UserID;
-        RealRequest.ThreadID = Thread.ID;
-        console.log(RealRequest);
+        Request.UserID = Thread.UserID;
+        Request.ThreadID = Thread.ID;
+        console.log(Request);
         // Do the request
         return new Promise<ChatRecord>((Resolve, Reject) => {
             var Section: ChatResponseSection = { Content: "" };
-            var Client = new SSEClient("http://localhost:3000/request", "", RealRequest);
+            var Client = new SSEClient("http://localhost:3000/request", "", Request);
             // Build the record
-            var Record: ChatRecord = RealRequest as ChatRecord;
+            var Record: ChatRecord = Request as ChatRecord;
             Record.Response = { Sections: [] };
             Record.RequestTimestamp = Date.now();
             // Send the request

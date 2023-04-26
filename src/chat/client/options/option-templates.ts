@@ -5,10 +5,11 @@ export function ChangeTopic(Label?: string): ChatResponseOption {
     return {
         Label: Label ?? "Let's change a topic",
         Operation: "Generic",
-        Style: "ChangeTopic",
+        Style: "leave",
         AskInput: true,
+        InputInContext: false,
         CodeInContext: false,
-        MessageInContext: ContextMessage.Nothing,
+        TextInContext: ContextMessage.Nothing,
         Inheritance: ContextInheritance.Drop
     }
 }
@@ -17,10 +18,8 @@ export function ChangeTopic(Label?: string): ChatResponseOption {
 export function FollowUp(Label?: string): ChatResponseOption {
     return {
         Label: Label ?? "Actually, I mean...",
-        Style: "FollowUp",
+        Style: "followup",
         AskInput: true,
-        CodeInContext: true,
-        MessageInContext: ContextMessage.EntireMessage,
         Inheritance: ContextInheritance.InheritRecursive
     }
 }
@@ -29,10 +28,10 @@ export function FollowUp(Label?: string): ChatResponseOption {
 export function AskExamples(Label?: string): ChatResponseOption {
     return {
         Label: Label ?? "Can you give me some examples?",
-        Style: "AskExamples",
+        Style: "followup",
+        SubOperation: "Examples",
         AskInput: false,
-        CodeInContext: true,
-        MessageInContext: ContextMessage.Section,
+        Transparent: true,
         Inheritance: ContextInheritance.InheritParent
     }
 }

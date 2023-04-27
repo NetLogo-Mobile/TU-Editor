@@ -159,7 +159,7 @@ export class ChatManager {
         // Inherit the last input (from new to old)
         if (Option.InputInContext ?? true)
             Context.PreviousMessages.unshift({ 
-                Text: this.PendingRequest.Input, 
+                Text: Record.Input, 
                 Role: ChatRole.User
             });
         // Inherit the last code message (from new to old)

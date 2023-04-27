@@ -27,8 +27,9 @@ export class ChatNetwork {
             Client.Listen((Data) => {
                 try {
                     var Update = JSON.parse(Data.data) as ChatResponseSection;
+                    // console.log(Update);
                 } catch (Exception) {
-                    console.log(Data.data);
+                    console.log("Error: " + Data.data);
                     return;
                 }
                 // Handle the update

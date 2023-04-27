@@ -10,4 +10,9 @@ export class ChatThread {
     Language?: string;
     /** Records: The chat records of the thread. */
     Records: Record<string, ChatRecord> = {};
+    /** GetRecord: Get a record by its parent ID. */
+    public GetRecord(ParentID?: string): ChatRecord | undefined {
+        if (!ParentID) return undefined;
+        return this.Records[ParentID];
+    }
 }

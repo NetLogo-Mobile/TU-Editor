@@ -24,6 +24,18 @@ export function FollowUp(Label?: string): ChatResponseOption {
     }
 }
 
+/** EditCode: Generate a template edit code option. */
+export function EditCode(Label?: string): ChatResponseOption {
+    return {
+        Label: Label ?? "Can you edit the code?",
+        Style: "followup",
+        Operation: "EditCode",
+        AskInput: true,
+        TextInContext: ContextMessage.Section,
+        Inheritance: ContextInheritance.InheritOne
+    }
+}
+
 /** AskExamples: Ask for examples. */
 export function AskExamples(Label?: string): ChatResponseOption {
     return {
@@ -32,11 +44,13 @@ export function AskExamples(Label?: string): ChatResponseOption {
         SubOperation: "Examples",
         AskInput: false,
         Transparent: true,
-        Inheritance: ContextInheritance.InheritParent
+        Inheritance: ContextInheritance.InheritOne
     }
 }
 
 /** AskOtherExamples: Ask for other examples. */
 export function AskOtherExamples(Label?: string): ChatResponseOption {
-    return AskExamples(Label ?? "Can you give me other examples?");
+    var Option = AskExamples(Label ?? "Can you give me some other examples?");
+    Option.Style = "followup-more";
+    return Option;
 }

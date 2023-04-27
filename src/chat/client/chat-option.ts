@@ -18,7 +18,7 @@ export interface ChatResponseOption {
     CodeInContext?: boolean;
     /** TextInContext: How the the text output should be retained in the following context. Default is EntireMessage. */
     TextInContext?: ContextMessage,
-    /** Transparent: Whether this record should be transparent in the context. Will not impact input. Default is false. */
+    /** Transparent: Whether the resulting record should be transparent in the context. Children of transparent records will recognize grand-parents instead. */
     Transparent?: boolean;
     /** Inheritance: How to inherit the parent context if the option is chosen. Default is InheritEntire. */
     Inheritance?: ContextInheritance;

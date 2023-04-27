@@ -51,9 +51,10 @@ export class ChatManager {
             this.Render(CurrentRenderer, Renderer, Section, true);
             CurrentRenderer = null;
         }).then((Record) => {
-            console.log(Record);
+            Record.Transparent = Request.Option?.Transparent ?? false,
             Renderer.data("record", Record);
             if (Options == 0) this.Commands.ShowInput();
+            console.log(Record);
         }).catch((Error) => {
             if (!this.Commands.Disabled) return;
             var Output = this.Outputs.PrintOutput(
@@ -76,12 +77,35 @@ export class ChatManager {
             Option: Option,
             Operation: Option.Operation,
             SubOperation: Option.SubOperation,
-            ParentID: Record.ID,
-            SectionIndex: Section.Index,
         };
+        // Find a parent
+        var RealChild = Record;
+        var RealParent = Record;
+        var RealSection = Section;
+        // If the option is transparent, find the first could-be-transparent parent
+        // Otherwise, find the first non-transparent parent
+        // (Option.Transparent ?? false) !== true && 
+        while (RealParent?.Transparent === true) {
+            RealParent = this.Thread.GetRecord(RealParent.ParentID);
+            if (!RealParent) {
+                RealSection = undefined;
+                break;
+            } else {
+                RealSection = RealParent.Response.Sections[RealChild.SectionIndex];
+                RealChild = RealParent;
+            }
+        }
         // Inherit the context
         this.PendingRequest.Context = { PreviousMessages: [] };
-        this.InheritContext(Option, Section, Record, -1);
+        if (RealParent && RealSection) {
+            this.PendingRequest.ParentID = RealParent?.ID;
+            this.PendingRequest.SectionIndex = RealSection?.Index;
+            this.InheritContext(Option, RealSection, RealParent, -1);
+            if (Option.InputInContext ?? true) 
+                this.PendingRequest.Context.PreviousMessages.shift();
+        }
+        // Although I dropped my parent contexts, I still want to keep myself in the loop
+        if (Option.Inheritance == ContextInheritance.Drop) Option.Inheritance = ContextInheritance.InheritOne;
         // Send request or unlock the input
         if (Option.AskInput) {
             this.Commands.ShowInput();
@@ -90,7 +114,8 @@ export class ChatManager {
         }
     }
     /** InheritContext: Inherit the context from the previous request. */
-    private InheritContext(Option: ChatResponseOption, Section: ChatResponseSection, Record: ChatRecord, Layers: number = -1) {
+    private InheritContext(Option: ChatResponseOption | undefined, Section: ChatResponseSection, Record: ChatRecord, Layers: number = -1) {
+        Option = Option ?? { Inheritance: ContextInheritance.InheritOne, Label: "" };
         var Context = this.PendingRequest.Context;
         if (Layers == -1) {
             switch (Option.Inheritance) {
@@ -131,14 +156,27 @@ export class ChatManager {
                     Role: ChatRole.Assistant
                 });
         }
+        // Inherit the last input (from new to old)
+        if (Option.InputInContext ?? true)
+            Context.PreviousMessages.unshift({ 
+                Text: this.PendingRequest.Input, 
+                Role: ChatRole.User
+            });
         // Inherit the last code message (from new to old)
         if ((Option.CodeInContext ?? true) === true && Context.CodeSnippet === undefined) {
             var Code = Record.Response.Sections.find(Section => Section.Type == ChatResponseType.Code);
             if (Code != null) Context.CodeSnippet = Code.Content;
         }
         // Inherit previous messages
-        if (Layers == -2) return;
-
+        if (Layers == -2 || !Record.ParentID) return;
+        // Find the parent
+        var Parent = this.Thread.GetRecord(Record.ParentID);
+        if (Parent == null) return;
+        var ParentSection = Parent.Response.Sections[Record.SectionIndex];
+        if (ParentSection == null) return;
+        if (Layers == 0) Layers = -2; // Stop after the parent
+        // Inherit the parent
+        this.InheritContext(Parent.Option, ParentSection, Parent, Layers);
     }
     // #endregion
     

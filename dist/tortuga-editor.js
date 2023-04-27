@@ -414,6 +414,12 @@
             /** Records: The chat records of the thread. */
             this.Records = {};
         }
+        /** GetRecord: Get a record by its parent ID. */
+        GetRecord(ParentID) {
+            if (!ParentID)
+                return undefined;
+            return this.Records[ParentID];
+        }
     }
 
     /** SSEClient: A simple client for handling Server-Sent Events. */
@@ -657,10 +663,12 @@
                 this.Render(CurrentRenderer, Renderer, Section, true);
                 CurrentRenderer = null;
             }).then((Record) => {
-                console.log(Record);
-                Renderer.data("record", Record);
+                var _a, _b;
+                Record.Transparent = (_b = (_a = Request.Option) === null || _a === void 0 ? void 0 : _a.Transparent) !== null && _b !== void 0 ? _b : false,
+                    Renderer.data("record", Record);
                 if (Options == 0)
                     this.Commands.ShowInput();
+                console.log(Record);
             }).catch((Error) => {
                 if (!this.Commands.Disabled)
                     return;
@@ -676,18 +684,44 @@
         // #region " Options and Contexts "
         /** RequestOption: Choose a chat option and send the request. */
         RequestOption(Option, Section, Record) {
+            var _a;
             // Construct the request
             this.PendingRequest = {
                 Input: Option.Label,
                 Option: Option,
                 Operation: Option.Operation,
                 SubOperation: Option.SubOperation,
-                ParentID: Record.ID,
-                SectionIndex: Section.Index,
             };
+            // Find a parent
+            var RealChild = Record;
+            var RealParent = Record;
+            var RealSection = Section;
+            // If the option is transparent, find the first could-be-transparent parent
+            // Otherwise, find the first non-transparent parent
+            // (Option.Transparent ?? false) !== true && 
+            while ((RealParent === null || RealParent === void 0 ? void 0 : RealParent.Transparent) === true) {
+                RealParent = this.Thread.GetRecord(RealParent.ParentID);
+                if (!RealParent) {
+                    RealSection = undefined;
+                    break;
+                }
+                else {
+                    RealSection = RealParent.Response.Sections[RealChild.SectionIndex];
+                    RealChild = RealParent;
+                }
+            }
             // Inherit the context
             this.PendingRequest.Context = { PreviousMessages: [] };
-            this.InheritContext(Option, Section, Record, -1);
+            if (RealParent && RealSection) {
+                this.PendingRequest.ParentID = RealParent === null || RealParent === void 0 ? void 0 : RealParent.ID;
+                this.PendingRequest.SectionIndex = RealSection === null || RealSection === void 0 ? void 0 : RealSection.Index;
+                this.InheritContext(Option, RealSection, RealParent, -1);
+                if ((_a = Option.InputInContext) !== null && _a !== void 0 ? _a : true)
+                    this.PendingRequest.Context.PreviousMessages.shift();
+            }
+            // Although I dropped my parent contexts, I still want to keep myself in the loop
+            if (Option.Inheritance == ContextInheritance.Drop)
+                Option.Inheritance = ContextInheritance.InheritOne;
             // Send request or unlock the input
             if (Option.AskInput) {
                 this.Commands.ShowInput();
@@ -698,7 +732,8 @@
         }
         /** InheritContext: Inherit the context from the previous request. */
         InheritContext(Option, Section, Record, Layers = -1) {
-            var _a, _b;
+            var _a, _b, _c;
+            Option = Option !== null && Option !== void 0 ? Option : { Inheritance: ContextInheritance.InheritOne, Label: "" };
             var Context = this.PendingRequest.Context;
             if (Layers == -1) {
                 switch (Option.Inheritance) {
@@ -739,15 +774,32 @@
                         Role: ChatRole.Assistant
                     });
             }
+            // Inherit the last input (from new to old)
+            if ((_b = Option.InputInContext) !== null && _b !== void 0 ? _b : true)
+                Context.PreviousMessages.unshift({
+                    Text: this.PendingRequest.Input,
+                    Role: ChatRole.User
+                });
             // Inherit the last code message (from new to old)
-            if (((_b = Option.CodeInContext) !== null && _b !== void 0 ? _b : true) === true && Context.CodeSnippet === undefined) {
+            if (((_c = Option.CodeInContext) !== null && _c !== void 0 ? _c : true) === true && Context.CodeSnippet === undefined) {
                 var Code = Record.Response.Sections.find(Section => Section.Type == ChatResponseType.Code);
                 if (Code != null)
                     Context.CodeSnippet = Code.Content;
             }
             // Inherit previous messages
-            if (Layers == -2)
+            if (Layers == -2 || !Record.ParentID)
                 return;
+            // Find the parent
+            var Parent = this.Thread.GetRecord(Record.ParentID);
+            if (Parent == null)
+                return;
+            var ParentSection = Parent.Response.Sections[Record.SectionIndex];
+            if (ParentSection == null)
+                return;
+            if (Layers == 0)
+                Layers = -2; // Stop after the parent
+            // Inherit the parent
+            this.InheritContext(Parent.Option, ParentSection, Parent, Layers);
         }
         /** Constructor: Create a chat interface. */
         constructor(Tab) {

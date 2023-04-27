@@ -7,7 +7,7 @@ export interface ChatRequest {
     Input: string;
     /** Option: The option chosen. */
     Option?: ChatResponseOption;
-    /** SectionIndex: The section index of the request. */
+    /** SectionIndex: The section index of the last response. */
     SectionIndex?: number;
     /** Operation: The requested operation. */
     Operation?: string;

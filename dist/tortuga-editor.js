@@ -224,14 +224,14 @@
             this.Tab = Tab;
             this.Container = $(Tab.Container).find(".command-output");
             // Annotate by default
-            this.KeepSize = this.Container.children(".Keep").length;
+            this.KeepSize = this.Container.children(".keep").length;
             this.Tab.AnnotateCode(this.Container.find(".keep code"), null, true);
         }
-        /** ClearOutput: Clear the output region of Command Center */
+        /** ClearOutput: Clear the output region of Command Center. */
         ClearOutput() {
             this.Container.children().slice(this.KeepSize).remove();
         }
-        /** ScrollToBottom: After user entered input, screen view should scroll down to the botom line */
+        /** ScrollToBottom: After user entered input, screen view should scroll down to the bottom line. */
         ScrollToBottom() {
             this.Container.scrollTop(this.Container.get(0).scrollHeight);
         }
@@ -415,12 +415,35 @@
         constructor() {
             /** Records: The chat records of the thread. */
             this.Records = {};
+            /** Subthreads: The subthreads of the conversation. */
+            this.Subthreads = [];
         }
         /** GetRecord: Get a record by its parent ID. */
         GetRecord(ParentID) {
             if (!ParentID)
                 return undefined;
             return this.Records[ParentID];
+        }
+        /** GetSubthread: Get a specific subthread. */
+        GetSubthread(RootID) {
+            return this.Subthreads.find((Subthread) => Subthread.RootID === RootID);
+        }
+        /** AddToSubthread: Add a record to a subthread. */
+        AddToSubthread(Record) {
+            // Find the parent
+            var Parent = Record;
+            while (Parent.ParentID) {
+                Parent = this.Records[Parent.ParentID];
+            }
+            // Find or create a subthread
+            var Subthread = this.GetSubthread(Parent.ID);
+            if (!Subthread) {
+                Subthread = { RootID: Parent.ID, Records: [] };
+                this.Subthreads.push(Subthread);
+            }
+            // Add the record
+            Subthread.Records.push(Record);
+            return Subthread;
         }
     }
 
@@ -513,20 +536,20 @@
     /** ChatNetwork: Class that handles the network communication for the chat. */
     class ChatNetwork {
         /** SendRequest: Send a request to the chat backend and handle its outputs. */
-        static SendRequest(Request, Thread, NewSection, UpdateSection, FinishSection) {
+        static SendRequest(Record, Thread, NewSection, UpdateSection, FinishSection) {
+            var _a, _b;
             return __awaiter(this, void 0, void 0, function* () {
-                // Build the request
-                Request.UserID = Thread.UserID;
-                Request.ThreadID = Thread.ID;
-                console.log(Request);
+                // Build the record
+                Record.UserID = Thread.UserID;
+                Record.ThreadID = Thread.ID;
+                Record.Transparent = (_b = (_a = Record.Option) === null || _a === void 0 ? void 0 : _a.Transparent) !== null && _b !== void 0 ? _b : false;
+                Record.Response = { Sections: [] };
+                Record.RequestTimestamp = Date.now();
+                console.log(Record);
                 // Do the request
                 return new Promise((Resolve, Reject) => {
                     var Section = { Content: "" };
-                    var Client = new SSEClient("http://localhost:3000/request", "", Request);
-                    // Build the record
-                    var Record = Request;
-                    Record.Response = { Sections: [] };
-                    Record.RequestTimestamp = Date.now();
+                    var Client = new SSEClient("http://localhost:3000/request", "", Record);
                     // Send the request
                     Client.Listen((Data) => {
                         var _a;
@@ -653,9 +676,12 @@
             var CurrentRenderer;
             this.Commands.HideInput();
             this.Commands.ClearInput();
+            // Make it a record and put it in the thread
+            var Record = Request;
+            this.Thread.AddToSubthread(Record);
             // Send the request
             var Options = 0;
-            ChatNetwork.SendRequest(Request, this.Thread, (Section) => {
+            ChatNetwork.SendRequest(Record, this.Thread, (Section) => {
                 // Create the section
                 CurrentRenderer = this.Render(CurrentRenderer, Renderer, Section, false);
             }, (Section) => {
@@ -668,9 +694,7 @@
                 this.Render(CurrentRenderer, Renderer, Section, true);
                 CurrentRenderer = null;
             }).then((Record) => {
-                var _a, _b;
-                Record.Transparent = (_b = (_a = Request.Option) === null || _a === void 0 ? void 0 : _a.Transparent) !== null && _b !== void 0 ? _b : false,
-                    Renderer.data("record", Record);
+                Renderer.data("record", Record);
                 if (Options == 0)
                     this.Commands.ShowInput();
                 console.log(Record);

@@ -1,5 +1,6 @@
 
 /** Command-center Stylesheet */
+/** Full-text display */
 .command-output,
 .command-fulltext {
 	width: 100%;
@@ -8,12 +9,6 @@
 	overflow: auto;
 	box-sizing: border-box;
 	line-height: 1.5;
-}
-
-.command-fulltext,
-.jconfirm,
-.jconfirm button {
-	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', "Microsoft Yahei", sans-serif;
 }
 
 .command-fulltext {
@@ -80,22 +75,80 @@
 	margin: 0;
 }
 
-.command-output a,
-.command-output command {
+/** Command input display */
+.command-line {
+	bottom: 0;
+	width: 100%;
+	height: 2.7rem;
+	display: flex;
+	padding-bottom: env(safe-area-inset-bottom);
+	align-items: center;
+	border-top: 1px solid #eee;
+	background-color: #f2f2f2;
+}
+
+.darkmode--activated .command-line {
+	background-color: #CCC;
+}
+
+.command-line .wrapper {
+	width: 100%;
+	display: flex;
+	padding: 0 0.5rem;
+}
+
+.command-line select {
+	background-color: #2F80ED;
+	border-radius: 0.5rem;
+	color: #fff;
+	padding: 0.5rem 0.5rem;
+	font-size: 1em;
+	line-height: 1.05rem;
+	border: none;
+	text-align-last: center;
+	margin-right: 0.5rem;
+	-webkit-appearance: none;
+	-moz-appearance: none;
+	appearance: none;
+}
+
+.command-line .command-input {
+	flex: 1 auto;
+	flex-grow: 1;
+	width: 1.4em;
+	/* Arbitrary width */
+	height: 2rem;
+}
+
+.command-line .command-input .cm-editor {
+	height: auto;
+	font-size: 1em;
+	background: #FFF;
+	max-height: 2rem;
+	border-radius: 0.24rem;
+}
+
+.command-line .command-input .cm-editor .cm-gutters {
+	display: none;
+}
+
+.command-line .command-input .cm-editor .cm-scroller {
+	line-height: 1.5;
+	overflow-y: hidden;
+}
+
+.command-line .command-input .cm-editor .cm-scroller ::-webkit-scrollbar {
+	display: none;
+}
+
+.command-line .command-input .cm-editor .cm-activeLine {
+	background: transparent;
+}
+
+/** Output display */
+.command-output a {
 	color: #216BBF;
 	cursor: pointer;
-}
-
-.command-output div.block {
-	background: #F5F5F5;
-}
-
-.command-output div.block .command-wrapper {
-	background: #FAFAFA;
-}
-
-.command-output div.block .command-wrapper.active {
-	background: #F5F5F5;
 }
 
 .command-output .output {
@@ -166,73 +219,4 @@
 
 .command-output .Succeeded {
 	color: #007F69;
-}
-
-.command-line {
-	bottom: 0;
-	width: 100%;
-	height: 2.7rem;
-	display: flex;
-	padding-bottom: env(safe-area-inset-bottom);
-	align-items: center;
-	border-top: 1px solid #eee;
-	background-color: #f2f2f2;
-}
-
-.darkmode--activated .command-line {
-	background-color: #CCC;
-}
-
-.command-line .wrapper {
-	width: 100%;
-	display: flex;
-	padding: 0 0.5rem;
-}
-
-.command-line select {
-	background-color: #2F80ED;
-	border-radius: 0.5rem;
-	color: #fff;
-	padding: 0.5rem 0.5rem;
-	font-size: 1em;
-	line-height: 1.05rem;
-	border: none;
-	text-align-last: center;
-	margin-right: 0.5rem;
-	-webkit-appearance: none;
-	-moz-appearance: none;
-	appearance: none;
-}
-
-.command-line .command-input {
-	flex: 1 auto;
-	flex-grow: 1;
-	width: 1.4em;
-	/* Arbitrary width */
-	height: 2rem;
-}
-
-.command-line .command-input .cm-editor {
-	height: auto;
-	font-size: 1em;
-	background: #FFF;
-	max-height: 2rem;
-	border-radius: 0.24rem;
-}
-
-.command-line .command-input .cm-editor .cm-gutters {
-	display: none;
-}
-
-.command-line .command-input .cm-editor .cm-scroller {
-	line-height: 1.5;
-	overflow-y: hidden;
-}
-
-.command-line .command-input .cm-editor .cm-scroller ::-webkit-scrollbar {
-	display: none;
-}
-
-.command-line .command-input .cm-editor .cm-activeLine {
-	background: transparent;
 }

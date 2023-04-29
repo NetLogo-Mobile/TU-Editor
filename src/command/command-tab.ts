@@ -53,7 +53,7 @@ export class CommandTab extends Tab {
 		super.Reset();
 		this.ShowInput();
 		this.ClearInput();
-		this.Outputs.ClearOutput();
+		this.Outputs.Clear();
 		this.ChatManager.Reset();
 		this.HideFullText();
 	}
@@ -147,7 +147,7 @@ export class CommandTab extends Tab {
 		// Chatable or not
 		var Chatable = this.ChatManager.Available;
 		if (!Chatable) {
-			this.ExecuteUserCommand(Objective, Content);
+			this.ExecuteInput(Objective, Content);
 			return;
 		}
 		// Check if it is a command
@@ -158,7 +158,7 @@ export class CommandTab extends Tab {
 			let Mode = this.Galapagos.GetRecognizedMode();
 			if (Diagnostics.length == 0) {
 				if (Mode == "Reporter" || Mode == "Unknown") Content = `show ${Content}`;
-				this.ExecuteUserCommand(Objective, Content);
+				this.ExecuteInput(Objective, Content);
 				return;
 			}
 		}
@@ -167,29 +167,6 @@ export class CommandTab extends Tab {
 			.children("span:eq(1)").text(Content);
 		this.Outputs.ScrollToBottom();
 		this.ChatManager.SendMessage(Content);
-	}
-	/** ExecuteUserCommand: Execute a human-sent command. */
-	private ExecuteUserCommand(Objective: string, Content: string) {
-		// Record command history
-		this.Outputs.PrintInput(Objective, Content, false);
-		this.CommandStack.push([Objective, Content]);
-		this.CurrentCommandIndex = 0;
-		this.CurrentCommand = [];
-		// Transform command
-		switch (Objective.toLowerCase()) {
-			case "turtles":
-				Content = `ask turtles [ ${Content} ]`;
-				break;
-			case "patches":
-				Content = `ask patches [ ${Content} ]`;
-				break;
-			case "links":
-				Content = `ask links [ ${Content} ]`;
-				break;
-		}
-		// Execute command
-		this.Editor.Call({ Type: "CommandExecute", Source: Objective, Command: Content });
-		this.ClearInput();
 	}
 	/** ClearInput: Clear the input box of Command Center. */
 	public ClearInput() {
@@ -211,28 +188,6 @@ export class CommandTab extends Tab {
 		this.Galapagos.SetCode(Content);
 		setTimeout(() => this.Galapagos.SetCursorPosition(Content.length), 1);
 	}
-	// #endregion
-
-	// #region "Command Execution"
-	/** FinishExecution: Notify the completion of the command. */
-	public FinishExecution(Status: string, Message: string) {
-		this.Outputs.PrintOutput(Message, Status);
-		this.Disabled = false;
-	}
-	/** ExecuteCommand: Execute a command. */
-	public ExecuteCommand(Objective: string, Content: string) {
-		this.Editor.Call({ Type: "CommandExecute", Source: Objective, Command: Content });
-		this.Outputs.PrintInput(Objective, Content, false);
-		this.Outputs.ScrollToBottom();
-	}
-	/** ExplainFull: ExplainFull: Explain the selected text in the command center in full. */
-	public ExplainFull(Command: string) {
-		if (!EditorDictionary.Check(Command)) return false;
-		this.Outputs.ScrollToBottom();
-		this.ExecuteCommand("observer", `help ${Command} -full`);
-	}
-	// #endregion
-
 	/** AnnotateCode: Annotate some code snippets. */
 	public AnnotateCode(Target: JQuery<HTMLElement>, Content?: string, Copyable?: boolean) {
 		var This = this;
@@ -250,4 +205,48 @@ export class CommandTab extends Tab {
 					});
 		}
 	}
+	// #endregion
+
+	// #region "Command Execution"
+	/** ExecuteInput: Execute a human-sent command. */
+	private ExecuteInput(Objective: string, Content: string) {
+		// Record command history
+		this.Outputs.PrintInput(Objective, Content, false);
+		this.CommandStack.push([Objective, Content]);
+		this.CurrentCommandIndex = 0;
+		this.CurrentCommand = [];
+		// Transform command
+		switch (Objective.toLowerCase()) {
+			case "turtles":
+				Content = `ask turtles [ ${Content} ]`;
+				break;
+			case "patches":
+				Content = `ask patches [ ${Content} ]`;
+				break;
+			case "links":
+				Content = `ask links [ ${Content} ]`;
+				break;
+		}
+		// Execute command
+		this.Editor.Call({ Type: "CommandExecute", Source: Objective, Command: Content });
+		this.ClearInput();
+	}
+	/** ExecuteCommand: Execute a command. */
+	public ExecuteCommand(Objective: string, Content: string) {
+		this.Editor.Call({ Type: "CommandExecute", Source: Objective, Command: Content });
+		this.Outputs.PrintInput(Objective, Content, false);
+		this.Outputs.ScrollToBottom();
+	}
+	/** ExplainFull: ExplainFull: Explain the selected text in the command center in full. */
+	public ExplainFull(Command: string) {
+		if (!EditorDictionary.Check(Command)) return false;
+		this.Outputs.ScrollToBottom();
+		this.ExecuteCommand("observer", `help ${Command} -full`);
+	}
+	/** FinishExecution: Notify the completion of the command. */
+	public FinishExecution(Status: string, Message: string) {
+		this.Outputs.PrintOutput(Message, Status);
+		this.Disabled = false;
+	}
+	// #endregion
 }

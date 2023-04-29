@@ -13,4 +13,6 @@ export interface ChatRecord extends ClientChatRequest {
     RequestTimestamp: number;
     /** ResponseTimestamp: The timestamp of the response. */
     ResponseTimestamp: number;
+    /** Failed: Whether the request failed. */
+    Failed?: boolean;
 }

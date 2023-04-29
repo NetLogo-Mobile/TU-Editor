@@ -21,7 +21,7 @@ export function LinkCommand(Query: JQuery<HTMLElement>) {
         var Objective = Current.attr("objective");
         if (!Objective) Objective = "null";
         Current.attr("href", "javascript:void(0)");
-        Current.attr("onclick", `this.Execute(${Objective}, '${Target}')`);
+        Current.attr("onclick", `this.ExecuteCommand(${Objective}, '${Target}')`);
     })
     return Query;
 }

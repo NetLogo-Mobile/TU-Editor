@@ -1,28 +1,27 @@
 import { ChatThread } from "./client/chat-thread";
 import { ChatRecord } from "./client/chat-record";
-import { ChatRequest, ClientChatRequest } from "./client/chat-request";
 import { ChatResponseSection, ChatResponseType } from "./client/chat-response";
 import { SSEClient } from "./sse-client";
+import { ClientChatRequest } from "./client/chat-request";
 
 /** ChatNetwork: Class that handles the network communication for the chat. */
 export class ChatNetwork {
     /** SendRequest: Send a request to the chat backend and handle its outputs. */
-    public static async SendRequest(Request: ClientChatRequest, Thread: ChatThread, 
+    public static async SendRequest(Record: ChatRecord, Thread: ChatThread, 
         NewSection: (Section: ChatResponseSection) => void, 
         UpdateSection: (Section: ChatResponseSection) => void, 
         FinishSection: (Section: ChatResponseSection) => void): Promise<ChatRecord> {
-        // Build the request
-        Request.UserID = Thread.UserID;
-        Request.ThreadID = Thread.ID;
-        console.log(Request);
+        // Build the record
+        Record.UserID = Thread.UserID;
+        Record.ThreadID = Thread.ID;
+        Record.Transparent = Record.Option?.Transparent ?? false;
+        Record.Response = { Sections: [] };
+        Record.RequestTimestamp = Date.now();
+        console.log(Record);
         // Do the request
         return new Promise<ChatRecord>((Resolve, Reject) => {
             var Section: ChatResponseSection = { Content: "" };
-            var Client = new SSEClient("http://localhost:3000/request", "", Request);
-            // Build the record
-            var Record: ChatRecord = Request as ChatRecord;
-            Record.Response = { Sections: [] };
-            Record.RequestTimestamp = Date.now();
+            var Client = new SSEClient("http://localhost:3000/request", "", Record as ClientChatRequest);
             // Send the request
             Client.Listen((Data) => {
                 try {

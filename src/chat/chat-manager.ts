@@ -36,9 +36,12 @@ export class ChatManager {
         var CurrentRenderer: JQuery<HTMLElement> | null;
         this.Commands.HideInput();
 		this.Commands.ClearInput();
+        // Make it a record and put it in the thread
+        var Record = Request as ChatRecord;
+        this.Thread.AddToSubthread(Record);
         // Send the request
         var Options = 0;
-        ChatNetwork.SendRequest(Request, this.Thread, (Section) => {
+        ChatNetwork.SendRequest(Record, this.Thread, (Section) => {
             // Create the section
             CurrentRenderer = this.Render(CurrentRenderer, Renderer, Section, false);
         }, (Section) => {
@@ -51,7 +54,6 @@ export class ChatManager {
             this.Render(CurrentRenderer, Renderer, Section, true);
             CurrentRenderer = null;
         }).then((Record) => {
-            Record.Transparent = Request.Option?.Transparent ?? false,
             Renderer.data("record", Record);
             if (Options == 0) this.Commands.ShowInput();
             console.log(Record);

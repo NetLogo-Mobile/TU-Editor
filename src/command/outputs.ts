@@ -1,9 +1,12 @@
 import { CommandTab } from "./command-tab";
 import { RenderAgent, LinkCommand } from "src/utils/element";
 import { Localized } from "src/legacy";
+import { SubthreadRenderer } from "./outputs/subthread-renderer";
+import { ChatSubthread } from "../chat/client/chat-thread";
 
 /** OutputDisplay: Display the output section. */
 export class OutputDisplay {
+    // #region "Foundational Interfaces"
     /** Tab: The related command tab. */
     public readonly Tab: CommandTab;
     /** Container: The output help area.  */
@@ -12,15 +15,8 @@ export class OutputDisplay {
     constructor(Tab: CommandTab) {
         this.Tab = Tab;
         this.Container = $(Tab.Container).find(".command-output");
-		// Annotate by default
-		this.KeepSize = this.Container.children(".Keep").length;
-		this.Tab.AnnotateCode(this.Container.find(".keep code"), null, true);
     }
-	/** ClearOutput: Clear the output region of Command Center */
-	public ClearOutput() {
-		this.Container.children().slice(this.KeepSize).remove();
-	}
-	/** ScrollToBottom: After user entered input, screen view should scroll down to the botom line */
+	/** ScrollToBottom: After user entered input, screen view should scroll down to the bottom line. */
 	public ScrollToBottom() {
 		this.Container.scrollTop(this.Container.get(0)!.scrollHeight);
 	}
@@ -29,14 +25,26 @@ export class OutputDisplay {
 		var Element = this.Container.get(0)!;
 		return Math.abs(Element.scrollHeight - Element.clientHeight - Element.scrollTop) < 1;
 	}
+	// #endregion
+
+	// #region "Threading Support"
+	/** Subthread: The active subthread. */
+	private Subthread: SubthreadRenderer;
+	/** Subthreads: The subthread store. */
+	private Subthreads: Map<ChatSubthread, SubthreadRenderer> = new Map<ChatSubthread, SubthreadRenderer>();
+	/** Clear: Clear the output region of Command Center. */
+	public Clear() {
+		this.Container.remove();
+		this.Subthreads.clear();
+		this.Subthread = null;
+	}
+	// #endregion
 
     // #region "Batch Printing Support"
 	/** Fragment: Batch printing support for batch printing. */
 	private Fragment: JQuery<DocumentFragment> | null = null;
 	/** BufferSize: Buffer size for batch printing. */
 	private BufferSize = 1000;
-	/** KeepSize: The number of messages that are kept forever.  */
-	private KeepSize = -1;
 	/** WriteOutput: Print to a batch. */
 	private WriteOutput(Element: JQuery<HTMLElement>) {
 		if (this.Fragment == null)
@@ -55,11 +63,11 @@ export class OutputDisplay {
 		var Length = this.Fragment.children().length;
 		if (Length > this.BufferSize) {
 			this.Fragment.children().slice(0, Length - this.BufferSize).remove();
-			this.Container.children().slice(this.KeepSize).remove();
+			this.Container.children().remove();
 		} else {
-			var NewLength = this.Container.children().length - this.KeepSize + Length;
+			var NewLength = this.Container.children().length + Length;
 			if (NewLength > this.BufferSize)
-                this.Container.children().slice(this.KeepSize, NewLength - this.BufferSize + this.KeepSize).remove();
+                this.Container.children().slice(0, NewLength - this.BufferSize).remove();
 		}
 		// Append to the display
 		this.Container.append(this.Fragment);

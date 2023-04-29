@@ -90,7 +90,9 @@ export class SSEClient {
         };
 
         lines.forEach((line) => {
-            const [key, value] = line.split(': ');
+            const index = line.indexOf(':');
+            var key = line.substring(0, index).trim();
+            var value = line.substring(index + 1).trim();
             switch (key) {
                 case 'id':
                     data.id = value;

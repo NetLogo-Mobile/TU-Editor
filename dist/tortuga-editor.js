@@ -491,7 +491,9 @@
                 data: '',
             };
             lines.forEach((line) => {
-                const [key, value] = line.split(': ');
+                const index = line.indexOf(':');
+                var key = line.substring(0, index).trim();
+                var value = line.substring(index + 1).trim();
                 switch (key) {
                     case 'id':
                         data.id = value;
@@ -530,9 +532,10 @@
                         var _a;
                         try {
                             var Update = JSON.parse(Data.data);
+                            // console.log(Update);
                         }
                         catch (Exception) {
-                            console.log(Data.data);
+                            console.log("Error: " + Data.data);
                             return;
                         }
                         // Handle the update
@@ -778,7 +781,7 @@
             // Inherit the last input (from new to old)
             if ((_b = Option.InputInContext) !== null && _b !== void 0 ? _b : true)
                 Context.PreviousMessages.unshift({
-                    Text: this.PendingRequest.Input,
+                    Text: Record.Input,
                     Role: ChatRole.User
                 });
             // Inherit the last code message (from new to old)

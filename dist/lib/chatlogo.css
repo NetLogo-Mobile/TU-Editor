@@ -151,6 +151,22 @@
 	cursor: pointer;
 }
 
+.command-output .record .input,
+.command-output .record .contents {
+	display: flex;
+	padding: 0 1rem;
+	flex-direction: row;
+}
+
+.command-output .avatar {
+	width: 2rem;
+}
+
+.command-output .content {
+	flex-grow: 1;
+}
+
+/** Output display (Legacy) */
 .command-output .output {
 	padding: 0 1rem;
 }

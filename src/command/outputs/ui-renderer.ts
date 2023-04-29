@@ -3,7 +3,7 @@ export abstract class UIRenderer {
     /** Container: The container for the renderer. */
     public Container: JQuery<HTMLElement>;
     /** Dirty: Whether the renderer is dirty and needs to be updated. */
-    private Dirty: boolean;
+    private Dirty: boolean = false;
     /** Constructor: Create a new UI renderer. */
     public constructor() { 
         this.Container = $("<div></div>");
@@ -31,9 +31,9 @@ export abstract class UIRenderer {
     /** Parent: The parent UI renderer. */
     protected Parent?: UIRenderer;
     /** AddChild: Add a child renderer. */
-    public AddChild(Renderer: UIRenderer): UIRenderer {
+    public AddChild(Renderer: UIRenderer, Append: boolean = true): UIRenderer {
         this.Children.push(Renderer);
-        this.Container.append(Renderer.Container);
+        if (Append) this.Container.append(Renderer.Container);
         Renderer.Parent = this;
         return this;
     }
@@ -63,15 +63,16 @@ export abstract class UIRenderer {
 /** UIRendererOf: Abstract class for rendering UI elements. */
 export abstract class UIRendererOf<T> extends UIRenderer {
     /** Data: The data to render. */
-    protected Data: T;
+    protected Data?: T;
     /** SetData: Set the data to render. */
     public SetData(Data: T): UIRendererOf<T> {
         this.Data = Data;
         this.SetDirty(true);
+        this.Container.data("data", Data);
         return this;
     }
     /** GetData: Get the data for rendering. */
     public GetData(): T {
-        return this.Data;
+        return this.Data!;
     }
 }

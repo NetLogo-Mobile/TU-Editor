@@ -29,10 +29,10 @@ export class TurtleEditor {
     this.EditorTabs[0].Galapagos.AddChild(this.CommandTab.Galapagos);
 		// Listen to the sizing
 		if (window.visualViewport)
-			window.visualViewport.addEventListener("resize", () => this.CurrentTab.SyncSize());
+			window.visualViewport.addEventListener("resize", () => this.CurrentTab?.SyncSize());
   }
   /** Call: Call the facilitator (by default, the Unity Engine). */
-  Call(Message) {
+  public Call(Message: any) {
     if (TurtleEditor.PostMessage)
       TurtleEditor.PostMessage(JSON.stringify(Message));
     else console.log(Message);
@@ -45,7 +45,7 @@ export class TurtleEditor {
   /** EditorTabs: The editor tabs. */
   public readonly EditorTabs: EditorTab[] = [];
   /** CurrentTab: The visible tab. */
-  public CurrentTab: Tab;
+  public CurrentTab: Tab | null = null;
   /** GetAllTabs: Get all tabs. */
   public GetAllTabs(): Tab[] {
     return [this.CommandTab, ...this.EditorTabs];
@@ -89,28 +89,28 @@ export class TurtleEditor {
 
   // #region "Editor Statuses"
   /** Resize: Resize the viewport width (on mobile platforms) */
-  Resize(Ratio) {
+  public Resize(Ratio: number) {
     $("body").addClass("Mobile");
     $("#viewport").attr("content", `width=device-width,initial-scale=${Ratio},maximum-scale=${Ratio},minimum-scale=${Ratio},user-scalable=no,viewport-fit=cover`);
   }
   /** SetDesktop: Set the desktop mode. */
-  SetFontsize(Status) {
+  public SetFontsize(Status: number) {
     $("html").css("font-size", Status + "px");
   }
   /** ToggleDark: Toggle the dark mode. */
-  ToggleDark(Status) {
+  public ToggleDark(Status: boolean) {
     if (Status != this.Darkmode.isActivated()) this.Darkmode.toggle();
   }
   /** SetPlatform: Set the platform of the editor. */
-  SetPlatform(Platform) {
+  public SetPlatform(Platform: string) {
     $("body").addClass(Platform);
   }
 	/** Toast: Show a toast. */
-	Toast = function(Type, Content, Subject) {
+	public Toast = function(Type: string, Content: string, Subject?: string) {
 		toastr[Type](Content, Subject);
 	}
   /** Reset: Reset the editor. */
-  Reset() {
+  public Reset() {
     this.CommandTab.Reset();
     this.EditorTabs.forEach(Tab => Tab.Reset());
   }

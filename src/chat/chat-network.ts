@@ -75,7 +75,7 @@ export class ChatNetwork {
                 if (Update.Summary !== undefined) 
                     Section.Summary = Update.Summary;
                 if (Update.Options !== undefined) 
-                    Section.Options.push(...Update.Options);
+                    Section.Options!.push(...Update.Options);
                 UpdateSection(Section);
             }, (Error) => {
                 console.log("Server Error: " + Error);

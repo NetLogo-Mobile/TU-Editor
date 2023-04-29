@@ -122,7 +122,7 @@
             if (!Objective)
                 Objective = "null";
             Current.attr("href", "javascript:void(0)");
-            Current.attr("onclick", `this.Execute(${Objective}, '${Target}')`);
+            Current.attr("onclick", `this.ExecuteCommand(${Objective}, '${Target}')`);
         });
         return Query;
     }
@@ -210,26 +210,233 @@
         }
     }
 
+    /** UIRenderer: Abstract class for rendering UI elements. */
+    class UIRenderer {
+        /** Constructor: Create a new UI renderer. */
+        constructor() {
+            /** Children: The children UI renderers. */
+            this.Children = [];
+            this.Container = $("<div></div>");
+        }
+        /** SetDirty: Set the dirty status of the renderer. */
+        SetDirty(Status) {
+            var _a;
+            this.Dirty = Status;
+            if (Status)
+                (_a = this.Parent) === null || _a === void 0 ? void 0 : _a.SetDirty(Status);
+            return this;
+        }
+        /** Render: Render the UI element if it is dirty. */
+        Render() {
+            if (this.Dirty) {
+                for (var Child of this.Children)
+                    Child.Render();
+                this.RenderInternal();
+                this.Dirty = false;
+            }
+            return this;
+        }
+        /** AddChild: Add a child renderer. */
+        AddChild(Renderer, Append = true) {
+            this.Children.push(Renderer);
+            if (Append)
+                this.Container.append(Renderer.Container);
+            Renderer.Parent = this;
+            return this;
+        }
+        /** DeactivateAll: Deactivate all renderers. */
+        DeactivateAll(Class) {
+            this.Children.forEach((Child) => {
+                Child.Container.removeClass(Class);
+            });
+            return this;
+        }
+        /** ActivateSelf: Activate the renderer with a class name and deactivate all other renderers. */
+        ActivateSelf(Class) {
+            var _a;
+            (_a = this.Parent) === null || _a === void 0 ? void 0 : _a.Children.forEach((Child) => {
+                if (Child == this)
+                    Child.Container.addClass(Class);
+                else
+                    Child.Container.removeClass(Class);
+            });
+            return this;
+        }
+        /** SetStatus: Set the status of the renderer. */
+        SetStatus(Status) {
+            var _a;
+            (_a = this.Parent) === null || _a === void 0 ? void 0 : _a.SetStatus(Status);
+            return this;
+        }
+    }
+    /** UIRendererOf: Abstract class for rendering UI elements. */
+    class UIRendererOf extends UIRenderer {
+        /** SetData: Set the data to render. */
+        SetData(Data) {
+            this.Data = Data;
+            this.SetDirty(true);
+            return this;
+        }
+        /** GetData: Get the data for rendering. */
+        GetData() {
+            return this.Data;
+        }
+    }
+
+    /** NewChatResponse: Creates a new chat response. */
+    /** ChatResponseType: The type for the chat response. */
+    var ChatResponseType;
+    (function (ChatResponseType) {
+        /** Start: The response is a start message. */
+        ChatResponseType[ChatResponseType["Start"] = -1] = "Start";
+        /** Finish: The response is a finish message. */
+        ChatResponseType[ChatResponseType["Finish"] = -2] = "Finish";
+        /** Text: The response is a text block. */
+        ChatResponseType[ChatResponseType["Text"] = 0] = "Text";
+        /** Code: The response is a code block. */
+        ChatResponseType[ChatResponseType["Code"] = 1] = "Code";
+        /** JSON: The response is a JSON block. */
+        ChatResponseType[ChatResponseType["JSON"] = 2] = "JSON";
+        /** CompileError: The response is a compile error message. */
+        ChatResponseType[ChatResponseType["CompileError"] = 3] = "CompileError";
+        /** RuntimeError: The response is a runtime error message. */
+        ChatResponseType[ChatResponseType["RuntimeError"] = 4] = "RuntimeError";
+        /** ServerError: The response is a server error message. */
+        ChatResponseType[ChatResponseType["ServerError"] = 5] = "ServerError";
+    })(ChatResponseType || (ChatResponseType = {}));
+
+    /** SectionRenderer: A block that displays the a response section. */
+    class SectionRenderer extends UIRendererOf {
+        /** SetFirst: Set the first status of the section. */
+        SetFirst() {
+            this.First = true;
+            return this;
+        }
+        /** SetFinalized: Set the finalized status of the section. */
+        SetFinalized() {
+            this.Finalized = true;
+            return this;
+        }
+        /** Constructor: Create a new UI renderer. */
+        constructor() {
+            super();
+            /** First: Whether the section is the first one. */
+            this.First = false;
+            /** Finalized: Whether the section is finalized. */
+            this.Finalized = false;
+            this.Container.addClass("section");
+        }
+        /** RenderInternal: Render the UI element. */
+        RenderInternal() {
+            this.Container.text(this.Data.Content);
+        }
+    }
+
+    /** InputRenderer: A block that displays the an user input. */
+    class InputRenderer extends UIRendererOf {
+        /** Constructor: Create a new UI renderer. */
+        constructor() {
+            super();
+            this.Container.addClass("input");
+            this.Container.html(`
+<div class="avatar"><img src="images/user.png" /></div>
+<div class="content"></div>`);
+            this.Avatar = this.Container.find(".avatar");
+            this.Content = this.Container.find(".content");
+        }
+        /** RenderInternal: Render the UI element. */
+        RenderInternal() {
+            this.Content.text(this.Data.Input);
+        }
+    }
+
+    /** RecordRenderer: A block that displays the output of a request. */
+    class RecordRenderer extends UIRendererOf {
+        /** Constructor: Create a new UI renderer. */
+        constructor() {
+            super();
+            this.Container.addClass("record");
+            this.InputRenderer = new InputRenderer();
+            this.AddChild(this.InputRenderer);
+            this.ContentContainer = $(`
+<div class="contents">
+    <div class="avatar"><img src="images/assistant.png" /></div>
+    <div class="content"></div>
+</div>`).appendTo(this.Container).find(".content");
+        }
+        /** RenderInternal: Render the UI element. */
+        RenderInternal() { }
+        /** SetData: Set the data of the renderer. */
+        SetData(Data) {
+            this.InputRenderer.SetData(Data);
+            return super.SetData(Data);
+        }
+        /** AddSection: Add a section to the record. */
+        AddSection(Section) {
+            var Renderer;
+            // Choose a renderer for the section
+            var Renderers = SectionRenderers[Section.Type];
+            for (var Chooser of Renderers) {
+                Renderer = Chooser(Section);
+                if (Renderer)
+                    break;
+            }
+            // If no renderer was chosen, use the default renderer
+            Renderer = Renderer !== null && Renderer !== void 0 ? Renderer : new SectionRenderer();
+            // If this is the first section
+            if (this.Children.length == 1)
+                Renderer.SetFirst();
+            // Add the renderer
+            Renderer.SetData(Section);
+            this.AddChild(Renderer, false);
+            this.ContentContainer.append(Renderer.Container);
+            return Renderer;
+        }
+    }
+    /** SectionRenderers: The renderers for each section type. */
+    const SectionRenderers = {
+        [ChatResponseType.Start]: [],
+        [ChatResponseType.Finish]: [],
+        [ChatResponseType.Text]: [],
+        [ChatResponseType.Code]: [],
+        [ChatResponseType.JSON]: [],
+        [ChatResponseType.CompileError]: [],
+        [ChatResponseType.RuntimeError]: [],
+        [ChatResponseType.ServerError]: []
+    };
+
+    /** SubthreadRenderer: A block that displays the output of a subthread. */
+    class SubthreadRenderer extends UIRendererOf {
+        /** Constructor: Create a new UI renderer. */
+        constructor() {
+            super();
+            this.Container.addClass("subthread");
+        }
+        /** RenderInternal: Render the UI element. */
+        RenderInternal() { }
+        /** AddRecord: Add a record to the subthread. */
+        AddRecord(Record) {
+            var Renderer = new RecordRenderer();
+            Renderer.SetData(Record);
+            this.AddChild(Renderer);
+            return Renderer;
+        }
+    }
+
     /** OutputDisplay: Display the output section. */
     class OutputDisplay {
         /** Constructor: Create a new output section. */
         constructor(Tab) {
+            /** Subthreads: The subthread store. */
+            this.Subthreads = new Map();
+            // #endregion
             // #region "Batch Printing Support"
             /** Fragment: Batch printing support for batch printing. */
             this.Fragment = null;
             /** BufferSize: Buffer size for batch printing. */
             this.BufferSize = 1000;
-            /** KeepSize: The number of messages that are kept forever.  */
-            this.KeepSize = -1;
             this.Tab = Tab;
             this.Container = $(Tab.Container).find(".command-output");
-            // Annotate by default
-            this.KeepSize = this.Container.children(".keep").length;
-            this.Tab.AnnotateCode(this.Container.find(".keep code"), null, true);
-        }
-        /** ClearOutput: Clear the output region of Command Center. */
-        ClearOutput() {
-            this.Container.children().slice(this.KeepSize).remove();
         }
         /** ScrollToBottom: After user entered input, screen view should scroll down to the bottom line. */
         ScrollToBottom() {
@@ -239,6 +446,33 @@
         IsAtBottom() {
             var Element = this.Container.get(0);
             return Math.abs(Element.scrollHeight - Element.clientHeight - Element.scrollTop) < 1;
+        }
+        /** Clear: Clear the output region of Command Center. */
+        Clear() {
+            this.Container.remove();
+            this.Subthreads.clear();
+            this.Subthread = null;
+        }
+        /** RenderRecord: Render a new chat record. */
+        RenderRecord(Record, Subthread) {
+            var _a;
+            var Renderer;
+            // Create a new subthread if necessary
+            if (Subthread != ((_a = this.Subthread) === null || _a === void 0 ? void 0 : _a.GetData())) {
+                this.Subthread = this.Subthreads.get(Subthread);
+                if (this.Subthread == null) {
+                    this.Subthread = new SubthreadRenderer();
+                    this.Container.append(this.Subthread.Container);
+                    this.Subthread.SetData(Subthread);
+                    this.Subthreads.set(Subthread, this.Subthread);
+                }
+                this.Subthread.SetStatus("active");
+                this.ScrollToBottom();
+            }
+            // Render the record
+            Renderer = this.Subthread.AddRecord(Record);
+            this.Subthread.Render();
+            return Renderer;
         }
         /** WriteOutput: Print to a batch. */
         WriteOutput(Element) {
@@ -260,12 +494,12 @@
             var Length = this.Fragment.children().length;
             if (Length > this.BufferSize) {
                 this.Fragment.children().slice(0, Length - this.BufferSize).remove();
-                this.Container.children().slice(this.KeepSize).remove();
+                this.Container.children().remove();
             }
             else {
-                var NewLength = this.Container.children().length - this.KeepSize + Length;
+                var NewLength = this.Container.children().length + Length;
                 if (NewLength > this.BufferSize)
-                    this.Container.children().slice(this.KeepSize, NewLength - this.BufferSize + this.KeepSize).remove();
+                    this.Container.children().slice(0, NewLength - this.BufferSize).remove();
             }
             // Append to the display
             this.Container.append(this.Fragment);
@@ -387,28 +621,6 @@
             });
         }
     }
-
-    /** NewChatResponse: Creates a new chat response. */
-    /** ChatResponseType: The type for the chat response. */
-    var ChatResponseType;
-    (function (ChatResponseType) {
-        /** Start: The response is a start message. */
-        ChatResponseType[ChatResponseType["Start"] = -1] = "Start";
-        /** Finish: The response is a finish message. */
-        ChatResponseType[ChatResponseType["Finish"] = -2] = "Finish";
-        /** Text: The response is a text block. */
-        ChatResponseType[ChatResponseType["Text"] = 0] = "Text";
-        /** Code: The response is a code block. */
-        ChatResponseType[ChatResponseType["Code"] = 1] = "Code";
-        /** JSON: The response is a JSON block. */
-        ChatResponseType[ChatResponseType["JSON"] = 2] = "JSON";
-        /** CompileError: The response is a compile error message. */
-        ChatResponseType[ChatResponseType["CompileError"] = 3] = "CompileError";
-        /** RuntimeError: The response is a runtime error message. */
-        ChatResponseType[ChatResponseType["RuntimeError"] = 4] = "RuntimeError";
-        /** ServerError: The response is a server error message. */
-        ChatResponseType[ChatResponseType["ServerError"] = 5] = "ServerError";
-    })(ChatResponseType || (ChatResponseType = {}));
 
     /** ChatThread: Record a conversation between human-AI. */
     class ChatThread {
@@ -671,30 +883,32 @@
         }
         /** SendRequest: Send a request to the chat backend and handle its outputs. */
         SendRequest(Request) {
-            // UI stuff
-            var Renderer = $(`<div class="chat-response"></div>`).appendTo(this.Outputs.Container);
-            var CurrentRenderer;
             this.Commands.HideInput();
             this.Commands.ClearInput();
             // Make it a record and put it in the thread
             var Record = Request;
-            this.Thread.AddToSubthread(Record);
+            var Subthread = this.Thread.AddToSubthread(Record);
+            var Renderer = this.Outputs.RenderRecord(Record, Subthread);
+            var CurrentRenderer;
             // Send the request
             var Options = 0;
             ChatNetwork.SendRequest(Record, this.Thread, (Section) => {
+                var _a;
                 // Create the section
-                CurrentRenderer = this.Render(CurrentRenderer, Renderer, Section, false);
+                Subthread.RootID = (_a = Subthread.RootID) !== null && _a !== void 0 ? _a : Record.ID;
+                CurrentRenderer = Renderer.AddSection(Section);
             }, (Section) => {
                 // Update the section
-                CurrentRenderer = this.Render(CurrentRenderer, Renderer, Section, false);
+                CurrentRenderer.SetData(Section);
+                CurrentRenderer.Render();
             }, (Section) => {
-                // Finish the section
                 console.log(Section);
+                // Finish the section
                 Options += Section.Options.length;
-                this.Render(CurrentRenderer, Renderer, Section, true);
-                CurrentRenderer = null;
+                CurrentRenderer.SetData(Section);
+                CurrentRenderer.SetFinalized();
+                CurrentRenderer.Render();
             }).then((Record) => {
-                Renderer.data("record", Record);
                 if (Options == 0)
                     this.Commands.ShowInput();
                 console.log(Record);
@@ -833,8 +1047,6 @@
         constructor(Tab) {
             /** Available: Whether the chat backend is available. */
             this.Available = true;
-            /** ThinkProcess: Whether to demonstrate the thinking processes. */
-            this.ThinkProcess = false;
             this.Commands = Tab;
             this.Outputs = Tab.Outputs;
             this.Reset();
@@ -857,27 +1069,6 @@
             switch (Section.Type) {
                 case ChatResponseType.Text:
                     // Filter the content
-                    var Content = Section.Content;
-                    if (!this.ThinkProcess &&
-                        (Content.startsWith("Parameters:") || Content.startsWith("Thoughts:") || Content.startsWith("Input:"))) {
-                        var OutputIndex = Content.indexOf("\nOutput:");
-                        if (OutputIndex == -1) {
-                            if (!Finalize)
-                                Content = EditorLocalized.Get("I am planning for the answer...");
-                            else
-                                Content = "";
-                        }
-                        else
-                            Content = Content.substring(OutputIndex + 8).trim();
-                    }
-                    if (Content.startsWith("Output: "))
-                        Content = Content.substring(8).trim();
-                    // Create the paragraph
-                    if (Section.Index == 0 || Content != "") {
-                        var Paragraph = $(`<p><span class="assistant">assistant&gt;</span>&nbsp;<span></span><p>`);
-                        Paragraph.appendTo(Output);
-                        Paragraph.children("span:eq(1)").text(Content);
-                    }
                     break;
                 case ChatResponseType.Code:
                     var Code = Section.Content.trim();
@@ -920,6 +1111,8 @@
             this.RequestOption(Option, Section, Record);
         }
     }
+    /** ThinkProcess: Whether to demonstrate the thinking processes. */
+    ChatManager.ThinkProcess = false;
 
     /** CommandTab: A tab for the command center. */
     class CommandTab extends Tab {
@@ -954,7 +1147,7 @@
             super.Reset();
             this.ShowInput();
             this.ClearInput();
-            this.Outputs.ClearOutput();
+            this.Outputs.Clear();
             this.ChatManager.Reset();
             this.HideFullText();
         }
@@ -1050,7 +1243,7 @@
                 // Chatable or not
                 var Chatable = this.ChatManager.Available;
                 if (!Chatable) {
-                    this.ExecuteUserCommand(Objective, Content);
+                    this.ExecuteInput(Objective, Content);
                     return;
                 }
                 // Check if it is a command
@@ -1062,39 +1255,13 @@
                     if (Diagnostics.length == 0) {
                         if (Mode == "Reporter" || Mode == "Unknown")
                             Content = `show ${Content}`;
-                        this.ExecuteUserCommand(Objective, Content);
+                        this.ExecuteInput(Objective, Content);
                         return;
                     }
                 }
                 // Otherwise, assume it is a chat message
-                $(`<p class="output"><span class="you">you&gt;</span>&nbsp;<span></span>`).appendTo(this.Outputs.Container)
-                    .children("span:eq(1)").text(Content);
-                this.Outputs.ScrollToBottom();
                 this.ChatManager.SendMessage(Content);
             });
-        }
-        /** ExecuteUserCommand: Execute a human-sent command. */
-        ExecuteUserCommand(Objective, Content) {
-            // Record command history
-            this.Outputs.PrintInput(Objective, Content, false);
-            this.CommandStack.push([Objective, Content]);
-            this.CurrentCommandIndex = 0;
-            this.CurrentCommand = [];
-            // Transform command
-            switch (Objective.toLowerCase()) {
-                case "turtles":
-                    Content = `ask turtles [ ${Content} ]`;
-                    break;
-                case "patches":
-                    Content = `ask patches [ ${Content} ]`;
-                    break;
-                case "links":
-                    Content = `ask links [ ${Content} ]`;
-                    break;
-            }
-            // Execute command
-            this.Editor.Call({ Type: "CommandExecute", Source: Objective, Command: Content });
-            this.ClearInput();
         }
         /** ClearInput: Clear the input box of Command Center. */
         ClearInput() {
@@ -1116,27 +1283,6 @@
             this.Galapagos.SetCode(Content);
             setTimeout(() => this.Galapagos.SetCursorPosition(Content.length), 1);
         }
-        // #endregion
-        // #region "Command Execution"
-        /** FinishExecution: Notify the completion of the command. */
-        FinishExecution(Status, Message) {
-            this.Outputs.PrintOutput(Message, Status);
-            this.Disabled = false;
-        }
-        /** ExecuteCommand: Execute a command. */
-        ExecuteCommand(Objective, Content) {
-            this.Editor.Call({ Type: "CommandExecute", Source: Objective, Command: Content });
-            this.Outputs.PrintInput(Objective, Content, false);
-            this.Outputs.ScrollToBottom();
-        }
-        /** ExplainFull: ExplainFull: Explain the selected text in the command center in full. */
-        ExplainFull(Command) {
-            if (!EditorDictionary.Check(Command))
-                return false;
-            this.Outputs.ScrollToBottom();
-            this.ExecuteCommand("observer", `help ${Command} -full`);
-        }
-        // #endregion
         /** AnnotateCode: Annotate some code snippets. */
         AnnotateCode(Target, Content, Copyable) {
             var This = this;
@@ -1153,6 +1299,49 @@
                         This.SetCode("observer", $(this).data("Code"));
                     });
             }
+        }
+        // #endregion
+        // #region "Command Execution"
+        /** ExecuteInput: Execute a human-sent command. */
+        ExecuteInput(Objective, Content) {
+            // Record command history
+            this.Outputs.PrintInput(Objective, Content, false);
+            this.CommandStack.push([Objective, Content]);
+            this.CurrentCommandIndex = 0;
+            this.CurrentCommand = [];
+            // Transform command
+            switch (Objective.toLowerCase()) {
+                case "turtles":
+                    Content = `ask turtles [ ${Content} ]`;
+                    break;
+                case "patches":
+                    Content = `ask patches [ ${Content} ]`;
+                    break;
+                case "links":
+                    Content = `ask links [ ${Content} ]`;
+                    break;
+            }
+            // Execute command
+            this.Editor.Call({ Type: "CommandExecute", Source: Objective, Command: Content });
+            this.ClearInput();
+        }
+        /** ExecuteCommand: Execute a command. */
+        ExecuteCommand(Objective, Content) {
+            this.Editor.Call({ Type: "CommandExecute", Source: Objective, Command: Content });
+            this.Outputs.PrintInput(Objective, Content, false);
+            this.Outputs.ScrollToBottom();
+        }
+        /** ExplainFull: ExplainFull: Explain the selected text in the command center in full. */
+        ExplainFull(Command) {
+            if (!EditorDictionary.Check(Command))
+                return false;
+            this.Outputs.ScrollToBottom();
+            this.ExecuteCommand("observer", `help ${Command} -full`);
+        }
+        /** FinishExecution: Notify the completion of the command. */
+        FinishExecution(Status, Message) {
+            this.Outputs.PrintOutput(Message, Status);
+            this.Disabled = false;
         }
     }
 

@@ -17,7 +17,6 @@ export class SubthreadRenderer extends UIRendererOf<ChatSubthread> {
         var Renderer = new RecordRenderer();
         Renderer.SetData(Record);
         this.AddChild(Renderer);
-        Renderer.Render();
         return Renderer;
     }
 }

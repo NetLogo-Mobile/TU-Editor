@@ -163,9 +163,6 @@ export class CommandTab extends Tab {
 			}
 		}
 		// Otherwise, assume it is a chat message
-		$(`<p class="output"><span class="you">you&gt;</span>&nbsp;<span></span>`).appendTo(this.Outputs.Container)
-			.children("span:eq(1)").text(Content);
-		this.Outputs.ScrollToBottom();
 		this.ChatManager.SendMessage(Content);
 	}
 	/** ClearInput: Clear the input box of Command Center. */

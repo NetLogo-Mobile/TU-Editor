@@ -3,6 +3,8 @@ import { RenderAgent, LinkCommand } from "src/utils/element";
 import { Localized } from "src/legacy";
 import { SubthreadRenderer } from "./outputs/subthread-renderer";
 import { ChatSubthread } from "../chat/client/chat-thread";
+import { ChatRecord } from "../chat/client/chat-record";
+import { RecordRenderer } from "./outputs/record-renderer";
 
 /** OutputDisplay: Display the output section. */
 export class OutputDisplay {
@@ -37,6 +39,26 @@ export class OutputDisplay {
 		this.Container.remove();
 		this.Subthreads.clear();
 		this.Subthread = null;
+	}
+	/** RenderRecord: Render a new chat record. */
+	public RenderRecord(Record: ChatRecord, Subthread: ChatSubthread): RecordRenderer {
+		var Renderer: RecordRenderer;
+		// Create a new subthread if necessary
+		if (Subthread != this.Subthread?.GetData()) {
+			this.Subthread = this.Subthreads.get(Subthread);
+			if (this.Subthread == null) {
+				this.Subthread = new SubthreadRenderer();
+				this.Container.append(this.Subthread.Container);
+				this.Subthread.SetData(Subthread);
+				this.Subthreads.set(Subthread, this.Subthread);
+			}
+			this.Subthread.SetStatus("active");
+			this.ScrollToBottom();
+		}
+		// Render the record
+		Renderer = this.Subthread.AddRecord(Record);
+		this.Subthread.Render();
+		return Renderer;
 	}
 	// #endregion
 

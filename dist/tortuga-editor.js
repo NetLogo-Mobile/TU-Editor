@@ -400,12 +400,14 @@
         ChatResponseType[ChatResponseType["Text"] = 0] = "Text";
         /** Code: The response is a code block. */
         ChatResponseType[ChatResponseType["Code"] = 1] = "Code";
+        /** JSON: The response is a JSON block. */
+        ChatResponseType[ChatResponseType["JSON"] = 2] = "JSON";
         /** CompileError: The response is a compile error message. */
-        ChatResponseType[ChatResponseType["CompileError"] = 2] = "CompileError";
+        ChatResponseType[ChatResponseType["CompileError"] = 3] = "CompileError";
         /** RuntimeError: The response is a runtime error message. */
-        ChatResponseType[ChatResponseType["RuntimeError"] = 3] = "RuntimeError";
+        ChatResponseType[ChatResponseType["RuntimeError"] = 4] = "RuntimeError";
         /** ServerError: The response is a server error message. */
-        ChatResponseType[ChatResponseType["ServerError"] = 4] = "ServerError";
+        ChatResponseType[ChatResponseType["ServerError"] = 5] = "ServerError";
     })(ChatResponseType || (ChatResponseType = {}));
 
     /** ChatThread: Record a conversation between human-AI. */
@@ -698,7 +700,6 @@
             var RealSection = Section;
             // If the option is transparent, find the first could-be-transparent parent
             // Otherwise, find the first non-transparent parent
-            // (Option.Transparent ?? false) !== true && 
             while ((RealParent === null || RealParent === void 0 ? void 0 : RealParent.Transparent) === true) {
                 RealParent = this.Thread.GetRecord(RealParent.ParentID);
                 if (!RealParent) {
@@ -1341,7 +1342,7 @@
             this.Darkmode = new Darkmode();
             // Initialize the tabs
             this.EditorTabs = [new EditorTab($(Container).children("div.editor").get(0), this)];
-            this.CommandTab = new CommandTab($(Container).children("div.command").get(0), this);
+            this.CommandTab = new CommandTab($(Container).children("div.commands").get(0), this);
             this.CommandTab.Show();
             this.EditorTabs[0].Galapagos.AddChild(this.CommandTab.Galapagos);
             // Listen to the sizing

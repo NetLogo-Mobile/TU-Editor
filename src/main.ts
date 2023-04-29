@@ -24,7 +24,7 @@ export class TurtleEditor {
 		this.Darkmode = new Darkmode();
     // Initialize the tabs
     this.EditorTabs = [new EditorTab($(Container).children("div.editor").get(0)!, this)];
-    this.CommandTab = new CommandTab($(Container).children("div.command").get(0)!, this);
+    this.CommandTab = new CommandTab($(Container).children("div.commands").get(0)!, this);
     this.CommandTab.Show();
     this.EditorTabs[0].Galapagos.AddChild(this.CommandTab.Galapagos);
 		// Listen to the sizing

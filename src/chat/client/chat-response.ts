@@ -37,10 +37,12 @@ export enum ChatResponseType {
     Text = 0,
     /** Code: The response is a code block. */
     Code = 1,
+    /** JSON: The response is a JSON block. */
+    JSON = 2,
     /** CompileError: The response is a compile error message. */
-    CompileError = 2,
+    CompileError = 3,
     /** RuntimeError: The response is a runtime error message. */
-    RuntimeError = 3,
+    RuntimeError = 4,
     /** ServerError: The response is a server error message. */
-    ServerError = 4
+    ServerError = 5
 }

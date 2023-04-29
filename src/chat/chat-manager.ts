@@ -84,7 +84,6 @@ export class ChatManager {
         var RealSection = Section;
         // If the option is transparent, find the first could-be-transparent parent
         // Otherwise, find the first non-transparent parent
-        // (Option.Transparent ?? false) !== true && 
         while (RealParent?.Transparent === true) {
             RealParent = this.Thread.GetRecord(RealParent.ParentID);
             if (!RealParent) {

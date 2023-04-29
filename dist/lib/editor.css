@@ -1,6 +1,6 @@
-/* TU-Editor Stylesheet */
-/* Layout */
-body, 
+/** Turtle Universe: Editor Stylesheet */
+/** Basic Styling */
+body,
 div {
 	overscroll-behavior: none;
 }
@@ -26,25 +26,18 @@ html {
 code,
 .cm-editor .cm-content,
 .cm-editor .cm-diagnostic,
-.cm-editor .cm-tooltip.cm-tooltip-autocomplete > ul {
+.cm-editor .cm-tooltip.cm-tooltip-autocomplete>ul {
 	font-family: Consolas, "Droid Sans Mono", "PingFangSC", "Microsoft Yahei", monospace;
 }
 
 html,
 body,
 select {
-	font-family: "Helvetica", "Noto Sans", "Roboto", "PingFangSC", "Microsoft Yahei", serif;
+	font-family: Söhne, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif, Helvetica Neue, Arial, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol, Noto Color Emoji;
 }
 
 p {
 	margin: 0;
-}
-
-#Container {
-	width: 100%;
-	height: 100%;
-	overflow: hidden;
-	box-sizing: border-box;
 }
 
 /** Hints **/
@@ -67,10 +60,22 @@ p {
 	}
 }
 
-/** Editor Stylesheet **/
-.editor {
+/** Multi-Tab Structure */
+.root-container {
 	width: 100%;
 	height: 100%;
+	overflow: hidden;
+	box-sizing: border-box;
+}
+
+.root-container .tab {
+	width: 100%;
+	height: 100%;
+	background: #FFF;
+}
+
+/** Editor Stylesheet **/
+.editor {
 	line-height: 1.3;
 	position: relative;
 	flex-direction: column;
@@ -79,70 +84,9 @@ p {
 .editor .CodeMirror {
 	width: 100%;
 	height: 100%;
-	/* font-size: 0.95em; some devices have a larger font =_= */
 }
 
-.jconfirm-content {
-	line-height: 1.5;
-}
-
-.CodeMirror-dialog {
-	background: #082A84;
-	color: #FFF;
-}
-
-.CodeMirror-dialog input {
-	font-size: 1rem;
-}
-
-.CodeMirror-linenumber {
-	padding: 0 0.26em 0 0.85em;
-	font-size: 0.9em;
-}
-
-.CodeMirror-marker-error {
-	display: inline-block;
-	width: 0.7em;
-	height: 0.7em;
-	margin: 0.3em 0.1em;
-	background-image: url(../images/error.png);
-}
-
-.CodeMirror-context-tips {
-	cursor: pointer;
-	padding: 0.2em 0.3em;
-	font-size: 0.9em;
-	line-height: 1.2;
-	background: #FFFFF0;
-}
-
-.darkmode--activated .CodeMirror-context-tips {
-	background: #CCC;
-}
-
-.CodeMirror pre.CodeMirror-line,
-.CodeMirror pre.CodeMirror-line-like {
-	padding: 0 0.13em 0 0.26em;
-}
-
-.darkmode--activated .CodeMirror-line::selection,
-.darkmode--activated .CodeMirror-line>span::selection,
-.darkmode--activated .CodeMirror-line>span>span::selection {
-	background-color: #909090;
-}
-
-.darkmode--activated .CodeMirror-selected,
-.darkmode--activated .CodeMirror-focused .CodeMirror-selected {
-	background-color: #909090;
-}
-
-.darkmode--activated .CodeMirror-line::-moz-selection,
-.darkmode--activated .CodeMirror-line>span::-moz-selection,
-.darkmode--activated .CodeMirror-line>span>span::-moz-selection {
-	background-color: #909090;
-}
-
-/* Overlays */
+/** Third-party Overlays */
 .overlays div {
 	top: 50%;
 	left: 50%;
@@ -163,6 +107,14 @@ p {
 		-webkit-backdrop-filter: blur(3px);
 		background: rgba(234, 234, 234, 0.6);
 	}
+}
+
+.jconfirm-content {
+	line-height: 1.5;
+}
+
+.darkmode-layer {
+	z-index: 256;
 }
 
 /* Dialog: Rotate Screen */
@@ -235,257 +187,4 @@ p {
 
 #Dialog-Procedures ul li:not(:last-child) {
 	border-bottom: 1px solid #E0E0E0;
-}
-
-/* Styles */
-.Backdrop {
-	-webkit-backdrop-filter: blur(10px);
-}
-
-.darkmode-layer {
-	z-index: 256;
-}
-
-/** Command-center Stylesheet */
-div.command {
-	background: #FFF;
-	width: 100%;
-	height: 100%;
-}
-
-.command-output,
-.command-fulltext {
-	width: 100%;
-	height: calc(100% - 2.7rem);
-	padding-top: 0.5rem;
-	overflow: auto;
-	box-sizing: border-box;
-	line-height: 1.5;
-}
-
-.command-fulltext,
-.jconfirm,
-.jconfirm button {
-	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', "Microsoft Yahei", sans-serif;
-}
-
-.command-fulltext {
-	color: #333;
-	display: none;
-	padding: 0 1rem;
-	font-size: 1rem;
-}
-
-.command-fulltext h2 {
-	font-size: 1.5rem;
-	margin: 0.5em 0;
-}
-
-.command-fulltext h4 {
-	font-size: 1.2rem;
-	margin: 0.5em 0;
-}
-
-.command-fulltext p,
-.command-fulltext ul {
-	margin: 0 0 0.5em 0;
-}
-
-.command-fulltext a {
-	color: #216BBF;
-	font-weight: normal;
-	text-decoration: none;
-}
-
-.command-fulltext pre {
-	padding: 0.25em 0.5em;
-	margin: 0 0 0.5em;
-}
-
-.command-fulltext pre,
-.command-fulltext code {
-	background: #F7F7F7;
-}
-
-.command-fulltext code img {
-	padding: 0 0 0 0.25em;
-}
-
-.command-fulltext h2 span {
-	color: #666;
-	margin: 0 0 0 0.5em;
-	font-size: 1rem;
-	font-weight: normal;
-}
-
-.command-fulltext div.translator {
-	margin: 0 0 0.5em 0;
-	padding: 0.25em 0.5em;
-	font-size: 1rem;
-	background: #F7F7F7;
-}
-
-.darkmode--activated .command-fulltext div.translator {
-	background: #CCCCCC;
-}
-
-.command-fulltext div.translator p {
-	margin: 0;
-}
-
-.command-output a,
-.command-output command {
-	color: #216BBF;
-	cursor: pointer;
-}
-
-.command-output div.block {
-	background: #F5F5F5;
-}
-
-.command-output div.block .command-wrapper {
-	background: #FAFAFA;
-}
-
-.command-output div.block .command-wrapper.active {
-	background: #F5F5F5;
-}
-
-.command-output .output {
-	padding: 0 1rem;
-}
-
-.command-output img.copy-icon {
-	float: right;
-}
-
-.command-wrapper {
-	padding: 0 1rem;
-	display: flex;
-	flex-direction: row;
-}
-
-.command-wrapper.active {
-	background-color: #f7f7f7;
-}
-
-.command-wrapper .icon {
-	align-items: center;
-	width: 1rem;
-	padding: 0 0.5em;
-	display: flex;
-}
-
-.command-wrapper .content {
-	flex: 1 auto;
-}
-
-.command-wrapper .icon img {
-	width: 100%;
-}
-
-.command-output .assistant {
-	color: #2881e0;
-}
-
-.command-output .you {
-	color: #cc2200;
-}
-
-.command-output .Comment {
-	color: #333;
-}
-
-.darkmode--activated .command-output .Comment {
-	color: #111;
-}
-
-.command-output .Help {
-	color: #333;
-}
-
-.command-output .Help a {
-	text-decoration: none;
-}
-
-.command-output .CompilationError,
-.command-output .RuntimeError {
-	color: #cc2200;
-}
-
-.command-output .RuntimeError a {
-	margin: 0 0 0 0.5em;
-}
-
-.command-output .Succeeded {
-	color: #007F69;
-}
-
-.command-line {
-	bottom: 0;
-	width: 100%;
-	height: 2.7rem;
-	display: flex;
-	padding-bottom: env(safe-area-inset-bottom);
-	align-items: center;
-	border-top: 1px solid #eee;
-	background-color: #f2f2f2;
-}
-
-.darkmode--activated .command-line {
-	background-color: #CCC;
-}
-
-.command-line .wrapper {
-	width: 100%;
-	display: flex;
-	padding: 0 0.5rem;
-}
-
-.command-line select {
-	background-color: #2F80ED;
-	border-radius: 0.5rem;
-	color: #fff;
-	padding: 0.5rem 0.5rem;
-	font-size: 1em;
-	line-height: 1.05rem;
-	border: none;
-	text-align-last: center;
-	margin-right: 0.5rem;
-	-webkit-appearance: none;
-	-moz-appearance: none;
-	appearance: none;
-}
-
-.command-line .command-input {
-	flex: 1 auto;
-	flex-grow: 1;
-	width: 1.4em;
-	/* Arbitrary width */
-	height: 2rem;
-}
-
-.command-line .command-input .cm-editor {
-	height: auto;
-	font-size: 1em;
-	background: #FFF;
-	max-height: 2rem;
-	border-radius: 0.24rem;
-}
-
-.command-line .command-input .cm-editor .cm-gutters {
-	display: none;
-}
-
-.command-line .command-input .cm-editor .cm-scroller {
-	line-height: 1.5;
-	overflow-y: hidden;
-}
-
-.command-line .command-input .cm-editor .cm-scroller ::-webkit-scrollbar {
-	display: none;
-}
-
-.command-line .command-input .cm-editor .cm-activeLine {
-	background: transparent;
 }

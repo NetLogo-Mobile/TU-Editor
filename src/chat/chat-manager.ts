@@ -1,7 +1,7 @@
 import { CommandTab } from "src/command/command-tab";
 import { OutputDisplay } from "src/command/outputs";
 import { ClientChatRequest } from "./client/chat-request";
-import { ChatResponseSection, ChatResponseType } from "./client/chat-response";
+import { ChatResponseSection, ChatResponseType, IsTextLike, SectionsToJSON } from "./client/chat-response";
 import { ChatThread } from "./client/chat-thread";
 import { ChatNetwork } from "./chat-network";
 import { ChatRole } from "./client/chat-context";
@@ -142,20 +142,23 @@ export class ChatManager {
         switch (Option.TextInContext) {
             case ContextMessage.Nothing:
                 break;
-            case ContextMessage.TextOnly:
+            case ContextMessage.MessagesAsText:
                 Context.PreviousMessages.unshift({ 
-                    Text: Record.Response.Sections.filter(Section => 
-                        Section.Type != ChatResponseType.Thought && Section.Type != ChatResponseType.Code && Section.Type != ChatResponseType.JSON)
+                    Text: Record.Response.Sections.filter(IsTextLike)
                         .map(Section => Section.Content).join("\n"), 
                     Role: ChatRole.Assistant
                 });
                 break;
-            case ContextMessage.TextAndThoughts:
+            case ContextMessage.MessagesAsJSON:
+                Context.PreviousMessages.unshift({ 
+                    Text: SectionsToJSON(Record.Response.Sections.filter(IsTextLike)), 
+                    Role: ChatRole.Assistant
+                });
+                break;
+            case ContextMessage.AllAsJSON:
             default:
                 Context.PreviousMessages.unshift({ 
-                    Text: Record.Response.Sections.filter(Section => 
-                        Section.Type != ChatResponseType.Code && Section.Type != ChatResponseType.JSON)
-                        .map(Section => Section.Content).join("\n"), 
+                    Text: SectionsToJSON(Record.Response.Sections.filter(IsTextLike)), 
                     Role: ChatRole.Assistant
                 });
         }
@@ -198,16 +201,6 @@ export class ChatManager {
         this.Outputs = Tab.Outputs;
         this.Reset();
         ChatManager.Instance = this;
-    }
-    // #endregion
-
-    // #region " Message Rendering "
-    /** OptionHandler: Handling an option. */
-    private OptionHandler(OptionElement: JQuery<HTMLElement>) {
-        var Option = OptionElement.data("option") as ChatResponseOption;
-        var Section = OptionElement.parents(".chat-section").data("section") as ChatResponseSection;
-        var Record = OptionElement.parents(".chat-response").data("record") as ChatRecord;
-        this.RequestOption(Option, Section, Record);
     }
     // #endregion
 }

@@ -24,14 +24,16 @@ export interface ChatResponseOption {
     Inheritance?: ContextInheritance;
 }
 
-/** ContextMessage: How to segment a message for the context. */
+/** ContextMessage: How to inherit an output message for the context. */
 export enum ContextMessage {
     /** Nothing: Nothing should be retained. */
     Nothing = 0,
-    /** TextOnly: Only the text message should be retained. */
-    TextOnly = 1,
-    /** TextAndThoughts: Both the output text and thoughts should be retained. */
-    TextAndThoughts = 2,
+    /** TextOnly: Only text messages should be retained, in a text format. */
+    MessagesAsText = 1,
+    /** MessagesAsJSON: Only text messages should be retained, in a JSON format. */
+    MessagesAsJSON = 2,
+    /** AllAsJSON: Except for the code, all should be retained in a JSON format. */
+    AllAsJSON = 3,
 }
 
 /** ContextInheritance: How to inherit the parent context. */

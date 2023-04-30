@@ -43,9 +43,10 @@ export class SectionRenderer extends UIRendererOf<ChatResponseSection> {
         for (var I = 0; I < Options.length; I++) {
             var Option = Options[I];
             var Renderer: OptionRenderer;
-            if (this.Children.length < I) {
+            if (this.Children.length <= I) {
                 Renderer = new OptionRenderer();
-                this.AddChild(Renderer);
+                this.AddChild(Renderer, false);
+                this.OptionContainer.append(Renderer.Container);
             } else Renderer = this.Children[I] as OptionRenderer;
             Renderer.SetData(Option);
             Renderer.Render();

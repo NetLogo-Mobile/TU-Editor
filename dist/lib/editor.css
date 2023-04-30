@@ -13,14 +13,11 @@ select {
 	font-size: 1em;
 	overflow: hidden;
 	scroll-behavior: auto;
+	font-family: Söhne, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif, Helvetica Neue, Arial, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol, Noto Color Emoji;
 }
 
-pre {
+p, pre, ul, ol {
 	margin: 0;
-}
-
-html {
-	font-size: 15px;
 }
 
 code,
@@ -28,16 +25,6 @@ code,
 .cm-editor .cm-diagnostic,
 .cm-editor .cm-tooltip.cm-tooltip-autocomplete>ul {
 	font-family: Consolas, "Droid Sans Mono", "PingFangSC", "Microsoft Yahei", monospace;
-}
-
-html,
-body,
-select {
-	font-family: Söhne, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif, Helvetica Neue, Arial, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol, Noto Color Emoji;
-}
-
-p {
-	margin: 0;
 }
 
 /** Hints **/

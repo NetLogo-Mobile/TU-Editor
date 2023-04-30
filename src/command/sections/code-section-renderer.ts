@@ -2,8 +2,8 @@ import { ChatManager } from "../../chat/chat-manager";
 import { SectionRenderer } from "./section-renderer";
 declare const { EditorLocalized }: any;
 
-/** TextSectionRenderer: A block that displays the a text response section. */
-export class TextSectionRenderer extends SectionRenderer {
+/** CodeSectionRenderer: A block that displays the a code response section. */
+export class CodeSectionRenderer extends SectionRenderer {
     /** Constructor: Create a new UI renderer. */
     public constructor() {
         super();
@@ -22,10 +22,11 @@ export class TextSectionRenderer extends SectionRenderer {
             Code = Code.substring(0, Code.length - 3).trimEnd();
         // Create the code block
         if (this.Finalized) {
-            var Element = this.ContentContainer.replaceWith(`<code></code>`);
-            ChatManager.Instance.Commands.AnnotateCode(Element, Code, true);
+            this.ContentContainer = this.ContentContainer.replaceWith(`<code></code>`);
+            ChatManager.Instance.Commands.AnnotateCode(this.ContentContainer, Code, true);
         } else {
-            this.ContentContainer.replaceWith(`<pre></pre>`).text(Code.trim());
+            this.ContentContainer = this.ContentContainer.replaceWith(`<pre></pre>`).text(Code.trim());
         }
+        this.RenderOptions();
     }
 }

@@ -93,10 +93,6 @@ export class TurtleEditor {
     $("body").addClass("Mobile");
     $("#viewport").attr("content", `width=device-width,initial-scale=${Ratio},maximum-scale=${Ratio},minimum-scale=${Ratio},user-scalable=no,viewport-fit=cover`);
   }
-  /** SetDesktop: Set the desktop mode. */
-  public SetFontsize(Status: number) {
-    $("html").css("font-size", Status + "px");
-  }
   /** ToggleDark: Toggle the dark mode. */
   public ToggleDark(Status: boolean) {
     if (Status != this.Darkmode.isActivated()) this.Darkmode.toggle();

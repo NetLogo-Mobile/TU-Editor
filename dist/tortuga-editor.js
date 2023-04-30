@@ -313,70 +313,6 @@
         ChatResponseType[ChatResponseType["ServerError"] = 5] = "ServerError";
     })(ChatResponseType || (ChatResponseType = {}));
 
-    /** OptionRenderer: A block that displays the a chat option. */
-    class OptionRenderer extends UIRendererOf {
-        /** ContainerInitializer: The initializer for the container. */
-        ContainerInitializer() {
-            return $(`<li class="option"><a href="javascript:void(0)"></a></li>`);
-        }
-        /** RenderInternal: Render the UI element. */
-        RenderInternal() {
-            var _a, _b;
-            this.Container.addClass((_a = this.GetData().Style) !== null && _a !== void 0 ? _a : "generated").text((_b = this.GetData().LocalizedLabel) !== null && _b !== void 0 ? _b : this.GetData().Label);
-        }
-    }
-
-    /** SectionRenderer: A block that displays the a response section. */
-    class SectionRenderer extends UIRendererOf {
-        /** SetFirst: Set the first status of the section. */
-        SetFirst() {
-            this.First = true;
-            return this;
-        }
-        /** SetFinalized: Set the finalized status of the section. */
-        SetFinalized() {
-            this.Finalized = true;
-            return this;
-        }
-        /** Constructor: Create a new UI renderer. */
-        constructor() {
-            super();
-            /** First: Whether the section is the first one. */
-            this.First = false;
-            /** Finalized: Whether the section is finalized. */
-            this.Finalized = false;
-            this.Container.addClass("section");
-            this.ContentContainer = $(`<p></p>`).appendTo(this.Container);
-        }
-        /** RenderInternal: Render the UI element. */
-        RenderInternal() {
-            this.ContentContainer.text(this.GetData().Content);
-            this.RenderOptions();
-        }
-        /** RenderOptions: Render the options of the section. */
-        RenderOptions() {
-            var _a;
-            var Options = this.GetData().Options;
-            if (!Options || Options.length == 0)
-                return;
-            // Create the container
-            this.OptionContainer = (_a = this.OptionContainer) !== null && _a !== void 0 ? _a : $(`<ul></ul>`).appendTo(this.Container);
-            // Render the options
-            for (var I = 0; I < Options.length; I++) {
-                var Option = Options[I];
-                var Renderer;
-                if (this.Children.length < I) {
-                    Renderer = new OptionRenderer();
-                    this.AddChild(Renderer);
-                }
-                else
-                    Renderer = this.Children[I];
-                Renderer.SetData(Option);
-                Renderer.Render();
-            }
-        }
-    }
-
     /** ChatThread: Record a conversation between human-AI. */
     class ChatThread {
         constructor() {
@@ -695,34 +631,33 @@
                 SubOperation: Option.SubOperation,
             };
             // Find a parent
-            var RealChild = Record;
-            var RealParent = Record;
-            var RealSection = Section;
-            // If the option is transparent, find the first could-be-transparent parent
-            // Otherwise, find the first non-transparent parent
-            while ((RealParent === null || RealParent === void 0 ? void 0 : RealParent.Transparent) === true) {
-                RealParent = this.Thread.GetRecord(RealParent.ParentID);
-                if (!RealParent) {
-                    RealSection = undefined;
-                    break;
-                }
-                else {
-                    RealSection = RealParent.Response.Sections[RealChild.SectionIndex];
-                    RealChild = RealParent;
-                }
-            }
-            // Inherit the context
             this.PendingRequest.Context = { PreviousMessages: [] };
-            if (RealParent && RealSection) {
-                this.PendingRequest.ParentID = RealParent === null || RealParent === void 0 ? void 0 : RealParent.ID;
-                this.PendingRequest.SectionIndex = RealSection === null || RealSection === void 0 ? void 0 : RealSection.Index;
-                this.InheritContext(Option, RealSection, RealParent, -1);
-                if ((_a = Option.InputInContext) !== null && _a !== void 0 ? _a : true)
-                    this.PendingRequest.Context.PreviousMessages.shift();
+            if (Option.Inheritance !== ContextInheritance.Drop) {
+                var RealChild = Record;
+                var RealParent = Record;
+                var RealSection = Section;
+                // If the option is transparent, find the first could-be-transparent parent
+                // Otherwise, find the first non-transparent parent
+                while ((RealParent === null || RealParent === void 0 ? void 0 : RealParent.Transparent) === true) {
+                    RealParent = this.Thread.GetRecord(RealParent.ParentID);
+                    if (!RealParent) {
+                        RealSection = undefined;
+                        break;
+                    }
+                    else {
+                        RealSection = RealParent.Response.Sections[RealChild.SectionIndex];
+                        RealChild = RealParent;
+                    }
+                }
+                // Inherit the context
+                if (RealParent && RealSection) {
+                    this.PendingRequest.ParentID = RealParent === null || RealParent === void 0 ? void 0 : RealParent.ID;
+                    this.PendingRequest.SectionIndex = RealSection === null || RealSection === void 0 ? void 0 : RealSection.Index;
+                    this.InheritContext(Option, RealSection, RealParent, -1);
+                    if ((_a = Option.InputInContext) !== null && _a !== void 0 ? _a : true)
+                        this.PendingRequest.Context.PreviousMessages.shift();
+                }
             }
-            // Although I dropped my parent contexts, I still want to keep myself in the loop
-            if (Option.Inheritance == ContextInheritance.Drop)
-                Option.Inheritance = ContextInheritance.InheritOne;
             // Send request or unlock the input
             if (Option.AskInput) {
                 this.Commands.ShowInput();
@@ -739,8 +674,6 @@
             if (Layers == -1) {
                 switch (Option.Inheritance) {
                     case ContextInheritance.Drop:
-                        // Stop right here
-                        return;
                     case ContextInheritance.InheritOne:
                         // Stop after this
                         Layers = -2;
@@ -829,6 +762,111 @@
     /** ThinkProcess: Whether to demonstrate the thinking processes. */
     ChatManager.ThinkProcess = false;
 
+    /** OptionRenderer: A block that displays the a chat option. */
+    class OptionRenderer extends UIRendererOf {
+        /** ContainerInitializer: The initializer for the container. */
+        ContainerInitializer() {
+            var Container = $(`<li class="option"><a href="javascript:void(0)"></a></li>`);
+            Container.on("click", () => this.ClickHandler());
+            return Container;
+        }
+        /** RenderInternal: Render the UI element. */
+        RenderInternal() {
+            var _a, _b;
+            this.Container.addClass((_a = this.GetData().Style) !== null && _a !== void 0 ? _a : "generated").children("a")
+                .text((_b = this.GetData().LocalizedLabel) !== null && _b !== void 0 ? _b : this.GetData().Label);
+        }
+        /** ClickHandler: The handler for the click event. */
+        ClickHandler() {
+            var Section = this.Parent;
+            var Record = Section.Parent;
+            ChatManager.Instance.RequestOption(this.GetData(), Section.GetData(), Record.GetData());
+        }
+    }
+
+    /** SectionRenderer: A block that displays the a response section. */
+    class SectionRenderer extends UIRendererOf {
+        /** SetFirst: Set the first status of the section. */
+        SetFirst() {
+            this.First = true;
+            return this;
+        }
+        /** SetFinalized: Set the finalized status of the section. */
+        SetFinalized() {
+            this.Finalized = true;
+            return this;
+        }
+        /** Constructor: Create a new UI renderer. */
+        constructor() {
+            super();
+            /** First: Whether the section is the first one. */
+            this.First = false;
+            /** Finalized: Whether the section is finalized. */
+            this.Finalized = false;
+            this.Container.addClass("section");
+            this.ContentContainer = $(`<p></p>`).appendTo(this.Container);
+        }
+        /** RenderInternal: Render the UI element. */
+        RenderInternal() {
+            this.ContentContainer.text(this.GetData().Content);
+            this.RenderOptions();
+        }
+        /** RenderOptions: Render the options of the section. */
+        RenderOptions() {
+            var _a;
+            var Options = this.GetData().Options;
+            if (!Options || Options.length == 0)
+                return;
+            // Create the container
+            this.OptionContainer = (_a = this.OptionContainer) !== null && _a !== void 0 ? _a : $(`<ul></ul>`).appendTo(this.Container);
+            // Render the options
+            for (var I = 0; I < Options.length; I++) {
+                var Option = Options[I];
+                var Renderer;
+                if (this.Children.length <= I) {
+                    Renderer = new OptionRenderer();
+                    this.AddChild(Renderer, false);
+                    this.OptionContainer.append(Renderer.Container);
+                }
+                else
+                    Renderer = this.Children[I];
+                Renderer.SetData(Option);
+                Renderer.Render();
+            }
+        }
+    }
+
+    /** CodeSectionRenderer: A block that displays the a code response section. */
+    class CodeSectionRenderer extends SectionRenderer {
+        /** Constructor: Create a new UI renderer. */
+        constructor() {
+            super();
+            this.Container.addClass("code");
+        }
+        /** RenderInternal: Render the UI element. */
+        RenderInternal() {
+            var Section = this.GetData();
+            var Code = Section.Content.trim();
+            // Remove the first line
+            var LineBreak = Code.indexOf("\n");
+            if (LineBreak == -1)
+                return;
+            Code = Code.substring(LineBreak + 1);
+            // Remove the last ```
+            if (Code.endsWith("```"))
+                Code = Code.substring(0, Code.length - 3).trimEnd();
+            // Create the code block
+            if (this.Finalized) {
+                this.ContentContainer = this.ContentContainer.replaceWith(`<code></code>`);
+                ChatManager.Instance.Commands.AnnotateCode(this.ContentContainer, Code, true);
+            }
+            else {
+                this.ContentContainer = this.ContentContainer.replaceWith(`<pre></pre>`).text(Code.trim());
+            }
+            this.RenderOptions();
+        }
+    }
+
     /** TextSectionRenderer: A block that displays the a text response section. */
     class TextSectionRenderer extends SectionRenderer {
         /** Constructor: Create a new UI renderer. */
@@ -858,7 +896,8 @@
             if (Content.startsWith("Output: "))
                 Content = Content.substring(8).trim();
             // Render the text
-            this.Container.text(Content);
+            this.ContentContainer.text(Content);
+            this.RenderOptions();
             // Remove the section if it's empty
             if (Content == "" && ((_b = (_a = Section.Options) === null || _a === void 0 ? void 0 : _a.length) !== null && _b !== void 0 ? _b : 0) == 0 && this.Finalized)
                 this.Container.remove();
@@ -931,7 +970,7 @@
         [ChatResponseType.Start]: [],
         [ChatResponseType.Finish]: [],
         [ChatResponseType.Text]: [() => new TextSectionRenderer()],
-        [ChatResponseType.Code]: [],
+        [ChatResponseType.Code]: [() => new CodeSectionRenderer()],
         [ChatResponseType.JSON]: [],
         [ChatResponseType.CompileError]: [],
         [ChatResponseType.RuntimeError]: [],
@@ -1658,10 +1697,6 @@
         Resize(Ratio) {
             $("body").addClass("Mobile");
             $("#viewport").attr("content", `width=device-width,initial-scale=${Ratio},maximum-scale=${Ratio},minimum-scale=${Ratio},user-scalable=no,viewport-fit=cover`);
-        }
-        /** SetDesktop: Set the desktop mode. */
-        SetFontsize(Status) {
-            $("html").css("font-size", Status + "px");
         }
         /** ToggleDark: Toggle the dark mode. */
         ToggleDark(Status) {

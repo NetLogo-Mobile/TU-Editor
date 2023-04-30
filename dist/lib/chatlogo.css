@@ -154,12 +154,21 @@
 .command-output .record .input,
 .command-output .record .contents {
 	display: flex;
-	padding: 0 1rem;
+	padding: 0.5rem 1rem;
+    border-bottom: 1px solid #eee;
 	flex-direction: row;
 }
 
+.command-output .record .contents {
+    background: #f7f7f7;
+}
+
 .command-output .avatar {
-	width: 2rem;
+	width: 2.5rem;
+}
+
+.command-output .avatar img {
+	width: 1.5rem;
 }
 
 .command-output .content {

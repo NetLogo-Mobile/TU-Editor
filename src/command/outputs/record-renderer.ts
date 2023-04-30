@@ -1,5 +1,6 @@
 import { ChatRecord } from "../../chat/client/chat-record";
 import { ChatResponseSection, ChatResponseType } from "../../chat/client/chat-response";
+import { CodeSectionRenderer } from "../sections/code-section-renderer";
 import { SectionRenderer } from "../sections/section-renderer";
 import { TextSectionRenderer } from "../sections/text-section-renderer";
 import { InputRenderer } from "./input-renderer";
@@ -59,7 +60,7 @@ export const SectionRenderers: Record<ChatResponseType, RendererChooser[]> = {
     [ChatResponseType.Start]: [],
     [ChatResponseType.Finish]: [],
     [ChatResponseType.Text]: [() => new TextSectionRenderer()],
-    [ChatResponseType.Code]: [],
+    [ChatResponseType.Code]: [() => new CodeSectionRenderer()],
     [ChatResponseType.JSON]: [],
     [ChatResponseType.CompileError]: [],
     [ChatResponseType.RuntimeError]: [],

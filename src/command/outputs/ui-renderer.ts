@@ -33,7 +33,7 @@ export abstract class UIRenderer {
     /** Children: The children UI renderers. */
     protected Children: UIRenderer[] = [];
     /** Parent: The parent UI renderer. */
-    protected Parent?: UIRenderer;
+    public Parent?: UIRenderer;
     /** AddChild: Add a child renderer. */
     public AddChild(Renderer: UIRenderer, Append: boolean = true): UIRenderer {
         this.Children.push(Renderer);

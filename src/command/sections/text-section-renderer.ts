@@ -26,7 +26,8 @@ export class TextSectionRenderer extends SectionRenderer {
         if (Content.startsWith("Output: "))
             Content = Content.substring(8).trim();
         // Render the text
-        this.Container.text(Content);
+        this.ContentContainer.text(Content);
+        this.RenderOptions();
         // Remove the section if it's empty
         if (Content == "" && (Section.Options?.length ?? 0) == 0 && this.Finalized)
             this.Container.remove();

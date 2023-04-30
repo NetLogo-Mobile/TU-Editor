@@ -77,7 +77,7 @@ export class ChatManager {
 
     // #region " Options and Contexts "
     /** RequestOption: Choose a chat option and send the request. */
-    private RequestOption(Option: ChatResponseOption, Section: ChatResponseSection, Record: ChatRecord) {
+    public RequestOption(Option: ChatResponseOption, Section: ChatResponseSection, Record: ChatRecord) {
         // Construct the request
         this.PendingRequest = {
             Input: Option.Label,
@@ -86,32 +86,32 @@ export class ChatManager {
             SubOperation: Option.SubOperation,
         };
         // Find a parent
-        var RealChild = Record;
-        var RealParent: ChatRecord | undefined = Record;
-        var RealSection: ChatResponseSection | undefined = Section;
-        // If the option is transparent, find the first could-be-transparent parent
-        // Otherwise, find the first non-transparent parent
-        while (RealParent?.Transparent === true) {
-            RealParent = this.Thread.GetRecord(RealParent.ParentID);
-            if (!RealParent) {
-                RealSection = undefined;
-                break;
-            } else {
-                RealSection = RealParent.Response.Sections[RealChild.SectionIndex!];
-                RealChild = RealParent;
+        this.PendingRequest.Context = { PreviousMessages: [] };
+        if (Option.Inheritance !== ContextInheritance.Drop) {
+            var RealChild = Record;
+            var RealParent: ChatRecord | undefined = Record;
+            var RealSection: ChatResponseSection | undefined = Section;
+            // If the option is transparent, find the first could-be-transparent parent
+            // Otherwise, find the first non-transparent parent
+            while (RealParent?.Transparent === true) {
+                RealParent = this.Thread.GetRecord(RealParent.ParentID);
+                if (!RealParent) {
+                    RealSection = undefined;
+                    break;
+                } else {
+                    RealSection = RealParent.Response.Sections[RealChild.SectionIndex!];
+                    RealChild = RealParent;
+                }
+            }
+            // Inherit the context
+            if (RealParent && RealSection) {
+                this.PendingRequest.ParentID = RealParent?.ID;
+                this.PendingRequest.SectionIndex = RealSection?.Index;
+                this.InheritContext(Option, RealSection, RealParent, -1);
+                if (Option.InputInContext ?? true) 
+                    this.PendingRequest.Context.PreviousMessages.shift();
             }
         }
-        // Inherit the context
-        this.PendingRequest.Context = { PreviousMessages: [] };
-        if (RealParent && RealSection) {
-            this.PendingRequest.ParentID = RealParent?.ID;
-            this.PendingRequest.SectionIndex = RealSection?.Index;
-            this.InheritContext(Option, RealSection, RealParent, -1);
-            if (Option.InputInContext ?? true) 
-                this.PendingRequest.Context.PreviousMessages.shift();
-        }
-        // Although I dropped my parent contexts, I still want to keep myself in the loop
-        if (Option.Inheritance == ContextInheritance.Drop) Option.Inheritance = ContextInheritance.InheritOne;
         // Send request or unlock the input
         if (Option.AskInput) {
             this.Commands.ShowInput();
@@ -126,8 +126,6 @@ export class ChatManager {
         if (Layers == -1) {
             switch (Option.Inheritance) {
                 case ContextInheritance.Drop:
-                    // Stop right here
-                    return;
                 case ContextInheritance.InheritOne:
                     // Stop after this
                     Layers = -2;

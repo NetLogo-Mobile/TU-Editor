@@ -1,6 +1,5 @@
 import { ChatManager } from "../../chat/chat-manager";
 import { SectionRenderer } from "./section-renderer";
-declare const { EditorLocalized }: any;
 
 /** CodeSectionRenderer: A block that displays the a code response section. */
 export class CodeSectionRenderer extends SectionRenderer {

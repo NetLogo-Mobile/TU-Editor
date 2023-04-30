@@ -32,8 +32,7 @@ export class ChatManager {
     }
     /** SendRequest: Send a request to the chat backend and handle its outputs. */
     private SendRequest(Request: ClientChatRequest) {
-        this.Commands.HideInput();
-		this.Commands.ClearInput();
+        if (this.Commands.Disabled) return;
         // Make it a record and put it in the thread
         var Record = Request as ChatRecord;
         var Subthread = this.Thread.AddToSubthread(Record);
@@ -41,37 +40,41 @@ export class ChatManager {
         var CurrentRenderer: SectionRenderer;
         // Send the request
         var Options = 0;
-        ChatNetwork.SendRequest(Record, this.Thread, (Section) => {
-            // Create the section
-            Subthread.RootID = Subthread.RootID ?? Record.ID;
-            CurrentRenderer = Renderer.AddSection(Section);
-            this.Outputs.ScrollToBottom();
-        }, (Section) => {
-            // Update the section
-            CurrentRenderer.SetData(Section);
-            CurrentRenderer.Render();
-            this.Outputs.ScrollToBottom();
-        }, (Section) => {
-            console.log(Section);
-            // Finish the section
-            Options += Section.Options?.length ?? 0;
-            CurrentRenderer.SetFinalized();
-            CurrentRenderer.SetData(Section);
-            CurrentRenderer.Render();
-            this.Outputs.ScrollToBottom();
-        }).then((Record) => {
-            if (Options == 0) this.Commands.ShowInput();
-            console.log(Record);
-        }).catch((Error) => {
-            if (!this.Commands.Disabled) return;
-            var Output = this.Outputs.PrintOutput(
-                EditorLocalized.Get("Connection to server failed _", Error ?? EditorLocalized.Get("Unknown")), "RuntimeError");
-            Output.append($("<a></a>").attr("href", "javascript:void(0)").text(EditorLocalized.Get("Reconnect")).on("click", () => {
-                this.Commands.HideInput();
-                this.SendRequest(Request);
-            }));
-            this.Commands.ShowInput();
-        });
+        var SendRequest = () => {
+            if (this.Commands.Disabled) return;
+            this.Commands.HideInput();
+            ChatNetwork.SendRequest(Record, this.Thread, (Section) => {
+                // Create the section
+                Subthread.RootID = Subthread.RootID ?? Record.ID;
+                CurrentRenderer = Renderer.AddSection(Section);
+                this.Outputs.ScrollToBottom();
+            }, (Section) => {
+                // Update the section
+                CurrentRenderer.SetData(Section);
+                CurrentRenderer.Render();
+                this.Outputs.ScrollToBottom();
+            }, (Section) => {
+                console.log(Section);
+                // Finish the section
+                Options += Section.Options?.length ?? 0;
+                CurrentRenderer.SetFinalized();
+                CurrentRenderer.SetData(Section);
+                CurrentRenderer.Render();
+                this.Outputs.ScrollToBottom();
+            }).then((Record) => {
+                if (Options == 0) this.Commands.ShowInput();
+                console.log(Record);
+            }).catch((Error) => {
+                if (!this.Commands.Disabled) return;
+                Renderer.AddSection({ 
+                    Type: ChatResponseType.ServerError, 
+                    Content: EditorLocalized.Get("Connection to server failed _", Error ?? EditorLocalized.Get("Unknown")),
+                    Field: SendRequest as any
+                }).SetFinalized().Render();
+                this.Commands.ShowInput();
+            });
+        };
+        SendRequest();
     }
     // #endregion
 
@@ -88,17 +91,12 @@ export class ChatManager {
         // Find a parent
         this.PendingRequest.Context = { PreviousMessages: [] };
         if (Option.Inheritance !== ContextInheritance.Drop) {
-            var RealChild = Record;
             var RealParent: ChatRecord | undefined = Record;
             // If the option is transparent, find the first could-be-transparent parent
             // Otherwise, find the first non-transparent parent
             while (RealParent?.Transparent === true) {
                 RealParent = this.Thread.GetRecord(RealParent.ParentID);
-                if (!RealParent) {
-                    break;
-                } else {
-                    RealChild = RealParent;
-                }
+                if (!RealParent) break;
             }
             // Inherit the context
             if (RealParent) {

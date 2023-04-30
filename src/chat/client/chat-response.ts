@@ -63,7 +63,7 @@ export function ExcludeCode(Section: ChatResponseSection): boolean {
 export function SectionsToJSON(Sections: ChatResponseSection[]): string {
     var Result = "{";
     for (var Section of Sections) {
-        Result += `${Section.Field ?? ChatResponseType[Section.Type!]}: ${Section.Type == ChatResponseType.JSON ? Section.Content : JSON.stringify(Section.Content)}`;
+        Result += `${Section.Field ?? ChatResponseType[Section.Type!]}:${Section.Type == ChatResponseType.JSON ? Section.Content : JSON.stringify(Section.Content)}`;
         if (Section != Sections[Sections.length - 1]) Result += ",\n";
     }
     return Result + "}";

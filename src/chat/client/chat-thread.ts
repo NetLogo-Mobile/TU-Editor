@@ -29,7 +29,8 @@ export class ChatThread {
             Parent = this.Records[Parent.ParentID];
         }
         // Find or create a subthread
-        var Subthread = this.GetSubthread(Parent.ID);
+        var Subthread = this.Subthreads.find((Subthread) => 
+            (Subthread.RootID === Parent.ID && Subthread.RootID !== undefined) || Subthread.Records[0] === Parent);
         if (!Subthread) {
             Subthread = { RootID: Parent.ID, Records: [] };
             this.Subthreads.push(Subthread);

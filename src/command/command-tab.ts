@@ -163,6 +163,7 @@ export class CommandTab extends Tab {
 			}
 		}
 		// Otherwise, assume it is a chat message
+		this.ClearInput();
 		this.ChatManager.SendMessage(Content);
 	}
 	/** ClearInput: Clear the input box of Command Center. */

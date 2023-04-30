@@ -2,6 +2,7 @@ import { ChatRecord } from "../../chat/client/chat-record";
 import { ChatResponseSection, ChatResponseType } from "../../chat/client/chat-response";
 import { CodeSectionRenderer } from "../sections/code-section-renderer";
 import { SectionRenderer } from "../sections/section-renderer";
+import { ServerErrorRenderer } from "../sections/server-error-renderer";
 import { TextSectionRenderer } from "../sections/text-section-renderer";
 import { InputRenderer } from "./input-renderer";
 import { UIRendererOf } from "./ui-renderer";
@@ -65,5 +66,5 @@ export const SectionRenderers: Record<ChatResponseType, RendererChooser[]> = {
     [ChatResponseType.Thought]: [],
     [ChatResponseType.CompileError]: [],
     [ChatResponseType.RuntimeError]: [],
-    [ChatResponseType.ServerError]: []
+    [ChatResponseType.ServerError]: [() => new ServerErrorRenderer()]
 };

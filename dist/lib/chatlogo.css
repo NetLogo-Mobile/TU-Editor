@@ -164,15 +164,23 @@
 }
 
 .command-output .avatar {
-	width: 2.5rem;
+	min-width: 2.5rem;
 }
 
 .command-output .avatar img {
-	width: 1.5rem;
+	max-width: 1.5rem;
 }
 
 .command-output .content {
 	flex-grow: 1;
+}
+
+.command-output .server-error {
+    color: #cc2200;
+}
+
+.command-output .server-error a {
+    margin: 0 0 0 0.5rem;
 }
 
 /** Output display (Legacy) */

@@ -305,13 +305,30 @@
         ChatResponseType[ChatResponseType["Code"] = 1] = "Code";
         /** JSON: The response is a JSON block. */
         ChatResponseType[ChatResponseType["JSON"] = 2] = "JSON";
+        /** Thought: The response is a thought block. */
+        ChatResponseType[ChatResponseType["Thought"] = 3] = "Thought";
         /** CompileError: The response is a compile error message. */
-        ChatResponseType[ChatResponseType["CompileError"] = 3] = "CompileError";
+        ChatResponseType[ChatResponseType["CompileError"] = 4] = "CompileError";
         /** RuntimeError: The response is a runtime error message. */
-        ChatResponseType[ChatResponseType["RuntimeError"] = 4] = "RuntimeError";
+        ChatResponseType[ChatResponseType["RuntimeError"] = 5] = "RuntimeError";
         /** ServerError: The response is a server error message. */
-        ChatResponseType[ChatResponseType["ServerError"] = 5] = "ServerError";
+        ChatResponseType[ChatResponseType["ServerError"] = 6] = "ServerError";
     })(ChatResponseType || (ChatResponseType = {}));
+    /** IsTextLike: Returns true if the section is text-like. */
+    function IsTextLike(Section) {
+        return Section.Type == ChatResponseType.Text || Section.Type == ChatResponseType.CompileError || Section.Type == ChatResponseType.RuntimeError;
+    }
+    /** SectionsToJSON: Serialize a number of sections to JSON5. */
+    function SectionsToJSON(Sections) {
+        var _a;
+        var Result = "{";
+        for (var Section of Sections) {
+            Result += `${(_a = Section.Field) !== null && _a !== void 0 ? _a : ChatResponseType[Section.Type]}:${Section.Type == ChatResponseType.JSON ? Section.Content : JSON.stringify(Section.Content)}`;
+            if (Section != Sections[Sections.length - 1])
+                Result += ",\n";
+        }
+        return Result + "}";
+    }
 
     /** ChatThread: Record a conversation between human-AI. */
     class ChatThread {
@@ -339,7 +356,7 @@
                 Parent = this.Records[Parent.ParentID];
             }
             // Find or create a subthread
-            var Subthread = this.GetSubthread(Parent.ID);
+            var Subthread = this.Subthreads.find((Subthread) => (Subthread.RootID === Parent.ID && Subthread.RootID !== undefined) || Subthread.Records[0] === Parent);
             if (!Subthread) {
                 Subthread = { RootID: Parent.ID, Records: [] };
                 this.Subthreads.push(Subthread);
@@ -446,7 +463,7 @@
                 Record.UserID = Thread.UserID;
                 Record.ThreadID = Thread.ID;
                 Record.Transparent = (_b = (_a = Record.Option) === null || _a === void 0 ? void 0 : _a.Transparent) !== null && _b !== void 0 ? _b : false;
-                Record.Response = { Sections: [] };
+                Record.Response = { Sections: [], Options: [] };
                 Record.RequestTimestamp = Date.now();
                 console.log(Record);
                 // Do the request
@@ -473,12 +490,12 @@
                             case ChatResponseType.Start:
                                 if (Update.Content) {
                                     Record.ID = Update.Content;
-                                    Record.ThreadID = Update.Optional;
-                                    Thread.ID = Update.Optional;
+                                    Record.ThreadID = Update.Field;
+                                    Thread.ID = Update.Field;
                                 }
-                                else if (Update.Optional) {
-                                    Record.Language = Update.Optional;
-                                    Thread.Language = Update.Optional;
+                                else if (Update.Field) {
+                                    Record.Language = Update.Field;
+                                    Thread.Language = Update.Field;
                                 }
                                 return;
                             case ChatResponseType.Finish:
@@ -503,9 +520,10 @@
                                 return;
                         }
                         // Update the section
-                        Section.Content += Update.Content;
-                        if (Update.Optional !== undefined)
-                            Section.Optional = Update.Optional;
+                        if (Update.Content !== undefined)
+                            Section.Content += Update.Content;
+                        if (Update.Field !== undefined)
+                            Section.Field = Update.Field;
                         if (Update.Summary !== undefined)
                             Section.Summary = Update.Summary;
                         if (Update.Options !== undefined)
@@ -531,15 +549,17 @@
         ChatRole["Assistant"] = "assistant";
     })(ChatRole || (ChatRole = {}));
 
-    /** ContextMessage: How to segment a message for the context. */
+    /** ContextMessage: How to inherit an output message for the context. */
     var ContextMessage;
     (function (ContextMessage) {
         /** Nothing: Nothing should be retained. */
         ContextMessage[ContextMessage["Nothing"] = 0] = "Nothing";
-        /** Section: Only the current section should be retained. */
-        ContextMessage[ContextMessage["Section"] = 1] = "Section";
-        /** EntireMessage: The entire message should be retained. */
-        ContextMessage[ContextMessage["EntireMessage"] = 2] = "EntireMessage";
+        /** TextOnly: Only text messages should be retained, in a text format. */
+        ContextMessage[ContextMessage["MessagesAsText"] = 1] = "MessagesAsText";
+        /** MessagesAsJSON: Only text messages should be retained, in a JSON format. */
+        ContextMessage[ContextMessage["MessagesAsJSON"] = 2] = "MessagesAsJSON";
+        /** AllAsJSON: Except for the code, all should be retained in a JSON format. */
+        ContextMessage[ContextMessage["AllAsJSON"] = 3] = "AllAsJSON";
     })(ContextMessage || (ContextMessage = {}));
     /** ContextInheritance: How to inherit the parent context. */
     var ContextInheritance;
@@ -574,8 +594,8 @@
         }
         /** SendRequest: Send a request to the chat backend and handle its outputs. */
         SendRequest(Request) {
-            this.Commands.HideInput();
-            this.Commands.ClearInput();
+            if (this.Commands.Disabled)
+                return;
             // Make it a record and put it in the thread
             var Record = Request;
             var Subthread = this.Thread.AddToSubthread(Record);
@@ -583,40 +603,46 @@
             var CurrentRenderer;
             // Send the request
             var Options = 0;
-            ChatNetwork.SendRequest(Record, this.Thread, (Section) => {
-                var _a;
-                // Create the section
-                Subthread.RootID = (_a = Subthread.RootID) !== null && _a !== void 0 ? _a : Record.ID;
-                CurrentRenderer = Renderer.AddSection(Section);
-                this.Outputs.ScrollToBottom();
-            }, (Section) => {
-                // Update the section
-                CurrentRenderer.SetData(Section);
-                CurrentRenderer.Render();
-                this.Outputs.ScrollToBottom();
-            }, (Section) => {
-                var _a, _b;
-                console.log(Section);
-                // Finish the section
-                Options += (_b = (_a = Section.Options) === null || _a === void 0 ? void 0 : _a.length) !== null && _b !== void 0 ? _b : 0;
-                CurrentRenderer.SetFinalized();
-                CurrentRenderer.SetData(Section);
-                CurrentRenderer.Render();
-                this.Outputs.ScrollToBottom();
-            }).then((Record) => {
-                if (Options == 0)
-                    this.Commands.ShowInput();
-                console.log(Record);
-            }).catch((Error) => {
-                if (!this.Commands.Disabled)
+            var SendRequest = () => {
+                if (this.Commands.Disabled)
                     return;
-                var Output = this.Outputs.PrintOutput(EditorLocalized.Get("Connection to server failed _", Error ?? "Unknown"), "RuntimeError");
-                Output.append($("<a></a>").attr("href", "javascript:void(0)").text(EditorLocalized.Get("Reconnect")).on("click", () => {
-                    this.Commands.HideInput();
-                    this.SendRequest(Request);
-                }));
-                this.Commands.ShowInput();
-            });
+                this.Commands.HideInput();
+                ChatNetwork.SendRequest(Record, this.Thread, (Section) => {
+                    var _a;
+                    // Create the section
+                    Subthread.RootID = (_a = Subthread.RootID) !== null && _a !== void 0 ? _a : Record.ID;
+                    CurrentRenderer = Renderer.AddSection(Section);
+                    this.Outputs.ScrollToBottom();
+                }, (Section) => {
+                    // Update the section
+                    CurrentRenderer.SetData(Section);
+                    CurrentRenderer.Render();
+                    this.Outputs.ScrollToBottom();
+                }, (Section) => {
+                    var _a, _b;
+                    console.log(Section);
+                    // Finish the section
+                    Options += (_b = (_a = Section.Options) === null || _a === void 0 ? void 0 : _a.length) !== null && _b !== void 0 ? _b : 0;
+                    CurrentRenderer.SetFinalized();
+                    CurrentRenderer.SetData(Section);
+                    CurrentRenderer.Render();
+                    this.Outputs.ScrollToBottom();
+                }).then((Record) => {
+                    if (Options == 0)
+                        this.Commands.ShowInput();
+                    console.log(Record);
+                }).catch((Error) => {
+                    if (!this.Commands.Disabled)
+                        return;
+                    Renderer.AddSection({
+                        Type: ChatResponseType.ServerError,
+                        Content: EditorLocalized.Get("Connection to server failed _", Error !== null && Error !== void 0 ? Error : EditorLocalized.Get("Unknown")),
+                        Field: SendRequest
+                    }).SetFinalized().Render();
+                    this.Commands.ShowInput();
+                });
+            };
+            SendRequest();
         }
         // #endregion
         // #region " Options and Contexts "
@@ -633,27 +659,18 @@
             // Find a parent
             this.PendingRequest.Context = { PreviousMessages: [] };
             if (Option.Inheritance !== ContextInheritance.Drop) {
-                var RealChild = Record;
                 var RealParent = Record;
-                var RealSection = Section;
                 // If the option is transparent, find the first could-be-transparent parent
                 // Otherwise, find the first non-transparent parent
                 while ((RealParent === null || RealParent === void 0 ? void 0 : RealParent.Transparent) === true) {
                     RealParent = this.Thread.GetRecord(RealParent.ParentID);
-                    if (!RealParent) {
-                        RealSection = undefined;
+                    if (!RealParent)
                         break;
-                    }
-                    else {
-                        RealSection = RealParent.Response.Sections[RealChild.SectionIndex];
-                        RealChild = RealParent;
-                    }
                 }
                 // Inherit the context
-                if (RealParent && RealSection) {
+                if (RealParent) {
                     this.PendingRequest.ParentID = RealParent === null || RealParent === void 0 ? void 0 : RealParent.ID;
-                    this.PendingRequest.SectionIndex = RealSection === null || RealSection === void 0 ? void 0 : RealSection.Index;
-                    this.InheritContext(Option, RealSection, RealParent, -1);
+                    this.InheritContext(Option, RealParent, -1);
                     if ((_a = Option.InputInContext) !== null && _a !== void 0 ? _a : true)
                         this.PendingRequest.Context.PreviousMessages.shift();
                 }
@@ -667,7 +684,7 @@
             }
         }
         /** InheritContext: Inherit the context from the previous request. */
-        InheritContext(Option, Section, Record, Layers = -1) {
+        InheritContext(Option, Record, Layers = -1) {
             var _a, _b, _c;
             Option = Option !== null && Option !== void 0 ? Option : { Inheritance: ContextInheritance.InheritOne, Label: "" };
             var Context = this.PendingRequest.Context;
@@ -694,17 +711,23 @@
             switch (Option.TextInContext) {
                 case ContextMessage.Nothing:
                     break;
-                case ContextMessage.Section:
+                case ContextMessage.MessagesAsText:
                     Context.PreviousMessages.unshift({
-                        Text: Section.Content,
+                        Text: Record.Response.Sections.filter(IsTextLike)
+                            .map(Section => Section.Content).join("\n"),
                         Role: ChatRole.Assistant
                     });
                     break;
-                case ContextMessage.EntireMessage:
+                case ContextMessage.MessagesAsJSON:
+                    Context.PreviousMessages.unshift({
+                        Text: SectionsToJSON(Record.Response.Sections.filter(IsTextLike)),
+                        Role: ChatRole.Assistant
+                    });
+                    break;
+                case ContextMessage.AllAsJSON:
                 default:
                     Context.PreviousMessages.unshift({
-                        Text: Record.Response.Sections.filter(Section => Section.Type != ChatResponseType.Code)
-                            .map(Section => Section.Content).join("\n"),
+                        Text: SectionsToJSON(Record.Response.Sections.filter(IsTextLike)),
                         Role: ChatRole.Assistant
                     });
             }
@@ -727,13 +750,10 @@
             var Parent = this.Thread.GetRecord(Record.ParentID);
             if (Parent == null)
                 return;
-            var ParentSection = Parent.Response.Sections[Record.SectionIndex];
-            if (ParentSection == null)
-                return;
             if (Layers == 0)
                 Layers = -2; // Stop after the parent
             // Inherit the parent
-            this.InheritContext(Parent.Option, ParentSection, Parent, Layers);
+            this.InheritContext(Parent.Option, Parent, Layers);
         }
         /** Constructor: Create a chat interface. */
         constructor(Tab) {
@@ -748,15 +768,6 @@
             this.Outputs = Tab.Outputs;
             this.Reset();
             ChatManager.Instance = this;
-        }
-        // #endregion
-        // #region " Message Rendering "
-        /** OptionHandler: Handling an option. */
-        OptionHandler(OptionElement) {
-            var Option = OptionElement.data("option");
-            var Section = OptionElement.parents(".chat-section").data("section");
-            var Record = OptionElement.parents(".chat-response").data("record");
-            this.RequestOption(Option, Section, Record);
         }
     }
     /** ThinkProcess: Whether to demonstrate the thinking processes. */
@@ -808,7 +819,8 @@
         }
         /** RenderInternal: Render the UI element. */
         RenderInternal() {
-            this.ContentContainer.text(this.GetData().Content);
+            var _a;
+            this.ContentContainer.text((_a = this.GetData().Content) !== null && _a !== void 0 ? _a : "");
             this.RenderOptions();
         }
         /** RenderOptions: Render the options of the section. */
@@ -845,8 +857,9 @@
         }
         /** RenderInternal: Render the UI element. */
         RenderInternal() {
+            var _a, _b;
             var Section = this.GetData();
-            var Code = Section.Content.trim();
+            var Code = (_b = (_a = Section.Content) === null || _a === void 0 ? void 0 : _a.trim()) !== null && _b !== void 0 ? _b : "";
             // Remove the first line
             var LineBreak = Code.indexOf("\n");
             if (LineBreak == -1)
@@ -867,6 +880,24 @@
         }
     }
 
+    /** ServerErrorRenderer: A block that displays the a server error section. */
+    class ServerErrorRenderer extends SectionRenderer {
+        /** Constructor: Create a new UI renderer. */
+        constructor() {
+            super();
+            this.Container.addClass("server-error");
+        }
+        /** RenderInternal: Render the UI element. */
+        RenderInternal() {
+            var Section = this.GetData();
+            this.ContentContainer.text(Section.Content);
+            if (Section.Field) {
+                $(`<a href="javascript:void(0)"></a>`).text(EditorLocalized.Get("Reconnect"))
+                    .appendTo(this.ContentContainer).on("click", Section.Field);
+            }
+        }
+    }
+
     /** TextSectionRenderer: A block that displays the a text response section. */
     class TextSectionRenderer extends SectionRenderer {
         /** Constructor: Create a new UI renderer. */
@@ -876,9 +907,9 @@
         }
         /** RenderInternal: Render the UI element. */
         RenderInternal() {
-            var _a, _b;
+            var _a, _b, _c;
             var Section = this.GetData();
-            var Content = Section.Content;
+            var Content = (_a = Section.Content) !== null && _a !== void 0 ? _a : "";
             // Filter the thinking process
             if (!ChatManager.ThinkProcess &&
                 (Content.startsWith("Parameters:") || Content.startsWith("Thoughts:") || Content.startsWith("Input:"))) {
@@ -899,7 +930,7 @@
             this.ContentContainer.text(Content);
             this.RenderOptions();
             // Remove the section if it's empty
-            if (Content == "" && ((_b = (_a = Section.Options) === null || _a === void 0 ? void 0 : _a.length) !== null && _b !== void 0 ? _b : 0) == 0 && this.Finalized)
+            if (Content == "" && ((_c = (_b = Section.Options) === null || _b === void 0 ? void 0 : _b.length) !== null && _c !== void 0 ? _c : 0) == 0 && this.Finalized)
                 this.Container.remove();
         }
     }
@@ -972,9 +1003,10 @@
         [ChatResponseType.Text]: [() => new TextSectionRenderer()],
         [ChatResponseType.Code]: [() => new CodeSectionRenderer()],
         [ChatResponseType.JSON]: [],
+        [ChatResponseType.Thought]: [],
         [ChatResponseType.CompileError]: [],
         [ChatResponseType.RuntimeError]: [],
-        [ChatResponseType.ServerError]: []
+        [ChatResponseType.ServerError]: [() => new ServerErrorRenderer()]
     };
 
     /** SubthreadRenderer: A block that displays the output of a subthread. */
@@ -1340,6 +1372,7 @@
                     }
                 }
                 // Otherwise, assume it is a chat message
+                this.ClearInput();
                 this.ChatManager.SendMessage(Content);
             });
         }

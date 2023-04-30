@@ -13,15 +13,6 @@ export class TextSectionRenderer extends SectionRenderer {
     protected RenderInternal(): void {
         var Section = this.GetData();
         var Content = Section.Content ?? "";
-        // Filter the thinking process
-        if (!ChatManager.ThinkProcess && 
-            (Content.startsWith("Parameters:") || Content.startsWith("Thoughts:") || Content.startsWith("Input:"))) {
-            var OutputIndex = Content.indexOf("\nOutput:");
-            if (OutputIndex == -1) {
-                if (!this.Finalized) Content = EditorLocalized.Get("I am planning for the answer...");
-                else Content = "";
-            } else Content = Content.substring(OutputIndex + 8).trim();
-        }
         // Filter the "output:"
         if (Content.startsWith("Output: "))
             Content = Content.substring(8).trim();

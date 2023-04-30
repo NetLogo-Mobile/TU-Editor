@@ -41,6 +41,13 @@ export abstract class UIRenderer {
         Renderer.Parent = this;
         return this;
     }
+    /** RemoveChildren: Remove all children that satisfy a condition. */
+    public RemoveChildren(Condition: (Child: UIRenderer) => boolean): UIRenderer {
+        var Removal = this.Children.filter(Condition);
+        Removal.forEach(Child => Child.Container.remove());
+        this.Children = this.Children.filter((Child) => !Condition(Child));
+        return this;
+    }
     /** DeactivateAll: Deactivate all renderers. */
     public DeactivateAll(Class: string): UIRenderer {
         this.Children.forEach((Child) => {

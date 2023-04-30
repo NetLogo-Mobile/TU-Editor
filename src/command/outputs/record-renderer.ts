@@ -1,3 +1,4 @@
+import { ChatManager } from "../../chat/chat-manager";
 import { ChatRecord } from "../../chat/client/chat-record";
 import { ChatResponseSection, ChatResponseType } from "../../chat/client/chat-response";
 import { CodeSectionRenderer } from "../sections/code-section-renderer";
@@ -33,8 +34,9 @@ export class RecordRenderer extends UIRendererOf<ChatRecord> {
         return super.SetData(Data);
     }
     /** AddSection: Add a section to the record. */
-    public AddSection(Section: ChatResponseSection): SectionRenderer {
+    public AddSection(Section: ChatResponseSection): SectionRenderer | undefined {
         var Renderer: SectionRenderer | undefined;
+        if (Section.Type == ChatResponseType.Thought && !ChatManager.ThinkProcess) return Renderer;
         // Choose a renderer for the section
         var Renderers = SectionRenderers[Section.Type!];
         for (var Chooser of Renderers) {

@@ -252,6 +252,13 @@
             Renderer.Parent = this;
             return this;
         }
+        /** RemoveChildren: Remove all children that satisfy a condition. */
+        RemoveChildren(Condition) {
+            var Removal = this.Children.filter(Condition);
+            Removal.forEach(Child => Child.Container.remove());
+            this.Children = this.Children.filter((Child) => !Condition(Child));
+            return this;
+        }
         /** DeactivateAll: Deactivate all renderers. */
         DeactivateAll(Class) {
             this.Children.forEach((Child) => {
@@ -614,15 +621,18 @@
                     CurrentRenderer = Renderer.AddSection(Section);
                     this.Outputs.ScrollToBottom();
                 }, (Section) => {
+                    if (!CurrentRenderer)
+                        return;
                     // Update the section
                     CurrentRenderer.SetData(Section);
                     CurrentRenderer.Render();
                     this.Outputs.ScrollToBottom();
                 }, (Section) => {
                     var _a, _b;
-                    console.log(Section);
-                    // Finish the section
                     Options += (_b = (_a = Section.Options) === null || _a === void 0 ? void 0 : _a.length) !== null && _b !== void 0 ? _b : 0;
+                    // Finish the section
+                    if (!CurrentRenderer)
+                        return;
                     CurrentRenderer.SetFinalized();
                     CurrentRenderer.SetData(Section);
                     CurrentRenderer.Render();
@@ -819,8 +829,8 @@
         }
         /** RenderInternal: Render the UI element. */
         RenderInternal() {
-            var _a;
-            this.ContentContainer.text((_a = this.GetData().Content) !== null && _a !== void 0 ? _a : "");
+            var _a, _b;
+            this.ContentContainer.text(`${(_a = this.GetData().Field) !== null && _a !== void 0 ? _a : "Empty"}: ${(_b = this.GetData().Content) !== null && _b !== void 0 ? _b : ""}`);
             this.RenderOptions();
         }
         /** RenderOptions: Render the options of the section. */
@@ -891,10 +901,13 @@
         RenderInternal() {
             var Section = this.GetData();
             this.ContentContainer.text(Section.Content);
-            if (Section.Field) {
-                $(`<a href="javascript:void(0)"></a>`).text(EditorLocalized.Get("Reconnect"))
-                    .appendTo(this.ContentContainer).on("click", Section.Field);
-            }
+            if (!Section.Field)
+                return;
+            $(`<a href="javascript:void(0)"></a>`).text(EditorLocalized.Get("Reconnect"))
+                .appendTo(this.ContentContainer).on("click", () => {
+                Section.Field();
+                this.Parent.RemoveChildren(Child => Child instanceof ServerErrorRenderer);
+            });
         }
     }
 
@@ -977,6 +990,8 @@
         /** AddSection: Add a section to the record. */
         AddSection(Section) {
             var Renderer;
+            if (Section.Type == ChatResponseType.Thought && !ChatManager.ThinkProcess)
+                return Renderer;
             // Choose a renderer for the section
             var Renderers = SectionRenderers[Section.Type];
             for (var Chooser of Renderers) {

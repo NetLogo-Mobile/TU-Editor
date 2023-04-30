@@ -12,9 +12,11 @@ export class ServerErrorRenderer extends SectionRenderer {
     protected RenderInternal(): void {
         var Section = this.GetData();
         this.ContentContainer.text(Section.Content!);
-        if (Section.Field) {
-            $(`<a href="javascript:void(0)"></a>`).text(EditorLocalized.Get("Reconnect"))
-                .appendTo(this.ContentContainer).on("click", Section.Field as any);
-        }
+        if (!Section.Field) return;
+        $(`<a href="javascript:void(0)"></a>`).text(EditorLocalized.Get("Reconnect"))
+            .appendTo(this.ContentContainer).on("click", () => {
+                (Section.Field as any)();
+                this.Parent!.RemoveChildren(Child => Child instanceof ServerErrorRenderer);
+            });
     }
 }

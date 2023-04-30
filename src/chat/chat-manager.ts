@@ -37,7 +37,7 @@ export class ChatManager {
         var Record = Request as ChatRecord;
         var Subthread = this.Thread.AddToSubthread(Record);
         var Renderer = this.Outputs.RenderRecord(Record, Subthread);
-        var CurrentRenderer: SectionRenderer;
+        var CurrentRenderer: SectionRenderer | undefined;
         // Send the request
         var Options = 0;
         var SendRequest = () => {
@@ -49,14 +49,15 @@ export class ChatManager {
                 CurrentRenderer = Renderer.AddSection(Section);
                 this.Outputs.ScrollToBottom();
             }, (Section) => {
+                if (!CurrentRenderer) return;
                 // Update the section
                 CurrentRenderer.SetData(Section);
                 CurrentRenderer.Render();
                 this.Outputs.ScrollToBottom();
             }, (Section) => {
-                console.log(Section);
-                // Finish the section
                 Options += Section.Options?.length ?? 0;
+                // Finish the section
+                if (!CurrentRenderer) return;
                 CurrentRenderer.SetFinalized();
                 CurrentRenderer.SetData(Section);
                 CurrentRenderer.Render();
@@ -70,7 +71,7 @@ export class ChatManager {
                     Type: ChatResponseType.ServerError, 
                     Content: EditorLocalized.Get("Connection to server failed _", Error ?? EditorLocalized.Get("Unknown")),
                     Field: SendRequest as any
-                }).SetFinalized().Render();
+                })!.SetFinalized().Render();
                 this.Commands.ShowInput();
             });
         };

@@ -31,7 +31,7 @@ export function EditCode(Label?: string): ChatResponseOption {
         Style: "followup",
         Operation: "EditCode",
         AskInput: true,
-        TextInContext: ContextMessage.Section,
+        TextInContext: ContextMessage.Nothing,
         Inheritance: ContextInheritance.InheritOne
     }
 }

@@ -65,7 +65,7 @@ export class ChatManager {
         }).catch((Error) => {
             if (!this.Commands.Disabled) return;
             var Output = this.Outputs.PrintOutput(
-                EditorLocalized.Get("Connection to server failed _", Error), "RuntimeError");
+                EditorLocalized.Get("Connection to server failed _", Error ?? EditorLocalized.Get("Unknown")), "RuntimeError");
             Output.append($("<a></a>").attr("href", "javascript:void(0)").text(EditorLocalized.Get("Reconnect")).on("click", () => {
                 this.Commands.HideInput();
                 this.SendRequest(Request);
@@ -90,24 +90,20 @@ export class ChatManager {
         if (Option.Inheritance !== ContextInheritance.Drop) {
             var RealChild = Record;
             var RealParent: ChatRecord | undefined = Record;
-            var RealSection: ChatResponseSection | undefined = Section;
             // If the option is transparent, find the first could-be-transparent parent
             // Otherwise, find the first non-transparent parent
             while (RealParent?.Transparent === true) {
                 RealParent = this.Thread.GetRecord(RealParent.ParentID);
                 if (!RealParent) {
-                    RealSection = undefined;
                     break;
                 } else {
-                    RealSection = RealParent.Response.Sections[RealChild.SectionIndex!];
                     RealChild = RealParent;
                 }
             }
             // Inherit the context
-            if (RealParent && RealSection) {
+            if (RealParent) {
                 this.PendingRequest.ParentID = RealParent?.ID;
-                this.PendingRequest.SectionIndex = RealSection?.Index;
-                this.InheritContext(Option, RealSection, RealParent, -1);
+                this.InheritContext(Option, RealParent, -1);
                 if (Option.InputInContext ?? true) 
                     this.PendingRequest.Context.PreviousMessages.shift();
             }
@@ -120,7 +116,7 @@ export class ChatManager {
         }
     }
     /** InheritContext: Inherit the context from the previous request. */
-    private InheritContext(Option: ChatResponseOption | undefined, Section: ChatResponseSection, Record: ChatRecord, Layers: number = -1) {
+    private InheritContext(Option: ChatResponseOption | undefined, Record: ChatRecord, Layers: number = -1) {
         Option = Option ?? { Inheritance: ContextInheritance.InheritOne, Label: "" };
         var Context = this.PendingRequest!.Context!;
         if (Layers == -1) {
@@ -146,16 +142,19 @@ export class ChatManager {
         switch (Option.TextInContext) {
             case ContextMessage.Nothing:
                 break;
-            case ContextMessage.Section:
+            case ContextMessage.TextOnly:
                 Context.PreviousMessages.unshift({ 
-                    Text: Section.Content, 
+                    Text: Record.Response.Sections.filter(Section => 
+                        Section.Type != ChatResponseType.Thought && Section.Type != ChatResponseType.Code && Section.Type != ChatResponseType.JSON)
+                        .map(Section => Section.Content).join("\n"), 
                     Role: ChatRole.Assistant
                 });
                 break;
-            case ContextMessage.EntireMessage:
+            case ContextMessage.TextAndThoughts:
             default:
                 Context.PreviousMessages.unshift({ 
-                    Text: Record.Response.Sections.filter(Section => Section.Type != ChatResponseType.Code)
+                    Text: Record.Response.Sections.filter(Section => 
+                        Section.Type != ChatResponseType.Code && Section.Type != ChatResponseType.JSON)
                         .map(Section => Section.Content).join("\n"), 
                     Role: ChatRole.Assistant
                 });
@@ -176,11 +175,9 @@ export class ChatManager {
         // Find the parent
         var Parent = this.Thread.GetRecord(Record.ParentID);
         if (Parent == null) return;
-        var ParentSection = Parent.Response.Sections[Record.SectionIndex!];
-        if (ParentSection == null) return;
         if (Layers == 0) Layers = -2; // Stop after the parent
         // Inherit the parent
-        this.InheritContext(Parent.Option, ParentSection, Parent, Layers);
+        this.InheritContext(Parent.Option, Parent, Layers);
     }
     // #endregion
     

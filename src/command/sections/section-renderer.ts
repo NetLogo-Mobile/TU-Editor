@@ -28,7 +28,7 @@ export class SectionRenderer extends UIRendererOf<ChatResponseSection> {
     protected ContentContainer: JQuery<HTMLElement>;
     /** RenderInternal: Render the UI element. */
     protected RenderInternal(): void {
-        this.ContentContainer.text(this.GetData().Content);
+        this.ContentContainer.text(this.GetData().Content ?? "");
         this.RenderOptions();
     }
     /** OptionContainer: The container of the options. */

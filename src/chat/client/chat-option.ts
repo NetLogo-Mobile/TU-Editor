@@ -16,7 +16,7 @@ export interface ChatResponseOption {
     InputInContext?: boolean;
     /** CodeInContext: Whether the code output should be retained in the context. Default is true. */
     CodeInContext?: boolean;
-    /** TextInContext: How the the text output should be retained in the following context. Default is EntireMessage. */
+    /** TextInContext: How the the text output should be retained in the following context. Default is TextAndThoughts. */
     TextInContext?: ContextMessage,
     /** Transparent: Whether the resulting record should be transparent in the context. Children of transparent records will recognize grand-parents instead. */
     Transparent?: boolean;
@@ -28,10 +28,10 @@ export interface ChatResponseOption {
 export enum ContextMessage {
     /** Nothing: Nothing should be retained. */
     Nothing = 0,
-    /** Section: Only the current section should be retained. */
-    Section = 1,
-    /** EntireMessage: The entire message should be retained. */
-    EntireMessage = 2,
+    /** TextOnly: Only the text message should be retained. */
+    TextOnly = 1,
+    /** TextAndThoughts: Both the output text and thoughts should be retained. */
+    TextAndThoughts = 2,
 }
 
 /** ContextInheritance: How to inherit the parent context. */

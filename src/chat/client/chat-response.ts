@@ -4,25 +4,25 @@ import { ChatResponseOption } from "./chat-option";
 export interface ChatResponse {
     /** Sections: The sections of the response. */
     Sections: ChatResponseSection[];
+    /** Options: The options for the section. */
+    Options: ChatResponseOption[];
 }
 
 /** NewChatResponse: Creates a new chat response. */
 export function NewChatResponse(): ChatResponse {
-    return { Sections: [] }
+    return { Sections: [], Options: [] }
 }
 
 /** ChatResponseSection: A section in a chat response. */
 export interface ChatResponseSection {
     /** Type: The type of the section. */
     Type?: ChatResponseType;
-    /** Index: The index of the section. */
-    Index?: number;
+    /** Field: The JSON5 field of the section. */
+    Field?: string;
     /** Content: The content of the section. */
-    Content: string;
+    Content?: string;
     /** Summary: The summary of the section. */
     Summary?: string;
-    /** Optional: The optional content of the section. */
-    Optional?: string;
     /** Options: The options for the section. */
     Options?: ChatResponseOption[];
 }
@@ -39,10 +39,12 @@ export enum ChatResponseType {
     Code = 1,
     /** JSON: The response is a JSON block. */
     JSON = 2,
+    /** Thought: The response is a thought block. */
+    Thought = 3,
     /** CompileError: The response is a compile error message. */
-    CompileError = 3,
+    CompileError = 4,
     /** RuntimeError: The response is a runtime error message. */
-    RuntimeError = 4,
+    RuntimeError = 5,
     /** ServerError: The response is a server error message. */
-    ServerError = 5
+    ServerError = 6
 }

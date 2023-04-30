@@ -610,7 +610,7 @@
             }).catch((Error) => {
                 if (!this.Commands.Disabled)
                     return;
-                var Output = this.Outputs.PrintOutput(EditorLocalized.Get("Connection to server failed _", Error), "RuntimeError");
+                var Output = this.Outputs.PrintOutput(EditorLocalized.Get("Connection to server failed _", Error ?? "Unknown"), "RuntimeError");
                 Output.append($("<a></a>").attr("href", "javascript:void(0)").text(EditorLocalized.Get("Reconnect")).on("click", () => {
                     this.Commands.HideInput();
                     this.SendRequest(Request);

@@ -15,7 +15,7 @@ export class ChatNetwork {
         Record.UserID = Thread.UserID;
         Record.ThreadID = Thread.ID;
         Record.Transparent = Record.Option?.Transparent ?? false;
-        Record.Response = { Sections: [] };
+        Record.Response = { Sections: [], Options: [] };
         Record.RequestTimestamp = Date.now();
         console.log(Record);
         // Do the request
@@ -40,11 +40,11 @@ export class ChatNetwork {
                     case ChatResponseType.Start:
                         if (Update.Content) {
                             Record.ID = Update.Content;
-                            Record.ThreadID = Update.Optional;
-                            Thread.ID = Update.Optional;
-                        } else if (Update.Optional) {
-                            Record.Language = Update.Optional;
-                            Thread.Language = Update.Optional;
+                            Record.ThreadID = Update.Field;
+                            Thread.ID = Update.Field;
+                        } else if (Update.Field) {
+                            Record.Language = Update.Field;
+                            Thread.Language = Update.Field;
                         }
                         return;
                     case ChatResponseType.Finish:
@@ -69,9 +69,10 @@ export class ChatNetwork {
                         return;
                 }
                 // Update the section
-                Section.Content += Update.Content;
-                if (Update.Optional !== undefined) 
-                    Section.Optional = Update.Optional;
+                if (Update.Content !== undefined)
+                    Section.Content += Update.Content;
+                if (Update.Field !== undefined) 
+                    Section.Field = Update.Field;
                 if (Update.Summary !== undefined) 
                     Section.Summary = Update.Summary;
                 if (Update.Options !== undefined) 

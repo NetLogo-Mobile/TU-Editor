@@ -12,7 +12,7 @@ export class TextSectionRenderer extends SectionRenderer {
     /** RenderInternal: Render the UI element. */
     protected RenderInternal(): void {
         var Section = this.GetData();
-        var Content = Section.Content;
+        var Content = Section.Content ?? "";
         // Filter the thinking process
         if (!ChatManager.ThinkProcess && 
             (Content.startsWith("Parameters:") || Content.startsWith("Thoughts:") || Content.startsWith("Input:"))) {

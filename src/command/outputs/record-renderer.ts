@@ -62,6 +62,7 @@ export const SectionRenderers: Record<ChatResponseType, RendererChooser[]> = {
     [ChatResponseType.Text]: [() => new TextSectionRenderer()],
     [ChatResponseType.Code]: [() => new CodeSectionRenderer()],
     [ChatResponseType.JSON]: [],
+    [ChatResponseType.Thought]: [],
     [ChatResponseType.CompileError]: [],
     [ChatResponseType.RuntimeError]: [],
     [ChatResponseType.ServerError]: []

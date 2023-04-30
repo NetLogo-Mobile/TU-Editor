@@ -12,7 +12,7 @@ export class CodeSectionRenderer extends SectionRenderer {
     /** RenderInternal: Render the UI element. */
     protected RenderInternal(): void {
         var Section = this.GetData();
-        var Code = Section.Content.trim();
+        var Code = Section.Content?.trim() ?? "";
         // Remove the first line
         var LineBreak = Code.indexOf("\n");
         if (LineBreak == -1) return;

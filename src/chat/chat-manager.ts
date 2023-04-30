@@ -188,18 +188,21 @@ export class ChatManager {
     
     // #region " Interfaces Connection "
     /** Tab: The command tab. */
-    private Commands: CommandTab;
+    public Commands: CommandTab;
     /** Outputs: The outputs area. */
-    private Outputs: OutputDisplay;
+    public Outputs: OutputDisplay;
     /** Available: Whether the chat backend is available. */
     public Available: boolean = true;
     /** ThinkProcess: Whether to demonstrate the thinking processes. */
     public static ThinkProcess: boolean = false;
+    /** Instance: The chat manager instance. */
+    public static Instance: ChatManager;
     /** Constructor: Create a chat interface. */
     public constructor(Tab: CommandTab) {
         this.Commands = Tab;
         this.Outputs = Tab.Outputs;
         this.Reset();
+        ChatManager.Instance = this;
     }
     // #endregion
 

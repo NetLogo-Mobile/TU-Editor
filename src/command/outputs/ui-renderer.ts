@@ -4,9 +4,13 @@ export abstract class UIRenderer {
     public Container: JQuery<HTMLElement>;
     /** Dirty: Whether the renderer is dirty and needs to be updated. */
     private Dirty: boolean = false;
+    /** ContainerInitializer: The initializer for the container. */
+    protected ContainerInitializer(): JQuery<HTMLElement> {
+        return $("<div></div>");
+    }
     /** Constructor: Create a new UI renderer. */
     public constructor() { 
-        this.Container = $("<div></div>");
+        this.Container = this.ContainerInitializer();
     }
     /** SetDirty: Set the dirty status of the renderer. */
     public SetDirty(Status: boolean): UIRenderer {
@@ -68,7 +72,6 @@ export abstract class UIRendererOf<T> extends UIRenderer {
     public SetData(Data: T): UIRendererOf<T> {
         this.Data = Data;
         this.SetDirty(true);
-        this.Container.data("data", Data);
         return this;
     }
     /** GetData: Get the data for rendering. */

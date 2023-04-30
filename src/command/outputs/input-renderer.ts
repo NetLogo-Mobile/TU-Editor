@@ -19,6 +19,6 @@ export class InputRenderer extends UIRendererOf<ChatRequest> {
     }
     /** RenderInternal: Render the UI element. */
     protected RenderInternal(): void {
-        this.Content.text(this.Data.Input);
+        this.Content.text(this.GetData().Input);
     }
 }

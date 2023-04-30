@@ -11,7 +11,8 @@ export class TextSectionRenderer extends SectionRenderer {
     }
     /** RenderInternal: Render the UI element. */
     protected RenderInternal(): void {
-        var Code = this.Data.Content.trim();
+        var Section = this.GetData();
+        var Code = Section.Content.trim();
         // Remove the first line
         var LineBreak = Code.indexOf("\n");
         if (LineBreak == -1) return;
@@ -21,10 +22,10 @@ export class TextSectionRenderer extends SectionRenderer {
             Code = Code.substring(0, Code.length - 3).trimEnd();
         // Create the code block
         if (this.Finalized) {
-            var Element = $(`<code></code>`).appendTo(this.Container.empty());
-            this.Commands.AnnotateCode(Element, Code, true);
+            var Element = this.ContentContainer.replaceWith(`<code></code>`);
+            ChatManager.Instance.Commands.AnnotateCode(Element, Code, true);
         } else {
-            $(`<pre></pre>`).appendTo(Output).text(Code.trim());
+            this.ContentContainer.replaceWith(`<pre></pre>`).text(Code.trim());
         }
     }
 }

@@ -17,14 +17,14 @@ export class FullTextDisplay {
         this.Container = $(Tab.Container).find(".command-fulltext");
     }
 	/** ShowFullText: Show the full text of a command. */
-	public ShowFullText(Data) {
+	public ShowFullText(Data: any) {
 		this.RequestedTab = this.Tab.Editor.CurrentTab;
 		if (!this.Tab.Visible) this.Tab.Show();
 		// Change the status
 		this.Container.show();
 		// Render the subject
 		this.Container.find("h2 strong").text(Data["display_name"]);
-		this.Container.find("h2 span").text(`(${Data["agents"].map((Agent) => `${RenderAgent(Agent)}`).join(", ")})`);
+		this.Container.find("h2 span").text(`(${Data["agents"].map((Agent: any) => `${RenderAgent(Agent)}`).join(", ")})`);
 		// Render the list
 		var SeeAlso = this.Container.find("ul.SeeAlso").empty();
 		for (var Primitive in Data["see_also"])
@@ -45,15 +45,15 @@ export class FullTextDisplay {
 			SetCode(Data["translation"]);
 		}).parent().hide();
 		// Render the full text
-		var SetCode = (Content) => {
+		var SetCode = (Content: any) => {
 			if (Content != null) this.Container.find("div.fulltext")
 				.html(new showdown.Converter().makeHtml(Content));
-			this.Tab.AnnotateCode(this.Container.find("code"), null, true);
+			this.Tab.AnnotateCode(this.Container.find("code"), undefined, true);
 			this.Container.scrollTop(0);
-		}
+		};
 		SetCode(Data["translation"] != null ? Data["translation"] : Data["content"]);
 		// Acknowledge
-		TransformLinks(this.Container.find(".Acknowledge").html(Data["acknowledge"]));
+		TransformLinks(this.Tab.Editor, this.Container.find(".Acknowledge").html(Data["acknowledge"]));
 	}
 	/** HideFullText: Hide the full text mode. */
 	public HideFullText() {

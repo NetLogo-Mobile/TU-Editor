@@ -2,13 +2,13 @@ import { Localized } from "src/legacy";
 import { TurtleEditor } from "../main";
 
   /** TransformLinks: Transform the embedded links. */
- export function TransformLinks(Element) {
+ export function TransformLinks(Editor: TurtleEditor, Element: JQuery<HTMLElement>) {
     if (TurtleEditor.PostMessage != null) return;
     Element.find("a").each((Index, Link) => {
-        Link = $(Link);
-        var Href = Link.attr("href");
-        Link.attr("href", "javascript:void(0);");
-        Link.on("click", function () { this.Call({ Type: "Visit", Target: Href }) });
+        var LinkElement = $(Link);
+        var Href = LinkElement.attr("href");
+        LinkElement.attr("href", "javascript:void(0);");
+        LinkElement.on("click", () => Editor.Call({ Type: "Visit", Target: Href }));
     });
 }
 
@@ -27,7 +27,7 @@ export function LinkCommand(Query: JQuery<HTMLElement>) {
 }
 
 /** RenderAgent: Render tips for an agent type. */
-export function RenderAgent(Agent) {
+export function RenderAgent(Agent: string) {
     var Message = Agent;
     switch (Agent) {
         case "turtles":

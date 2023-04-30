@@ -30,6 +30,8 @@
     class Tab {
         /** Constructor: Create an editor tab. */
         constructor(Container, Editor) {
+            // Whether it is visible.
+            this.Visible = false;
             this.Editor = Editor;
             this.Container = Container;
         }
@@ -101,14 +103,14 @@
     };
 
     /** TransformLinks: Transform the embedded links. */
-    function TransformLinks(Element) {
+    function TransformLinks(Editor, Element) {
         if (TurtleEditor.PostMessage != null)
             return;
         Element.find("a").each((Index, Link) => {
-            Link = $(Link);
-            var Href = Link.attr("href");
-            Link.attr("href", "javascript:void(0);");
-            Link.on("click", function () { this.Call({ Type: "Visit", Target: Href }); });
+            var LinkElement = $(Link);
+            var Href = LinkElement.attr("href");
+            LinkElement.attr("href", "javascript:void(0);");
+            LinkElement.on("click", () => Editor.Call({ Type: "Visit", Target: Href }));
         });
     }
     /** LinkCommand: Generate a link for another command. */
@@ -193,12 +195,12 @@
                 if (Content != null)
                     this.Container.find("div.fulltext")
                         .html(new showdown.Converter().makeHtml(Content));
-                this.Tab.AnnotateCode(this.Container.find("code"), null, true);
+                this.Tab.AnnotateCode(this.Container.find("code"), undefined, true);
                 this.Container.scrollTop(0);
             };
             SetCode(Data["translation"] != null ? Data["translation"] : Data["content"]);
             // Acknowledge
-            TransformLinks(this.Container.find(".Acknowledge").html(Data["acknowledge"]));
+            TransformLinks(this.Tab.Editor, this.Container.find(".Acknowledge").html(Data["acknowledge"]));
         }
         /** HideFullText: Hide the full text mode. */
         HideFullText() {
@@ -212,11 +214,17 @@
 
     /** UIRenderer: Abstract class for rendering UI elements. */
     class UIRenderer {
+        /** ContainerInitializer: The initializer for the container. */
+        ContainerInitializer() {
+            return $("<div></div>");
+        }
         /** Constructor: Create a new UI renderer. */
         constructor() {
+            /** Dirty: Whether the renderer is dirty and needs to be updated. */
+            this.Dirty = false;
             /** Children: The children UI renderers. */
             this.Children = [];
-            this.Container = $("<div></div>");
+            this.Container = this.ContainerInitializer();
         }
         /** SetDirty: Set the dirty status of the renderer. */
         SetDirty(Status) {
@@ -305,6 +313,19 @@
         ChatResponseType[ChatResponseType["ServerError"] = 5] = "ServerError";
     })(ChatResponseType || (ChatResponseType = {}));
 
+    /** OptionRenderer: A block that displays the a chat option. */
+    class OptionRenderer extends UIRendererOf {
+        /** ContainerInitializer: The initializer for the container. */
+        ContainerInitializer() {
+            return $(`<li class="option"><a href="javascript:void(0)"></a></li>`);
+        }
+        /** RenderInternal: Render the UI element. */
+        RenderInternal() {
+            var _a, _b;
+            this.Container.addClass((_a = this.GetData().Style) !== null && _a !== void 0 ? _a : "generated").text((_b = this.GetData().LocalizedLabel) !== null && _b !== void 0 ? _b : this.GetData().Label);
+        }
+    }
+
     /** SectionRenderer: A block that displays the a response section. */
     class SectionRenderer extends UIRendererOf {
         /** SetFirst: Set the first status of the section. */
@@ -325,300 +346,34 @@
             /** Finalized: Whether the section is finalized. */
             this.Finalized = false;
             this.Container.addClass("section");
+            this.ContentContainer = $(`<p></p>`).appendTo(this.Container);
         }
         /** RenderInternal: Render the UI element. */
         RenderInternal() {
-            this.Container.text(this.Data.Content);
+            this.ContentContainer.text(this.GetData().Content);
+            this.RenderOptions();
         }
-    }
-
-    /** InputRenderer: A block that displays the an user input. */
-    class InputRenderer extends UIRendererOf {
-        /** Constructor: Create a new UI renderer. */
-        constructor() {
-            super();
-            this.Container.addClass("input");
-            this.Container.html(`
-<div class="avatar"><img src="images/user.png" /></div>
-<div class="content"></div>`);
-            this.Avatar = this.Container.find(".avatar");
-            this.Content = this.Container.find(".content");
-        }
-        /** RenderInternal: Render the UI element. */
-        RenderInternal() {
-            this.Content.text(this.Data.Input);
-        }
-    }
-
-    /** RecordRenderer: A block that displays the output of a request. */
-    class RecordRenderer extends UIRendererOf {
-        /** Constructor: Create a new UI renderer. */
-        constructor() {
-            super();
-            this.Container.addClass("record");
-            this.InputRenderer = new InputRenderer();
-            this.AddChild(this.InputRenderer);
-            this.ContentContainer = $(`
-<div class="contents">
-    <div class="avatar"><img src="images/assistant.png" /></div>
-    <div class="content"></div>
-</div>`).appendTo(this.Container).find(".content");
-        }
-        /** RenderInternal: Render the UI element. */
-        RenderInternal() { }
-        /** SetData: Set the data of the renderer. */
-        SetData(Data) {
-            this.InputRenderer.SetData(Data);
-            return super.SetData(Data);
-        }
-        /** AddSection: Add a section to the record. */
-        AddSection(Section) {
-            var Renderer;
-            // Choose a renderer for the section
-            var Renderers = SectionRenderers[Section.Type];
-            for (var Chooser of Renderers) {
-                Renderer = Chooser(Section);
-                if (Renderer)
-                    break;
-            }
-            // If no renderer was chosen, use the default renderer
-            Renderer = Renderer !== null && Renderer !== void 0 ? Renderer : new SectionRenderer();
-            // If this is the first section
-            if (this.Children.length == 1)
-                Renderer.SetFirst();
-            // Add the renderer
-            Renderer.SetData(Section);
-            this.AddChild(Renderer, false);
-            this.ContentContainer.append(Renderer.Container);
-            return Renderer;
-        }
-    }
-    /** SectionRenderers: The renderers for each section type. */
-    const SectionRenderers = {
-        [ChatResponseType.Start]: [],
-        [ChatResponseType.Finish]: [],
-        [ChatResponseType.Text]: [],
-        [ChatResponseType.Code]: [],
-        [ChatResponseType.JSON]: [],
-        [ChatResponseType.CompileError]: [],
-        [ChatResponseType.RuntimeError]: [],
-        [ChatResponseType.ServerError]: []
-    };
-
-    /** SubthreadRenderer: A block that displays the output of a subthread. */
-    class SubthreadRenderer extends UIRendererOf {
-        /** Constructor: Create a new UI renderer. */
-        constructor() {
-            super();
-            this.Container.addClass("subthread");
-        }
-        /** RenderInternal: Render the UI element. */
-        RenderInternal() { }
-        /** AddRecord: Add a record to the subthread. */
-        AddRecord(Record) {
-            var Renderer = new RecordRenderer();
-            Renderer.SetData(Record);
-            this.AddChild(Renderer);
-            return Renderer;
-        }
-    }
-
-    /** OutputDisplay: Display the output section. */
-    class OutputDisplay {
-        /** Constructor: Create a new output section. */
-        constructor(Tab) {
-            /** Subthreads: The subthread store. */
-            this.Subthreads = new Map();
-            // #endregion
-            // #region "Batch Printing Support"
-            /** Fragment: Batch printing support for batch printing. */
-            this.Fragment = null;
-            /** BufferSize: Buffer size for batch printing. */
-            this.BufferSize = 1000;
-            this.Tab = Tab;
-            this.Container = $(Tab.Container).find(".command-output");
-        }
-        /** ScrollToBottom: After user entered input, screen view should scroll down to the bottom line. */
-        ScrollToBottom() {
-            this.Container.scrollTop(this.Container.get(0).scrollHeight);
-        }
-        /** IsAtBottom: Whether the container is scrolled to bottom. */
-        IsAtBottom() {
-            var Element = this.Container.get(0);
-            return Math.abs(Element.scrollHeight - Element.clientHeight - Element.scrollTop) < 1;
-        }
-        /** Clear: Clear the output region of Command Center. */
-        Clear() {
-            this.Container.remove();
-            this.Subthreads.clear();
-            this.Subthread = null;
-        }
-        /** RenderRecord: Render a new chat record. */
-        RenderRecord(Record, Subthread) {
+        /** RenderOptions: Render the options of the section. */
+        RenderOptions() {
             var _a;
-            var Renderer;
-            // Create a new subthread if necessary
-            if (Subthread != ((_a = this.Subthread) === null || _a === void 0 ? void 0 : _a.GetData())) {
-                this.Subthread = this.Subthreads.get(Subthread);
-                if (this.Subthread == null) {
-                    this.Subthread = new SubthreadRenderer();
-                    this.Container.append(this.Subthread.Container);
-                    this.Subthread.SetData(Subthread);
-                    this.Subthreads.set(Subthread, this.Subthread);
-                }
-                this.Subthread.SetStatus("active");
-                this.ScrollToBottom();
-            }
-            // Render the record
-            Renderer = this.Subthread.AddRecord(Record);
-            this.Subthread.Render();
-            return Renderer;
-        }
-        /** WriteOutput: Print to a batch. */
-        WriteOutput(Element) {
-            if (this.Fragment == null)
-                this.Container.append(Element);
-            else
-                this.Fragment.append(Element);
-        }
-        /** OpenBatch: Open a printing batch. */
-        OpenBatch() {
-            this.Fragment = $(document.createDocumentFragment());
-        }
-        /** CloseBatch: Close a printing batch. */
-        CloseBatch() {
-            if (this.Fragment == null)
+            var Options = this.GetData().Options;
+            if (!Options || Options.length == 0)
                 return;
-            var AtBottom = this.IsAtBottom();
-            // Trim the buffer (should refactor later) & the display
-            var Length = this.Fragment.children().length;
-            if (Length > this.BufferSize) {
-                this.Fragment.children().slice(0, Length - this.BufferSize).remove();
-                this.Container.children().remove();
+            // Create the container
+            this.OptionContainer = (_a = this.OptionContainer) !== null && _a !== void 0 ? _a : $(`<ul></ul>`).appendTo(this.Container);
+            // Render the options
+            for (var I = 0; I < Options.length; I++) {
+                var Option = Options[I];
+                var Renderer;
+                if (this.Children.length < I) {
+                    Renderer = new OptionRenderer();
+                    this.AddChild(Renderer);
+                }
+                else
+                    Renderer = this.Children[I];
+                Renderer.SetData(Option);
+                Renderer.Render();
             }
-            else {
-                var NewLength = this.Container.children().length + Length;
-                if (NewLength > this.BufferSize)
-                    this.Container.children().slice(0, NewLength - this.BufferSize).remove();
-            }
-            // Append to the display
-            this.Container.append(this.Fragment);
-            this.Fragment = null;
-            if (AtBottom)
-                this.ScrollToBottom();
-        }
-        // #endregion
-        // #region "Single Printing Support"
-        /** PrintInput: Print a line of input to the screen. */
-        PrintInput(Objective, Content, Embedded) {
-            // Change the objective
-            if (Objective == null)
-                Objective = this.Tab.TargetSelect.val();
-            else if (Objective != "assistant" && Objective != "you")
-                this.Tab.TargetSelect.val(Objective);
-            // CodeMirror Content
-            var Wrapper = $(`
-			<div class="command-wrapper">
-				<div class="content">
-					<p class="input Code">${Objective}&gt;&nbsp;<span></span></p>
-				</div>
-				<div class="icon">
-					<img class="copy-icon" src="images/copy.png"/>
-				</div>
-			</div>
-		`);
-            // Standalone mode
-            Wrapper.attr("objective", Objective);
-            Wrapper.attr("content", Content);
-            // Click to copy
-            Wrapper.children(".icon").on("click", () => {
-                this.Tab.SetCode(Wrapper.attr("objective"), Wrapper.attr("content"));
-                this.Tab.Editor.Call({ Type: "ClipboardWrite", Content: `${Wrapper.attr("objective")}: ${Wrapper.attr("content")}` });
-            });
-            // Run CodeMirror
-            this.Tab.AnnotateCode(Wrapper.children(".content").children(".Code").children("span"), Content, false);
-            if (!Embedded)
-                this.WriteOutput(Wrapper);
-            return Wrapper;
-        }
-        /** PrintOutput: Provide for Unity to print compiled output. */
-        PrintOutput(Content, Class) {
-            var AtBottom = this.Fragment == null && this.IsAtBottom();
-            var Output = null;
-            switch (Class) {
-                case "CompilationError":
-                    Output = $(`
-					<p class="CompilationError output">${Localized.Get("抱歉，未能理解你输入的命令")}: ${Content}</p>
-				`);
-                    break;
-                case "RuntimeError":
-                    Output = $(`<p class="RuntimeError output"></p>`);
-                    Output.get(0).innerText = Localized.Get(Content);
-                    break;
-                case "Succeeded":
-                    Output = $(`
-					<p class="Succeeded output">${Localized.Get("成功执行了命令。")}</p>
-				`);
-                    break;
-                case "Output":
-                    Output = $(`<p class="Output output"></p>`);
-                    Output.get(0).innerText = Content;
-                    break;
-                case "Help":
-                    if (typeof Content === 'string') {
-                        if (Content.indexOf("<div class=\"block\">") >= 0) {
-                            Output = $(Content);
-                        }
-                        else {
-                            Output = $(`
-							<p class="${Class} output">${Content}</p>
-						`);
-                        }
-                    }
-                    else if (Content instanceof Array) {
-                        Output = $(`
-						<div class="block">
-							${Content.map((Source) => `<p class="${Class} output">${Source}</p>`).join("")}
-						</div>
-					`);
-                    }
-                    else if (Content.Parameter == "-full") {
-                        Output = $(`<p class="Output output">${Localized.Get("显示 {0} 的帮助信息。")
-                        .replace("{0}", `<a class='command' target='help ${Content["display_name"]} -full'">${Content["display_name"]}</a>`)}</p>`);
-                        this.Tab.ShowFullText(Content);
-                    }
-                    else {
-                        Output = $(`
-						<div class="block">
-							<p class="${Class} output"><code>${Content["display_name"]}</code> - ${Content["agents"].map((Agent) => `${RenderAgent(Agent)}`).join(", ")}</p>
-							<p class="${Class} output">${Content["short_description"]} (<a class='command' target='help ${Content["display_name"]} -full'">${Localized.Get("阅读全文")}</a>)</p>
-							<p class="${Class} output">${Localized.Get("参见")}: ${Content["see_also"].map((Name) => `<a class='command' target='help ${Name}'>${Name}</a>`).join(", ")}</p>
-						</div>
-					`);
-                    }
-                    if (Output != null) {
-                        LinkCommand(Output.find("a.command"));
-                        this.AnnotateInput(Output.find("div.command"));
-                        this.Tab.AnnotateCode(Output.find("code"));
-                    }
-                    break;
-                default:
-                    Output = $(`
-					<p class="${Class} output">${Content}</p>
-				`);
-                    break;
-            }
-            this.WriteOutput(Output);
-            if (AtBottom)
-                this.ScrollToBottom();
-            return Output;
-        }
-        /** AnnotateInput: Annotate some code inputs. */
-        AnnotateInput(Query) {
-            Query.each((Index, Item) => {
-                var Current = $(Item);
-                Current.replaceWith(this.PrintInput(Current.attr("objective"), Current.attr("target"), true));
-            });
         }
     }
 
@@ -698,7 +453,7 @@
                     });
                 }
                 else {
-                    onError.call(this.Request, null);
+                    onError.call(this.Request);
                 }
             };
             // Handle errors
@@ -897,17 +652,21 @@
                 // Create the section
                 Subthread.RootID = (_a = Subthread.RootID) !== null && _a !== void 0 ? _a : Record.ID;
                 CurrentRenderer = Renderer.AddSection(Section);
+                this.Outputs.ScrollToBottom();
             }, (Section) => {
                 // Update the section
                 CurrentRenderer.SetData(Section);
                 CurrentRenderer.Render();
+                this.Outputs.ScrollToBottom();
             }, (Section) => {
+                var _a, _b;
                 console.log(Section);
                 // Finish the section
-                Options += Section.Options.length;
-                CurrentRenderer.SetData(Section);
+                Options += (_b = (_a = Section.Options) === null || _a === void 0 ? void 0 : _a.length) !== null && _b !== void 0 ? _b : 0;
                 CurrentRenderer.SetFinalized();
+                CurrentRenderer.SetData(Section);
                 CurrentRenderer.Render();
+                this.Outputs.ScrollToBottom();
             }).then((Record) => {
                 if (Options == 0)
                     this.Commands.ShowInput();
@@ -1045,64 +804,20 @@
         }
         /** Constructor: Create a chat interface. */
         constructor(Tab) {
+            // #region " Chat Requesting "
+            /** Thread: The current chat thread. */
+            this.Thread = new ChatThread();
+            /** PendingRequest: The pending chat request. */
+            this.PendingRequest = null;
             /** Available: Whether the chat backend is available. */
             this.Available = true;
             this.Commands = Tab;
             this.Outputs = Tab.Outputs;
             this.Reset();
+            ChatManager.Instance = this;
         }
         // #endregion
         // #region " Message Rendering "
-        /** Render: Render an AI response section onto the screen element. */
-        Render(Output, Renderer, Section, Finalize) {
-            var _a, _b, _c;
-            if (Output == null && (Section.Content != "" || ((_a = Section.Options) === null || _a === void 0 ? void 0 : _a.length) > 0))
-                Output = $(`<div class="chat-section output"></div>`).appendTo(Renderer);
-            if (Output == null)
-                return;
-            Output.data("section", Section);
-            // Clear the output
-            var ChatManager = this;
-            var AtBottom = this.Outputs.IsAtBottom();
-            Output.empty();
-            // Render the section
-            switch (Section.Type) {
-                case ChatResponseType.Text:
-                    // Filter the content
-                    break;
-                case ChatResponseType.Code:
-                    var Code = Section.Content.trim();
-                    // Remove the first line
-                    var LineBreak = Code.indexOf("\n");
-                    if (LineBreak == -1)
-                        return;
-                    Code = Code.substring(LineBreak + 1);
-                    // Remove the last ```
-                    if (Code.endsWith("```"))
-                        Code = Code.substring(0, Code.length - 3).trimEnd();
-                    // Create the code block
-                    if (Finalize) {
-                        var Element = $(`<code></code>`).appendTo(Output);
-                        this.Commands.AnnotateCode(Element, Code, true);
-                    }
-                    else {
-                        $(`<pre></pre>`).appendTo(Output).text(Code.trim());
-                    }
-                    break;
-            }
-            // Render the options
-            if (Section.Options != null) {
-                for (var Option of Section.Options) {
-                    var Link = $(`<p class="output option ${(_b = Option.Style) !== null && _b !== void 0 ? _b : "generated"}">- <a href="javascript:void(0)"></a></p>`);
-                    Link.appendTo(Output);
-                    Link.find("a").data("option", Option).text((_c = Option.LocalizedLabel) !== null && _c !== void 0 ? _c : Option.Label)
-                        .on("click", function () { ChatManager.OptionHandler($(this)); });
-                }
-            }
-            if (AtBottom)
-                this.Commands.Outputs.ScrollToBottom();
-            return Output;
-        }
         /** OptionHandler: Handling an option. */
         OptionHandler(OptionElement) {
             var Option = OptionElement.data("option");
@@ -1113,6 +828,332 @@
     }
     /** ThinkProcess: Whether to demonstrate the thinking processes. */
     ChatManager.ThinkProcess = false;
+
+    /** TextSectionRenderer: A block that displays the a text response section. */
+    class TextSectionRenderer extends SectionRenderer {
+        /** Constructor: Create a new UI renderer. */
+        constructor() {
+            super();
+            this.Container.addClass("text");
+        }
+        /** RenderInternal: Render the UI element. */
+        RenderInternal() {
+            var _a, _b;
+            var Section = this.GetData();
+            var Content = Section.Content;
+            // Filter the thinking process
+            if (!ChatManager.ThinkProcess &&
+                (Content.startsWith("Parameters:") || Content.startsWith("Thoughts:") || Content.startsWith("Input:"))) {
+                var OutputIndex = Content.indexOf("\nOutput:");
+                if (OutputIndex == -1) {
+                    if (!this.Finalized)
+                        Content = EditorLocalized.Get("I am planning for the answer...");
+                    else
+                        Content = "";
+                }
+                else
+                    Content = Content.substring(OutputIndex + 8).trim();
+            }
+            // Filter the "output:"
+            if (Content.startsWith("Output: "))
+                Content = Content.substring(8).trim();
+            // Render the text
+            this.Container.text(Content);
+            // Remove the section if it's empty
+            if (Content == "" && ((_b = (_a = Section.Options) === null || _a === void 0 ? void 0 : _a.length) !== null && _b !== void 0 ? _b : 0) == 0 && this.Finalized)
+                this.Container.remove();
+        }
+    }
+
+    /** InputRenderer: A block that displays the an user input. */
+    class InputRenderer extends UIRendererOf {
+        /** Constructor: Create a new UI renderer. */
+        constructor() {
+            super();
+            this.Container.addClass("input");
+            this.Container.html(`
+<div class="avatar"><img src="images/user.png" /></div>
+<div class="content"></div>`);
+            this.Avatar = this.Container.find(".avatar");
+            this.Content = this.Container.find(".content");
+        }
+        /** RenderInternal: Render the UI element. */
+        RenderInternal() {
+            this.Content.text(this.GetData().Input);
+        }
+    }
+
+    /** RecordRenderer: A block that displays the output of a request. */
+    class RecordRenderer extends UIRendererOf {
+        /** Constructor: Create a new UI renderer. */
+        constructor() {
+            super();
+            this.Container.addClass("record");
+            this.InputRenderer = new InputRenderer();
+            this.AddChild(this.InputRenderer);
+            this.ContentContainer = $(`
+<div class="contents">
+    <div class="avatar"><img src="images/assistant.png" /></div>
+    <div class="content"></div>
+</div>`).appendTo(this.Container).find(".content");
+        }
+        /** RenderInternal: Render the UI element. */
+        RenderInternal() { }
+        /** SetData: Set the data of the renderer. */
+        SetData(Data) {
+            this.InputRenderer.SetData(Data);
+            return super.SetData(Data);
+        }
+        /** AddSection: Add a section to the record. */
+        AddSection(Section) {
+            var Renderer;
+            // Choose a renderer for the section
+            var Renderers = SectionRenderers[Section.Type];
+            for (var Chooser of Renderers) {
+                Renderer = Chooser(Section);
+                if (Renderer)
+                    break;
+            }
+            // If no renderer was chosen, use the default renderer
+            Renderer = Renderer !== null && Renderer !== void 0 ? Renderer : new SectionRenderer();
+            // If this is the first section
+            if (this.Children.length == 1)
+                Renderer.SetFirst();
+            // Add the renderer
+            Renderer.SetData(Section);
+            this.AddChild(Renderer, false);
+            this.ContentContainer.append(Renderer.Container);
+            return Renderer;
+        }
+    }
+    /** SectionRenderers: The renderers for each section type. */
+    const SectionRenderers = {
+        [ChatResponseType.Start]: [],
+        [ChatResponseType.Finish]: [],
+        [ChatResponseType.Text]: [() => new TextSectionRenderer()],
+        [ChatResponseType.Code]: [],
+        [ChatResponseType.JSON]: [],
+        [ChatResponseType.CompileError]: [],
+        [ChatResponseType.RuntimeError]: [],
+        [ChatResponseType.ServerError]: []
+    };
+
+    /** SubthreadRenderer: A block that displays the output of a subthread. */
+    class SubthreadRenderer extends UIRendererOf {
+        /** Constructor: Create a new UI renderer. */
+        constructor() {
+            super();
+            this.Container.addClass("subthread");
+        }
+        /** RenderInternal: Render the UI element. */
+        RenderInternal() { }
+        /** AddRecord: Add a record to the subthread. */
+        AddRecord(Record) {
+            var Renderer = new RecordRenderer();
+            Renderer.SetData(Record);
+            this.AddChild(Renderer);
+            return Renderer;
+        }
+    }
+
+    /** OutputDisplay: Display the output section. */
+    class OutputDisplay {
+        /** Constructor: Create a new output section. */
+        constructor(Tab) {
+            /** Subthreads: The subthread store. */
+            this.Subthreads = new Map();
+            // #endregion
+            // #region "Batch Printing Support"
+            /** Fragment: Batch printing support for batch printing. */
+            this.Fragment = null;
+            /** BufferSize: Buffer size for batch printing. */
+            this.BufferSize = 1000;
+            this.Tab = Tab;
+            this.Container = $(Tab.Container).find(".command-output");
+        }
+        /** ScrollToBottom: After user entered input, screen view should scroll down to the bottom line. */
+        ScrollToBottom() {
+            this.Container.scrollTop(this.Container.get(0).scrollHeight);
+        }
+        /** IsAtBottom: Whether the container is scrolled to bottom. */
+        IsAtBottom() {
+            var Element = this.Container.get(0);
+            return Math.abs(Element.scrollHeight - Element.clientHeight - Element.scrollTop) < 1;
+        }
+        /** Clear: Clear the output region of Command Center. */
+        Clear() {
+            this.Container.remove();
+            this.Subthreads.clear();
+            delete this.Subthread;
+        }
+        /** RenderRecord: Render a new chat record. */
+        RenderRecord(Record, Subthread) {
+            var _a;
+            var Renderer;
+            // Create a new subthread if necessary
+            if (Subthread != ((_a = this.Subthread) === null || _a === void 0 ? void 0 : _a.GetData())) {
+                this.Subthread = this.Subthreads.get(Subthread);
+                if (this.Subthread == null) {
+                    this.Subthread = new SubthreadRenderer();
+                    this.Container.append(this.Subthread.Container);
+                    this.Subthread.SetData(Subthread);
+                    this.Subthreads.set(Subthread, this.Subthread);
+                }
+                this.Subthread.SetStatus("active");
+                this.ScrollToBottom();
+            }
+            // Render the record
+            Renderer = this.Subthread.AddRecord(Record);
+            this.Subthread.Render();
+            return Renderer;
+        }
+        /** WriteOutput: Print to a batch. */
+        WriteOutput(Element) {
+            if (this.Fragment == null)
+                this.Container.append(Element);
+            else
+                this.Fragment.append(Element);
+        }
+        /** OpenBatch: Open a printing batch. */
+        OpenBatch() {
+            this.Fragment = $(document.createDocumentFragment());
+        }
+        /** CloseBatch: Close a printing batch. */
+        CloseBatch() {
+            if (this.Fragment == null)
+                return;
+            var AtBottom = this.IsAtBottom();
+            // Trim the buffer (should refactor later) & the display
+            var Length = this.Fragment.children().length;
+            if (Length > this.BufferSize) {
+                this.Fragment.children().slice(0, Length - this.BufferSize).remove();
+                this.Container.children().remove();
+            }
+            else {
+                var NewLength = this.Container.children().length + Length;
+                if (NewLength > this.BufferSize)
+                    this.Container.children().slice(0, NewLength - this.BufferSize).remove();
+            }
+            // Append to the display
+            this.Container.append(this.Fragment);
+            this.Fragment = null;
+            if (AtBottom)
+                this.ScrollToBottom();
+        }
+        // #endregion
+        // #region "Single Printing Support"
+        /** PrintInput: Print a line of input to the screen. */
+        PrintInput(Objective, Content, Embedded) {
+            // Change the objective
+            if (Objective == null)
+                Objective = this.Tab.TargetSelect.val();
+            else if (Objective != "assistant" && Objective != "you")
+                this.Tab.TargetSelect.val(Objective);
+            // CodeMirror Content
+            var Wrapper = $(`
+			<div class="command-wrapper">
+				<div class="content">
+					<p class="input Code">${Objective}&gt;&nbsp;<span></span></p>
+				</div>
+				<div class="icon">
+					<img class="copy-icon" src="images/copy.png"/>
+				</div>
+			</div>
+		`);
+            // Standalone mode
+            Wrapper.attr("objective", Objective);
+            Wrapper.attr("content", Content);
+            // Click to copy
+            Wrapper.children(".icon").on("click", () => {
+                this.Tab.SetCode(Wrapper.attr("objective"), Wrapper.attr("content"));
+                this.Tab.Editor.Call({ Type: "ClipboardWrite", Content: `${Wrapper.attr("objective")}: ${Wrapper.attr("content")}` });
+            });
+            // Run CodeMirror
+            this.Tab.AnnotateCode(Wrapper.children(".content").children(".Code").children("span"), Content, false);
+            if (!Embedded)
+                this.WriteOutput(Wrapper);
+            return Wrapper;
+        }
+        /** PrintOutput: Provide for Unity to print compiled output. */
+        PrintOutput(Content, Class) {
+            var AtBottom = this.Fragment == null && this.IsAtBottom();
+            var Output = null;
+            switch (Class) {
+                case "CompilationError":
+                    Output = $(`
+					<p class="CompilationError output">${Localized.Get("抱歉，未能理解你输入的命令")}: ${Content}</p>
+				`);
+                    break;
+                case "RuntimeError":
+                    Output = $(`<p class="RuntimeError output"></p>`);
+                    Output.get(0).innerText = Localized.Get(Content);
+                    break;
+                case "Succeeded":
+                    Output = $(`
+					<p class="Succeeded output">${Localized.Get("成功执行了命令。")}</p>
+				`);
+                    break;
+                case "Output":
+                    Output = $(`<p class="Output output"></p>`);
+                    Output.get(0).innerText = Content;
+                    break;
+                case "Help":
+                    if (typeof Content === 'string') {
+                        if (Content.indexOf("<div class=\"block\">") >= 0) {
+                            Output = $(Content);
+                        }
+                        else {
+                            Output = $(`
+							<p class="${Class} output">${Content}</p>
+						`);
+                        }
+                    }
+                    else if (Content instanceof Array) {
+                        Output = $(`
+						<div class="block">
+							${Content.map((Source) => `<p class="${Class} output">${Source}</p>`).join("")}
+						</div>
+					`);
+                    }
+                    else if (Content.Parameter == "-full") {
+                        Output = $(`<p class="Output output">${Localized.Get("显示 {0} 的帮助信息。")
+                        .replace("{0}", `<a class='command' target='help ${Content["display_name"]} -full'">${Content["display_name"]}</a>`)}</p>`);
+                        this.Tab.ShowFullText(Content);
+                    }
+                    else {
+                        Output = $(`
+						<div class="block">
+							<p class="${Class} output"><code>${Content["display_name"]}</code> - ${Content["agents"].map((Agent) => `${RenderAgent(Agent)}`).join(", ")}</p>
+							<p class="${Class} output">${Content["short_description"]} (<a class='command' target='help ${Content["display_name"]} -full'">${Localized.Get("阅读全文")}</a>)</p>
+							<p class="${Class} output">${Localized.Get("参见")}: ${Content["see_also"].map((Name) => `<a class='command' target='help ${Name}'>${Name}</a>`).join(", ")}</p>
+						</div>
+					`);
+                    }
+                    if (Output != null) {
+                        LinkCommand(Output.find("a.command"));
+                        this.AnnotateInput(Output.find("div.command"));
+                        this.Tab.AnnotateCode(Output.find("code"));
+                    }
+                    break;
+                default:
+                    Output = $(`
+					<p class="${Class} output">${Content}</p>
+				`);
+                    break;
+            }
+            this.WriteOutput(Output);
+            if (AtBottom)
+                this.ScrollToBottom();
+            return Output;
+        }
+        /** AnnotateInput: Annotate some code inputs. */
+        AnnotateInput(Query) {
+            Query.each((Index, Item) => {
+                var Current = $(Item);
+                Current.replaceWith(this.PrintInput(Current.attr("objective"), Current.attr("target"), true));
+            });
+        }
+    }
 
     /** CommandTab: A tab for the command center. */
     class CommandTab extends Tab {
@@ -1396,47 +1437,12 @@
             this.IgnoreUpdate = false;
             /** CodeRefreshed: Did we refresh the code on the background? */
             this.CodeRefreshed = false;
-            /** ShowProcedures: List all procedures in the code. */
-            this.ShowProcedures = function () {
-                var Procedures = this.GetProcedures();
-                if (Object.keys(Procedures).length == 0) {
-                    this.Toast("warning", Localized.Get("代码中还没有任何子程序。"));
-                }
-                else {
-                    var Dialog = $("#Dialog-Procedures");
-                    var List = Dialog.children("ul").empty();
-                    Dialog.children("h4").text(Localized.Get("跳转到子程序"));
-                    var Handler = function () {
-                        this.Galapagos.Select($(this).attr("start"), $(this).attr("end"));
-                        $.modal.close();
-                    };
-                    for (var Procedure in Procedures) {
-                        $(`<li>${Procedure}</li>`).appendTo(List)
-                            .attr("start", Procedures[Procedure][0])
-                            .attr("end", Procedures[Procedure][1]).click(Handler);
-                    }
-                    Dialog.modal({});
-                }
-            };
-            /** GetProcedures: Get all procedures from the code. */
-            this.GetProcedures = function () {
-                var Rule = /^\s*(?:to|to-report)\s(?:\s*;.*\n)*\s*(\w\S*)/gm; // From NLW
-                var Content = this.GetCode();
-                var Names = [];
-                var Match;
-                while (Match = Rule.exec(Content)) {
-                    var Length = Match.index + Match[0].length;
-                    Names[Match[1]] = [Length - Match[1].length, Length];
-                }
-                return Names;
-            };
             this.TipsElement = $(Container).children(".codemirror-tips");
             this.Galapagos = new GalapagosEditor($(Container).children(".codemirror").get(0), {
                 Wrapping: true,
                 OnUpdate: (Changed, Update) => {
-                    if (Changed && !this.IgnoreUpdate) {
+                    if (Changed && !this.IgnoreUpdate)
                         this.Editor.Call({ Type: "CodeChanged" });
-                    }
                 },
                 OnDictionaryClick: (Text) => this.Editor.CommandTab.ExplainFull(Text)
             });
@@ -1444,7 +1450,7 @@
         // Show the tips
         ShowTips(Content, Callback) {
             if (!Callback)
-                Callback = () => { this.HideTips(); };
+                Callback = () => this.HideTips();
             this.TipsElement.off("click").text(Content).on("click", Callback).show();
         }
         // Hide the tips
@@ -1540,6 +1546,40 @@
             }
             Dialog.modal({});
         }
+        /** ShowProcedures: List all procedures in the code. */
+        ShowProcedures() {
+            var Procedures = this.GetProcedures();
+            if (Object.keys(Procedures).length == 0) {
+                this.Editor.Toast("warning", Localized.Get("代码中还没有任何子程序。"));
+            }
+            else {
+                var Dialog = $("#Dialog-Procedures");
+                var List = Dialog.children("ul").empty();
+                Dialog.children("h4").text(Localized.Get("跳转到子程序"));
+                var Handler = () => {
+                    this.Galapagos.Select($(this).attr("start"), $(this).attr("end"));
+                    $.modal.close();
+                };
+                for (var Procedure in Procedures) {
+                    $(`<li>${Procedure}</li>`).appendTo(List)
+                        .attr("start", Procedures[Procedure][0])
+                        .attr("end", Procedures[Procedure][1]).click(Handler);
+                }
+                Dialog.modal({});
+            }
+        }
+        /** GetProcedures: Get all procedures from the code. */
+        GetProcedures() {
+            var Rule = /^\s*(?:to|to-report)\s(?:\s*;.*\n)*\s*(\w\S*)/gm; // From NLW
+            var Content = this.GetCode();
+            var Names = {};
+            var Match;
+            while (Match = Rule.exec(Content)) {
+                var Length = Match.index + Match[0].length;
+                Names[Match[1]] = [Length - Match[1].length, Length];
+            }
+            return Names;
+        }
     }
 
     /** TurtleEditor: The multi-tab code editor for Turtle Universe. */
@@ -1548,6 +1588,8 @@
         constructor(Container, PostMessage) {
             /** EditorTabs: The editor tabs. */
             this.EditorTabs = [];
+            /** CurrentTab: The visible tab. */
+            this.CurrentTab = null;
             /** Toast: Show a toast. */
             this.Toast = function (Type, Content, Subject) {
                 toastr[Type](Content, Subject);
@@ -1563,7 +1605,7 @@
             this.EditorTabs[0].Galapagos.AddChild(this.CommandTab.Galapagos);
             // Listen to the sizing
             if (window.visualViewport)
-                window.visualViewport.addEventListener("resize", () => this.CurrentTab.SyncSize());
+                window.visualViewport.addEventListener("resize", () => { var _a; return (_a = this.CurrentTab) === null || _a === void 0 ? void 0 : _a.SyncSize(); });
         }
         /** Call: Call the facilitator (by default, the Unity Engine). */
         Call(Message) {

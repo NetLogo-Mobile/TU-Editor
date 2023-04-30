@@ -11,7 +11,8 @@ export class TextSectionRenderer extends SectionRenderer {
     }
     /** RenderInternal: Render the UI element. */
     protected RenderInternal(): void {
-        var Content = this.Data.Content;
+        var Section = this.GetData();
+        var Content = Section.Content;
         // Filter the thinking process
         if (!ChatManager.ThinkProcess && 
             (Content.startsWith("Parameters:") || Content.startsWith("Thoughts:") || Content.startsWith("Input:"))) {
@@ -27,7 +28,7 @@ export class TextSectionRenderer extends SectionRenderer {
         // Render the text
         this.Container.text(Content);
         // Remove the section if it's empty
-        if (Content == "" && (this.Data.Options?.length ?? 0) == 0 && this.Finalized)
+        if (Content == "" && (Section.Options?.length ?? 0) == 0 && this.Finalized)
             this.Container.remove();
     }
 }

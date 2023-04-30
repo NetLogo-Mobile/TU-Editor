@@ -1,4 +1,5 @@
 import { ChatResponseSection } from "../../chat/client/chat-response";
+import { OptionRenderer } from "../outputs/option-renderer";
 import { UIRendererOf } from "../outputs/ui-renderer";
 
 /** SectionRenderer: A block that displays the a response section. */
@@ -21,20 +22,33 @@ export class SectionRenderer extends UIRendererOf<ChatResponseSection> {
     public constructor() {
         super();
         this.Container.addClass("section");
+        this.ContentContainer = $(`<p></p>`).appendTo(this.Container);
     }
+    /** ContentContainer: The container of the contents. */
+    protected ContentContainer: JQuery<HTMLElement>;
     /** RenderInternal: Render the UI element. */
     protected RenderInternal(): void {
-        this.Container.text(this.Data.Content);
+        this.ContentContainer.text(this.GetData().Content);
         this.RenderOptions();
     }
+    /** OptionContainer: The container of the options. */
+    protected OptionContainer?: JQuery<HTMLElement>;
     /** RenderOptions: Render the options of the section. */
     protected RenderOptions() {
-        if (!this.Data.Options) return;
-        for (var Option of this.Data.Options) {
-            var Link = $(`<p class="output option ${Option.Style ?? "generated"}">- <a href="javascript:void(0)"></a></p>`);
-            Link.appendTo(this.Container);
-            Link.find("a").data("option", Option).text(Option.LocalizedLabel ?? Option.Label)
-                .on("click", function() { ChatManager.OptionHandler($(this)); });
+        var Options = this.GetData().Options;
+        if (!Options || Options.length == 0) return;
+        // Create the container
+        this.OptionContainer = this.OptionContainer ?? $(`<ul></ul>`).appendTo(this.Container);
+        // Render the options
+        for (var I = 0; I < Options.length; I++) {
+            var Option = Options[I];
+            var Renderer: OptionRenderer;
+            if (this.Children.length < I) {
+                Renderer = new OptionRenderer();
+                this.AddChild(Renderer);
+            } else Renderer = this.Children[I] as OptionRenderer;
+            Renderer.SetData(Option);
+            Renderer.Render();
         }
     }
 }

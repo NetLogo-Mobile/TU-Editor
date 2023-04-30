@@ -58,7 +58,7 @@ export class CommandTab extends Tab {
 		this.HideFullText();
 	}
 	/** ShowFullText: Show the full-text help area. */
-	public ShowFullText(Data) {
+	public ShowFullText(Data: any) {
 		this.FullText.ShowFullText(Data);
 		this.Outputs.Container.hide();
 	}
@@ -78,8 +78,8 @@ export class CommandTab extends Tab {
 		this.Galapagos = new GalapagosEditor(this.CommandLine.find(".command-input").get(0)!, {
 			OneLine: true,
 			ParseMode: "Oneline",
-			OnKeyUp: (Event) => this.InputKeyHandler(Event),
-			OnDictionaryClick: (Text) => this.ExplainFull(Text)
+			OnKeyUp: (Event: any) => this.InputKeyHandler(Event),
+			OnDictionaryClick: (Text: any) => this.ExplainFull(Text)
 		});
 		// Set up sections
 		this.Outputs = new OutputDisplay(this);

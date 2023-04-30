@@ -1,20 +1,20 @@
 declare const { EditorLocalized }: any;
 
 // Localized: Localized support.
-const Localized = function() {
+const Localized = function () {
 	var Localized: any = {};
 
 	// Initialize: Initialize the manager with given data.
-	Localized.Initialize = function(Data, Language) {
+	Localized.Initialize = function (Data: any, Language: string) {
 		Localized.Data = Data;
 		EditorLocalized.Switch(Language);
 		$(".Localized").each((Index, Target) => {
-            $(Target).text(Localized.Get($(Target).text()))
-        });
+			$(Target).text(Localized.Get($(Target).text()))
+		});
 	}
 
 	// Get: Get localized string.
-	Localized.Get = function(Source) {
+	Localized.Get = function (Source: string): string {
 		if (Localized.Data && Localized.Data.hasOwnProperty(Source))
 			return Localized.Data[Source];
 		return Source;
@@ -24,9 +24,9 @@ const Localized = function() {
 }();
 
 // RotateScreen: Show rotate screen prompt.
-const RotateScreen = function() {
-	(function($, undefined){
-		($.fn as any).asOverlay = function(Timeout = 3000, Animation = 300) {
+const RotateScreen = function () {
+	(function ($, undefined) {
+		($.fn as any).asOverlay = function (Timeout = 3000, Animation = 300) {
 			this.Hide = () => this.fadeOut(Animation);
 			this.Show = () => {
 				clearTimeout(this.timeout);

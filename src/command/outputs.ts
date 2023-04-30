@@ -31,14 +31,14 @@ export class OutputDisplay {
 
 	// #region "Threading Support"
 	/** Subthread: The active subthread. */
-	private Subthread: SubthreadRenderer;
+	private Subthread?: SubthreadRenderer;
 	/** Subthreads: The subthread store. */
 	private Subthreads: Map<ChatSubthread, SubthreadRenderer> = new Map<ChatSubthread, SubthreadRenderer>();
 	/** Clear: Clear the output region of Command Center. */
 	public Clear() {
 		this.Container.remove();
 		this.Subthreads.clear();
-		this.Subthread = null;
+		delete this.Subthread;
 	}
 	/** RenderRecord: Render a new chat record. */
 	public RenderRecord(Record: ChatRecord, Subthread: ChatSubthread): RecordRenderer {
@@ -120,7 +120,7 @@ export class OutputDisplay {
 		Wrapper.attr("content", Content);
 		// Click to copy
 		Wrapper.children(".icon").on("click", () => {
-			this.Tab.SetCode(Wrapper.attr("objective"), Wrapper.attr("content"));
+			this.Tab.SetCode(Wrapper.attr("objective")!, Wrapper.attr("content")!);
 			this.Tab.Editor.Call({ Type: "ClipboardWrite", Content: `${Wrapper.attr("objective")}: ${Wrapper.attr("content")}` });
 		});
 		// Run CodeMirror
@@ -129,7 +129,7 @@ export class OutputDisplay {
 		return Wrapper;
 	}
 	/** PrintOutput: Provide for Unity to print compiled output. */ 
-	public PrintOutput(Content, Class: string) {
+	public PrintOutput(Content: any, Class: string) {
 		var AtBottom = this.Fragment == null && this.IsAtBottom();
 	    var Output: JQuery<HTMLElement> | null = null;
 		switch (Class) {
@@ -173,9 +173,9 @@ export class OutputDisplay {
 				} else {
 					Output = $(`
 						<div class="block">
-							<p class="${Class} output"><code>${Content["display_name"]}</code> - ${Content["agents"].map((Agent) => `${RenderAgent(Agent)}`).join(", ")}</p>
+							<p class="${Class} output"><code>${Content["display_name"]}</code> - ${Content["agents"].map((Agent: any) => `${RenderAgent(Agent)}`).join(", ")}</p>
 							<p class="${Class} output">${Content["short_description"]} (<a class='command' target='help ${Content["display_name"]} -full'">${Localized.Get("阅读全文")}</a>)</p>
-							<p class="${Class} output">${Localized.Get("参见")}: ${Content["see_also"].map((Name) => `<a class='command' target='help ${Name}'>${Name}</a>`).join(", ")}</p>
+							<p class="${Class} output">${Localized.Get("参见")}: ${Content["see_also"].map((Name: any) => `<a class='command' target='help ${Name}'>${Name}</a>`).join(", ")}</p>
 						</div>
 					`);
 				}
@@ -199,7 +199,7 @@ export class OutputDisplay {
 	private AnnotateInput(Query: JQuery<HTMLElement>) {
 		Query.each((Index, Item) => {
 			var Current = $(Item);
-			Current.replaceWith(this.PrintInput(Current.attr("objective"), Current.attr("target"), true));
+			Current.replaceWith(this.PrintInput(Current.attr("objective")!, Current.attr("target")!, true));
 		});
 	}
     // #endregion

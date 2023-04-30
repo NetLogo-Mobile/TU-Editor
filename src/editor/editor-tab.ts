@@ -38,12 +38,11 @@ export class EditorTab extends Tab {
         this.TipsElement = $(Container).children(".codemirror-tips");
 		this.Galapagos = new GalapagosEditor($(Container).children(".codemirror").get(0)!, {
 			Wrapping: true,
-			OnUpdate: (Changed, Update) => {
-				if (Changed && !this.IgnoreUpdate) {
+			OnUpdate: (Changed: boolean, Update: any) => {
+				if (Changed && !this.IgnoreUpdate)
 					this.Editor.Call({ Type: "CodeChanged" });
-				}
 			},
-			OnDictionaryClick: (Text) => this.Editor.CommandTab.ExplainFull(Text)
+			OnDictionaryClick: (Text: string) => this.Editor.CommandTab.ExplainFull(Text)
 		});
 	}
     // #endregion
@@ -52,8 +51,8 @@ export class EditorTab extends Tab {
     /** TipsElement: The HTML element for tips. */
     private TipsElement: JQuery<HTMLElement>;
 	// Show the tips
-	public ShowTips(Content, Callback?) {
-		if (!Callback) Callback = () => { this.HideTips(); };
+	public ShowTips(Content: string, Callback?: () => void) {
+		if (!Callback) Callback = () => this.HideTips();
 		this.TipsElement.off("click").text(Content).on("click", Callback).show();
 	}
 	// Hide the tips
@@ -61,7 +60,7 @@ export class EditorTab extends Tab {
 		this.TipsElement.hide();
 	}
 	/** SetCompilerErrors: Show the compiler error linting messages. */
-	public SetCompilerErrors(Errors) {
+	public SetCompilerErrors(Errors: any[]) {
 		if (Errors.length == 0) this.HideTips();
 		/** Temp hack: the Galapagos does not support unknown position errors yet. */
 		if (Errors.length > 0 && Errors[0].start == 2147483647) {
@@ -75,7 +74,7 @@ export class EditorTab extends Tab {
 		}
 	}
 	/** SetRuntimeErrors: Show the runtime error linting messages. */
-	public SetRuntimeErrors(Errors) {
+	public SetRuntimeErrors(Errors: any[]) {
 		if (Errors.length > 0 && Errors[0].start == 2147483647) {
 			this.ShowTips(Errors[0].message);
 			this.Galapagos.SetRuntimeErrors([]);
@@ -133,7 +132,7 @@ export class EditorTab extends Tab {
 		var Dialog = $("#Dialog-Procedures")
 		var List = Dialog.children("ul").empty();
 		Dialog.children("h4").text(Localized.Get("更多功能"));
-		var Features = {};
+		var Features: Record<string, () => void> = {};
 		Features[Localized.Get("选择全部")] = () => this.Galapagos.SelectAll();
 		Features[Localized.Get("撤销操作")] = () => this.Galapagos.Undo();
 		Features[Localized.Get("重做操作")] = () => this.Galapagos.Redo();
@@ -142,22 +141,22 @@ export class EditorTab extends Tab {
 		Features[Localized.Get("重置代码")] = () => this.ResetCode();
 		for (var Feature in Features) {
 			$(`<li>${Feature}</li>`).attr("Tag", Feature).appendTo(List).click(function() {
-				Features[$(this).attr("Tag")]();
+				Features[$(this).attr("Tag")!]();
 				($ as any).modal.close();
 			});
 		}
 		(Dialog as any).modal({});
 	}
 	/** ShowProcedures: List all procedures in the code. */
-	public ShowProcedures = function() {
+	public ShowProcedures() {
 		var Procedures = this.GetProcedures();
 		if (Object.keys(Procedures).length == 0) {
-			this.Toast("warning", Localized.Get("代码中还没有任何子程序。"));
+			this.Editor.Toast("warning", Localized.Get("代码中还没有任何子程序。"));
 		} else {
 			var Dialog = $("#Dialog-Procedures")
 			var List = Dialog.children("ul").empty();
 			Dialog.children("h4").text(Localized.Get("跳转到子程序"));
-			var Handler = function() {
+			var Handler = () => {
 				this.Galapagos.Select($(this).attr("start"), $(this).attr("end"));
 				($ as any).modal.close();
 			};
@@ -170,11 +169,11 @@ export class EditorTab extends Tab {
 		}
 	}
 	/** GetProcedures: Get all procedures from the code. */
-	public GetProcedures = function() {
+	public GetProcedures() {
 		var Rule = /^\s*(?:to|to-report)\s(?:\s*;.*\n)*\s*(\w\S*)/gm // From NLW
 		var Content = this.GetCode(); 
-        var Names = [];
-        var Match: RegExpExecArray;
+        var Names: Record<string, [number, number]> = {};
+        var Match: RegExpExecArray | null;
 		while (Match = Rule.exec(Content)) {
 			var Length = Match.index + Match[0].length;
 			Names[Match[1]] = [ Length - Match[1].length, Length ];

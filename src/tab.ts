@@ -7,7 +7,7 @@ export abstract class Tab {
     /** Container: The container HTMLElement. */
     public readonly Container: HTMLElement;
     // Whether it is visible.
-    public Visible: boolean;
+    public Visible: boolean = false;
     /** Constructor: Create an editor tab. */
     constructor(Container: HTMLElement, Editor: TurtleEditor) {
         this.Editor = Editor;
@@ -36,7 +36,7 @@ export abstract class Tab {
     }
     /** SyncSize: Resize the visible region. */
     SyncSize() {
-        this.Resize(window.visualViewport.height, document.body.scrollHeight);
+        this.Resize(window.visualViewport!.height, document.body.scrollHeight);
     }
     /** Resize: Resize the visible region. */
     Resize(ViewportHeight: number, ScrollHeight: number): boolean {

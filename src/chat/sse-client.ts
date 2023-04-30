@@ -32,7 +32,7 @@ export class SSEClient {
      * Listen: Start listening to the SSE stream
      * @param {Function} onMessage Callback function for handling the received message
      */
-    public Listen(onMessage: (data: StreamData) => void, onError: (this: XMLHttpRequest, ev: ProgressEvent) => void): void {
+    public Listen(onMessage: (data: StreamData) => void, onError: (this: XMLHttpRequest, ev?: ProgressEvent) => void): void {
         this.Request.open('POST', this.url, true);
         this.Request.setRequestHeader('Cache-Control', 'no-cache');
         this.Request.setRequestHeader('Content-Type', 'application/json');
@@ -58,7 +58,7 @@ export class SSEClient {
                     }
                 });
             } else {
-                onError.call(this.Request, null);
+                onError.call(this.Request);
             }
         };
 

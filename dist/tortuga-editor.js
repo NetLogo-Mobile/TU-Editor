@@ -783,28 +783,6 @@
     /** ThinkProcess: Whether to demonstrate the thinking processes. */
     ChatManager.ThinkProcess = false;
 
-    /** OptionRenderer: A block that displays the a chat option. */
-    class OptionRenderer extends UIRendererOf {
-        /** ContainerInitializer: The initializer for the container. */
-        ContainerInitializer() {
-            var Container = $(`<li class="option"><a href="javascript:void(0)"></a></li>`);
-            Container.on("click", () => this.ClickHandler());
-            return Container;
-        }
-        /** RenderInternal: Render the UI element. */
-        RenderInternal() {
-            var _a, _b;
-            this.Container.addClass((_a = this.GetData().Style) !== null && _a !== void 0 ? _a : "generated").children("a")
-                .text((_b = this.GetData().LocalizedLabel) !== null && _b !== void 0 ? _b : this.GetData().Label);
-        }
-        /** ClickHandler: The handler for the click event. */
-        ClickHandler() {
-            var Section = this.Parent;
-            var Record = Section.Parent;
-            ChatManager.Instance.RequestOption(this.GetData(), Section.GetData(), Record.GetData());
-        }
-    }
-
     /** SectionRenderer: A block that displays the a response section. */
     class SectionRenderer extends UIRendererOf {
         /** SetFirst: Set the first status of the section. */
@@ -831,30 +809,6 @@
         RenderInternal() {
             var _a, _b;
             this.ContentContainer.text(`${(_a = this.GetData().Field) !== null && _a !== void 0 ? _a : "Empty"}: ${(_b = this.GetData().Content) !== null && _b !== void 0 ? _b : ""}`);
-            this.RenderOptions();
-        }
-        /** RenderOptions: Render the options of the section. */
-        RenderOptions() {
-            var _a;
-            var Options = this.GetData().Options;
-            if (!Options || Options.length == 0)
-                return;
-            // Create the container
-            this.OptionContainer = (_a = this.OptionContainer) !== null && _a !== void 0 ? _a : $(`<ul></ul>`).appendTo(this.Container);
-            // Render the options
-            for (var I = 0; I < Options.length; I++) {
-                var Option = Options[I];
-                var Renderer;
-                if (this.Children.length <= I) {
-                    Renderer = new OptionRenderer();
-                    this.AddChild(Renderer, false);
-                    this.OptionContainer.append(Renderer.Container);
-                }
-                else
-                    Renderer = this.Children[I];
-                Renderer.SetData(Option);
-                Renderer.Render();
-            }
         }
     }
 
@@ -886,7 +840,6 @@
             else {
                 this.ContentContainer = this.ContentContainer.replaceWith(`<pre></pre>`).text(Code.trim());
             }
-            this.RenderOptions();
         }
     }
 
@@ -923,25 +876,11 @@
             var _a, _b, _c;
             var Section = this.GetData();
             var Content = (_a = Section.Content) !== null && _a !== void 0 ? _a : "";
-            // Filter the thinking process
-            if (!ChatManager.ThinkProcess &&
-                (Content.startsWith("Parameters:") || Content.startsWith("Thoughts:") || Content.startsWith("Input:"))) {
-                var OutputIndex = Content.indexOf("\nOutput:");
-                if (OutputIndex == -1) {
-                    if (!this.Finalized)
-                        Content = EditorLocalized.Get("I am planning for the answer...");
-                    else
-                        Content = "";
-                }
-                else
-                    Content = Content.substring(OutputIndex + 8).trim();
-            }
             // Filter the "output:"
             if (Content.startsWith("Output: "))
                 Content = Content.substring(8).trim();
             // Render the text
             this.ContentContainer.text(Content);
-            this.RenderOptions();
             // Remove the section if it's empty
             if (Content == "" && ((_c = (_b = Section.Options) === null || _b === void 0 ? void 0 : _b.length) !== null && _c !== void 0 ? _c : 0) == 0 && this.Finalized)
                 this.Container.remove();
@@ -963,6 +902,28 @@
         /** RenderInternal: Render the UI element. */
         RenderInternal() {
             this.Content.text(this.GetData().Input);
+        }
+    }
+
+    /** OptionRenderer: A block that displays the a chat option. */
+    class OptionRenderer extends UIRendererOf {
+        /** ContainerInitializer: The initializer for the container. */
+        ContainerInitializer() {
+            var Container = $(`<li class="option"><a href="javascript:void(0)"></a></li>`);
+            Container.on("click", () => this.ClickHandler());
+            return Container;
+        }
+        /** RenderInternal: Render the UI element. */
+        RenderInternal() {
+            var _a, _b;
+            this.Container.addClass((_a = this.GetData().Style) !== null && _a !== void 0 ? _a : "generated").children("a")
+                .text((_b = this.GetData().LocalizedLabel) !== null && _b !== void 0 ? _b : this.GetData().Label);
+        }
+        /** ClickHandler: The handler for the click event. */
+        ClickHandler() {
+            var Section = this.Parent;
+            var Record = Section.Parent;
+            ChatManager.Instance.RequestOption(this.GetData(), Section.GetData(), Record.GetData());
         }
     }
 
@@ -1007,8 +968,37 @@
             // Add the renderer
             Renderer.SetData(Section);
             this.AddChild(Renderer, false);
-            this.ContentContainer.append(Renderer.Container);
+            // Append to the container
+            if (this.OptionContainer) {
+                this.OptionContainer.before(Renderer.Container);
+            }
+            else {
+                this.ContentContainer.append(Renderer.Container);
+            }
             return Renderer;
+        }
+        /** RenderOptions: Render the options of the section. */
+        RenderOptions() {
+            var _a;
+            var Options = this.GetData().Response.Options;
+            if (!Options || Options.length == 0)
+                return;
+            // Create the container
+            this.OptionContainer = (_a = this.OptionContainer) !== null && _a !== void 0 ? _a : $(`<ul></ul>`).appendTo(this.ContentContainer);
+            // Render the options
+            for (var I = 0; I < Options.length; I++) {
+                var Option = Options[I];
+                var Renderer;
+                if (this.Children.length <= I) {
+                    Renderer = new OptionRenderer();
+                    this.AddChild(Renderer, false);
+                    this.OptionContainer.append(Renderer.Container);
+                }
+                else
+                    Renderer = this.Children[I];
+                Renderer.SetData(Option);
+                Renderer.Render();
+            }
         }
     }
     /** SectionRenderers: The renderers for each section type. */

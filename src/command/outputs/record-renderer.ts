@@ -6,6 +6,7 @@ import { SectionRenderer } from "../sections/section-renderer";
 import { ServerErrorRenderer } from "../sections/server-error-renderer";
 import { TextSectionRenderer } from "../sections/text-section-renderer";
 import { InputRenderer } from "./input-renderer";
+import { OptionRenderer } from "./option-renderer";
 import { UIRendererOf } from "./ui-renderer";
 
 /** RecordRenderer: A block that displays the output of a request. */
@@ -50,8 +51,34 @@ export class RecordRenderer extends UIRendererOf<ChatRecord> {
         // Add the renderer
         Renderer.SetData(Section);
         this.AddChild(Renderer, false);
-        this.ContentContainer.append(Renderer.Container);
+        // Append to the container
+        if (this.OptionContainer) {
+            this.OptionContainer.before(Renderer.Container);
+        } else {
+            this.ContentContainer.append(Renderer.Container);
+        }
         return Renderer;
+    }
+    /** OptionContainer: The container of the options. */
+    protected OptionContainer?: JQuery<HTMLElement>;
+    /** RenderOptions: Render the options of the section. */
+    protected RenderOptions() {
+        var Options = this.GetData().Response.Options;
+        if (!Options || Options.length == 0) return;
+        // Create the container
+        this.OptionContainer = this.OptionContainer ?? $(`<ul></ul>`).appendTo(this.ContentContainer);
+        // Render the options
+        for (var I = 0; I < Options.length; I++) {
+            var Option = Options[I];
+            var Renderer: OptionRenderer;
+            if (this.Children.length <= I) {
+                Renderer = new OptionRenderer();
+                this.AddChild(Renderer, false);
+                this.OptionContainer.append(Renderer.Container);
+            } else Renderer = this.Children[I] as OptionRenderer;
+            Renderer.SetData(Option);
+            Renderer.Render();
+        }
     }
 }
 

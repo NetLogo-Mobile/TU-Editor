@@ -26,6 +26,5 @@ export class CodeSectionRenderer extends SectionRenderer {
         } else {
             this.ContentContainer = this.ContentContainer.replaceWith(`<pre></pre>`).text(Code.trim());
         }
-        this.RenderOptions();
     }
 }

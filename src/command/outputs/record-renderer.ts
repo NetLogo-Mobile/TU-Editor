@@ -1,6 +1,7 @@
 import { ChatManager } from "../../chat/chat-manager";
 import { ChatRecord } from "../../chat/client/chat-record";
 import { ChatResponseSection, ChatResponseType } from "../../chat/client/chat-response";
+import { CodeIdeationRenderer } from "../../chat/ui/code-ideation-renderer";
 import { CodeSectionRenderer } from "../sections/code-section-renderer";
 import { SectionRenderer } from "../sections/section-renderer";
 import { ServerErrorRenderer } from "../sections/server-error-renderer";
@@ -28,7 +29,9 @@ export class RecordRenderer extends UIRendererOf<ChatRecord> {
 </div>`).appendTo(this.Container).find(".content");
     }
     /** RenderInternal: Render the UI element. */
-    protected RenderInternal(): void { }
+    protected RenderInternal(): void {
+        this.RenderOptions();
+    }
     /** SetData: Set the data of the renderer. */
     public SetData(Data: ChatRecord) {
         this.InputRenderer.SetData(Data);
@@ -41,7 +44,7 @@ export class RecordRenderer extends UIRendererOf<ChatRecord> {
         // Choose a renderer for the section
         var Renderers = SectionRenderers[Section.Type!];
         for (var Chooser of Renderers) {
-            Renderer = Chooser(Section);
+            Renderer = Chooser(this.GetData(), Section);
             if (Renderer) break;
         }
         // If no renderer was chosen, use the default renderer
@@ -61,9 +64,11 @@ export class RecordRenderer extends UIRendererOf<ChatRecord> {
     }
     /** OptionContainer: The container of the options. */
     protected OptionContainer?: JQuery<HTMLElement>;
+    /** OptionRenderers: The renderer of the options. */
+    protected OptionRenderers: OptionRenderer[] = [];
     /** RenderOptions: Render the options of the section. */
     protected RenderOptions() {
-        var Options = this.GetData().Response.Options;
+        var Options = this.GetData().Response?.Options;
         if (!Options || Options.length == 0) return;
         // Create the container
         this.OptionContainer = this.OptionContainer ?? $(`<ul></ul>`).appendTo(this.ContentContainer);
@@ -71,11 +76,12 @@ export class RecordRenderer extends UIRendererOf<ChatRecord> {
         for (var I = 0; I < Options.length; I++) {
             var Option = Options[I];
             var Renderer: OptionRenderer;
-            if (this.Children.length <= I) {
+            if (this.OptionRenderers.length <= I) {
                 Renderer = new OptionRenderer();
                 this.AddChild(Renderer, false);
                 this.OptionContainer.append(Renderer.Container);
-            } else Renderer = this.Children[I] as OptionRenderer;
+                this.OptionRenderers.push(Renderer);
+            } else Renderer = this.OptionRenderers[I];
             Renderer.SetData(Option);
             Renderer.Render();
         }
@@ -83,7 +89,7 @@ export class RecordRenderer extends UIRendererOf<ChatRecord> {
 }
 
 /** RendererChooser: A function that chooses a renderer for a section. */
-export type RendererChooser = (Section: ChatResponseSection) => SectionRenderer | undefined;
+export type RendererChooser = (Record: ChatRecord, Section: ChatResponseSection) => SectionRenderer | undefined;
 
 /** SectionRenderers: The renderers for each section type. */
 export const SectionRenderers: Record<ChatResponseType, RendererChooser[]> = {
@@ -91,7 +97,7 @@ export const SectionRenderers: Record<ChatResponseType, RendererChooser[]> = {
     [ChatResponseType.Finish]: [],
     [ChatResponseType.Text]: [() => new TextSectionRenderer()],
     [ChatResponseType.Code]: [() => new CodeSectionRenderer()],
-    [ChatResponseType.JSON]: [],
+    [ChatResponseType.JSON]: [CodeIdeationRenderer.GetChooser()],
     [ChatResponseType.Thought]: [],
     [ChatResponseType.CompileError]: [],
     [ChatResponseType.RuntimeError]: [],

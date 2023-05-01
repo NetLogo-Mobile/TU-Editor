@@ -21,7 +21,11 @@ export class SectionRenderer extends UIRendererOf<ChatResponseSection> {
     public constructor() {
         super();
         this.Container.addClass("section");
-        this.ContentContainer = $(`<p></p>`).appendTo(this.Container);
+        this.ContentContainer = this.ContentContainerInitializer().appendTo(this.Container);
+    }
+    /** ContentContainerInitializer: The initializer for the container. */
+    protected ContentContainerInitializer(): JQuery<HTMLElement> {
+        return $("<p></p>");
     }
     /** ContentContainer: The container of the contents. */
     protected ContentContainer: JQuery<HTMLElement>;

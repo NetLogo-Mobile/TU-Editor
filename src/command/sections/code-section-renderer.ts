@@ -12,19 +12,11 @@ export class CodeSectionRenderer extends SectionRenderer {
     protected RenderInternal(): void {
         var Section = this.GetData();
         var Code = Section.Content?.trim() ?? "";
-        // Remove the first line
-        var LineBreak = Code.indexOf("\n");
-        if (LineBreak == -1) return;
-        Code = Code.substring(LineBreak + 1);
-        // Remove the last ```
-        if (Code.endsWith("```"))
-            Code = Code.substring(0, Code.length - 3).trimEnd();
-        // Create the code block
         if (this.Finalized) {
-            this.ContentContainer = this.ContentContainer.replaceWith(`<code></code>`);
+            this.ContentContainer = $(`<code></code>`).replaceAll(this.ContentContainer);
             ChatManager.Instance.Commands.AnnotateCode(this.ContentContainer, Code, true);
         } else {
-            this.ContentContainer = this.ContentContainer.replaceWith(`<pre></pre>`).text(Code.trim());
+            this.ContentContainer = $(`<pre></pre>`).replaceAll(this.ContentContainer).text(Code);
         }
     }
 }

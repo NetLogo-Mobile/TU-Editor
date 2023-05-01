@@ -23,6 +23,8 @@ export interface ChatResponseSection {
     Content?: string;
     /** Summary: The summary of the section. */
     Summary?: string;
+    /** Parsed: The parsed object of the section. */
+    Parsed?: any;
     /** Options: The options for the section. */
     Options?: ChatResponseOption[];
 }

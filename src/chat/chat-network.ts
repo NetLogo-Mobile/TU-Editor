@@ -3,6 +3,7 @@ import { ChatRecord } from "./client/chat-record";
 import { ChatResponseSection, ChatResponseType } from "./client/chat-response";
 import { SSEClient } from "./sse-client";
 import { ClientChatRequest } from "./client/chat-request";
+declare const { JSON5 }: any;
 
 /** ChatNetwork: Class that handles the network communication for the chat. */
 export class ChatNetwork {
@@ -20,12 +21,29 @@ export class ChatNetwork {
         console.log(Record);
         // Do the request
         return new Promise<ChatRecord>((Resolve, Reject) => {
-            var Section: ChatResponseSection = { Content: "" };
+            var Update: ChatResponseSection = { };
+            var Section: ChatResponseSection = { };
             var Client = new SSEClient("http://localhost:3000/request", "", Record as ClientChatRequest);
+            // Finish the section if possible
+            var TryFinishSection = () => {
+                if (Section.Type !== undefined) {
+                    if (Section.Type === ChatResponseType.JSON && Section.Content && !Section.Content.endsWith(",")) 
+                        Section.Parsed = Section.Parsed ?? ChatNetwork.TryParse(Section.Content);
+                    Record.Response.Sections.push(Section);
+                    FinishSection(Section);
+                }
+            };
+            // Parse an element in the array if possible
+            var TryParseElement = () => {
+                if (Section.Type === ChatResponseType.JSON && Update.Content && Update.Content.endsWith(",")) {
+                    Section.Parsed = Section.Parsed ?? [];
+                    Section.Parsed.push(ChatNetwork.TryParse(Update.Content.substring(0, Update.Content.length - 1)));
+                }
+            };
             // Send the request
             Client.Listen((Data) => {
                 try {
-                    var Update = JSON.parse(Data.data) as ChatResponseSection;
+                    Update = JSON.parse(Data.data) as ChatResponseSection;
                     // console.log(Update);
                 } catch (Exception) {
                     console.log("Error: " + Data.data);
@@ -48,23 +66,17 @@ export class ChatNetwork {
                         }
                         return;
                     case ChatResponseType.Finish:
-                        if (Section.Type !== undefined) {
-                            Record.Response.Sections.push(Section);
-                            Thread.Records[Record.ID] = Record;
-                            FinishSection(Section);
-                        }
+                        TryFinishSection();
                         Record.ResponseTimestamp = Date.now();
+                        Thread.Records[Record.ID] = Record;
                         Resolve(Record);
                         return;
                     case undefined:
                         break;
                     default:
-                        if (Section.Type !== undefined) {
-                            Record.Response.Sections.push(Section);
-                            FinishSection(Section);
-                        }
+                        TryFinishSection();
                         Section = Update;
-                        Section.Options = Section.Options ?? [];
+                        TryParseElement();
                         NewSection(Section);
                         return;
                 }
@@ -76,12 +88,23 @@ export class ChatNetwork {
                 if (Update.Summary !== undefined) 
                     Section.Summary = Update.Summary;
                 if (Update.Options !== undefined) 
-                    Section.Options!.push(...Update.Options);
+                    Record.Response.Options!.push(...Update.Options);
+                TryParseElement();
                 UpdateSection(Section);
             }, (Error) => {
                 console.log("Server Error: " + Error);
                 Reject(Error);
             });
         });
+    }
+    /** TryParse: Try to parse a JSON5 string. */
+    private static TryParse(Source: string): any {
+        try {
+            return JSON5.parse(Source);
+        } catch (Exception) {
+            console.log(Source);
+            console.log(Exception);
+            return {};
+        }
     }
 }

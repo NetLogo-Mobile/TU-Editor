@@ -39,7 +39,6 @@ export class ChatManager {
         var Renderer = this.Outputs.RenderRecord(Record, Subthread);
         var CurrentRenderer: SectionRenderer | undefined;
         // Send the request
-        var Options = 0;
         var SendRequest = () => {
             if (this.Commands.Disabled) return;
             this.Commands.HideInput();
@@ -47,6 +46,7 @@ export class ChatManager {
                 // Create the section
                 Subthread.RootID = Subthread.RootID ?? Record.ID;
                 CurrentRenderer = Renderer.AddSection(Section);
+                CurrentRenderer?.Render();
                 this.Outputs.ScrollToBottom();
             }, (Section) => {
                 if (!CurrentRenderer) return;
@@ -55,7 +55,6 @@ export class ChatManager {
                 CurrentRenderer.Render();
                 this.Outputs.ScrollToBottom();
             }, (Section) => {
-                Options += Section.Options?.length ?? 0;
                 // Finish the section
                 if (!CurrentRenderer) return;
                 CurrentRenderer.SetFinalized();
@@ -63,8 +62,10 @@ export class ChatManager {
                 CurrentRenderer.Render();
                 this.Outputs.ScrollToBottom();
             }).then((Record) => {
-                if (Options == 0) this.Commands.ShowInput();
+                if (Record.Response.Options.length == 0) this.Commands.ShowInput();
                 console.log(Record);
+                Renderer.SetData(Record);
+                Renderer.Render();
             }).catch((Error) => {
                 if (!this.Commands.Disabled) return;
                 Renderer.AddSection({ 
@@ -81,7 +82,7 @@ export class ChatManager {
 
     // #region " Options and Contexts "
     /** RequestOption: Choose a chat option and send the request. */
-    public RequestOption(Option: ChatResponseOption, Section: ChatResponseSection, Record: ChatRecord) {
+    public RequestOption(Option: ChatResponseOption, Record: ChatRecord) {
         // Construct the request
         this.PendingRequest = {
             Input: Option.Label,

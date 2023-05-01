@@ -475,13 +475,31 @@
                 console.log(Record);
                 // Do the request
                 return new Promise((Resolve, Reject) => {
-                    var Section = { Content: "" };
+                    var Update = {};
+                    var Section = {};
                     var Client = new SSEClient("http://localhost:3000/request", "", Record);
+                    // Finish the section if possible
+                    var TryFinishSection = () => {
+                        var _a;
+                        if (Section.Type !== undefined) {
+                            if (Section.Type === ChatResponseType.JSON && Section.Content && !Section.Content.endsWith(","))
+                                Section.Parsed = (_a = Section.Parsed) !== null && _a !== void 0 ? _a : ChatNetwork.TryParse(Section.Content);
+                            Record.Response.Sections.push(Section);
+                            FinishSection(Section);
+                        }
+                    };
+                    // Parse an element in the array if possible
+                    var TryParseElement = () => {
+                        var _a;
+                        if (Section.Type === ChatResponseType.JSON && Update.Content && Update.Content.endsWith(",")) {
+                            Section.Parsed = (_a = Section.Parsed) !== null && _a !== void 0 ? _a : [];
+                            Section.Parsed.push(ChatNetwork.TryParse(Update.Content.substring(0, Update.Content.length - 1)));
+                        }
+                    };
                     // Send the request
                     Client.Listen((Data) => {
-                        var _a;
                         try {
-                            var Update = JSON.parse(Data.data);
+                            Update = JSON.parse(Data.data);
                             // console.log(Update);
                         }
                         catch (Exception) {
@@ -506,23 +524,17 @@
                                 }
                                 return;
                             case ChatResponseType.Finish:
-                                if (Section.Type !== undefined) {
-                                    Record.Response.Sections.push(Section);
-                                    Thread.Records[Record.ID] = Record;
-                                    FinishSection(Section);
-                                }
+                                TryFinishSection();
                                 Record.ResponseTimestamp = Date.now();
+                                Thread.Records[Record.ID] = Record;
                                 Resolve(Record);
                                 return;
                             case undefined:
                                 break;
                             default:
-                                if (Section.Type !== undefined) {
-                                    Record.Response.Sections.push(Section);
-                                    FinishSection(Section);
-                                }
+                                TryFinishSection();
                                 Section = Update;
-                                Section.Options = (_a = Section.Options) !== null && _a !== void 0 ? _a : [];
+                                TryParseElement();
                                 NewSection(Section);
                                 return;
                         }
@@ -534,7 +546,8 @@
                         if (Update.Summary !== undefined)
                             Section.Summary = Update.Summary;
                         if (Update.Options !== undefined)
-                            Section.Options.push(...Update.Options);
+                            Record.Response.Options.push(...Update.Options);
+                        TryParseElement();
                         UpdateSection(Section);
                     }, (Error) => {
                         console.log("Server Error: " + Error);
@@ -542,6 +555,17 @@
                     });
                 });
             });
+        }
+        /** TryParse: Try to parse a JSON5 string. */
+        static TryParse(Source) {
+            try {
+                return JSON5.parse(Source);
+            }
+            catch (Exception) {
+                console.log(Source);
+                console.log(Exception);
+                return {};
+            }
         }
     }
 
@@ -609,7 +633,6 @@
             var Renderer = this.Outputs.RenderRecord(Record, Subthread);
             var CurrentRenderer;
             // Send the request
-            var Options = 0;
             var SendRequest = () => {
                 if (this.Commands.Disabled)
                     return;
@@ -619,6 +642,7 @@
                     // Create the section
                     Subthread.RootID = (_a = Subthread.RootID) !== null && _a !== void 0 ? _a : Record.ID;
                     CurrentRenderer = Renderer.AddSection(Section);
+                    CurrentRenderer === null || CurrentRenderer === void 0 ? void 0 : CurrentRenderer.Render();
                     this.Outputs.ScrollToBottom();
                 }, (Section) => {
                     if (!CurrentRenderer)
@@ -628,8 +652,6 @@
                     CurrentRenderer.Render();
                     this.Outputs.ScrollToBottom();
                 }, (Section) => {
-                    var _a, _b;
-                    Options += (_b = (_a = Section.Options) === null || _a === void 0 ? void 0 : _a.length) !== null && _b !== void 0 ? _b : 0;
                     // Finish the section
                     if (!CurrentRenderer)
                         return;
@@ -638,9 +660,11 @@
                     CurrentRenderer.Render();
                     this.Outputs.ScrollToBottom();
                 }).then((Record) => {
-                    if (Options == 0)
+                    if (Record.Response.Options.length == 0)
                         this.Commands.ShowInput();
                     console.log(Record);
+                    Renderer.SetData(Record);
+                    Renderer.Render();
                 }).catch((Error) => {
                     if (!this.Commands.Disabled)
                         return;
@@ -657,7 +681,7 @@
         // #endregion
         // #region " Options and Contexts "
         /** RequestOption: Choose a chat option and send the request. */
-        RequestOption(Option, Section, Record) {
+        RequestOption(Option, Record) {
             var _a;
             // Construct the request
             this.PendingRequest = {
@@ -803,12 +827,121 @@
             /** Finalized: Whether the section is finalized. */
             this.Finalized = false;
             this.Container.addClass("section");
-            this.ContentContainer = $(`<p></p>`).appendTo(this.Container);
+            this.ContentContainer = this.ContentContainerInitializer().appendTo(this.Container);
+        }
+        /** ContentContainerInitializer: The initializer for the container. */
+        ContentContainerInitializer() {
+            return $("<p></p>");
         }
         /** RenderInternal: Render the UI element. */
         RenderInternal() {
             var _a, _b;
             this.ContentContainer.text(`${(_a = this.GetData().Field) !== null && _a !== void 0 ? _a : "Empty"}: ${(_b = this.GetData().Content) !== null && _b !== void 0 ? _b : ""}`);
+        }
+    }
+
+    /** JSONSectionRenderer: A block that displays the a JSON response section. */
+    class JSONSectionRenderer extends SectionRenderer {
+        /** Constructor: Create a new UI renderer. */
+        constructor() {
+            super();
+            this.Container.addClass("json");
+        }
+        /** RenderInternal: Render the UI element. */
+        RenderInternal() { }
+        /** GetParsed: Get the parsed data. */
+        GetParsed() {
+            return super.GetData().Parsed;
+        }
+    }
+
+    /** CodeIdeationRenderer: A dedicated block for code ideation. */
+    class CodeIdeationRenderer extends JSONSectionRenderer {
+        /** Constructor: Create a new UI renderer. */
+        constructor() {
+            super();
+            this.Container.addClass("code-ideation");
+        }
+        /** ContentContainerInitializer: The initializer for the container. */
+        ContentContainerInitializer() {
+            return $("<ul></ul>");
+        }
+        /** RenderInternal: Render the UI element. */
+        RenderInternal() {
+            var Parameters = this.GetParsed();
+            if (this.Finalized) {
+                this.ContentContainer = $(`<div class="parameters"></div>`).replaceAll(this.ContentContainer);
+                // When finalized, render the entire HTML structure
+                for (var Parameter of Parameters) {
+                    var Renderer = new ParameterRenderer();
+                    this.AddChild(Renderer, false);
+                    Renderer.Container.appendTo(this.ContentContainer);
+                    Renderer.SetData(Parameter);
+                    Renderer.Render();
+                }
+                $(`<p><a href="javascript:void(0)">${EditorLocalized.Get("I think that's what I want, for now...")}</a></p>`)
+                    .appendTo(this.ContentContainer).on("click", () => this.SubmitParameters());
+            }
+            else {
+                this.ContentContainer.empty();
+                // When not finalized, render the questions
+                for (var Parameter of Parameters) {
+                    $("<li></li>").appendTo(this.ContentContainer).text(Parameter.Question);
+                }
+            }
+        }
+        /** SubmitParameters: Submit the parameters to the server. */
+        SubmitParameters() {
+            // Compose the input
+            var Composed = this.Children.map(Renderer => {
+                var Current = Renderer;
+                var Parameter = Current.GetData();
+                var Value = Current.Input.val();
+                if (!Value || Value === "")
+                    Value = Current.Input.attr("placeholder");
+                return {
+                    Name: Parameter.Name,
+                    Value: Value
+                };
+            });
+            // Request the virtual option
+            var Manager = ChatManager.Instance;
+            var Record = this.Parent.GetData();
+            Manager.RequestOption(Record.Response.Options[0], Record);
+            var Message = JSON.stringify({
+                Need: Record.Response.Sections[0].Content,
+                Parameters: Composed
+            });
+            console.log(Message);
+            Manager.SendMessage(Message);
+        }
+        /** GetChooser: Return the section chooser for this renderer. */
+        static GetChooser() {
+            return (Record, Section) => Section.Parsed && Array.isArray(Section.Parsed) && Section.Parsed.length > 0 &&
+                Section.Parsed[0].Name && Section.Parsed[0].Question ? new CodeIdeationRenderer() : undefined;
+        }
+    }
+    /** ParameterRenderer: A block that displays the a parameter. */
+    class ParameterRenderer extends UIRendererOf {
+        /** Constructor: Create a new UI renderer. */
+        constructor() {
+            super();
+            this.Container.addClass("parameter");
+            this.Question = $(`<div class="Question"></div>`).appendTo(this.Container);
+            this.Input = $(`<input type="text" />`).appendTo(this.Container);
+        }
+        /** RenderInternal: Render the UI element. */
+        RenderInternal() {
+            var _a, _b;
+            var Parameter = this.GetData();
+            this.Question.text(Parameter.Question);
+            if (typeof Parameter.Known === "string" || Parameter.Known instanceof String) {
+                this.Input.val(Parameter.Known);
+            }
+            else {
+                this.Input.val("");
+            }
+            this.Input.attr("placeholder", (_b = (_a = Parameter.Options) === null || _a === void 0 ? void 0 : _a[0]) !== null && _b !== void 0 ? _b : "");
         }
     }
 
@@ -824,21 +957,12 @@
             var _a, _b;
             var Section = this.GetData();
             var Code = (_b = (_a = Section.Content) === null || _a === void 0 ? void 0 : _a.trim()) !== null && _b !== void 0 ? _b : "";
-            // Remove the first line
-            var LineBreak = Code.indexOf("\n");
-            if (LineBreak == -1)
-                return;
-            Code = Code.substring(LineBreak + 1);
-            // Remove the last ```
-            if (Code.endsWith("```"))
-                Code = Code.substring(0, Code.length - 3).trimEnd();
-            // Create the code block
             if (this.Finalized) {
-                this.ContentContainer = this.ContentContainer.replaceWith(`<code></code>`);
+                this.ContentContainer = $(`<code></code>`).replaceAll(this.ContentContainer);
                 ChatManager.Instance.Commands.AnnotateCode(this.ContentContainer, Code, true);
             }
             else {
-                this.ContentContainer = this.ContentContainer.replaceWith(`<pre></pre>`).text(Code.trim());
+                this.ContentContainer = $(`<pre></pre>`).replaceAll(this.ContentContainer).text(Code);
             }
         }
     }
@@ -915,15 +1039,15 @@
         }
         /** RenderInternal: Render the UI element. */
         RenderInternal() {
-            var _a, _b;
-            this.Container.addClass((_a = this.GetData().Style) !== null && _a !== void 0 ? _a : "generated").children("a")
-                .text((_b = this.GetData().LocalizedLabel) !== null && _b !== void 0 ? _b : this.GetData().Label);
+            var _a, _b, _c;
+            this.Container.addClass((_b = (_a = this.GetData().Style) === null || _a === void 0 ? void 0 : _a.toLowerCase()) !== null && _b !== void 0 ? _b : "generated").children("a")
+                .text((_c = this.GetData().LocalizedLabel) !== null && _c !== void 0 ? _c : this.GetData().Label);
         }
         /** ClickHandler: The handler for the click event. */
         ClickHandler() {
             var Section = this.Parent;
             var Record = Section.Parent;
-            ChatManager.Instance.RequestOption(this.GetData(), Section.GetData(), Record.GetData());
+            ChatManager.Instance.RequestOption(this.GetData(), Record.GetData());
         }
     }
 
@@ -932,6 +1056,8 @@
         /** Constructor: Create a new UI renderer. */
         constructor() {
             super();
+            /** OptionRenderers: The renderer of the options. */
+            this.OptionRenderers = [];
             this.Container.addClass("record");
             this.InputRenderer = new InputRenderer();
             this.AddChild(this.InputRenderer);
@@ -942,7 +1068,9 @@
 </div>`).appendTo(this.Container).find(".content");
         }
         /** RenderInternal: Render the UI element. */
-        RenderInternal() { }
+        RenderInternal() {
+            this.RenderOptions();
+        }
         /** SetData: Set the data of the renderer. */
         SetData(Data) {
             this.InputRenderer.SetData(Data);
@@ -956,7 +1084,7 @@
             // Choose a renderer for the section
             var Renderers = SectionRenderers[Section.Type];
             for (var Chooser of Renderers) {
-                Renderer = Chooser(Section);
+                Renderer = Chooser(this.GetData(), Section);
                 if (Renderer)
                     break;
             }
@@ -979,23 +1107,24 @@
         }
         /** RenderOptions: Render the options of the section. */
         RenderOptions() {
-            var _a;
-            var Options = this.GetData().Response.Options;
+            var _a, _b;
+            var Options = (_a = this.GetData().Response) === null || _a === void 0 ? void 0 : _a.Options;
             if (!Options || Options.length == 0)
                 return;
             // Create the container
-            this.OptionContainer = (_a = this.OptionContainer) !== null && _a !== void 0 ? _a : $(`<ul></ul>`).appendTo(this.ContentContainer);
+            this.OptionContainer = (_b = this.OptionContainer) !== null && _b !== void 0 ? _b : $(`<ul></ul>`).appendTo(this.ContentContainer);
             // Render the options
             for (var I = 0; I < Options.length; I++) {
                 var Option = Options[I];
                 var Renderer;
-                if (this.Children.length <= I) {
+                if (this.OptionRenderers.length <= I) {
                     Renderer = new OptionRenderer();
                     this.AddChild(Renderer, false);
                     this.OptionContainer.append(Renderer.Container);
+                    this.OptionRenderers.push(Renderer);
                 }
                 else
-                    Renderer = this.Children[I];
+                    Renderer = this.OptionRenderers[I];
                 Renderer.SetData(Option);
                 Renderer.Render();
             }
@@ -1007,7 +1136,7 @@
         [ChatResponseType.Finish]: [],
         [ChatResponseType.Text]: [() => new TextSectionRenderer()],
         [ChatResponseType.Code]: [() => new CodeSectionRenderer()],
-        [ChatResponseType.JSON]: [],
+        [ChatResponseType.JSON]: [CodeIdeationRenderer.GetChooser()],
         [ChatResponseType.Thought]: [],
         [ChatResponseType.CompileError]: [],
         [ChatResponseType.RuntimeError]: [],

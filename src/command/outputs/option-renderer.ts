@@ -14,13 +14,13 @@ export class OptionRenderer extends UIRendererOf<ChatResponseOption> {
     }
     /** RenderInternal: Render the UI element. */
     protected RenderInternal(): void {
-        this.Container.addClass(this.GetData().Style ?? "generated").children("a")
+        this.Container.addClass(this.GetData().Style?.toLowerCase() ?? "generated").children("a")
             .text(this.GetData().LocalizedLabel ?? this.GetData().Label);
     }
     /** ClickHandler: The handler for the click event. */
     protected ClickHandler(): void {
         var Section = this.Parent! as SectionRenderer;
         var Record = Section.Parent! as RecordRenderer;
-        ChatManager.Instance.RequestOption(this.GetData(), Section.GetData(), Record.GetData());
+        ChatManager.Instance.RequestOption(this.GetData(), Record.GetData());
     }
 }

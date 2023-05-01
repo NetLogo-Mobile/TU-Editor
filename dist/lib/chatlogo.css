@@ -183,6 +183,35 @@
     margin: 0 0 0 0.5rem;
 }
 
+.command-output .content ul li.hidden {
+    display: none;
+}
+
+.command-output .code-ideation {
+    border: 1px solid #eee;
+    margin: 0.3rem 0 0.5rem 0;
+    padding: 0.3rem 0.5rem;
+    background: #fff;
+}
+
+.command-output .code-ideation p {
+    padding: 0.3rem;
+}
+
+.command-output .parameter input {
+    width: 100%;
+    margin: 0.2rem 0 0 0;
+    padding: 0.2rem 0.3rem 0.1rem;
+    border: 1px solid #eee;
+    line-height: 1.5;
+    max-width: 30rem;
+}
+
+.command-output .parameter:not(:last-child) {
+    padding: 0.3rem 0.3rem 0.5rem 0.3rem;
+    border-bottom: 1px solid #eee;
+}
+
 /** Output display (Legacy) */
 .command-output .output {
 	padding: 0 1rem;

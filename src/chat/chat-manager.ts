@@ -30,9 +30,11 @@ export class ChatManager {
         this.SendRequest(this.PendingRequest);
         this.PendingRequest = null;
     }
+    /** IsRequesting: Whether we are currently requesting anything. */
+    private IsRequesting: boolean = false;
     /** SendRequest: Send a request to the chat backend and handle its outputs. */
     private SendRequest(Request: ClientChatRequest) {
-        if (this.Commands.Disabled) return;
+        if (this.IsRequesting) return;
         // Make it a record and put it in the thread
         var Record = Request as ChatRecord;
         var Subthread = this.Thread.AddToSubthread(Record);
@@ -40,7 +42,8 @@ export class ChatManager {
         var CurrentRenderer: SectionRenderer | undefined;
         // Send the request
         var SendRequest = () => {
-            if (this.Commands.Disabled) return;
+            if (this.IsRequesting) return;
+            this.IsRequesting = true;
             this.Commands.HideInput();
             ChatNetwork.SendRequest(Record, this.Thread, (Section) => {
                 // Create the section
@@ -62,18 +65,21 @@ export class ChatManager {
                 CurrentRenderer.Render();
                 this.Outputs.ScrollToBottom();
             }).then((Record) => {
-                if (Record.Response.Options.length == 0) this.Commands.ShowInput();
                 console.log(Record);
                 Renderer.SetData(Record);
                 Renderer.Render();
+                this.IsRequesting = false;
+                if (Record.Response.Options.length == 0) 
+                    this.Commands.ShowInput();
             }).catch((Error) => {
-                if (!this.Commands.Disabled) return;
+                if (!this.IsRequesting) return;
                 Renderer.AddSection({ 
                     Type: ChatResponseType.ServerError, 
                     Content: EditorLocalized.Get("Connection to server failed _", Error ?? EditorLocalized.Get("Unknown")),
                     Field: SendRequest as any
                 })!.SetFinalized().Render();
                 this.Commands.ShowInput();
+                this.IsRequesting = false;
             });
         };
         SendRequest();

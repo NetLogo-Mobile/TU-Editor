@@ -625,7 +625,7 @@
         }
         /** SendRequest: Send a request to the chat backend and handle its outputs. */
         SendRequest(Request) {
-            if (this.Commands.Disabled)
+            if (this.IsRequesting)
                 return;
             // Make it a record and put it in the thread
             var Record = Request;
@@ -634,8 +634,9 @@
             var CurrentRenderer;
             // Send the request
             var SendRequest = () => {
-                if (this.Commands.Disabled)
+                if (this.IsRequesting)
                     return;
+                this.IsRequesting = true;
                 this.Commands.HideInput();
                 ChatNetwork.SendRequest(Record, this.Thread, (Section) => {
                     var _a;
@@ -660,13 +661,14 @@
                     CurrentRenderer.Render();
                     this.Outputs.ScrollToBottom();
                 }).then((Record) => {
-                    if (Record.Response.Options.length == 0)
-                        this.Commands.ShowInput();
                     console.log(Record);
                     Renderer.SetData(Record);
                     Renderer.Render();
+                    this.IsRequesting = false;
+                    if (Record.Response.Options.length == 0)
+                        this.Commands.ShowInput();
                 }).catch((Error) => {
-                    if (!this.Commands.Disabled)
+                    if (!this.IsRequesting)
                         return;
                     Renderer.AddSection({
                         Type: ChatResponseType.ServerError,
@@ -674,6 +676,7 @@
                         Field: SendRequest
                     }).SetFinalized().Render();
                     this.Commands.ShowInput();
+                    this.IsRequesting = false;
                 });
             };
             SendRequest();
@@ -796,6 +799,8 @@
             this.Thread = new ChatThread();
             /** PendingRequest: The pending chat request. */
             this.PendingRequest = null;
+            /** IsRequesting: Whether we are currently requesting anything. */
+            this.IsRequesting = false;
             /** Available: Whether the chat backend is available. */
             this.Available = true;
             this.Commands = Tab;

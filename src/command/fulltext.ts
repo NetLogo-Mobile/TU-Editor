@@ -1,7 +1,6 @@
 import { Tab } from "src/tab";
 import { CommandTab } from "./command-tab";
-import { TransformLinks, RenderAgent, LinkCommand } from "src/utils/element";
-declare const { showdown }: any;
+import { TransformLinks, RenderAgent, LinkCommand, MarkdownToHTML } from "src/utils/element";
 
 /** FullTextDisplay: Display the full-text help information. */
 export class FullTextDisplay {
@@ -45,9 +44,9 @@ export class FullTextDisplay {
 			SetCode(Data["translation"]);
 		}).parent().hide();
 		// Render the full text
-		var SetCode = (Content: any) => {
+		var SetCode = (Content: string) => {
 			if (Content != null) this.Container.find("div.fulltext")
-				.html(new showdown.Converter().makeHtml(Content));
+				.html(MarkdownToHTML(Content));
 			this.Tab.AnnotateCode(this.Container.find("code"), undefined, true);
 			this.Container.scrollTop(0);
 		};

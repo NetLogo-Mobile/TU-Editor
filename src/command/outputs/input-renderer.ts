@@ -1,8 +1,9 @@
-import { ChatRequest } from "../../chat/client/chat-request";
+import { ClientChatRequest } from "../../chat/client/chat-request";
+import { MarkdownToHTML } from "../../utils/element";
 import { UIRendererOf } from "./ui-renderer";
 
 /** InputRenderer: A block that displays the an user input. */
-export class InputRenderer extends UIRendererOf<ChatRequest> {
+export class InputRenderer extends UIRendererOf<ClientChatRequest> {
     /** Avatar: The avatar of the input. */
     private Avatar: JQuery<HTMLElement>;
     /** Content: The content of the input. */
@@ -19,6 +20,6 @@ export class InputRenderer extends UIRendererOf<ChatRequest> {
     }
     /** RenderInternal: Render the UI element. */
     protected RenderInternal(): void {
-        this.Content.text(this.GetData().Input);
+        this.Content.html(MarkdownToHTML(this.GetData().FriendlyInput ?? this.GetData().Input));
     }
 }

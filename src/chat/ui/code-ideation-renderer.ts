@@ -2,7 +2,6 @@ import { RecordRenderer, RendererChooser } from "../../command/outputs/record-re
 import { UIRendererOf } from "../../command/outputs/ui-renderer";
 import { JSONSectionRenderer } from "../../command/sections/json-section-renderer";
 import { ChatManager } from "../chat-manager";
-import { ContextInheritance, ContextMessage } from "../client/chat-option";
 declare const { EditorLocalized }: any;
 
 /** CodeIdeationRenderer: A dedicated block for code ideation. */
@@ -42,26 +41,29 @@ export class CodeIdeationRenderer extends JSONSectionRenderer<CodeParameter[]> {
     /** SubmitParameters: Submit the parameters to the server. */
     private SubmitParameters(): void {
         // Compose the input
-        var Composed = this.Children.map(Renderer => {
+        var Composed: Record<string, any> = {};
+        this.Children.forEach(Renderer => {
             var Current = Renderer as ParameterRenderer;
             var Parameter = Current.GetData();
             var Value = Current.Input.val();
             if (!Value || Value === "") Value = Current.Input.attr("placeholder");
-            return {
-                Name: Parameter.Name,
-                Value: Value
-            }
+            Composed[Parameter.Name] = Value;
         });
         // Request the virtual option
         var Manager = ChatManager.Instance;
         var Record = (this.Parent! as RecordRenderer).GetData();
         Manager.RequestOption(Record.Response.Options[0], Record);
+        // Build the messages
         var Message = JSON.stringify({
             Need: Record.Response.Sections[0].Content,
             Parameters: Composed
         });
+        var Friendly = `${EditorLocalized.Get("Here is a summary of my response:")}`;
+        for (var Parameter in Composed) {
+            Friendly += `\n- ${Parameter}: ${Composed[Parameter]}`;
+        }
         console.log(Message);
-        Manager.SendMessage(Message);
+        Manager.SendMessage(Message, Friendly);
     }
     /** GetChooser: Return the section chooser for this renderer. */
     public static GetChooser(): RendererChooser {
@@ -76,23 +78,38 @@ export class ParameterRenderer extends UIRendererOf<CodeParameter> {
     public Question: JQuery<HTMLElement>;
     /** Input: The content of the input. */
     public Input: JQuery<HTMLElement>;
+    /** Examples: The examples of the input. */
+    public Examples: JQuery<HTMLElement>;
     /** Constructor: Create a new UI renderer. */
     public constructor() {
         super();
         this.Container.addClass("parameter");
         this.Question = $(`<div class="Question"></div>`).appendTo(this.Container);
         this.Input = $(`<input type="text" />`).appendTo(this.Container);
+        this.Examples = $(`<div class="Examples"></div>`).appendTo(this.Container);
     }
     /** RenderInternal: Render the UI element. */
     protected RenderInternal(): void {
         var Parameter = this.GetData();
+        // Render the question
         this.Question.text(Parameter.Question);
+        // Sync the input
         if (typeof Parameter.Known === "string" || Parameter.Known as any instanceof String) {
             this.Input.val(Parameter.Known as string);
         } else {
             this.Input.val("");
         }
         this.Input.attr("placeholder", Parameter.Options?.[0] ?? "");
+        // Render the examples
+        this.Examples.empty();
+        if (!Parameter.Options) return;
+        var Input = this.Input;
+        $("<span></span>").appendTo(this.Examples).text(EditorLocalized.Get("e.g."));
+        for (var Option of Parameter.Options) {
+            $(`<a href="javascript:void(0)"></a>`).data("option", Option).appendTo(this.Examples).text(Option).on("click", function() {
+                Input.val($(this).data("option"));
+            });
+        }
     }
 }
 

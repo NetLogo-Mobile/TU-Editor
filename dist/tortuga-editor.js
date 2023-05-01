@@ -113,6 +113,10 @@
             LinkElement.on("click", () => Editor.Call({ Type: "Visit", Target: Href }));
         });
     }
+    /** MarkdownToHTML: Convert markdown to HTML. */
+    function MarkdownToHTML(Source) {
+        return new showdown.Converter().makeHtml(Source);
+    }
     /** LinkCommand: Generate a link for another command. */
     function LinkCommand(Query) {
         Query.each((Index, Item) => {
@@ -194,7 +198,7 @@
             var SetCode = (Content) => {
                 if (Content != null)
                     this.Container.find("div.fulltext")
-                        .html(new showdown.Converter().makeHtml(Content));
+                        .html(MarkdownToHTML(Content));
                 this.Tab.AnnotateCode(this.Container.find("code"), undefined, true);
                 this.Container.scrollTop(0);
             };
@@ -615,10 +619,11 @@
             this.PendingRequest = null;
         }
         /** SendMessage: Send a direct message to the chat backend. */
-        SendMessage(Content) {
+        SendMessage(Content, Friendly) {
             var _a;
             this.PendingRequest = (_a = this.PendingRequest) !== null && _a !== void 0 ? _a : { Input: "" };
             this.PendingRequest.Input = Content;
+            this.PendingRequest.FriendlyInput = Friendly;
             this.PendingRequest.Language = this.Thread.Language;
             this.SendRequest(this.PendingRequest);
             this.PendingRequest = null;
@@ -898,27 +903,30 @@
         /** SubmitParameters: Submit the parameters to the server. */
         SubmitParameters() {
             // Compose the input
-            var Composed = this.Children.map(Renderer => {
+            var Composed = {};
+            this.Children.forEach(Renderer => {
                 var Current = Renderer;
                 var Parameter = Current.GetData();
                 var Value = Current.Input.val();
                 if (!Value || Value === "")
                     Value = Current.Input.attr("placeholder");
-                return {
-                    Name: Parameter.Name,
-                    Value: Value
-                };
+                Composed[Parameter.Name] = Value;
             });
             // Request the virtual option
             var Manager = ChatManager.Instance;
             var Record = this.Parent.GetData();
             Manager.RequestOption(Record.Response.Options[0], Record);
+            // Build the messages
             var Message = JSON.stringify({
                 Need: Record.Response.Sections[0].Content,
                 Parameters: Composed
             });
+            var Friendly = `${EditorLocalized.Get("Here is a summary of my response:")}`;
+            for (var Parameter in Composed) {
+                Friendly += `\n- ${Parameter}: ${Composed[Parameter]}`;
+            }
             console.log(Message);
-            Manager.SendMessage(Message);
+            Manager.SendMessage(Message, Friendly);
         }
         /** GetChooser: Return the section chooser for this renderer. */
         static GetChooser() {
@@ -934,12 +942,15 @@
             this.Container.addClass("parameter");
             this.Question = $(`<div class="Question"></div>`).appendTo(this.Container);
             this.Input = $(`<input type="text" />`).appendTo(this.Container);
+            this.Examples = $(`<div class="Examples"></div>`).appendTo(this.Container);
         }
         /** RenderInternal: Render the UI element. */
         RenderInternal() {
             var _a, _b;
             var Parameter = this.GetData();
+            // Render the question
             this.Question.text(Parameter.Question);
+            // Sync the input
             if (typeof Parameter.Known === "string" || Parameter.Known instanceof String) {
                 this.Input.val(Parameter.Known);
             }
@@ -947,6 +958,17 @@
                 this.Input.val("");
             }
             this.Input.attr("placeholder", (_b = (_a = Parameter.Options) === null || _a === void 0 ? void 0 : _a[0]) !== null && _b !== void 0 ? _b : "");
+            // Render the examples
+            this.Examples.empty();
+            if (!Parameter.Options)
+                return;
+            var Input = this.Input;
+            $("<span></span>").appendTo(this.Examples).text(EditorLocalized.Get("e.g."));
+            for (var Option of Parameter.Options) {
+                $(`<a href="javascript:void(0)"></a>`).data("option", Option).appendTo(this.Examples).text(Option).on("click", function () {
+                    Input.val($(this).data("option"));
+                });
+            }
         }
     }
 
@@ -1030,7 +1052,8 @@
         }
         /** RenderInternal: Render the UI element. */
         RenderInternal() {
-            this.Content.text(this.GetData().Input);
+            var _a;
+            this.Content.html(MarkdownToHTML((_a = this.GetData().FriendlyInput) !== null && _a !== void 0 ? _a : this.GetData().Input));
         }
     }
 
@@ -1428,6 +1451,11 @@
             // Get the elements
             this.CommandLine = $(Container).find(".command-line");
             this.TargetSelect = this.CommandLine.find("select");
+            this.TargetSelect.html(`
+		<option value="observer">${EditorLocalized.Get("Observer")}</option>
+		<option value="turtles">${EditorLocalized.Get("Turtles")}</option>
+		<option value="patches">${EditorLocalized.Get("Patches")}</option>
+		<option value="links">${EditorLocalized.Get("Links")}</option>`);
             // CodeMirror Editor
             this.Galapagos = new GalapagosEditor(this.CommandLine.find(".command-input").get(0), {
                 OneLine: true,

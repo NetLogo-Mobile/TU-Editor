@@ -1,5 +1,6 @@
 import { Localized } from "src/legacy";
 import { TurtleEditor } from "../main";
+declare const { showdown }: any;
 
   /** TransformLinks: Transform the embedded links. */
  export function TransformLinks(Editor: TurtleEditor, Element: JQuery<HTMLElement>) {
@@ -10,6 +11,11 @@ import { TurtleEditor } from "../main";
         LinkElement.attr("href", "javascript:void(0);");
         LinkElement.on("click", () => Editor.Call({ Type: "Visit", Target: Href }));
     });
+}
+
+/** MarkdownToHTML: Convert markdown to HTML. */
+export function MarkdownToHTML(Source: string): string {
+    return new showdown.Converter().makeHtml(Source);
 }
 
 /** LinkCommand: Generate a link for another command. */

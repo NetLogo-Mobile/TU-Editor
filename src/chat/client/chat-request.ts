@@ -25,4 +25,6 @@ export interface ClientChatRequest extends ChatRequest {
     ThreadID?: string;
     /** ParentID: The parent response ID. */
     ParentID?: string;
+    /** FriendlyInput: The input for display. */
+    FriendlyInput?: string;
 }

@@ -212,6 +212,17 @@
     border-bottom: 1px solid #eee;
 }
 
+.command-output .parameter .examples {
+	color: #666;
+	margin: 0.2em 0 0;
+	font-size: 0.9rem;
+}
+
+.command-output .parameter .examples a {
+	color: #666;
+	margin: 0 0 0 0.3rem;
+}
+
 /** Output display (Legacy) */
 .command-output .output {
 	padding: 0 1rem;

@@ -23,9 +23,10 @@ export class ChatManager {
         this.PendingRequest = null;
     }
     /** SendMessage: Send a direct message to the chat backend. */ 
-    public SendMessage(Content: string) {
+    public SendMessage(Content: string, Friendly?: string) {
         this.PendingRequest = this.PendingRequest ?? { Input: "" };
         this.PendingRequest.Input = Content;
+        this.PendingRequest.FriendlyInput = Friendly;
         this.PendingRequest.Language = this.Thread.Language;
         this.SendRequest(this.PendingRequest);
         this.PendingRequest = null;

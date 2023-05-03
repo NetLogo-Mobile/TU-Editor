@@ -4,6 +4,8 @@ import { Display } from "./display";
 
 /** FullTextDisplay: Display the full-text help information. */
 export class FullTextDisplay extends Display {
+    /** Selector: The selector of the display. */
+    public readonly Selector: string = ".command-fulltext";
     /** RequestedTab: The tab that requested the full text. */
 	private RequestedTab: Tab | null = null;
 	/** ShowFullText: Show the full text of a command. */

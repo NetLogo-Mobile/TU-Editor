@@ -29,8 +29,8 @@ export class TurtleEditor {
 		// Listen to the sizing
 		if (window.visualViewport)
 			window.visualViewport.addEventListener("resize", () => this.CurrentTab?.SyncSize());
-      this.CommandTab.Show();
-    }
+    this.CommandTab.Show();
+  }
   /** Call: Call the facilitator (by default, the Unity Engine). */
   public Call(Message: any) {
     if (TurtleEditor.PostMessage)

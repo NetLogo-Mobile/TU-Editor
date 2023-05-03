@@ -1,17 +1,19 @@
 import { CommandTab } from "../command-tab";
 
 /** Display: A display section of Command Center. */
-export class Display {
+export abstract class Display {
     /** Tab: The related command tab. */
     public readonly Tab: CommandTab;
     /** Container: The output help area.  */
 	public readonly Container: JQuery<HTMLElement>;
     // Whether it is visible.
     public Visible: boolean = false;
+    /** Selector: The selector of the display. */
+    public readonly Selector: string = "";
     /** Constructor: Create a new output section. */
     constructor(Tab: CommandTab) {
         this.Tab = Tab;
-        this.Container = $(Tab.Container).find(".command-output");
+        this.Container = $(Tab.Container).find(this.Selector);
         this.Tab.Sections.push(this);
     }
     /** Show: Show the section. */

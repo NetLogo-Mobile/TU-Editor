@@ -5,10 +5,21 @@ import { ChatSubthread } from "../../chat/client/chat-thread";
 import { ChatRecord } from "../../chat/client/chat-record";
 import { RecordRenderer } from "../outputs/record-renderer";
 import { Display } from "./display";
+import { CommandTab } from "../command-tab";
 
 /** OutputDisplay: Display the output section. */
 export class OutputDisplay extends Display {
+    /** Selector: The selector of the display. */
+    public readonly Selector: string = ".command-output";
+	/** Constructor: Create a new output section. */
+	public constructor(Tab: CommandTab) {
+		super(Tab);
+		this.OutputContainer = this.Container.find(".output");
+	}
+
 	// #region "Threading Support"
+	/** Container: The container of the output region. */
+	private OutputContainer: JQuery<HTMLElement>;
 	/** Subthread: The active subthread. */
 	private Subthread?: SubthreadRenderer;
 	/** Subthreads: The subthread store. */
@@ -20,7 +31,7 @@ export class OutputDisplay extends Display {
 	}
 	/** Clear: Clear the output region of Command Center. */
 	public Clear() {
-		this.Container.empty();
+		this.OutputContainer.empty();
 		this.Subthreads.clear();
 		delete this.Subthread;
 	}
@@ -32,7 +43,7 @@ export class OutputDisplay extends Display {
 			this.Subthread = this.Subthreads.get(Subthread);
 			if (this.Subthread == null) {
 				this.Subthread = new SubthreadRenderer();
-				this.Container.append(this.Subthread.Container);
+				this.OutputContainer.append(this.Subthread.Container);
 				this.Subthread.SetData(Subthread);
 				this.Subthreads.set(Subthread, this.Subthread);
 			}
@@ -54,7 +65,7 @@ export class OutputDisplay extends Display {
 	/** WriteOutput: Print to a batch. */
 	private WriteOutput(Element: JQuery<HTMLElement>) {
 		if (this.Fragment == null)
-			this.Container.append(Element);
+			this.OutputContainer.append(Element);
 		else this.Fragment.append(Element);
 	}
 	/** OpenBatch: Open a printing batch. */
@@ -69,14 +80,14 @@ export class OutputDisplay extends Display {
 		var Length = this.Fragment.children().length;
 		if (Length > this.BufferSize) {
 			this.Fragment.children().slice(0, Length - this.BufferSize).remove();
-			this.Container.children().remove();
+			this.OutputContainer.children().remove();
 		} else {
-			var NewLength = this.Container.children().length + Length;
+			var NewLength = this.OutputContainer.children().length + Length;
 			if (NewLength > this.BufferSize)
-                this.Container.children().slice(0, NewLength - this.BufferSize).remove();
+                this.OutputContainer.children().slice(0, NewLength - this.BufferSize).remove();
 		}
 		// Append to the display
-		this.Container.append(this.Fragment);
+		this.OutputContainer.append(this.Fragment);
 		this.Fragment = null;
 		if (AtBottom) this.ScrollToBottom();
 	}

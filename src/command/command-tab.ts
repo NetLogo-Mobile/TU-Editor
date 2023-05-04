@@ -1,8 +1,10 @@
 import { TurtleEditor } from "../main";
 import { Tab } from '../tab';
-import { FullTextDisplay } from "./fulltext";
-import { OutputDisplay } from "./outputs";
+import { FullTextDisplay } from "./displays/fulltext";
+import { OutputDisplay } from "./displays/outputs";
 import { ChatManager } from '../chat/chat-manager';
+import { Display } from "./displays/display";
+import { CodeDisplay } from "./displays/code";
 
 declare const { bodyScrollLock, EditorDictionary, EditorLocalized, GalapagosEditor }: any;
 type GalapagosEditor = any;
@@ -18,6 +20,10 @@ export class CommandTab extends Tab {
 	public readonly FullText: FullTextDisplay;
 	/** Outputs: The outputs area.  */
 	public readonly Outputs: OutputDisplay;
+	/** Codes: The interactive code area.  */
+	public readonly Codes: CodeDisplay;
+	/** Sections: The sections of the command center. */
+	public readonly Sections: Display[] = [];
 	/** ChatManager: The chat interface to the backend. */
 	public readonly ChatManager: ChatManager;
 	/** Show: Show the command tab.  */
@@ -26,15 +32,13 @@ export class CommandTab extends Tab {
 		bodyScrollLock.clearAllBodyScrollLocks();
 		bodyScrollLock.disableBodyScroll(this.Outputs.Container.get(0)!);
 		bodyScrollLock.disableBodyScroll(this.FullText.Container.get(0)!);
-		this.HideFullText();
-		this.Outputs.ScrollToBottom();
+		this.Outputs.Show();
 	}
 	/** Hide: Hide the command tab. */
 	public Hide() {
 		super.Hide();
 		bodyScrollLock.clearAllBodyScrollLocks();
 		bodyScrollLock.disableBodyScroll(document.querySelector('.cm-scroller'), { allowTouchMove: () => true });
-		this.HideFullText();
 	}
 	/** Blur: Blur the tab's editor. */
 	public Blur() {
@@ -42,10 +46,10 @@ export class CommandTab extends Tab {
 		this.Galapagos.Blur();
 	}
 	/** Resize: Resize the tab. */
-	private TimeoutHandler: any;
 	public Resize(ViewportHeight: number, ScrollHeight: number) {
 		super.Resize(ViewportHeight, ScrollHeight);
 		this.Outputs.ScrollToBottom();
+		this.Codes.ScrollToBottom();
 		return true;
 	}
 	/** Reset: Reset the command center. */
@@ -53,20 +57,13 @@ export class CommandTab extends Tab {
 		super.Reset();
 		this.ShowInput();
 		this.ClearInput();
+		this.Outputs.Show();
 		this.Outputs.Clear();
 		this.ChatManager.Reset();
-		this.HideFullText();
 	}
-	/** ShowFullText: Show the full-text help area. */
-	public ShowFullText(Data: any) {
-		this.FullText.ShowFullText(Data);
-		this.Outputs.Container.hide();
-	}
-	/** HideFullText: Hide the full-text help area. */
-	public HideFullText() {
-		this.FullText.HideFullText();
-		this.Outputs.Container.show();
-		this.Outputs.ScrollToBottom();
+	/** HideAllSections: Hide all sections. */
+	public HideAllSections() {
+		this.Sections.forEach((Section) => Section.Hide());
 	}
 	/** Constructor: Initialize the command center. */
 	constructor(Container: HTMLElement, Editor: TurtleEditor) {
@@ -88,7 +85,9 @@ export class CommandTab extends Tab {
 		});
 		// Set up sections
 		this.Outputs = new OutputDisplay(this);
+		this.Codes = new CodeDisplay(this);
 		this.FullText = new FullTextDisplay(this);
+		// Set up chat manager
 		this.ChatManager = new ChatManager(this);
 	}
 	// #endregion
@@ -115,7 +114,7 @@ export class CommandTab extends Tab {
 			if (!Content || this.Disabled) return;
 			const Objective = this.TargetSelect.val() as string;
 			if (TurtleEditor.PostMessage != null) this.Disabled = true;
-			this.HideFullText();
+			this.Outputs.Show();
 			this.SendCommand(Objective, Content);
 		}
 		// After press key `ArrowUp`, get previous command from command history
@@ -160,7 +159,7 @@ export class CommandTab extends Tab {
 			// If there is no linting issues, assume it is code snippet
 			this.Galapagos.ForceParse();
 			let Diagnostics = await this.Galapagos.ForceLintAsync();
-			let Mode = this.Galapagos.GetRecognizedMode();
+			let Mode = this.Galapagos.Semantics.GetRecognizedMode();
 			if (Diagnostics.length == 0) {
 				if (Mode == "Reporter" || Mode == "Unknown") Content = `show ${Content}`;
 				this.ExecuteInput(Objective, Content);
@@ -170,6 +169,7 @@ export class CommandTab extends Tab {
 		// Otherwise, assume it is a chat message
 		this.ClearInput();
 		this.ChatManager.SendMessage(Content);
+		this.Outputs.ScrollToBottom();
 	}
 	/** ClearInput: Clear the input box of Command Center. */
 	public ClearInput() {
@@ -198,7 +198,7 @@ export class CommandTab extends Tab {
 			var Snippet = $(Item);
 			// Render the code
 			Content = Content ? Content : Item.innerText;
-			var Output = this.Galapagos.Highlight(Content);
+			var Output = this.Galapagos.Semantics.HighlightContent(Content);
 			Snippet.empty().append($(Output));
 			// Copy support
 			if (Copyable && Content.trim().indexOf(" ") >= 0 && Content.trim().indexOf("\n") == 0 && Snippet.parent("pre").length == 0)

@@ -25,12 +25,12 @@ export class TurtleEditor {
     // Initialize the tabs
     this.EditorTabs = [new EditorTab($(Container).children("div.editor").get(0)!, this)];
     this.CommandTab = new CommandTab($(Container).children("div.commands").get(0)!, this);
-    this.CommandTab.Show();
     this.EditorTabs[0].Galapagos.AddChild(this.CommandTab.Galapagos);
 		// Listen to the sizing
 		if (window.visualViewport)
 			window.visualViewport.addEventListener("resize", () => this.CurrentTab?.SyncSize());
-  }
+      this.CommandTab.Show();
+    }
   /** Call: Call the facilitator (by default, the Unity Engine). */
   public Call(Message: any) {
     if (TurtleEditor.PostMessage)
@@ -61,6 +61,8 @@ export class TurtleEditor {
   // #endregion
 
 	// #region "Editor Interfaces"
+  /** ProjectName: The name of the project. */
+  public ProjectName?: string;
 	/** GetContext: Get the NetLogo context. */
 	public GetContext(): NetLogoContext {
     var Galapagos = this.EditorTabs[0].Galapagos;
@@ -76,6 +78,7 @@ export class TurtleEditor {
 		for (var [Name, Breed] of State.Breeds) {
 			Breeds.push({ Singular: Breed.Singular, Plural: Breed.Plural, Variables: [...Breed.Variables], IsLinkBreed: Breed.IsLinkBreed });
 		}
+    // Other contexts
 		return {
       Language: "NetLogo",
 			Extensions: [...State.Extensions],

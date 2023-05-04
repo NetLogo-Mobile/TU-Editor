@@ -1,26 +1,15 @@
 import { Tab } from "src/tab";
-import { CommandTab } from "./command-tab";
 import { TransformLinks, RenderAgent, LinkCommand, MarkdownToHTML } from "src/utils/element";
+import { Display } from "./display";
 
 /** FullTextDisplay: Display the full-text help information. */
-export class FullTextDisplay {
-    /** Tab: The related command tab. */
-    public readonly Tab: CommandTab;
-    /** Container: The full-text help area.  */
-	public readonly Container: JQuery<HTMLElement>;
+export class FullTextDisplay extends Display {
     /** RequestedTab: The tab that requested the full text. */
 	private RequestedTab: Tab | null = null;
-    /** Constructor: Create a new full-text display. */
-    constructor(Tab: CommandTab) {
-        this.Tab = Tab;
-        this.Container = $(Tab.Container).find(".command-fulltext");
-    }
 	/** ShowFullText: Show the full text of a command. */
 	public ShowFullText(Data: any) {
 		this.RequestedTab = this.Tab.Editor.CurrentTab;
-		if (!this.Tab.Visible) this.Tab.Show();
-		// Change the status
-		this.Container.show();
+		this.Show();
 		// Render the subject
 		this.Container.find("h2 strong").text(Data["display_name"]);
 		this.Container.find("h2 span").text(`(${Data["agents"].map((Agent: any) => `${RenderAgent(Agent)}`).join(", ")})`);

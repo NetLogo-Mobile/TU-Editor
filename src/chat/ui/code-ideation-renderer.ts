@@ -58,7 +58,7 @@ export class CodeIdeationRenderer extends JSONSectionRenderer<CodeParameter[]> {
             Need: Record.Response.Sections[0].Content,
             Parameters: Composed
         });
-        var Friendly = `${EditorLocalized.Get("Here is a summary of my response:")}`;
+        var Friendly = `${EditorLocalized.Get("Here is a summary of my request:")}`;
         for (var Parameter in Composed) {
             Friendly += `\n- ${Parameter}: ${Composed[Parameter]}`;
         }

@@ -13,7 +13,7 @@ export class EditorTab extends Tab {
 	/** Show: Show the editor tab.  */
     public Show() {
         super.Show();
-		if (this.CodeRefreshed) this.Galapagos.SetCursorPosition(0);
+		if (this.CodeRefreshed) this.Galapagos.Selection.SetCursorPosition(0);
     }
 	/** Hide: Hide the editor tab.  */
     public Hide() {
@@ -29,7 +29,7 @@ export class EditorTab extends Tab {
 	public Resize(ViewportHeight: number, ScrollHeight: number) {
 		super.Resize(ViewportHeight, ScrollHeight);
 		this.Galapagos.CodeMirror.requestMeasure();
-		this.Galapagos.RefreshCursor();
+		this.Galapagos.Selection.RefreshCursor();
 		return true;
 	}
 	/** Constructor: Initialize the editor. */
@@ -68,7 +68,7 @@ export class EditorTab extends Tab {
 			this.Galapagos.SetCompilerErrors([]);
 		} else {
 			if (Errors.length > 0) {
-				this.Galapagos.SetCursorPosition(Errors[0].start);
+				this.Galapagos.Selection.SetCursorPosition(Errors[0].start);
 			}
 			this.Galapagos.SetCompilerErrors(Errors);
 		}
@@ -80,7 +80,7 @@ export class EditorTab extends Tab {
 			this.Galapagos.SetRuntimeErrors([]);
 		}else {
 			if (Errors.length > 0) {
-				this.Galapagos.SetCursorPosition(Errors[0].start);
+				this.Galapagos.Selection.SetCursorPosition(Errors[0].start);
 			}
 			this.Galapagos.SetRuntimeErrors(Errors);
 		}
@@ -93,12 +93,11 @@ export class EditorTab extends Tab {
 		// Set the content
 		if (Content != this.Galapagos.GetCode()) {
 			this.IgnoreUpdate = true;
-			this.Galapagos.ClearHistory();
 			this.Galapagos.SetCode(Content);
 			this.SetCompilerErrors([]);
 			this.Galapagos.UpdateContext();
 			if (!this.Visible) this.CodeRefreshed = true;
-			this.Galapagos.SetCursorPosition(0);
+			this.Galapagos.Selection.SetCursorPosition(0);
 			this.HideTips();
 			this.IgnoreUpdate = false;
 		}
@@ -120,7 +119,7 @@ export class EditorTab extends Tab {
 	public JumpToNetTango() {
 		var Index = this.GetCode().indexOf("; --- NETTANGO BEGIN ---");
 		if (Index == -1) return;
-		this.Galapagos.SetCursorPosition(Index);
+		this.Galapagos.Selection.SetCursorPosition(Index);
 	}
 	/** ResetCode: Show the reset dialog. */
 	public ResetCode() {
@@ -133,11 +132,11 @@ export class EditorTab extends Tab {
 		var List = Dialog.children("ul").empty();
 		Dialog.children("h4").text(Localized.Get("更多功能"));
 		var Features: Record<string, () => void> = {};
-		Features[Localized.Get("选择全部")] = () => this.Galapagos.SelectAll();
-		Features[Localized.Get("撤销操作")] = () => this.Galapagos.Undo();
-		Features[Localized.Get("重做操作")] = () => this.Galapagos.Redo();
-		Features[Localized.Get("跳转到行")] = () => this.Galapagos.ShowJumpTo();
-		Features[Localized.Get("整理代码")] = () => this.Galapagos.PrettifyAll();
+		Features[Localized.Get("选择全部")] = () => this.Galapagos.Selection.SelectAll();
+		Features[Localized.Get("撤销操作")] = () => this.Galapagos.Editing.Undo();
+		Features[Localized.Get("重做操作")] = () => this.Galapagos.Editing.Redo();
+		Features[Localized.Get("跳转到行")] = () => this.Galapagos.Semantics.ShowJumpTo();
+		Features[Localized.Get("整理代码")] = () => this.Galapagos.Semantics.PrettifyOrAll();
 		Features[Localized.Get("重置代码")] = () => this.ResetCode();
 		for (var Feature in Features) {
 			$(`<li>${Feature}</li>`).attr("Tag", Feature).appendTo(List).click(function() {
@@ -157,7 +156,7 @@ export class EditorTab extends Tab {
 			var List = Dialog.children("ul").empty();
 			Dialog.children("h4").text(Localized.Get("跳转到子程序"));
 			var Handler = () => {
-				this.Galapagos.Select($(this).attr("start"), $(this).attr("end"));
+				this.Galapagos.Editing.Select($(this).attr("start"), $(this).attr("end"));
 				($ as any).modal.close();
 			};
 			for (var Procedure in Procedures) {

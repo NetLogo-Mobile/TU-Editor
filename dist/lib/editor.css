@@ -13,7 +13,7 @@ select {
 	font-size: 1em;
 	overflow: hidden;
 	scroll-behavior: auto;
-	font-family: Söhne, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif, Helvetica Neue, Arial, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol, Noto Color Emoji;
+	font-family: Söhne, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif, "Microsoft Yahei", Helvetica Neue, Arial, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol, Noto Color Emoji;
 }
 
 p, pre, ul, ol {
@@ -62,7 +62,7 @@ code,
 }
 
 /** Editor Stylesheet **/
-.editor {
+.editor.tab {
 	line-height: 1.3;
 	position: relative;
 	flex-direction: column;

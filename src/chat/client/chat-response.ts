@@ -23,10 +23,10 @@ export interface ChatResponseSection {
     Content?: string;
     /** Summary: The summary of the section. */
     Summary?: string;
-    /** Parsed: The parsed object of the section. */
-    Parsed?: any;
     /** Options: The options for the section. */
     Options?: ChatResponseOption[];
+    /** Parsed: The parsed content of the section. */
+    Parsed?: any;
 }
 
 /** ChatResponseType: The type for the chat response. */
@@ -49,6 +49,13 @@ export enum ChatResponseType {
     RuntimeError = 5,
     /** ServerError: The response is a server error message. */
     ServerError = 6
+}
+
+/** GetField: Returns the section with the given field. */
+export function GetField(Sections: ChatResponseSection[], Field: string): ChatResponseSection | undefined {
+    for (var Section of Sections)
+        if (Section.Field == Field)
+            return Section;
 }
 
 /** IsTextLike: Returns true if the section is text-like. */

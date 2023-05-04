@@ -1,7 +1,7 @@
 import { CommandTab } from "src/command/command-tab";
-import { OutputDisplay } from "src/command/outputs";
+import { OutputDisplay } from "src/command/displays/outputs";
 import { ClientChatRequest } from "./client/chat-request";
-import { ChatResponseSection, ChatResponseType, IsTextLike, SectionsToJSON } from "./client/chat-response";
+import { ChatResponseType, IsTextLike, SectionsToJSON } from "./client/chat-response";
 import { ChatThread } from "./client/chat-thread";
 import { ChatNetwork } from "./chat-network";
 import { ChatRole } from "./client/chat-context";
@@ -28,6 +28,7 @@ export class ChatManager {
         this.PendingRequest.Input = Content;
         this.PendingRequest.FriendlyInput = Friendly;
         this.PendingRequest.Language = this.Thread.Language;
+        this.PendingRequest.Context = this.PendingRequest.Context ?? { PreviousMessages: [] };
         this.SendRequest(this.PendingRequest);
         this.PendingRequest = null;
     }
@@ -41,6 +42,9 @@ export class ChatManager {
         var Subthread = this.Thread.AddToSubthread(Record);
         var Renderer = this.Outputs.RenderRecord(Record, Subthread);
         var CurrentRenderer: SectionRenderer | undefined;
+        // Project contexts
+        Record.Context!.ProjectName = this.Commands.Editor.ProjectName;
+        Record.Context!.ProjectContext = this.Commands.Editor.GetContext();
         // Send the request
         var SendRequest = () => {
             if (this.IsRequesting) return;
@@ -67,9 +71,12 @@ export class ChatManager {
                 this.Outputs.ScrollToBottom();
             }).then((Record) => {
                 console.log(Record);
+                // Finish the record
                 Renderer.SetData(Record);
                 Renderer.Render();
                 this.IsRequesting = false;
+                this.Outputs.ScrollToBottom();
+                // Show the input if there are no options
                 if (Record.Response.Options.length == 0) 
                     this.Commands.ShowInput();
             }).catch((Error) => {

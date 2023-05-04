@@ -17,12 +17,12 @@ export abstract class Tab {
     Show() {
         this.Editor.CurrentTab = this;
         this.Editor.HideAllTabs();
-        this.Container.style.display = "block";
+        $(this.Container).show();
         this.Visible = true;
     }
     /** Hide: Hide the tab. */
     Hide() {
-        this.Container.style.display = "none";
+        $(this.Container).hide();
         this.Visible = false;
         this.Blur();
     }

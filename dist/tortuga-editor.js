@@ -39,12 +39,12 @@
         Show() {
             this.Editor.CurrentTab = this;
             this.Editor.HideAllTabs();
-            this.Container.style.display = "block";
+            $(this.Container).show();
             this.Visible = true;
         }
         /** Hide: Hide the tab. */
         Hide() {
-            this.Container.style.display = "none";
+            $(this.Container).hide();
             this.Visible = false;
             this.Blur();
         }
@@ -155,22 +155,51 @@
         return Message;
     }
 
-    /** FullTextDisplay: Display the full-text help information. */
-    class FullTextDisplay {
-        /** Constructor: Create a new full-text display. */
+    /** Display: A display section of Command Center. */
+    class Display {
+        /** Constructor: Create a new output section. */
         constructor(Tab) {
+            // Whether it is visible.
+            this.Visible = false;
+            this.Tab = Tab;
+            this.Container = $(Tab.Container).find(".command-output");
+            this.Tab.Sections.push(this);
+        }
+        /** Show: Show the section. */
+        Show() {
+            if (!this.Tab.Visible)
+                this.Tab.Show();
+            this.Tab.HideAllSections();
+            $(this.Container).show();
+            this.Visible = true;
+        }
+        /** Hide: Hide the section. */
+        Hide() {
+            $(this.Container).hide();
+            this.Visible = false;
+        }
+        /** ScrollToBottom: After user entered input, screen view should scroll down to the bottom line. */
+        ScrollToBottom() {
+            this.Container.scrollTop(this.Container.get(0).scrollHeight);
+        }
+        /** IsAtBottom: Whether the container is scrolled to bottom. */
+        IsAtBottom() {
+            var Element = this.Container.get(0);
+            return Math.abs(Element.scrollHeight - Element.clientHeight - Element.scrollTop) < 1;
+        }
+    }
+
+    /** FullTextDisplay: Display the full-text help information. */
+    class FullTextDisplay extends Display {
+        constructor() {
+            super(...arguments);
             /** RequestedTab: The tab that requested the full text. */
             this.RequestedTab = null;
-            this.Tab = Tab;
-            this.Container = $(Tab.Container).find(".command-fulltext");
         }
         /** ShowFullText: Show the full text of a command. */
         ShowFullText(Data) {
             this.RequestedTab = this.Tab.Editor.CurrentTab;
-            if (!this.Tab.Visible)
-                this.Tab.Show();
-            // Change the status
-            this.Container.show();
+            this.Show();
             // Render the subject
             this.Container.find("h2 strong").text(Data["display_name"]);
             this.Container.find("h2 span").text(`(${Data["agents"].map((Agent) => `${RenderAgent(Agent)}`).join(", ")})`);
@@ -620,11 +649,12 @@
         }
         /** SendMessage: Send a direct message to the chat backend. */
         SendMessage(Content, Friendly) {
-            var _a;
+            var _a, _b;
             this.PendingRequest = (_a = this.PendingRequest) !== null && _a !== void 0 ? _a : { Input: "" };
             this.PendingRequest.Input = Content;
             this.PendingRequest.FriendlyInput = Friendly;
             this.PendingRequest.Language = this.Thread.Language;
+            this.PendingRequest.Context = (_b = this.PendingRequest.Context) !== null && _b !== void 0 ? _b : { PreviousMessages: [] };
             this.SendRequest(this.PendingRequest);
             this.PendingRequest = null;
         }
@@ -637,6 +667,9 @@
             var Subthread = this.Thread.AddToSubthread(Record);
             var Renderer = this.Outputs.RenderRecord(Record, Subthread);
             var CurrentRenderer;
+            // Project contexts
+            Record.Context.ProjectName = this.Commands.Editor.ProjectName;
+            Record.Context.ProjectContext = this.Commands.Editor.GetContext();
             // Send the request
             var SendRequest = () => {
                 if (this.IsRequesting)
@@ -667,9 +700,12 @@
                     this.Outputs.ScrollToBottom();
                 }).then((Record) => {
                     console.log(Record);
+                    // Finish the record
                     Renderer.SetData(Record);
                     Renderer.Render();
                     this.IsRequesting = false;
+                    this.Outputs.ScrollToBottom();
+                    // Show the input if there are no options
                     if (Record.Response.Options.length == 0)
                         this.Commands.ShowInput();
                 }).catch((Error) => {
@@ -921,7 +957,7 @@
                 Need: Record.Response.Sections[0].Content,
                 Parameters: Composed
             });
-            var Friendly = `${EditorLocalized.Get("Here is a summary of my response:")}`;
+            var Friendly = `${EditorLocalized.Get("Here is a summary of my request:")}`;
             for (var Parameter in Composed) {
                 Friendly += `\n- ${Parameter}: ${Composed[Parameter]}`;
             }
@@ -1190,9 +1226,9 @@
     }
 
     /** OutputDisplay: Display the output section. */
-    class OutputDisplay {
-        /** Constructor: Create a new output section. */
-        constructor(Tab) {
+    class OutputDisplay extends Display {
+        constructor() {
+            super(...arguments);
             /** Subthreads: The subthread store. */
             this.Subthreads = new Map();
             // #endregion
@@ -1201,21 +1237,16 @@
             this.Fragment = null;
             /** BufferSize: Buffer size for batch printing. */
             this.BufferSize = 1000;
-            this.Tab = Tab;
-            this.Container = $(Tab.Container).find(".command-output");
+            // #endregion
         }
-        /** ScrollToBottom: After user entered input, screen view should scroll down to the bottom line. */
-        ScrollToBottom() {
-            this.Container.scrollTop(this.Container.get(0).scrollHeight);
-        }
-        /** IsAtBottom: Whether the container is scrolled to bottom. */
-        IsAtBottom() {
-            var Element = this.Container.get(0);
-            return Math.abs(Element.scrollHeight - Element.clientHeight - Element.scrollTop) < 1;
+        /** Show: Show the output region of Command Center. */
+        Show() {
+            super.Show();
+            this.ScrollToBottom();
         }
         /** Clear: Clear the output region of Command Center. */
         Clear() {
-            this.Container.remove();
+            this.Container.empty();
             this.Subthreads.clear();
             delete this.Subthread;
         }
@@ -1351,7 +1382,7 @@
                     else if (Content.Parameter == "-full") {
                         Output = $(`<p class="Output output">${Localized.Get("显示 {0} 的帮助信息。")
                         .replace("{0}", `<a class='command' target='help ${Content["display_name"]} -full'">${Content["display_name"]}</a>`)}</p>`);
-                        this.Tab.ShowFullText(Content);
+                        this.Tab.FullText.ShowFullText(Content);
                     }
                     else {
                         Output = $(`
@@ -1388,6 +1419,10 @@
         }
     }
 
+    /** CodeDisplay: The interactive code editor section. */
+    class CodeDisplay extends Display {
+    }
+
     /** CommandTab: A tab for the command center. */
     class CommandTab extends Tab {
         /** Show: Show the command tab.  */
@@ -1396,24 +1431,24 @@
             bodyScrollLock.clearAllBodyScrollLocks();
             bodyScrollLock.disableBodyScroll(this.Outputs.Container.get(0));
             bodyScrollLock.disableBodyScroll(this.FullText.Container.get(0));
-            this.HideFullText();
-            this.Outputs.ScrollToBottom();
+            this.Outputs.Show();
         }
         /** Hide: Hide the command tab. */
         Hide() {
             super.Hide();
             bodyScrollLock.clearAllBodyScrollLocks();
             bodyScrollLock.disableBodyScroll(document.querySelector('.cm-scroller'), { allowTouchMove: () => true });
-            this.HideFullText();
         }
         /** Blur: Blur the tab's editor. */
         Blur() {
             super.Blur();
             this.Galapagos.Blur();
         }
+        /** Resize: Resize the tab. */
         Resize(ViewportHeight, ScrollHeight) {
             super.Resize(ViewportHeight, ScrollHeight);
             this.Outputs.ScrollToBottom();
+            this.Codes.ScrollToBottom();
             return true;
         }
         /** Reset: Reset the command center. */
@@ -1421,20 +1456,13 @@
             super.Reset();
             this.ShowInput();
             this.ClearInput();
+            this.Outputs.Show();
             this.Outputs.Clear();
             this.ChatManager.Reset();
-            this.HideFullText();
         }
-        /** ShowFullText: Show the full-text help area. */
-        ShowFullText(Data) {
-            this.FullText.ShowFullText(Data);
-            this.Outputs.Container.hide();
-        }
-        /** HideFullText: Hide the full-text help area. */
-        HideFullText() {
-            this.FullText.HideFullText();
-            this.Outputs.Container.show();
-            this.Outputs.ScrollToBottom();
+        /** HideAllSections: Hide all sections. */
+        HideAllSections() {
+            this.Sections.forEach((Section) => Section.Hide());
         }
         /** Constructor: Initialize the command center. */
         constructor(Container, Editor) {
@@ -1442,6 +1470,8 @@
             // #region "Foundational Interfaces"
             // Command center would be disabled before compile output come out.
             this.Disabled = false;
+            /** Sections: The sections of the command center. */
+            this.Sections = [];
             /** CommandStack: Store the command history. */
             this.CommandStack = [];
             /** CurrentCommand: Store the current command. */
@@ -1465,7 +1495,9 @@
             });
             // Set up sections
             this.Outputs = new OutputDisplay(this);
+            this.Codes = new CodeDisplay(this);
             this.FullText = new FullTextDisplay(this);
+            // Set up chat manager
             this.ChatManager = new ChatManager(this);
         }
         /** InputKeyHandler: Handle the key input. */
@@ -1481,7 +1513,7 @@
                 const Objective = this.TargetSelect.val();
                 if (TurtleEditor.PostMessage != null)
                     this.Disabled = true;
-                this.HideFullText();
+                this.Outputs.Show();
                 this.SendCommand(Objective, Content);
             }
             // After press key `ArrowUp`, get previous command from command history
@@ -1530,7 +1562,7 @@
                     // If there is no linting issues, assume it is code snippet
                     this.Galapagos.ForceParse();
                     let Diagnostics = yield this.Galapagos.ForceLintAsync();
-                    let Mode = this.Galapagos.GetRecognizedMode();
+                    let Mode = this.Galapagos.Semantics.GetRecognizedMode();
                     if (Diagnostics.length == 0) {
                         if (Mode == "Reporter" || Mode == "Unknown")
                             Content = `show ${Content}`;
@@ -1541,6 +1573,7 @@
                 // Otherwise, assume it is a chat message
                 this.ClearInput();
                 this.ChatManager.SendMessage(Content);
+                this.Outputs.ScrollToBottom();
             });
         }
         /** ClearInput: Clear the input box of Command Center. */
@@ -1570,7 +1603,7 @@
                 var Snippet = $(Item);
                 // Render the code
                 Content = Content ? Content : Item.innerText;
-                var Output = this.Galapagos.Highlight(Content);
+                var Output = this.Galapagos.Semantics.HighlightContent(Content);
                 Snippet.empty().append($(Output));
                 // Copy support
                 if (Copyable && Content.trim().indexOf(" ") >= 0 && Content.trim().indexOf("\n") == 0 && Snippet.parent("pre").length == 0)
@@ -1653,7 +1686,7 @@
         Show() {
             super.Show();
             if (this.CodeRefreshed)
-                this.Galapagos.SetCursorPosition(0);
+                this.Galapagos.Selection.SetCursorPosition(0);
         }
         /** Hide: Hide the editor tab.  */
         Hide() {
@@ -1667,7 +1700,7 @@
         Resize(ViewportHeight, ScrollHeight) {
             super.Resize(ViewportHeight, ScrollHeight);
             this.Galapagos.CodeMirror.requestMeasure();
-            this.Galapagos.RefreshCursor();
+            this.Galapagos.Selection.RefreshCursor();
             return true;
         }
         /** Constructor: Initialize the editor. */
@@ -1707,7 +1740,7 @@
             }
             else {
                 if (Errors.length > 0) {
-                    this.Galapagos.SetCursorPosition(Errors[0].start);
+                    this.Galapagos.Selection.SetCursorPosition(Errors[0].start);
                 }
                 this.Galapagos.SetCompilerErrors(Errors);
             }
@@ -1720,7 +1753,7 @@
             }
             else {
                 if (Errors.length > 0) {
-                    this.Galapagos.SetCursorPosition(Errors[0].start);
+                    this.Galapagos.Selection.SetCursorPosition(Errors[0].start);
                 }
                 this.Galapagos.SetRuntimeErrors(Errors);
             }
@@ -1730,13 +1763,12 @@
             // Set the content
             if (Content != this.Galapagos.GetCode()) {
                 this.IgnoreUpdate = true;
-                this.Galapagos.ClearHistory();
                 this.Galapagos.SetCode(Content);
                 this.SetCompilerErrors([]);
                 this.Galapagos.UpdateContext();
                 if (!this.Visible)
                     this.CodeRefreshed = true;
-                this.Galapagos.SetCursorPosition(0);
+                this.Galapagos.Selection.SetCursorPosition(0);
                 this.HideTips();
                 this.IgnoreUpdate = false;
             }
@@ -1759,7 +1791,7 @@
             var Index = this.GetCode().indexOf("; --- NETTANGO BEGIN ---");
             if (Index == -1)
                 return;
-            this.Galapagos.SetCursorPosition(Index);
+            this.Galapagos.Selection.SetCursorPosition(Index);
         }
         /** ResetCode: Show the reset dialog. */
         ResetCode() {
@@ -1771,11 +1803,11 @@
             var List = Dialog.children("ul").empty();
             Dialog.children("h4").text(Localized.Get("更多功能"));
             var Features = {};
-            Features[Localized.Get("选择全部")] = () => this.Galapagos.SelectAll();
-            Features[Localized.Get("撤销操作")] = () => this.Galapagos.Undo();
-            Features[Localized.Get("重做操作")] = () => this.Galapagos.Redo();
-            Features[Localized.Get("跳转到行")] = () => this.Galapagos.ShowJumpTo();
-            Features[Localized.Get("整理代码")] = () => this.Galapagos.PrettifyAll();
+            Features[Localized.Get("选择全部")] = () => this.Galapagos.Selection.SelectAll();
+            Features[Localized.Get("撤销操作")] = () => this.Galapagos.Editing.Undo();
+            Features[Localized.Get("重做操作")] = () => this.Galapagos.Editing.Redo();
+            Features[Localized.Get("跳转到行")] = () => this.Galapagos.Semantics.ShowJumpTo();
+            Features[Localized.Get("整理代码")] = () => this.Galapagos.Semantics.PrettifyOrAll();
             Features[Localized.Get("重置代码")] = () => this.ResetCode();
             for (var Feature in Features) {
                 $(`<li>${Feature}</li>`).attr("Tag", Feature).appendTo(List).click(function () {
@@ -1796,7 +1828,7 @@
                 var List = Dialog.children("ul").empty();
                 Dialog.children("h4").text(Localized.Get("跳转到子程序"));
                 var Handler = () => {
-                    this.Galapagos.Select($(this).attr("start"), $(this).attr("end"));
+                    this.Galapagos.Editing.Select($(this).attr("start"), $(this).attr("end"));
                     $.modal.close();
                 };
                 for (var Procedure in Procedures) {
@@ -1840,11 +1872,11 @@
             // Initialize the tabs
             this.EditorTabs = [new EditorTab($(Container).children("div.editor").get(0), this)];
             this.CommandTab = new CommandTab($(Container).children("div.commands").get(0), this);
-            this.CommandTab.Show();
             this.EditorTabs[0].Galapagos.AddChild(this.CommandTab.Galapagos);
             // Listen to the sizing
             if (window.visualViewport)
                 window.visualViewport.addEventListener("resize", () => { var _a; return (_a = this.CurrentTab) === null || _a === void 0 ? void 0 : _a.SyncSize(); });
+            this.CommandTab.Show();
         }
         /** Call: Call the facilitator (by default, the Unity Engine). */
         Call(Message) {
@@ -1865,8 +1897,6 @@
         BlurAll() {
             this.GetAllTabs().forEach(Tab => Tab.Blur());
         }
-        // #endregion
-        // #region "Editor Interfaces"
         /** GetContext: Get the NetLogo context. */
         GetContext() {
             var Galapagos = this.EditorTabs[0].Galapagos;
@@ -1882,6 +1912,7 @@
             for (var [Name, Breed] of State.Breeds) {
                 Breeds.push({ Singular: Breed.Singular, Plural: Breed.Plural, Variables: [...Breed.Variables], IsLinkBreed: Breed.IsLinkBreed });
             }
+            // Other contexts
             return {
                 Language: "NetLogo",
                 Extensions: [...State.Extensions],

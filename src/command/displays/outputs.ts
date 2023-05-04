@@ -1,42 +1,26 @@
-import { CommandTab } from "./command-tab";
 import { RenderAgent, LinkCommand } from "src/utils/element";
 import { Localized } from "src/legacy";
-import { SubthreadRenderer } from "./outputs/subthread-renderer";
-import { ChatSubthread } from "../chat/client/chat-thread";
-import { ChatRecord } from "../chat/client/chat-record";
-import { RecordRenderer } from "./outputs/record-renderer";
+import { SubthreadRenderer } from "../outputs/subthread-renderer";
+import { ChatSubthread } from "../../chat/client/chat-thread";
+import { ChatRecord } from "../../chat/client/chat-record";
+import { RecordRenderer } from "../outputs/record-renderer";
+import { Display } from "./display";
 
 /** OutputDisplay: Display the output section. */
-export class OutputDisplay {
-    // #region "Foundational Interfaces"
-    /** Tab: The related command tab. */
-    public readonly Tab: CommandTab;
-    /** Container: The output help area.  */
-	public readonly Container: JQuery<HTMLElement>;
-    /** Constructor: Create a new output section. */
-    constructor(Tab: CommandTab) {
-        this.Tab = Tab;
-        this.Container = $(Tab.Container).find(".command-output");
-    }
-	/** ScrollToBottom: After user entered input, screen view should scroll down to the bottom line. */
-	public ScrollToBottom() {
-		this.Container.scrollTop(this.Container.get(0)!.scrollHeight);
-	}
-	/** IsAtBottom: Whether the container is scrolled to bottom. */
-	public IsAtBottom(): boolean {
-		var Element = this.Container.get(0)!;
-		return Math.abs(Element.scrollHeight - Element.clientHeight - Element.scrollTop) < 1;
-	}
-	// #endregion
-
+export class OutputDisplay extends Display {
 	// #region "Threading Support"
 	/** Subthread: The active subthread. */
 	private Subthread?: SubthreadRenderer;
 	/** Subthreads: The subthread store. */
 	private Subthreads: Map<ChatSubthread, SubthreadRenderer> = new Map<ChatSubthread, SubthreadRenderer>();
+	/** Show: Show the output region of Command Center. */
+	public Show() {
+		super.Show();
+		this.ScrollToBottom();
+	}
 	/** Clear: Clear the output region of Command Center. */
 	public Clear() {
-		this.Container.remove();
+		this.Container.empty();
 		this.Subthreads.clear();
 		delete this.Subthread;
 	}
@@ -169,7 +153,7 @@ export class OutputDisplay {
 				} else if (Content.Parameter == "-full") {
                     Output = $(`<p class="Output output">${Localized.Get("显示 {0} 的帮助信息。")
                         .replace("{0}", `<a class='command' target='help ${Content["display_name"]} -full'">${Content["display_name"]}</a>`)}</p>`);
-					this.Tab.ShowFullText(Content);
+					this.Tab.FullText.ShowFullText(Content);
 				} else {
 					Output = $(`
 						<div class="block">

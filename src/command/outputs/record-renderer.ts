@@ -71,7 +71,7 @@ export class RecordRenderer extends UIRendererOf<ChatRecord> {
         var Options = this.GetData().Response?.Options;
         if (!Options || Options.length == 0) return;
         // Create the container
-        this.OptionContainer = this.OptionContainer ?? $(`<ul></ul>`).appendTo(this.ContentContainer);
+        this.OptionContainer = this.OptionContainer ?? $(`<ul></ul>`).addClass("options").appendTo(this.ContentContainer);
         // Render the options
         for (var I = 0; I < Options.length; I++) {
             var Option = Options[I];

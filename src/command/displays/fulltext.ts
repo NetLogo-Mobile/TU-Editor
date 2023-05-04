@@ -1,11 +1,14 @@
 import { Tab } from "src/tab";
 import { TransformLinks, RenderAgent, LinkCommand, MarkdownToHTML } from "src/utils/element";
 import { Display } from "./display";
+import { CommandTab } from "../command-tab";
 
 /** FullTextDisplay: Display the full-text help information. */
 export class FullTextDisplay extends Display {
-    /** Selector: The selector of the display. */
-    public readonly Selector: string = ".command-fulltext";
+	/** Constructor: Create a new output section. */
+	public constructor(Tab: CommandTab) {
+		super(Tab, ".command-fulltext");
+	}
     /** RequestedTab: The tab that requested the full text. */
 	private RequestedTab: Tab | null = null;
 	/** ShowFullText: Show the full text of a command. */

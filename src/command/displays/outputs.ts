@@ -9,17 +9,13 @@ import { CommandTab } from "../command-tab";
 
 /** OutputDisplay: Display the output section. */
 export class OutputDisplay extends Display {
-    /** Selector: The selector of the display. */
-    public readonly Selector: string = ".command-output";
 	/** Constructor: Create a new output section. */
 	public constructor(Tab: CommandTab) {
-		super(Tab);
-		this.OutputContainer = this.Container.find(".output");
+		super(Tab, ".command-output");
+		this.ScrollContainer = this.Container.find(".outputs");
 	}
 
 	// #region "Threading Support"
-	/** Container: The container of the output region. */
-	private OutputContainer: JQuery<HTMLElement>;
 	/** Subthread: The active subthread. */
 	private Subthread?: SubthreadRenderer;
 	/** Subthreads: The subthread store. */
@@ -31,7 +27,7 @@ export class OutputDisplay extends Display {
 	}
 	/** Clear: Clear the output region of Command Center. */
 	public Clear() {
-		this.OutputContainer.empty();
+		this.ScrollContainer.empty();
 		this.Subthreads.clear();
 		delete this.Subthread;
 	}
@@ -40,10 +36,12 @@ export class OutputDisplay extends Display {
 		var Renderer: RecordRenderer;
 		// Create a new subthread if necessary
 		if (Subthread != this.Subthread?.GetData()) {
+			this.Subthread?.Container.removeClass("activated");
+			this.Subthread?.DeactivateAll("activated");
 			this.Subthread = this.Subthreads.get(Subthread);
 			if (this.Subthread == null) {
-				this.Subthread = new SubthreadRenderer();
-				this.OutputContainer.append(this.Subthread.Container);
+				this.Subthread = new SubthreadRenderer(this);
+				this.ScrollContainer.append(this.Subthread.Container);
 				this.Subthread.SetData(Subthread);
 				this.Subthreads.set(Subthread, this.Subthread);
 			}
@@ -53,7 +51,18 @@ export class OutputDisplay extends Display {
 		// Render the record
 		Renderer = this.Subthread.AddRecord(Record);
 		this.Subthread.Render();
+		this.Subthread.Container.addClass("activated");
 		return Renderer;
+	}
+	/** ActivateSubthread: Activate a subthread. */
+	public ActivateSubthread(Subthread: SubthreadRenderer) {
+		if (this.Subthread) {
+			this.Subthread.Container.removeClass("activated");
+			this.Subthread.DeactivateAll("activated");
+		}
+		Subthread.Container.addClass("activated");
+		Subthread.Children[Subthread.Children.length - 1].ActivateSelf("activated");
+		this.Subthread = Subthread;
 	}
 	// #endregion
 
@@ -65,7 +74,7 @@ export class OutputDisplay extends Display {
 	/** WriteOutput: Print to a batch. */
 	private WriteOutput(Element: JQuery<HTMLElement>) {
 		if (this.Fragment == null)
-			this.OutputContainer.append(Element);
+			this.ScrollContainer.append(Element);
 		else this.Fragment.append(Element);
 	}
 	/** OpenBatch: Open a printing batch. */
@@ -80,14 +89,14 @@ export class OutputDisplay extends Display {
 		var Length = this.Fragment.children().length;
 		if (Length > this.BufferSize) {
 			this.Fragment.children().slice(0, Length - this.BufferSize).remove();
-			this.OutputContainer.children().remove();
+			this.ScrollContainer.children().remove();
 		} else {
-			var NewLength = this.OutputContainer.children().length + Length;
+			var NewLength = this.ScrollContainer.children().length + Length;
 			if (NewLength > this.BufferSize)
-                this.OutputContainer.children().slice(0, NewLength - this.BufferSize).remove();
+                this.ScrollContainer.children().slice(0, NewLength - this.BufferSize).remove();
 		}
 		// Append to the display
-		this.OutputContainer.append(this.Fragment);
+		this.ScrollContainer.append(this.Fragment);
 		this.Fragment = null;
 		if (AtBottom) this.ScrollToBottom();
 	}

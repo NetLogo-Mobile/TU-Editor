@@ -31,7 +31,7 @@ export abstract class UIRenderer {
     /** RenderInternal: Render the UI element. */
     protected abstract RenderInternal(): void;
     /** Children: The children UI renderers. */
-    protected Children: UIRenderer[] = [];
+    public Children: UIRenderer[] = [];
     /** Parent: The parent UI renderer. */
     public Parent?: UIRenderer;
     /** AddChild: Add a child renderer. */

@@ -158,11 +158,12 @@
     /** Display: A display section of Command Center. */
     class Display {
         /** Constructor: Create a new output section. */
-        constructor(Tab) {
+        constructor(Tab, Selector) {
             // Whether it is visible.
             this.Visible = false;
             this.Tab = Tab;
-            this.Container = $(Tab.Container).find(".command-output");
+            this.Container = $(Tab.Container).find(Selector);
+            this.ScrollContainer = this.Container;
             this.Tab.Sections.push(this);
         }
         /** Show: Show the section. */
@@ -180,19 +181,20 @@
         }
         /** ScrollToBottom: After user entered input, screen view should scroll down to the bottom line. */
         ScrollToBottom() {
-            this.Container.scrollTop(this.Container.get(0).scrollHeight);
+            this.ScrollContainer.scrollTop(this.ScrollContainer.get(0).scrollHeight);
         }
         /** IsAtBottom: Whether the container is scrolled to bottom. */
         IsAtBottom() {
-            var Element = this.Container.get(0);
+            var Element = this.ScrollContainer.get(0);
             return Math.abs(Element.scrollHeight - Element.clientHeight - Element.scrollTop) < 1;
         }
     }
 
     /** FullTextDisplay: Display the full-text help information. */
     class FullTextDisplay extends Display {
-        constructor() {
-            super(...arguments);
+        /** Constructor: Create a new output section. */
+        constructor(Tab) {
+            super(Tab, ".command-fulltext");
             /** RequestedTab: The tab that requested the full text. */
             this.RequestedTab = null;
         }
@@ -660,7 +662,7 @@
         }
         /** SendRequest: Send a request to the chat backend and handle its outputs. */
         SendRequest(Request) {
-            if (this.IsRequesting)
+            if (ChatManager.IsRequesting)
                 return;
             // Make it a record and put it in the thread
             var Record = Request;
@@ -672,10 +674,11 @@
             Record.Context.ProjectContext = this.Commands.Editor.GetContext();
             // Send the request
             var SendRequest = () => {
-                if (this.IsRequesting)
+                if (ChatManager.IsRequesting)
                     return;
-                this.IsRequesting = true;
+                ChatManager.IsRequesting = true;
                 this.Commands.HideInput();
+                this.Outputs.ScrollToBottom();
                 ChatNetwork.SendRequest(Record, this.Thread, (Section) => {
                     var _a;
                     // Create the section
@@ -703,13 +706,13 @@
                     // Finish the record
                     Renderer.SetData(Record);
                     Renderer.Render();
-                    this.IsRequesting = false;
+                    ChatManager.IsRequesting = false;
                     this.Outputs.ScrollToBottom();
                     // Show the input if there are no options
                     if (Record.Response.Options.length == 0)
                         this.Commands.ShowInput();
                 }).catch((Error) => {
-                    if (!this.IsRequesting)
+                    if (!ChatManager.IsRequesting)
                         return;
                     Renderer.AddSection({
                         Type: ChatResponseType.ServerError,
@@ -717,10 +720,11 @@
                         Field: SendRequest
                     }).SetFinalized().Render();
                     this.Commands.ShowInput();
-                    this.IsRequesting = false;
+                    ChatManager.IsRequesting = false;
                 });
             };
             SendRequest();
+            this.Outputs.ScrollToBottom();
         }
         // #endregion
         // #region " Options and Contexts "
@@ -755,7 +759,9 @@
             }
             // Send request or unlock the input
             if (Option.AskInput) {
+                this.Commands.Outputs.ScrollToBottom();
                 this.Commands.ShowInput();
+                this.Commands.Galapagos.Focus();
             }
             else {
                 this.SendRequest(this.PendingRequest);
@@ -840,8 +846,6 @@
             this.Thread = new ChatThread();
             /** PendingRequest: The pending chat request. */
             this.PendingRequest = null;
-            /** IsRequesting: Whether we are currently requesting anything. */
-            this.IsRequesting = false;
             /** Available: Whether the chat backend is available. */
             this.Available = true;
             this.Commands = Tab;
@@ -850,6 +854,8 @@
             ChatManager.Instance = this;
         }
     }
+    /** IsRequesting: Whether we are currently requesting anything. */
+    ChatManager.IsRequesting = false;
     /** ThinkProcess: Whether to demonstrate the thinking processes. */
     ChatManager.ThinkProcess = false;
 
@@ -864,6 +870,10 @@
         SetFinalized() {
             this.Finalized = true;
             return this;
+        }
+        /** GetRecord: Get the record of the section. */
+        GetRecord() {
+            return this.Parent.GetData();
         }
         /** Constructor: Create a new UI renderer. */
         constructor() {
@@ -914,6 +924,7 @@
         }
         /** RenderInternal: Render the UI element. */
         RenderInternal() {
+            var _a;
             var Parameters = this.GetParsed();
             if (this.Finalized) {
                 this.ContentContainer = $(`<div class="parameters"></div>`).replaceAll(this.ContentContainer);
@@ -925,8 +936,12 @@
                     Renderer.SetData(Parameter);
                     Renderer.Render();
                 }
-                $(`<p><a href="javascript:void(0)">${EditorLocalized.Get("I think that's what I want, for now...")}</a></p>`)
-                    .appendTo(this.ContentContainer).on("click", () => this.SubmitParameters());
+                var Option = this.GetRecord().Response.Options[0];
+                var Link = $(`<p><a href="javascript:void(0)">${(_a = Option.LocalizedLabel) !== null && _a !== void 0 ? _a : Option.Label}</a></p>`)
+                    .appendTo(this.ContentContainer).on("click", () => {
+                    this.SubmitParameters();
+                    Link.addClass("chosen");
+                });
             }
             else {
                 this.ContentContainer.empty();
@@ -950,14 +965,14 @@
             });
             // Request the virtual option
             var Manager = ChatManager.Instance;
-            var Record = this.Parent.GetData();
+            var Record = this.GetRecord();
             Manager.RequestOption(Record.Response.Options[0], Record);
             // Build the messages
             var Message = JSON.stringify({
                 Need: Record.Response.Sections[0].Content,
                 Parameters: Composed
             });
-            var Friendly = `${EditorLocalized.Get("Here is a summary of my request:")}`;
+            var Friendly = `${EditorLocalized.Get("Summary of request")}`;
             for (var Parameter in Composed) {
                 Friendly += `\n- ${Parameter}: ${Composed[Parameter]}`;
             }
@@ -1112,6 +1127,7 @@
             var Section = this.Parent;
             var Record = Section.Parent;
             ChatManager.Instance.RequestOption(this.GetData(), Record.GetData());
+            this.ActivateSelf("chosen");
         }
     }
 
@@ -1176,7 +1192,7 @@
             if (!Options || Options.length == 0)
                 return;
             // Create the container
-            this.OptionContainer = (_b = this.OptionContainer) !== null && _b !== void 0 ? _b : $(`<ul></ul>`).appendTo(this.ContentContainer);
+            this.OptionContainer = (_b = this.OptionContainer) !== null && _b !== void 0 ? _b : $(`<ul></ul>`).addClass("options").appendTo(this.ContentContainer);
             // Render the options
             for (var I = 0; I < Options.length; I++) {
                 var Option = Options[I];
@@ -1210,25 +1226,36 @@
     /** SubthreadRenderer: A block that displays the output of a subthread. */
     class SubthreadRenderer extends UIRendererOf {
         /** Constructor: Create a new UI renderer. */
-        constructor() {
+        constructor(Outputs) {
             super();
+            this.Outputs = Outputs;
             this.Container.addClass("subthread");
+            this.ExpandButton = $(`<div class="expand"></div>`).appendTo(this.Container)
+                .append($(`<a href="javascript:void(0)"></a>`)
+                .on("click", () => this.Outputs.ActivateSubthread(this)));
         }
         /** RenderInternal: Render the UI element. */
         RenderInternal() { }
         /** AddRecord: Add a record to the subthread. */
         AddRecord(Record) {
+            // Create the renderer.
             var Renderer = new RecordRenderer();
             Renderer.SetData(Record);
-            this.AddChild(Renderer);
+            Renderer.Container.insertBefore(this.ExpandButton);
+            this.AddChild(Renderer, false);
+            Renderer.ActivateSelf("activated");
+            // Update the expand button.
+            this.ExpandButton.find("a").text(EditorLocalized.Get("Expand messages _", this.Children.length));
+            this.ExpandButton.toggleClass("hidden", this.Children.length == 1 && Record.Response.Sections.length <= 1 && Record.Response.Options.length <= 1);
             return Renderer;
         }
     }
 
     /** OutputDisplay: Display the output section. */
     class OutputDisplay extends Display {
-        constructor() {
-            super(...arguments);
+        /** Constructor: Create a new output section. */
+        constructor(Tab) {
+            super(Tab, ".command-output");
             /** Subthreads: The subthread store. */
             this.Subthreads = new Map();
             // #endregion
@@ -1237,7 +1264,7 @@
             this.Fragment = null;
             /** BufferSize: Buffer size for batch printing. */
             this.BufferSize = 1000;
-            // #endregion
+            this.ScrollContainer = this.Container.find(".outputs");
         }
         /** Show: Show the output region of Command Center. */
         Show() {
@@ -1246,20 +1273,22 @@
         }
         /** Clear: Clear the output region of Command Center. */
         Clear() {
-            this.Container.empty();
+            this.ScrollContainer.empty();
             this.Subthreads.clear();
             delete this.Subthread;
         }
         /** RenderRecord: Render a new chat record. */
         RenderRecord(Record, Subthread) {
-            var _a;
+            var _a, _b, _c;
             var Renderer;
             // Create a new subthread if necessary
             if (Subthread != ((_a = this.Subthread) === null || _a === void 0 ? void 0 : _a.GetData())) {
+                (_b = this.Subthread) === null || _b === void 0 ? void 0 : _b.Container.removeClass("activated");
+                (_c = this.Subthread) === null || _c === void 0 ? void 0 : _c.DeactivateAll("activated");
                 this.Subthread = this.Subthreads.get(Subthread);
                 if (this.Subthread == null) {
-                    this.Subthread = new SubthreadRenderer();
-                    this.Container.append(this.Subthread.Container);
+                    this.Subthread = new SubthreadRenderer(this);
+                    this.ScrollContainer.append(this.Subthread.Container);
                     this.Subthread.SetData(Subthread);
                     this.Subthreads.set(Subthread, this.Subthread);
                 }
@@ -1269,12 +1298,23 @@
             // Render the record
             Renderer = this.Subthread.AddRecord(Record);
             this.Subthread.Render();
+            this.Subthread.Container.addClass("activated");
             return Renderer;
+        }
+        /** ActivateSubthread: Activate a subthread. */
+        ActivateSubthread(Subthread) {
+            if (this.Subthread) {
+                this.Subthread.Container.removeClass("activated");
+                this.Subthread.DeactivateAll("activated");
+            }
+            Subthread.Container.addClass("activated");
+            Subthread.Children[Subthread.Children.length - 1].ActivateSelf("activated");
+            this.Subthread = Subthread;
         }
         /** WriteOutput: Print to a batch. */
         WriteOutput(Element) {
             if (this.Fragment == null)
-                this.Container.append(Element);
+                this.ScrollContainer.append(Element);
             else
                 this.Fragment.append(Element);
         }
@@ -1291,15 +1331,15 @@
             var Length = this.Fragment.children().length;
             if (Length > this.BufferSize) {
                 this.Fragment.children().slice(0, Length - this.BufferSize).remove();
-                this.Container.children().remove();
+                this.ScrollContainer.children().remove();
             }
             else {
-                var NewLength = this.Container.children().length + Length;
+                var NewLength = this.ScrollContainer.children().length + Length;
                 if (NewLength > this.BufferSize)
-                    this.Container.children().slice(0, NewLength - this.BufferSize).remove();
+                    this.ScrollContainer.children().slice(0, NewLength - this.BufferSize).remove();
             }
             // Append to the display
-            this.Container.append(this.Fragment);
+            this.ScrollContainer.append(this.Fragment);
             this.Fragment = null;
             if (AtBottom)
                 this.ScrollToBottom();
@@ -1421,6 +1461,18 @@
 
     /** CodeDisplay: The interactive code editor section. */
     class CodeDisplay extends Display {
+        /** Constructor: Create a new output section. */
+        constructor(Tab) {
+            super(Tab, ".command-code");
+        }
+        /** Show: Show the section. */
+        Show() {
+            if (!this.Tab.Visible)
+                this.Tab.Show();
+            this.Tab.Outputs.Show();
+            $(this.Container).show();
+            this.Visible = true;
+        }
     }
 
     /** CommandTab: A tab for the command center. */

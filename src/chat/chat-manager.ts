@@ -33,10 +33,10 @@ export class ChatManager {
         this.PendingRequest = null;
     }
     /** IsRequesting: Whether we are currently requesting anything. */
-    private IsRequesting: boolean = false;
+    public static IsRequesting: boolean = false;
     /** SendRequest: Send a request to the chat backend and handle its outputs. */
     private SendRequest(Request: ClientChatRequest) {
-        if (this.IsRequesting) return;
+        if (ChatManager.IsRequesting) return;
         // Make it a record and put it in the thread
         var Record = Request as ChatRecord;
         var Subthread = this.Thread.AddToSubthread(Record);
@@ -47,9 +47,10 @@ export class ChatManager {
         Record.Context!.ProjectContext = this.Commands.Editor.GetContext();
         // Send the request
         var SendRequest = () => {
-            if (this.IsRequesting) return;
-            this.IsRequesting = true;
+            if (ChatManager.IsRequesting) return;
+            ChatManager.IsRequesting = true;
             this.Commands.HideInput();
+            this.Outputs.ScrollToBottom();
             ChatNetwork.SendRequest(Record, this.Thread, (Section) => {
                 // Create the section
                 Subthread.RootID = Subthread.RootID ?? Record.ID;
@@ -74,23 +75,24 @@ export class ChatManager {
                 // Finish the record
                 Renderer.SetData(Record);
                 Renderer.Render();
-                this.IsRequesting = false;
+                ChatManager.IsRequesting = false;
                 this.Outputs.ScrollToBottom();
                 // Show the input if there are no options
                 if (Record.Response.Options.length == 0) 
                     this.Commands.ShowInput();
             }).catch((Error) => {
-                if (!this.IsRequesting) return;
+                if (!ChatManager.IsRequesting) return;
                 Renderer.AddSection({ 
                     Type: ChatResponseType.ServerError, 
                     Content: EditorLocalized.Get("Connection to server failed _", Error ?? EditorLocalized.Get("Unknown")),
                     Field: SendRequest as any
                 })!.SetFinalized().Render();
                 this.Commands.ShowInput();
-                this.IsRequesting = false;
+                ChatManager.IsRequesting = false;
             });
         };
         SendRequest();
+        this.Outputs.ScrollToBottom();
     }
     // #endregion
 
@@ -124,7 +126,9 @@ export class ChatManager {
         }
         // Send request or unlock the input
         if (Option.AskInput) {
+            this.Commands.Outputs.ScrollToBottom();
             this.Commands.ShowInput();
+            this.Commands.Galapagos.Focus();
         } else {
             this.SendRequest(this.PendingRequest);
         }

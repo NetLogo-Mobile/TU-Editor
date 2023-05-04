@@ -22,5 +22,6 @@ export class OptionRenderer extends UIRendererOf<ChatResponseOption> {
         var Section = this.Parent! as SectionRenderer;
         var Record = Section.Parent! as RecordRenderer;
         ChatManager.Instance.RequestOption(this.GetData(), Record.GetData());
+        this.ActivateSelf("chosen");
     }
 }

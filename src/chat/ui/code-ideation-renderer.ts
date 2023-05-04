@@ -28,8 +28,12 @@ export class CodeIdeationRenderer extends JSONSectionRenderer<CodeParameter[]> {
                 Renderer.SetData(Parameter);
                 Renderer.Render();
             }
-            $(`<p><a href="javascript:void(0)">${EditorLocalized.Get("I think that's what I want, for now...")}</a></p>`)
-                .appendTo(this.ContentContainer).on("click", () => this.SubmitParameters());
+            var Option = this.GetRecord().Response.Options[0];
+            var Link = $(`<p><a href="javascript:void(0)">${Option.LocalizedLabel ?? Option.Label}</a></p>`)
+                .appendTo(this.ContentContainer).on("click", () => {
+                    this.SubmitParameters();
+                    Link.addClass("chosen");
+                });
         } else {
             this.ContentContainer.empty();
             // When not finalized, render the questions
@@ -51,14 +55,14 @@ export class CodeIdeationRenderer extends JSONSectionRenderer<CodeParameter[]> {
         });
         // Request the virtual option
         var Manager = ChatManager.Instance;
-        var Record = (this.Parent! as RecordRenderer).GetData();
+        var Record = this.GetRecord();
         Manager.RequestOption(Record.Response.Options[0], Record);
         // Build the messages
         var Message = JSON.stringify({
             Need: Record.Response.Sections[0].Content,
             Parameters: Composed
         });
-        var Friendly = `${EditorLocalized.Get("Here is a summary of my request:")}`;
+        var Friendly = `${EditorLocalized.Get("Summary of request")}`;
         for (var Parameter in Composed) {
             Friendly += `\n- ${Parameter}: ${Composed[Parameter]}`;
         }

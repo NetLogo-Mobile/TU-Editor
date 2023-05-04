@@ -4,16 +4,17 @@ import { CommandTab } from "../command-tab";
 export abstract class Display {
     /** Tab: The related command tab. */
     public readonly Tab: CommandTab;
-    /** Container: The output help area.  */
+    /** Container: The main container area.  */
 	public readonly Container: JQuery<HTMLElement>;
+	/** ScrollContainer: The scrolling container of the section. */
+	public ScrollContainer: JQuery<HTMLElement>;
     // Whether it is visible.
     public Visible: boolean = false;
-    /** Selector: The selector of the display. */
-    public readonly Selector: string = "";
     /** Constructor: Create a new output section. */
-    constructor(Tab: CommandTab) {
+    constructor(Tab: CommandTab, Selector: string) {
         this.Tab = Tab;
-        this.Container = $(Tab.Container).find(this.Selector);
+        this.Container = $(Tab.Container).find(Selector);
+        this.ScrollContainer = this.Container;
         this.Tab.Sections.push(this);
     }
     /** Show: Show the section. */
@@ -30,11 +31,11 @@ export abstract class Display {
     }
 	/** ScrollToBottom: After user entered input, screen view should scroll down to the bottom line. */
 	public ScrollToBottom() {
-		this.Container.scrollTop(this.Container.get(0)!.scrollHeight);
+		this.ScrollContainer.scrollTop(this.ScrollContainer.get(0)!.scrollHeight);
 	}
 	/** IsAtBottom: Whether the container is scrolled to bottom. */
 	public IsAtBottom(): boolean {
-		var Element = this.Container.get(0)!;
+		var Element = this.ScrollContainer.get(0)!;
 		return Math.abs(Element.scrollHeight - Element.clientHeight - Element.scrollTop) < 1;
 	}
 }

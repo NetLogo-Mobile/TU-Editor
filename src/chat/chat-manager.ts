@@ -1,5 +1,5 @@
-import { CommandTab } from "src/command/command-tab";
-import { OutputDisplay } from "src/command/displays/outputs";
+import { CommandTab } from "../command/command-tab";
+import { OutputDisplay } from "../command/displays/outputs";
 import { ClientChatRequest } from "./client/chat-request";
 import { ChatResponseType, IsTextLike, SectionsToJSON } from "./client/chat-response";
 import { ChatThread } from "./client/chat-thread";

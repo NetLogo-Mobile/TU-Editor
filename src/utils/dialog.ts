@@ -1,4 +1,4 @@
-import { Localized } from "src/legacy";
+import { Localized } from "../legacy";
 
 /** ShowConfirm: Show a confirm dialog. */
 const ShowConfirm = function(Subject: string, Content: string, OK: () => void, Cancel?: () => void) {

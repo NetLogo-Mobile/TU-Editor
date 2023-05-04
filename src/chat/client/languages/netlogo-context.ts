@@ -22,8 +22,16 @@ export interface Breed {
     Plural: string;
     /** Variables: Variables defined for the breed. */
     Variables: string[];
-    /** IsLinkBreed: Whether the breed is a link breed (the alternative being a turtle breed). */
-    IsLinkBreed: boolean;
+    /** BreedType: type of the breed. */
+    BreedType: BreedType;
+}
+
+/** BreedType: Type of the breed. */
+export enum BreedType {
+    Turtle = 0,
+    Patch = 1,
+    UndirectedLink = 2,
+    DirectedLink = 3,
 }
 
 /** Procedure: Dynamic metadata of a procedure. */

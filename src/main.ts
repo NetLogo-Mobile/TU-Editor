@@ -1,4 +1,4 @@
-import { NetLogoContext, Procedure, Breed } from "./chat/client/languages/netlogo-context";
+import { Breed, NetLogoContext, Procedure } from "./chat/client/languages/netlogo-context";
 import { CommandTab } from "./command/command-tab";
 import { EditorTab } from "./editor/editor-tab";
 import { Localized, RotateScreen } from "./legacy";
@@ -76,7 +76,7 @@ export class TurtleEditor {
 		// Create the breeds map
 		var Breeds: Breed[] = [];
 		for (var [Name, Breed] of State.Breeds) {
-			Breeds.push({ Singular: Breed.Singular, Plural: Breed.Plural, Variables: [...Breed.Variables], IsLinkBreed: Breed.IsLinkBreed });
+			Breeds.push({ Singular: Breed.Singular, Plural: Breed.Plural, Variables: [...Breed.Variables], BreedType: Breed.BreedType });
 		}
     // Other contexts
 		return {

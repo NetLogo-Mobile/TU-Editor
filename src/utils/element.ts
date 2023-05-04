@@ -1,4 +1,4 @@
-import { Localized } from "src/legacy";
+import { Localized } from "../legacy";
 import { TurtleEditor } from "../main";
 declare const { showdown }: any;
 

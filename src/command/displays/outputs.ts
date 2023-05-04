@@ -1,5 +1,5 @@
-import { RenderAgent, LinkCommand } from "src/utils/element";
-import { Localized } from "src/legacy";
+import { RenderAgent, LinkCommand } from "../../utils/element";
+import { Localized } from "../../legacy";
 import { SubthreadRenderer } from "../outputs/subthread-renderer";
 import { ChatSubthread } from "../../chat/client/chat-thread";
 import { ChatRecord } from "../../chat/client/chat-record";

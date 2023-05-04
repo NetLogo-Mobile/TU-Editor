@@ -1,9 +1,8 @@
-import { TurtleEditor } from "src/main";
+import { TurtleEditor } from "../main";
 import { Tab } from "../tab";
-import { ShowConfirm } from "src/utils/dialog";
-import { Localized } from "src/legacy";
-declare const { GalapagosEditor }: any;
-type GalapagosEditor = any;
+import { ShowConfirm } from "../utils/dialog";
+import { Localized } from "../legacy";
+import { GalapagosEditor } from "../../../CodeMirror-NetLogo/src/editor";
 
 /** EditorTab: A tab for the code editor. */
 export class EditorTab extends Tab {
@@ -135,7 +134,7 @@ export class EditorTab extends Tab {
 		Features[Localized.Get("选择全部")] = () => this.Galapagos.Selection.SelectAll();
 		Features[Localized.Get("撤销操作")] = () => this.Galapagos.Editing.Undo();
 		Features[Localized.Get("重做操作")] = () => this.Galapagos.Editing.Redo();
-		Features[Localized.Get("跳转到行")] = () => this.Galapagos.Semantics.ShowJumpTo();
+		Features[Localized.Get("跳转到行")] = () => this.Galapagos.Editing.ShowJumpTo();
 		Features[Localized.Get("整理代码")] = () => this.Galapagos.Semantics.PrettifyOrAll();
 		Features[Localized.Get("重置代码")] = () => this.ResetCode();
 		for (var Feature in Features) {
@@ -156,7 +155,7 @@ export class EditorTab extends Tab {
 			var List = Dialog.children("ul").empty();
 			Dialog.children("h4").text(Localized.Get("跳转到子程序"));
 			var Handler = () => {
-				this.Galapagos.Editing.Select($(this).attr("start"), $(this).attr("end"));
+				this.Galapagos.Selection.Select(parseInt($(this).attr("start")!), parseInt($(this).attr("end")!));
 				($ as any).modal.close();
 			};
 			for (var Procedure in Procedures) {

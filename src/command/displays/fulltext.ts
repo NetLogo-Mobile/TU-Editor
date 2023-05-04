@@ -1,5 +1,5 @@
-import { Tab } from "src/tab";
-import { TransformLinks, RenderAgent, LinkCommand, MarkdownToHTML } from "src/utils/element";
+import { Tab } from "../../tab";
+import { TransformLinks, RenderAgent, LinkCommand, MarkdownToHTML } from "../../utils/element";
 import { Display } from "./display";
 import { CommandTab } from "../command-tab";
 

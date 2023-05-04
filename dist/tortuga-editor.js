@@ -702,10 +702,11 @@
                     CurrentRenderer.Render();
                     this.Outputs.ScrollToBottom();
                 }).then((Record) => {
+                    var _a;
                     console.log(Record);
                     // Finish the record
                     Renderer.SetData(Record);
-                    Renderer.Render();
+                    (_a = Renderer.Parent) === null || _a === void 0 ? void 0 : _a.Render();
                     ChatManager.IsRequesting = false;
                     this.Outputs.ScrollToBottom();
                     // Show the input if there are no options
@@ -1235,7 +1236,11 @@
                 .on("click", () => this.Outputs.ActivateSubthread(this)));
         }
         /** RenderInternal: Render the UI element. */
-        RenderInternal() { }
+        RenderInternal() {
+            var _a, _b, _c, _d;
+            var Record = this.GetData().Records[0];
+            this.ExpandButton.toggleClass("hidden", this.Children.length == 1 || ((_b = (_a = Record.Response) === null || _a === void 0 ? void 0 : _a.Sections.length) !== null && _b !== void 0 ? _b : 0) <= 1 || ((_d = (_c = Record.Response) === null || _c === void 0 ? void 0 : _c.Options.length) !== null && _d !== void 0 ? _d : 0) <= 1);
+        }
         /** AddRecord: Add a record to the subthread. */
         AddRecord(Record) {
             // Create the renderer.
@@ -1246,7 +1251,6 @@
             Renderer.ActivateSelf("activated");
             // Update the expand button.
             this.ExpandButton.find("a").text(EditorLocalized.Get("Expand messages _", this.Children.length));
-            this.ExpandButton.toggleClass("hidden", this.Children.length == 1 && Record.Response.Sections.length <= 1 && Record.Response.Options.length <= 1);
             return Renderer;
         }
     }

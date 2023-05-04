@@ -74,7 +74,7 @@ export class ChatManager {
                 console.log(Record);
                 // Finish the record
                 Renderer.SetData(Record);
-                Renderer.Render();
+                Renderer.Parent?.Render();
                 ChatManager.IsRequesting = false;
                 this.Outputs.ScrollToBottom();
                 // Show the input if there are no options

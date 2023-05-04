@@ -21,7 +21,11 @@ export class SubthreadRenderer extends UIRendererOf<ChatSubthread> {
                     .on("click", () => this.Outputs.ActivateSubthread(this)));
     }
     /** RenderInternal: Render the UI element. */
-    protected RenderInternal(): void { }
+    protected RenderInternal(): void {
+        var Record = this.GetData().Records[0];
+        this.ExpandButton.toggleClass("hidden", 
+            this.Children.length == 1 || (Record.Response?.Sections.length ?? 0) <= 1 || (Record.Response?.Options.length ?? 0) <= 1);
+    }
     /** AddRecord: Add a record to the subthread. */
     public AddRecord(Record: ChatRecord): RecordRenderer {
         // Create the renderer.
@@ -32,8 +36,6 @@ export class SubthreadRenderer extends UIRendererOf<ChatSubthread> {
         Renderer.ActivateSelf("activated");
         // Update the expand button.
         this.ExpandButton.find("a").text(EditorLocalized.Get("Expand messages _", this.Children.length));
-        this.ExpandButton.toggleClass("hidden", 
-            this.Children.length == 1 && Record.Response.Sections.length <= 1 && Record.Response.Options.length <= 1);
         return Renderer;
     }
 }

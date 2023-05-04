@@ -18,7 +18,6 @@ export class ChatNetwork {
         Record.Transparent = Record.Option?.Transparent ?? false;
         Record.Response = { Sections: [], Options: [] };
         Record.RequestTimestamp = Date.now();
-        console.log(Record);
         // Do the request
         return new Promise<ChatRecord>((Resolve, Reject) => {
             var Update: ChatResponseSection = { };

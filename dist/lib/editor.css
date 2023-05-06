@@ -22,8 +22,11 @@ code,
 .cm-editor .cm-content,
 .cm-editor .cm-diagnostic,
 .cm-editor .cm-tooltip.cm-tooltip-autocomplete>ul {
-	font-size: 0.95em;
+	font-size: 0.95rem;
 	font-family: Consolas, "Droid Sans Mono", "PingFangSC", "Microsoft Yahei", monospace;
+}
+.cm-editor .cm-content {
+	font-size: 1rem;
 }
 
 /** Hints **/

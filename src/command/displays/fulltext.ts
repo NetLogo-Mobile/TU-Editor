@@ -2,6 +2,7 @@ import { Tab } from "../../tab";
 import { TransformLinks, RenderAgent, LinkCommand, MarkdownToHTML } from "../../utils/element";
 import { Display } from "./display";
 import { CommandTab } from "../command-tab";
+import { NetLogoUtils } from "../../utils/netlogo";
 
 /** FullTextDisplay: Display the full-text help information. */
 export class FullTextDisplay extends Display {
@@ -41,7 +42,7 @@ export class FullTextDisplay extends Display {
 		var SetCode = (Content: string) => {
 			if (Content != null) this.Container.find("div.fulltext")
 				.html(MarkdownToHTML(Content));
-			this.Tab.AnnotateCode(this.Container.find("code"), undefined, true);
+			NetLogoUtils.AnnotateCodes(this.Container.find("code"));
 			this.Container.scrollTop(0);
 		};
 		SetCode(Data["translation"] != null ? Data["translation"] : Data["content"]);

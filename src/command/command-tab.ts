@@ -191,23 +191,6 @@ export class CommandTab extends Tab {
 		this.Galapagos.SetCode(Content);
 		setTimeout(() => this.Galapagos.SetCursorPosition(Content.length), 1);
 	}
-	/** AnnotateCode: Annotate some code snippets. */
-	public AnnotateCode(Target: JQuery<HTMLElement>, Content?: string, Copyable?: boolean) {
-		var This = this;
-		for (var Item of Target.get()) {
-			var Snippet = $(Item);
-			// Render the code
-			Content = Content ? Content : Item.innerText;
-			var Output = this.Galapagos.Semantics.HighlightContent(Content);
-			Snippet.empty().append($(Output));
-			// Copy support
-			if (Copyable && Content.trim().indexOf(" ") >= 0 && Content.trim().indexOf("\n") == 0 && Snippet.parent("pre").length == 0)
-				Snippet.data("Code", Content).addClass("copyable").append($(`<img class="copy-icon" src="images/copy.png"/>`))
-					.on("click", function() {
-						This.SetCode("observer", $(this).data("Code"));
-					});
-		}
-	}
 	// #endregion
 
 	// #region "Command Execution"

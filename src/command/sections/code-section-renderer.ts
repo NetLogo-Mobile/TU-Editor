@@ -1,4 +1,4 @@
-import { ChatManager } from "../../chat/chat-manager";
+import { NetLogoUtils } from "../../utils/netlogo";
 import { SectionRenderer } from "./section-renderer";
 
 /** CodeSectionRenderer: A block that displays the a code response section. */
@@ -14,7 +14,7 @@ export class CodeSectionRenderer extends SectionRenderer {
         var Code = Section.Content?.trim() ?? "";
         if (this.Finalized) {
             this.ContentContainer = $(`<code></code>`).replaceAll(this.ContentContainer);
-            ChatManager.Instance.Commands.AnnotateCode(this.ContentContainer, Code, true);
+            NetLogoUtils.AnnotateCode(this.ContentContainer, Code);
         } else {
             this.ContentContainer = $(`<pre></pre>`).replaceAll(this.ContentContainer).text(Code);
         }

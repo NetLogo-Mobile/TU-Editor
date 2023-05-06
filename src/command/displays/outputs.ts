@@ -6,6 +6,7 @@ import { ChatRecord } from "../../chat/client/chat-record";
 import { RecordRenderer } from "../outputs/record-renderer";
 import { Display } from "./display";
 import { CommandTab } from "../command-tab";
+import { NetLogoUtils } from "../../utils/netlogo";
 
 /** OutputDisplay: Display the output section. */
 export class OutputDisplay extends Display {
@@ -128,7 +129,7 @@ export class OutputDisplay extends Display {
 			this.Tab.Editor.Call({ Type: "ClipboardWrite", Content: `${Wrapper.attr("objective")}: ${Wrapper.attr("content")}` });
 		});
 		// Run CodeMirror
-		this.Tab.AnnotateCode(Wrapper.children(".content").children(".Code").children("span"), Content, false);
+		NetLogoUtils.AnnotateCode(Wrapper.children(".content").children(".Code").children("span"), Content);
 		if (!Embedded) this.WriteOutput(Wrapper);
 		return Wrapper;
 	}
@@ -186,7 +187,7 @@ export class OutputDisplay extends Display {
 				if (Output != null) {
 					LinkCommand(Output.find("a.command"));
 					this.AnnotateInput(Output.find("div.command"));
-					this.Tab.AnnotateCode(Output.find("code"));
+					NetLogoUtils.AnnotateCodes(Output.find("code"));
 				}
 				break;
 			default:

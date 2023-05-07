@@ -19,8 +19,7 @@ export class OptionRenderer extends UIRendererOf<ChatResponseOption> {
     }
     /** ClickHandler: The handler for the click event. */
     protected ClickHandler(): void {
-        var Section = this.Parent! as SectionRenderer;
-        var Record = Section.Parent! as RecordRenderer;
+        var Record = this.Parent! as RecordRenderer;
         ChatManager.Instance.RequestOption(this.GetData(), Record.GetData());
         this.ActivateSelf("chosen");
     }

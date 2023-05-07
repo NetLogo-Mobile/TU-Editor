@@ -14,7 +14,7 @@ declare const { EditorLocalized }: any;
 export class ChatManager {
     // #region " Chat Requesting "
     /** Thread: The current chat thread. */
-    private Thread: ChatThread = new ChatThread();
+    public Thread: ChatThread = new ChatThread();
     /** PendingRequest: The pending chat request. */
     private PendingRequest: ClientChatRequest | null = null;
     /** Reset: Reset the chat interface. */
@@ -98,7 +98,7 @@ export class ChatManager {
 
     // #region " Options and Contexts "
     /** RequestOption: Choose a chat option and send the request. */
-    public RequestOption(Option: ChatResponseOption, Record: ChatRecord) {
+    public RequestOption(Option: ChatResponseOption, Record: ChatRecord, Postprocessor?: (Record: ChatRecord) => void) {
         // Construct the request
         this.PendingRequest = {
             Input: Option.Label,
@@ -125,10 +125,11 @@ export class ChatManager {
             }
         }
         // Send request or unlock the input
+        Postprocessor?.(Record);
         if (Option.AskInput) {
-            this.Commands.Outputs.ScrollToBottom();
             this.Commands.ShowInput();
             this.Commands.Galapagos.Focus();
+            this.Commands.Outputs.ScrollToBottom();
         } else {
             this.SendRequest(this.PendingRequest);
         }

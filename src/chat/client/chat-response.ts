@@ -21,8 +21,8 @@ export interface ChatResponseSection {
     Field?: string;
     /** Content: The content of the section. */
     Content?: string;
-    /** Summary: The summary of the section. */
-    Summary?: string;
+    /** Edited: The edited content of the section. */
+    Edited?: string;
     /** Options: The options for the section. */
     Options?: ChatResponseOption[];
     /** Parsed: The parsed content of the section. */

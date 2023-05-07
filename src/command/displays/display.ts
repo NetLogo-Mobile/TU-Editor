@@ -13,13 +13,14 @@ export abstract class Display {
     /** Constructor: Create a new output section. */
     constructor(Tab: CommandTab, Selector: string) {
         this.Tab = Tab;
-        this.Container = $(Tab.Container).find(Selector);
+        this.Container = $(Tab.Container).find(Selector).hide();
         this.ScrollContainer = this.Container;
         this.Tab.Sections.push(this);
     }
     /** Show: Show the section. */
     public Show() {
-		if (!this.Tab.Visible) this.Tab.Show();
+		if (this.Visible) return;
+        if (!this.Tab.Visible) this.Tab.Show();
         this.Tab.HideAllSections();
         $(this.Container).show();
         this.Visible = true;

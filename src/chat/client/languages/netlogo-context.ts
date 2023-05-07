@@ -43,3 +43,8 @@ export interface Procedure {
     /** IsCommand: Is the procedure a command (to) instead of a reporter (to-report)? */
     IsCommand: boolean;
 }
+
+/** Diagnostic: A diagnostic message. */
+export interface Diagnostic {
+
+}

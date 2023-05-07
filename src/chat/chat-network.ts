@@ -84,9 +84,7 @@ export class ChatNetwork {
                     Section.Content += Update.Content;
                 if (Update.Field !== undefined) 
                     Section.Field = Update.Field;
-                if (Update.Summary !== undefined) 
-                    Section.Summary = Update.Summary;
-                if (Update.Options !== undefined) 
+                if (Update.Options !== undefined)
                     Record.Response.Options!.push(...Update.Options);
                 TryParseElement();
                 UpdateSection(Section);

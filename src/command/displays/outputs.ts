@@ -7,13 +7,17 @@ import { RecordRenderer } from "../outputs/record-renderer";
 import { Display } from "./display";
 import { CommandTab } from "../command-tab";
 import { NetLogoUtils } from "../../utils/netlogo";
+import { ChatResponseSection } from "../../chat/client/chat-response";
 
 /** OutputDisplay: Display the output section. */
 export class OutputDisplay extends Display {
+	/** Instance: The singleton instance. */
+	public static Instance: OutputDisplay;
 	/** Constructor: Create a new output section. */
 	public constructor(Tab: CommandTab) {
 		super(Tab, ".command-output");
 		this.ScrollContainer = this.Container.find(".outputs");
+		OutputDisplay.Instance = this;
 	}
 
 	// #region "Threading Support"
@@ -47,6 +51,7 @@ export class OutputDisplay extends Display {
 				this.Subthreads.set(Subthread, this.Subthread);
 			}
 			this.Subthread.SetStatus("active");
+			this.Tab.Codes.Hide();
 			this.ScrollToBottom();
 		}
 		// Render the record
@@ -64,6 +69,30 @@ export class OutputDisplay extends Display {
 		Subthread.Container.addClass("activated");
 		Subthread.Children[Subthread.Children.length - 1].ActivateSelf("activated");
 		this.Subthread = Subthread;
+	}
+	// #endregion
+
+	// #region "Printing Support"
+	/** RenderRequest: Render an offline chat request and return a new record. */
+	public RenderRequest(Input?: string, FriendlyInput?: string): ChatRecord {
+		var Thread = this.Tab.ChatManager.Thread;
+		var Record = { Input: Input, FriendlyInput: FriendlyInput } as ChatRecord;
+		var Subthread = this.Subthread?.GetData();
+		Record.RequestTimestamp = Date.now();
+		Record.ThreadID = Thread.ID!;
+		if (!Subthread) Subthread = Thread.AddToSubthread(Record);
+		Record.Language = Thread.Language;
+		Record.ParentID = Subthread.RootID;
+		this.RenderRecord(Record, Subthread);
+		return Record;
+	}
+	/** RenderResponses: Render response sections in the current record. */
+	public RenderResponses(Sections: ChatResponseSection[]) {
+		var LastRecord = this.Subthread!.Children[this.Subthread!.Children.length - 1] as RecordRenderer;
+		for (var Section in Sections) {
+			var Renderer = LastRecord.AddSection(Sections[Section]);
+			Renderer?.Render();
+		}
 	}
 	// #endregion
 

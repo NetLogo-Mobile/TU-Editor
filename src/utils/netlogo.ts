@@ -18,7 +18,8 @@ export class NetLogoUtils {
 	/** HighlightCode: Highlight a code snippet. */
 	public static HighlightCode(Content: string): HTMLElement {
         this.SharedEditor.SetCode(Content);
-        this.SharedEditor.ForceParse();
+        this.SharedEditor.Semantics.PrettifyAll();
+        console.log(this.SharedEditor.GetCode());
         return this.SharedEditor.Semantics.Highlight();
 	}
 }

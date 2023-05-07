@@ -54,3 +54,17 @@ export function AskOtherExamples(Label?: string): ChatResponseOption {
     Option.Style = "followup-more";
     return Option;
 }
+
+/** AskCode: Ask a question about the code. */
+export function AskCode(Label?: string): ChatResponseOption {
+    return {
+        Label: Label ?? "Can I ask a question?",
+        Style: "hidden",
+        Operation: "CodeAsk",
+        AskInput: true,
+        TextInContext: ContextMessage.Nothing,
+        CodeInContext: true,
+        Transparent: true,
+        Inheritance: ContextInheritance.InheritOne
+    }
+}

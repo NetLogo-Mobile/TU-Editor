@@ -131,7 +131,6 @@
 	flex-direction: column;
 }
 .command-output .outputs {
-	padding-top: 0.5rem;
 	overflow: auto;
 	flex-grow: 1;
 }
@@ -179,17 +178,39 @@
     border-bottom: 1px solid #eee;
 	flex-direction: row;
 }
+.command-output .record .contents {
+	padding-right: 0.5rem;
+}
 .command-output .record .input {
     background: #f7f7f7;
 }
-.command-output .avatar {
+.command-output .record .avatar {
 	min-width: 2.5rem;
 }
-.command-output .avatar img {
+.command-output .record .avatar img {
 	max-width: 1.5rem;
 }
-.command-output .content {
+.command-output .record .content {
 	flex-grow: 1;
+	flex-shrink: 1;
+}
+.command-output .record .expand-record {
+	color: #fff;
+	height: 1.5rem;
+	cursor: pointer;
+	flex: 0 0 1.5rem;
+	margin-left: 0.5rem;
+	line-height: 1.5rem;
+	border-radius: 0.2rem;
+	background: #666;
+	text-align: center;
+	font-weight: bold;
+}
+.command-output .subthread:not(.activated) .expand-record {
+	display: none;
+}
+.command-output .record.activated .expand-record {
+	display: none;
 }
 .command-output .record:not(.activated) .section:not(:first-of-type) {
 	display: none;
@@ -210,6 +231,13 @@
 }
 .command-output .server-error a {
     margin: 0 0 0 0.5rem;
+}
+.command-output .code code {
+	border: 1px solid #eee;
+	cursor: pointer;
+    padding: 0.5rem 0.8rem;
+	background: #f7f7f7;
+	display: block;
 }
 
 /** Special: Code ideation */
@@ -246,7 +274,46 @@
 
 /** Interactive code section */
 .command-code {
+	display: flex;
+	flex-direction: column;
+}
+.command-code .codemirror {
+	flex-shrink: 1;
+}
+.command-code .hidden-editor {
+	display: none;
+}
+.command-code .toolbar {
+	display: flex;
+	padding: 0 0.5rem;
+	flex-direction: row;
+	border-bottom: 1px solid #ccc;
+	background-color: #fafafa;
+}
+.command-code .toolbar div.button {
+	color: #2881e0;
+	cursor: pointer;
+	padding: 0.5rem 1rem;
+	background-color: #f7f7f7;
+}
+.command-code .toolbar div.button:hover {
+	background-color: #f0f0f0;
+}
+.command-code .toolbar div.history {
+	display: flex;
+	flex-direction: row;
 	flex-grow: 1;
+	justify-content: flex-end;
+}
+.command-code .toolbar div.history div.label {
+	color: #333;
+	line-height: 2.5rem;
+}
+.command-output.code-enabled .subthread:not(.activated) {
+	display: none;
+}
+.command-output.code-enabled .record.code-hidden {
+	display: none;
 }
 
 /** Output display (Legacy) */

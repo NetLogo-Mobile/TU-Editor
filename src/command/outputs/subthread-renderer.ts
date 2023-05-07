@@ -24,15 +24,15 @@ export class SubthreadRenderer extends UIRendererOf<ChatSubthread> {
     protected RenderInternal(): void {
         var Record = this.GetData().Records[0];
         this.ExpandButton.toggleClass("hidden", 
-            this.Children.length == 1 || (Record.Response?.Sections.length ?? 0) <= 1 || (Record.Response?.Options.length ?? 0) <= 1);
+            this.Children.length == 1 && (Record.Response?.Sections.length ?? 0) <= 1 && (Record.Response?.Options.length ?? 0) <= 1);
     }
     /** AddRecord: Add a record to the subthread. */
     public AddRecord(Record: ChatRecord): RecordRenderer {
         // Create the renderer.
         var Renderer = new RecordRenderer();
-        Renderer.SetData(Record);
         Renderer.Container.insertBefore(this.ExpandButton);
         this.AddChild(Renderer, false);
+        Renderer.SetData(Record);
         Renderer.ActivateSelf("activated");
         // Update the expand button.
         this.ExpandButton.find("a").text(EditorLocalized.Get("Expand messages _", this.Children.length));

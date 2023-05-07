@@ -20,6 +20,8 @@ export class InputRenderer extends UIRendererOf<ClientChatRequest> {
     }
     /** RenderInternal: Render the UI element. */
     protected RenderInternal(): void {
-        this.Content.html(MarkdownToHTML(this.GetData().FriendlyInput ?? this.GetData().Input));
+        var Input = this.GetData().FriendlyInput ?? this.GetData().Input;
+        this.Container.toggle(!!Input && Input !== "");
+        this.Content.html(MarkdownToHTML(Input));
     }
 }

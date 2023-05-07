@@ -22,11 +22,16 @@ export class RecordRenderer extends UIRendererOf<ChatRecord> {
         this.Container.addClass("record");
         this.InputRenderer = new InputRenderer();
         this.AddChild(this.InputRenderer);
-        this.ContentContainer = $(`
+        var Container = $(`
 <div class="contents">
     <div class="avatar"><img src="images/assistant.png" /></div>
     <div class="content"></div>
-</div>`).appendTo(this.Container).find(".content");
+    <div class="expand-record">↓</div>
+</div>`);
+        Container.find(".expand-record").on("click", () => {
+            this.ActivateSelf("activated");
+        });
+        this.ContentContainer = Container.appendTo(this.Container).find(".content");
     }
     /** RenderInternal: Render the UI element. */
     protected RenderInternal(): void {

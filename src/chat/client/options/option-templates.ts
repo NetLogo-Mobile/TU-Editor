@@ -74,6 +74,9 @@ export function FixCode(Label?: string): ChatResponseOption {
     return {
         Label: Label ?? "Can you help me fix the code?",
         Operation: "CodeFix",
+        Style: "hidden",
+        AskInput: true,
+        InputInContext: false,
         TextInContext: ContextMessage.Nothing,
         CodeInContext: true,
         Transparent: true,

@@ -5,8 +5,9 @@ import { OutputDisplay } from "./displays/outputs";
 import { ChatManager } from '../chat/chat-manager';
 import { Display } from "./displays/display";
 import { CodeDisplay } from "./displays/code";
+import { Localized } from "../../../CodeMirror-NetLogo/src/editor";
 
-declare const { bodyScrollLock, EditorDictionary, EditorLocalized, GalapagosEditor }: any;
+declare const { bodyScrollLock, EditorDictionary, GalapagosEditor }: any;
 type GalapagosEditor = any;
 
 /** CommandTab: A tab for the command center. */
@@ -72,10 +73,10 @@ export class CommandTab extends Tab {
 		this.CommandLine = $(Container).find(".command-line");
 		this.TargetSelect = this.CommandLine.find("select");
 		this.TargetSelect.html(`
-		<option value="observer">${EditorLocalized.Get("Observer")}</option>
-		<option value="turtles">${EditorLocalized.Get("Turtles")}</option>
-		<option value="patches">${EditorLocalized.Get("Patches")}</option>
-		<option value="links">${EditorLocalized.Get("Links")}</option>`)
+		<option value="observer">${Localized.Get("Observer")}</option>
+		<option value="turtles">${Localized.Get("Turtles")}</option>
+		<option value="patches">${Localized.Get("Patches")}</option>
+		<option value="links">${Localized.Get("Links")}</option>`)
 		// CodeMirror Editor
 		this.Galapagos = new GalapagosEditor(this.CommandLine.find(".command-input").get(0)!, {
 			OneLine: true,

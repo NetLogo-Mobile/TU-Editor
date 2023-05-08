@@ -15,7 +15,10 @@ declare const { showdown }: any;
 
 /** MarkdownToHTML: Convert markdown to HTML. */
 export function MarkdownToHTML(Source: string): string {
-    return new showdown.Converter().makeHtml(Source);
+    return new showdown.Converter({
+        underline: true,
+        emoji: true
+    }).makeHtml(Source);
 }
 
 /** LinkCommand: Generate a link for another command. */

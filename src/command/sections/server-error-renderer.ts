@@ -1,5 +1,5 @@
+import { Localized } from "../../../../CodeMirror-NetLogo/src/editor";
 import { SectionRenderer } from "./section-renderer";
-declare const { EditorLocalized }: any;
 
 /** ServerErrorRenderer: A block that displays the a server error section. */
 export class ServerErrorRenderer extends SectionRenderer {
@@ -13,7 +13,7 @@ export class ServerErrorRenderer extends SectionRenderer {
         var Section = this.GetData();
         this.ContentContainer.text(Section.Content!);
         if (!Section.Field) return;
-        $(`<a href="javascript:void(0)"></a>`).text(EditorLocalized.Get("Reconnect"))
+        $(`<a href="javascript:void(0)"></a>`).text(Localized.Get("Reconnect"))
             .appendTo(this.ContentContainer).on("click", () => {
                 (Section.Field as any)();
                 this.Parent!.RemoveChildren(Child => Child instanceof ServerErrorRenderer);

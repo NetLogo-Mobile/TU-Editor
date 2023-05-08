@@ -8,7 +8,7 @@ import { ChatRole } from "./client/chat-context";
 import { ChatResponseOption, ContextInheritance, ContextMessage } from "./client/chat-option";
 import { ChatRecord } from "./client/chat-record";
 import { SectionRenderer } from "../command/sections/section-renderer";
-declare const { EditorLocalized }: any;
+import { Localized } from "../../../CodeMirror-NetLogo/src/editor";
 
 /** ChatManager: The interface for connecting to a chat backend. */
 export class ChatManager {
@@ -84,7 +84,7 @@ export class ChatManager {
                 if (!ChatManager.IsRequesting) return;
                 Renderer.AddSection({ 
                     Type: ChatResponseType.ServerError, 
-                    Content: EditorLocalized.Get("Connection to server failed _", Error ?? EditorLocalized.Get("Unknown")),
+                    Content: Localized.Get("Connection to server failed _", Error ?? Localized.Get("Unknown")),
                     Field: SendRequest as any
                 })!.SetFinalized().Render();
                 this.Commands.ShowInput();
@@ -98,7 +98,7 @@ export class ChatManager {
 
     // #region " Options and Contexts "
     /** RequestOption: Choose a chat option and send the request. */
-    public RequestOption(Option: ChatResponseOption, Record: ChatRecord, Postprocessor?: (Record: ChatRecord) => void) {
+    public RequestOption(Option: ChatResponseOption, Record: ChatRecord, Postprocessor?: (Request: ClientChatRequest) => void) {
         // Construct the request
         this.PendingRequest = {
             Input: Option.Label,
@@ -125,7 +125,7 @@ export class ChatManager {
             }
         }
         // Send request or unlock the input
-        Postprocessor?.(Record);
+        Postprocessor?.(this.PendingRequest);
         if (Option.AskInput) {
             this.Commands.ShowInput();
             this.Commands.Galapagos.Focus();
@@ -198,7 +198,7 @@ export class ChatManager {
             });
         // Inherit the last code message (from new to old)
         if ((Option.CodeInContext ?? true) === true && Context.CodeSnippet === undefined) {
-            var Code = Record.Response.Sections.find(Section => Section.Type == ChatResponseType.Code);
+            var Code = Record.Response.Sections.find(Section => Section.Type == ChatResponseType.Code || Section.Field == "Code");
             if (Code != null) Context.CodeSnippet = Code.Content;
         }
         // Inherit previous messages

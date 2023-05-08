@@ -49,15 +49,15 @@ export class CodeDisplay extends Display {
 		this.Tab.Editor.EditorTabs[0].Galapagos.AddChild(this.Editor);
 		// Create the toolbar
 		var Toolbar = $(`<div class="toolbar"></div>`).appendTo(this.Container);
-		this.PlayButton = $(`<div class="button play">${Localized.Get("Play")}</div>`).on("click", () => this.TryTo(this.Play)).appendTo(Toolbar);
-		// this.FixButton = $(`<div class="button fix">${Localized.Get("Fix")}</div>`).on("click", () => this.Fix()).appendTo(Toolbar);
-		this.AskButton = $(`<div class="button ask">${Localized.Get("Ask")}</div>`).on("click", () => this.TryTo(this.Ask)).appendTo(Toolbar);
-		this.AddToCodeButton = $(`<div class="button addtocode">${Localized.Get("Add to Code")}</div>`).on("click", () => this.AddToCode()).appendTo(Toolbar);
+		this.PlayButton = $(`<div class="button run">${Localized.Get("RunCode")}</div>`).on("click", () => this.Play()).appendTo(Toolbar);
+		// this.FixButton = $(`<div class="button fix">${Localized.Get("FixCode")}</div>`).on("click", () => this.Fix()).appendTo(Toolbar);
+		this.AskButton = $(`<div class="button ask">${Localized.Get("AskCode")}</div>`).on("click", () => this.Ask()).appendTo(Toolbar);
+		this.AddToCodeButton = $(`<div class="button addtocode">${Localized.Get("AddCode")}</div>`).on("click", () => this.AddToCode()).appendTo(Toolbar);
 		// Create the history
 		var History = $(`<div class="history"></div>`).appendTo(Toolbar);
-		this.PreviousButton = $(`<div class="button prev">${Localized.Get("Previous")}</div>`).on("click", () => this.ShowPrevious()).appendTo(History);
+		this.PreviousButton = $(`<div class="button prev">${Localized.Get("PreviousVersion")}</div>`).on("click", () => this.ShowPrevious()).appendTo(History);
 		this.HistoryDisplay = $(`<div class="label">0 / 0</div>`).appendTo(History);
-		this.NextButton = $(`<div class="button next">${Localized.Get("Next")}</div>`).on("click", () => this.ShowNext()).appendTo(History);
+		this.NextButton = $(`<div class="button next">${Localized.Get("NextVersion")}</div>`).on("click", () => this.ShowNext()).appendTo(History);
 		CodeDisplay.Instance = this;
 	}
     /** Show: Show the section. */
@@ -107,7 +107,7 @@ export class CodeDisplay extends Display {
 	private UpdateRecords() {
 		var [Record, Section] = this.Records[this.CurrentIndex];
 		// Set the code
-		this.Editor.SetCode(Section.Edited ?? Section.Content ?? "");
+		this.Editor.SetCode((Section.Edited ?? Section.Content ?? "").trim());
 		this.Editor.ForceParse();
 		this.Record = Record;
 		// Hide previous records
@@ -155,23 +155,14 @@ export class CodeDisplay extends Display {
 	// #region "Code Operations"
 	/** TryTo: Try to do something that requires grammatically correct code. */
 	public TryTo(Action: () => void) {
-		this.Editor.ForceLintAsync().then(Diagnostics => {
-			Diagnostics = Diagnostics.filter(Diagnostic => Diagnostic.severity == "error");
+		this.ExportDiagnostics().then(Diagnostics => {
 			if (Diagnostics.length == 0) {
 				Action();
 			} else {
-				// Build the errors
-				var Results: Diagnostic[] = [];
-				Diagnostics.forEach(Diagnostic => {
-					Results.push({
-						Message: Diagnostic.message,
-						Code: this.Editor.GetCodeSlice(Diagnostic.from, Diagnostic.to),
-						From: Diagnostic.from,
-						To: Diagnostic.to,
-					});
-				});
-				// Show the errors as a special message
-				this.Tab.Outputs.RenderRequest(undefined, this.Record);
+				this.Tab.Outputs.RenderOptions([
+					FixCode(),
+					ChangeTopic()
+				]);
 				this.Tab.Outputs.RenderResponses([
 					{
 						Type: ChatResponseType.Text,
@@ -179,26 +170,51 @@ export class CodeDisplay extends Display {
 						Content: Localized.Get("We need to fix the following errors _", Diagnostics.length),
 					},
 					{
+						Type: ChatResponseType.Thought,
+						Field: "Code",
+						Content: this.Editor.GetCode(),
+					},
+					{
+						Type: ChatResponseType.Thought,
+						Field: "HTML",
+						Content: this.Editor.Semantics.Highlight().innerHTML.trim().split(/\<br\>/g).join("\n"),
+					},
+					{
 						Type: ChatResponseType.JSON,
 						Field: "Diagnostics",
-						Content: JSON.stringify(Results),
-						Parsed: Results
+						Content: JSON.stringify(Diagnostics),
+						Parsed: Diagnostics
 					}
-				]);
-				this.Tab.Outputs.RenderOptions([
-					FixCode(),
-					ChangeTopic()
 				]);
 			}
 		});
 	}
+	/** Fix: Try to fix the code. */
+	public async ExportDiagnostics(): Promise<Diagnostic[]> {
+		var Diagnostics = await this.Editor.ForceLintAsync();
+			Diagnostics = Diagnostics.filter(Diagnostic => Diagnostic.severity == "error");
+		return Diagnostics.map(Diagnostic => {
+			return {
+				Message: Diagnostic.message,
+				Code: this.Editor.GetCodeSlice(Diagnostic.from, Diagnostic.to),
+				From: Diagnostic.from,
+				To: Diagnostic.to
+			};
+		});
+	}
 	/** Play: Try to play the code. */
 	public Play() {
-
+		this.Tab.Outputs.RenderRequest(Localized.Get("Trying to run the code"), this.Record).Transparent = true;
+		this.TryTo(() => {
+			
+		});
 	}
 	/** AddToCode: Add the code to the main editor. */
 	public AddToCode() {
-
+		this.Tab.Outputs.RenderRequest(Localized.Get("Trying to add the code to your project"), this.Record).Transparent = true;
+		this.TryTo(() => {
+			
+		});
 	}
 	/** Ask: Try to ask about the code. */
 	public Ask() {

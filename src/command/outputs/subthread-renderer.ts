@@ -3,7 +3,7 @@ import { ChatSubthread } from "../../chat/client/chat-thread";
 import { UIRendererOf } from "./ui-renderer";
 import { RecordRenderer } from "./record-renderer";
 import { OutputDisplay } from "../displays/outputs";
-declare const { EditorLocalized }: any;
+import { Localized } from "../../../../CodeMirror-NetLogo/src/editor";
 
 /** SubthreadRenderer: A block that displays the output of a subthread. */
 export class SubthreadRenderer extends UIRendererOf<ChatSubthread> {
@@ -35,7 +35,7 @@ export class SubthreadRenderer extends UIRendererOf<ChatSubthread> {
         Renderer.SetData(Record);
         Renderer.ActivateSelf("activated");
         // Update the expand button.
-        this.ExpandButton.find("a").text(EditorLocalized.Get("Expand messages _", this.Children.length));
+        this.ExpandButton.find("a").text(Localized.Get("Expand messages _", this.Children.length));
         return Renderer;
     }
 }

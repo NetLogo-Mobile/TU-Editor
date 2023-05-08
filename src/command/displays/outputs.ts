@@ -84,6 +84,7 @@ export class OutputDisplay extends Display {
 		if (!Subthread) Subthread = Thread.AddToSubthread(Record);
 		Record.Language = Thread.Language;
 		Record.ParentID = Parent?.ID ?? Subthread.RootID;
+		Record.Response = { Sections: [], Options: [] };
 		this.RenderRecord(Record, Subthread);
 		return Record;
 	}
@@ -98,6 +99,7 @@ export class OutputDisplay extends Display {
 			var Renderer = LastRecord.AddSection(Sections[Section]);
 			Renderer?.Render();
 		}
+		this.ScrollToBottom();
 	}
 	/** RenderOption: Render a response option in the current record. */
 	public RenderOption(Option: ChatResponseOption) {

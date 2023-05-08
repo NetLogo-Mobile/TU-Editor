@@ -194,6 +194,12 @@
 	flex-grow: 1;
 	flex-shrink: 1;
 }
+.command-output .record .content u {
+	background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="6" height="3">%3Cpath%20d%3D%22m0%202.5%20l2%20-1.5%20l1%200%20l2%201.5%20l1%200%22%20stroke%3D%22%23d11%22%20fill%3D%22none%22%20stroke-width%3D%22.7%22%2F%3E</svg>');
+	background-position: left bottom;
+	background-repeat: repeat-x;
+	text-decoration: none;
+}
 .command-output .record .expand-record {
 	color: #fff;
 	height: 1.5rem;
@@ -307,12 +313,15 @@
 }
 .command-code .toolbar div.history div.label {
 	color: #333;
-	line-height: 2.5rem;
+	padding: 0.5rem 1rem;
 }
 .command-output.code-enabled .subthread:not(.activated) {
 	display: none;
 }
-.command-output.code-enabled .record.code-hidden {
+.command-output.code-enabled .record.code-hidden:not(.activated) {
+	display: none;
+}
+.command-output.code-enabled .record.code-hidden .section.code {
 	display: none;
 }
 

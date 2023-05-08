@@ -46,5 +46,12 @@ export interface Procedure {
 
 /** Diagnostic: A diagnostic message. */
 export interface Diagnostic {
-
+    /** Message: The message of the diagnostic. */
+    Message: string;
+    /** Code: The code of the diagnostic. */
+    Code: string;
+    /** From: The starting position of the diagnostic. */
+    From: number;
+    /** To: The ending position of the diagnostic. */
+    To: number;
 }

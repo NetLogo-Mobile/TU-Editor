@@ -59,7 +59,7 @@ export class CodeIdeationRenderer extends JSONSectionRenderer<CodeParameter[]> {
         Manager.RequestOption(Record.Response.Options[0], Record);
         // Build the messages
         var Message = JSON.stringify({
-            Need: Record.Response.Sections[0].Content,
+            Need: Record.Response.Sections.find(Section => Section.Field == "Need")?.Content ?? "Unknown",
             Parameters: Composed
         });
         var Friendly = `${Localized.Get("Summary of request")}`;

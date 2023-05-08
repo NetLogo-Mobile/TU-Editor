@@ -101,7 +101,7 @@ export class ChatManager {
     public RequestOption(Option: ChatResponseOption, Record: ChatRecord, Postprocessor?: (Request: ClientChatRequest) => void) {
         // Construct the request
         this.PendingRequest = {
-            Input: Option.Label,
+            Input: Option.ActualInput ?? Option.LocalizedLabel ?? Option.Label,
             Option: Option,
             Operation: Option.Operation,
             SubOperation: Option.SubOperation,

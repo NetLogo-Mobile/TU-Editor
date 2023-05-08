@@ -1,5 +1,6 @@
+import { ChatManager } from "../../chat/chat-manager";
 import { ChatRecord } from "../../chat/client/chat-record";
-import { ChatResponseSection } from "../../chat/client/chat-response";
+import { ChatResponseSection, ChatResponseType } from "../../chat/client/chat-response";
 import { RecordRenderer } from "../outputs/record-renderer";
 import { UIRendererOf } from "../outputs/ui-renderer";
 
@@ -37,6 +38,10 @@ export class SectionRenderer extends UIRendererOf<ChatResponseSection> {
     protected ContentContainer: JQuery<HTMLElement>;
     /** RenderInternal: Render the UI element. */
     protected RenderInternal(): void {
+        if (this.GetData().Type == ChatResponseType.JSON && !ChatManager.ThinkProcess) {
+            this.Container.remove();
+            return;
+        } 
         this.ContentContainer.text(`${this.GetData().Field ?? "Empty"}: ${this.GetData().Content ?? ""}`);
     }
 }

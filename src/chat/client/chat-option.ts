@@ -4,6 +4,8 @@ export interface ChatResponseOption {
     Label: string;
     /** LocalizedLabel: The localized label of the option. */
     LocalizedLabel?: string;
+    /** ActualInput: The underlying input of the option. */
+    ActualInput?: string;
     /** Style: The style of the option. */
     Style?: string;
     /** Operation: The operation to perform if the option is chosen. Default is Inherit. */

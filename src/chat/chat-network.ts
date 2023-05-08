@@ -26,15 +26,18 @@ export class ChatNetwork {
             // Finish the section if possible
             var TryFinishSection = () => {
                 if (Section.Type !== undefined) {
-                    if (Section.Type === ChatResponseType.JSON && Section.Content && !Section.Content.endsWith(",")) 
-                        Section.Parsed = Section.Parsed ?? ChatNetwork.TryParse(Section.Content);
+                    if (Section.Type === ChatResponseType.JSON && Section.Content && !Section.Parsed) {
+                        if (Section.Content.endsWith(","))
+                            Section.Content = `[${Section.Content.substring(0, Section.Content.length - 1)}]`;
+                        Section.Parsed = ChatNetwork.TryParse(Section.Content);
+                    } 
                     Record.Response.Sections.push(Section);
                     FinishSection(Section);
                 }
             };
             // Parse an element in the array if possible
             var TryParseElement = () => {
-                if (Section.Type === ChatResponseType.JSON && Update.Content && Update.Content.endsWith(",")) {
+                if (Section.Type === ChatResponseType.JSON && Update.Content && Update.Content.endsWith("},")) {
                     Section.Parsed = Section.Parsed ?? [];
                     Section.Parsed.push(ChatNetwork.TryParse(Update.Content.substring(0, Update.Content.length - 1)));
                 }

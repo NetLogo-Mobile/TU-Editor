@@ -211,7 +211,7 @@ export class CodeDisplay extends Display {
 	}
 	/** AddToCode: Add the code to the main editor. */
 	public AddToCode() {
-		this.Tab.Outputs.RenderRequest(Localized.Get("Trying to add the code to your project"), this.Record).Transparent = true;
+		this.Tab.Outputs.RenderRequest(Localized.Get("Trying to add the code"), this.Record).Transparent = true;
 		this.TryTo(() => {
 			
 		});

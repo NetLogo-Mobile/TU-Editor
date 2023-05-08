@@ -70,6 +70,7 @@
 	bottom: 0;
 	height: 3rem;
 	display: flex;
+	flex: 0 0 3rem;
 	padding-bottom: env(safe-area-inset-bottom);
 	align-items: center;
 	border-top: 1px solid #eee;

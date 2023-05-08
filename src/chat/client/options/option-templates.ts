@@ -56,12 +56,24 @@ export function AskOtherExamples(Label?: string): ChatResponseOption {
 }
 
 /** AskCode: Ask a question about the code. */
-export function AskCode(Label?: string): ChatResponseOption {
+export function AskCode(Label?: string, Style?: string): ChatResponseOption {
     return {
         Label: Label ?? "Can I ask a question?",
-        Style: "hidden",
+        Style: Style ?? "followup",
         Operation: "CodeAsk",
         AskInput: true,
+        TextInContext: ContextMessage.Nothing,
+        CodeInContext: true,
+        Transparent: true,
+        Inheritance: ContextInheritance.InheritOne
+    }
+}
+
+/** FixCode: Fix the current code snippet. */
+export function FixCode(Label?: string): ChatResponseOption {
+    return {
+        Label: Label ?? "Can you help me fix the code?",
+        Operation: "CodeFix",
         TextInContext: ContextMessage.Nothing,
         CodeInContext: true,
         Transparent: true,

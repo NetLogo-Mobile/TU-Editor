@@ -1,8 +1,8 @@
-import { RecordRenderer, RendererChooser } from "../../command/outputs/record-renderer";
+import { Localized } from "../../../../CodeMirror-NetLogo/src/editor";
+import { RendererChooser } from "../../command/outputs/record-renderer";
 import { UIRendererOf } from "../../command/outputs/ui-renderer";
 import { JSONSectionRenderer } from "../../command/sections/json-section-renderer";
 import { ChatManager } from "../chat-manager";
-declare const { EditorLocalized }: any;
 
 /** CodeIdeationRenderer: A dedicated block for code ideation. */
 export class CodeIdeationRenderer extends JSONSectionRenderer<CodeParameter[]> {
@@ -62,7 +62,7 @@ export class CodeIdeationRenderer extends JSONSectionRenderer<CodeParameter[]> {
             Need: Record.Response.Sections[0].Content,
             Parameters: Composed
         });
-        var Friendly = `${EditorLocalized.Get("Summary of request")}`;
+        var Friendly = `${Localized.Get("Summary of request")}`;
         for (var Parameter in Composed) {
             Friendly += `\n- ${Parameter}: ${Composed[Parameter]}`;
         }
@@ -71,12 +71,12 @@ export class CodeIdeationRenderer extends JSONSectionRenderer<CodeParameter[]> {
     }
     /** GetChooser: Return the section chooser for this renderer. */
     public static GetChooser(): RendererChooser {
-        return (Record, Section) => Section.Parsed && Array.isArray(Section.Parsed) && Section.Parsed.length > 0 &&
+        return (Record, Section) => Section.Field == "Parameters" && Section.Parsed && Array.isArray(Section.Parsed) && Section.Parsed.length > 0 &&
             Section.Parsed[0].Name && Section.Parsed[0].Question ? new CodeIdeationRenderer() : undefined;
     }
 }
 
-/** ParameterRenderer: A block that displays the a parameter. */
+/** ParameterRenderer: A block that displays a parameter. */
 export class ParameterRenderer extends UIRendererOf<CodeParameter> {
     /** Question: The question mesage of the parameter. */
     public Question: JQuery<HTMLElement>;
@@ -108,7 +108,7 @@ export class ParameterRenderer extends UIRendererOf<CodeParameter> {
         this.Examples.empty();
         if (!Parameter.Options) return;
         var Input = this.Input;
-        $("<span></span>").appendTo(this.Examples).text(EditorLocalized.Get("e.g."));
+        $("<span></span>").appendTo(this.Examples).text(Localized.Get("e.g."));
         for (var Option of Parameter.Options) {
             $(`<a href="javascript:void(0)"></a>`).data("option", Option).appendTo(this.Examples).text(Option).on("click", function() {
                 Input.val($(this).data("option"));

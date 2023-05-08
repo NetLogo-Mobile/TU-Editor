@@ -8,6 +8,7 @@ import { Display } from "./display";
 import { CommandTab } from "../command-tab";
 import { NetLogoUtils } from "../../utils/netlogo";
 import { ChatResponseSection } from "../../chat/client/chat-response";
+import { ChatResponseOption } from "../../chat/client/chat-option";
 
 /** OutputDisplay: Display the output section. */
 export class OutputDisplay extends Display {
@@ -74,7 +75,7 @@ export class OutputDisplay extends Display {
 
 	// #region "Printing Support"
 	/** RenderRequest: Render an offline chat request and return a new record. */
-	public RenderRequest(Input?: string, FriendlyInput?: string): ChatRecord {
+	public RenderRequest(Input?: string, Parent?: ChatRecord, FriendlyInput?: string): ChatRecord {
 		var Thread = this.Tab.ChatManager.Thread;
 		var Record = { Input: Input, FriendlyInput: FriendlyInput } as ChatRecord;
 		var Subthread = this.Subthread?.GetData();
@@ -82,9 +83,13 @@ export class OutputDisplay extends Display {
 		Record.ThreadID = Thread.ID!;
 		if (!Subthread) Subthread = Thread.AddToSubthread(Record);
 		Record.Language = Thread.Language;
-		Record.ParentID = Subthread.RootID;
+		Record.ParentID = Parent?.ID ?? Subthread.RootID;
 		this.RenderRecord(Record, Subthread);
 		return Record;
+	}
+	/** RenderResponse: Render response sections in the current record. */
+	public RenderResponse(Section: ChatResponseSection) {
+		this.RenderResponses([Section]);
 	}
 	/** RenderResponses: Render response sections in the current record. */
 	public RenderResponses(Sections: ChatResponseSection[]) {
@@ -93,6 +98,17 @@ export class OutputDisplay extends Display {
 			var Renderer = LastRecord.AddSection(Sections[Section]);
 			Renderer?.Render();
 		}
+	}
+	/** RenderOption: Render a response option in the current record. */
+	public RenderOption(Option: ChatResponseOption) {
+		this.RenderOptions([Option]);
+	}
+	/** RenderOptions: Render response options in the current record. */
+	public RenderOptions(Options: ChatResponseOption[]) {
+		var LastRecord = this.Subthread!.Children[this.Subthread!.Children.length - 1] as RecordRenderer;
+		LastRecord.GetData().Response.Options.push(...Options);
+		LastRecord.SetDirty(true);
+		LastRecord.Render();
 	}
 	// #endregion
 

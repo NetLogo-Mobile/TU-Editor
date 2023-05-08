@@ -10,6 +10,7 @@ import { SubthreadRenderer } from "../outputs/subthread-renderer";
 import { RecordRenderer } from '../outputs/record-renderer';
 import { ChatResponseSection, ChatResponseType } from "../../chat/client/chat-response";
 import { Diagnostic } from "../../chat/client/languages/netlogo-context";
+import { ChangeTopic, FixCode } from '../../chat/client/options/option-templates';
 
 /** CodeDisplay: The interactive code editor section. */
 export class CodeDisplay extends Display {
@@ -170,13 +171,23 @@ export class CodeDisplay extends Display {
 					});
 				});
 				// Show the errors as a special message
-				this.Tab.Outputs.RenderRequest("");
+				this.Tab.Outputs.RenderRequest(undefined, this.Record);
 				this.Tab.Outputs.RenderResponses([
 					{
-						Content: JSON.stringify(Results),
+						Type: ChatResponseType.Text,
+						Field: "Message",
+						Content: Localized.Get("We need to fix the following errors _", Diagnostics.length),
+					},
+					{
 						Type: ChatResponseType.JSON,
+						Field: "Diagnostics",
+						Content: JSON.stringify(Results),
 						Parsed: Results
 					}
+				]);
+				this.Tab.Outputs.RenderOptions([
+					FixCode(),
+					ChangeTopic()
 				]);
 			}
 		});

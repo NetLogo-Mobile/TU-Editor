@@ -2,6 +2,7 @@ import { ChatManager } from "../../chat/chat-manager";
 import { ChatRecord } from "../../chat/client/chat-record";
 import { ChatResponseSection, ChatResponseType } from "../../chat/client/chat-response";
 import { CodeIdeationRenderer } from "../../chat/ui/code-ideation-renderer";
+import { DiagnosticsRenderer } from "../../chat/ui/diagnostic-renderer";
 import { CodeSectionRenderer } from "../sections/code-section-renderer";
 import { SectionRenderer } from "../sections/section-renderer";
 import { ServerErrorRenderer } from "../sections/server-error-renderer";
@@ -102,7 +103,7 @@ export const SectionRenderers: Record<ChatResponseType, RendererChooser[]> = {
     [ChatResponseType.Finish]: [],
     [ChatResponseType.Text]: [() => new TextSectionRenderer()],
     [ChatResponseType.Code]: [() => new CodeSectionRenderer()],
-    [ChatResponseType.JSON]: [CodeIdeationRenderer.GetChooser()],
+    [ChatResponseType.JSON]: [CodeIdeationRenderer.GetChooser(), DiagnosticsRenderer.GetChooser()],
     [ChatResponseType.Thought]: [],
     [ChatResponseType.CompileError]: [],
     [ChatResponseType.RuntimeError]: [],

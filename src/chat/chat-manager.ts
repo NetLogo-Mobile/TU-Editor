@@ -174,6 +174,15 @@ export class ChatManager {
                     Role: ChatRole.Assistant
                 });
                 break;
+            case ContextMessage.FirstJSON:
+                var JSON = Record.Response.Sections.find(Section => Section.Type == ChatResponseType.JSON);
+                if (JSON && JSON.Content) {
+                    Context.PreviousMessages.unshift({ 
+                        Text: JSON.Content, 
+                        Role: ChatRole.Assistant
+                    });
+                }
+                break;
             case ContextMessage.AllAsJSON:
             default:
                 Context.PreviousMessages.unshift({ 

@@ -32,8 +32,10 @@ export enum ContextMessage {
     MessagesAsText = 1,
     /** MessagesAsJSON: Only text messages should be retained, in a JSON format. */
     MessagesAsJSON = 2,
+    /** FirstJSON: Only the first JSON message should be retained. */
+    FirstJSON = 3,
     /** AllAsJSON: Except for the code, all should be retained in a JSON format. */
-    AllAsJSON = 3,
+    AllAsJSON = 4,
 }
 
 /** ContextInheritance: How to inherit the parent context. */

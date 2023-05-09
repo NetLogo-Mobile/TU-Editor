@@ -36,17 +36,17 @@ jobs:
       - name: Install rollup
         run: npm install rollup --global
       - name: Build the project for CodeMirror-NetLogo
-          run: |
-            cd TU-Editor
-            npm install
-            npm run build
-            cd ..
+        run: |
+          cd TU-Editor
+          npm install
+          npm run build
+          cd ..
       - name: Build the project for TU-Editor
-          run: |
-            cd TU-Editor
-            npm install
-            npm run build
-            cd ..
+        run: |
+          cd TU-Editor
+          npm install
+          npm run build
+          cd ..
       - name: Upload artifact in order to deploy
         uses: actions/upload-artifact@v3
         with:

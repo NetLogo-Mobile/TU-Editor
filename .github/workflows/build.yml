@@ -37,7 +37,7 @@ jobs:
         run: npm install rollup --global
       - name: Build the project for CodeMirror-NetLogo
         run: |
-          cd TU-Editor
+          cd CodeMirror-NetLogo
           npm install
           npm run build
           cd ..

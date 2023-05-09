@@ -1,0 +1,118 @@
+
+<head>
+	<meta id="viewport" name="viewport" content="width=device-width,maximum-scale=0.5,minimum-scale=0.5,initial-scale=0.5,user-scalable=no,viewport-fit=cover">
+	<link rel="stylesheet" href="lib/toastr.css">
+	<link rel="stylesheet" href="lib/jquery.modal.min.css">
+	<link rel="stylesheet" href="lib/jquery.confirm.min.css">
+	<link rel="stylesheet" href="lib/editor.css">
+	<link rel="stylesheet" href="lib/chatlogo.css">
+	<meta charset="UTF-8" />
+	<script src="lib/json5.min.js"></script>
+	<script src="lib/jquery.min.js"></script>
+	<script src="lib/jquery.modal.min.js"></script>
+	<script src="lib/jquery.confirm.min.js"></script>
+	<script src="lib/showdown.min.js"></script>
+	<script src="lib/scrolllock.js"></script>
+	<script src="lib/toastr.min.js"></script>
+	<script src="lib/darkmode.min.js"></script>
+</head>
+<body>
+	<div class="root-container">
+		<div class="commands tab">
+			<div class="command-output">
+				<div class="command-code"></div>
+				<div class="outputs"></div>
+			</div>
+			<div class="command-fulltext">
+				<h2><strong>Ask</strong><span></span></h2>
+				<p><a href="javascript:void(0)" onclick="Commands.HideFullText(true);"><span class="Localized">返回上一页……</span></a></p>
+				<div class="translator">
+					<p><span class="Localized">正在显示由 Google 翻译的内容。</span> <a href="javascript:void(0)" class="Original Localized">点击这里</a> <span class="Localized">切换到原始语言。</span></p>
+					<p><span class="Localized">正在显示原文。</span> <a href="javascript:void(0)" class="Translation Localized">点击这里</a> <span class="Localized">切换到智能翻译。</span></p>
+				</div>
+				<div class="fulltext"></div>
+				<h4 class="Localized">致谢</h4>
+				<p class="Acknowledge"></p>
+				<h4 class="Localized">参见</h4>
+				<ul class="SeeAlso"></ul>
+				<p><a href="javascript:void(0)" onclick="Commands.HideFullText(true);"><span class="Localized">返回上一页……</span></a></p>
+			</div>
+			<div class="command-line">
+				<div class="wrapper">
+					<select name="objectives" class="darkmode-ignore"></select>
+					<div class="command-input"></div>
+				</div>
+			</div>
+		</div>
+		<div class="editor tab">
+			<div class="codemirror-tips"></div>
+			<div class="codemirror"></div>
+			<div class="overlays">
+				<div class="rotate-screen backdrop">
+					<img src="images/rotate.png" />
+					<p class="Localized">编辑器支持竖屏使用。旋转屏幕获得最佳体验！</p>
+				</div>
+			</div>
+		</div>
+		<div id="Dialog-Procedures" class="modal">
+			<h4></h4>
+			<ul></ul>
+		</div>
+	</div>
+	<script type="text/javascript">
+		(function() {
+			/** For String.prototype.matchAll */
+			if(!String.prototype.matchAll) {
+				String.prototype.matchAll = function (rx) {
+					if (typeof rx === "string") rx = new RegExp(rx, "g"); // coerce a string to be a global regex
+					rx = new RegExp(rx); // Clone the regex so we don't update the last index on the regex they pass us
+					let cap = []; // the single capture
+					let all = []; // all the captures (return this)
+					while ((cap = rx.exec(this)) !== null) all.push(cap); // execute and add
+					return all; // profit!
+				};
+			}
+			
+			// Script loader
+			window.LoadScript = function (Name) {
+				var Element = document.createElement("script");
+				Element.src = Name + "?" + Date.now();
+				document.body.appendChild(Element);
+			};
+
+			// Basic scripts
+			window.modelConfig = {};
+			LoadScript("tortuga-editor.js");
+
+			// Messenger
+			if (navigator.userAgent.indexOf("ZFBrowser") != -1) {
+				window.PostMessage = function(Data) {
+					if (typeof ZFCallback != "undefined") ZFCallback(Data);
+				};
+			} else if (window.location.href.indexOf("localhost") == -1) {
+				if (window && window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.unityControl) {
+					window.PostMessage = function (Result) {
+						window.webkit.messageHandlers.unityControl.postMessage(Result);
+						return Result;
+					};
+				} else {
+					window.PostMessage = function (Result) {
+						window.location = 'unity:' + Result;
+						return Result;
+					}
+				}
+			} else {
+				window.PostMessage = null;
+			}
+
+			// Initialize
+			window.addEventListener("load", function () {
+				window.Editor = new TurtleEditor(document.querySelector("div.root-container"), PostMessage);
+				window.EditorTab = window.Editor.EditorTabs[0];
+				window.Commands = window.Editor.CommandTab;
+				if (PostMessage != null) PostMessage(navigator.userAgent);
+			});
+		})();
+	</script>
+</body>
+</html>

@@ -16,12 +16,18 @@ export class CodeSectionRenderer extends SectionRenderer {
     /** RenderInternal: Render the UI element. */
     protected RenderInternal(): void {
         var Section = this.GetData();
-        this.Code = Section.Content?.trim() ?? "";
-        if (this.Finalized) {
+        if (this.Finalized && Section.Content) {
+            // Fix the code
+            var Parent = this.GetRecord().Context?.CodeSnippet;
+            var ParentSnapshot = NetLogoUtils.BuildSnapshot(Parent);
+            Section.Content = NetLogoUtils.FixGeneratedCode(Section.Content, ParentSnapshot);
+            this.Code = Section.Content;
+            // Render the code
             this.ContentContainer = $(`<code></code>`).replaceAll(this.ContentContainer)
                 .on("click", () => this.EnterCode());
             NetLogoUtils.AnnotateCode(this.ContentContainer, this.Code);
         } else {
+            this.Code = Section.Content?.trim() ?? "";
             this.ContentContainer = $(`<pre></pre>`).replaceAll(this.ContentContainer).text(this.Code);
         }
     }

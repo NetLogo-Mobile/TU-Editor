@@ -100,7 +100,7 @@ export class CodeDisplay extends Display {
 	/** UpdateHistory: Update the history index of the display. */
 	private UpdateHistory() {
 		this.HistoryDisplay.text(`${this.CurrentIndex + 1} / ${this.Records.length}`);
-		this.PreviousButton.toggle(this.CurrentIndex > 0);
+		this.PreviousButton.toggle(true);
 		this.NextButton.toggle(this.CurrentIndex < this.Records.length - 1);
 	}
 	/** UpdateRecords: Update the records. */
@@ -120,9 +120,13 @@ export class CodeDisplay extends Display {
 	}
 	/** ShowPrevious: Show the previous code section. */
 	private ShowPrevious() {
-		this.SaveChanges();
-		this.CurrentIndex--;
-		this.UpdateRecords();
+		if (this.CurrentIndex == 0) {
+			this.Hide();
+		} else {
+			this.SaveChanges();
+			this.CurrentIndex--;
+			this.UpdateRecords();
+		}
 	}
 	/** ShowNext: Show the next code section. */
 	private ShowNext() {
@@ -195,7 +199,7 @@ export class CodeDisplay extends Display {
 			Diagnostics = Diagnostics.filter(Diagnostic => Diagnostic.severity == "error");
 		return Diagnostics.map(Diagnostic => {
 			return {
-				Message: Diagnostic.message,
+				Message: NetLogoUtils.PostprocessLintMessage(Diagnostic.message),
 				Code: this.Editor.GetCodeSlice(Diagnostic.from, Diagnostic.to),
 				From: Diagnostic.from,
 				To: Diagnostic.to
@@ -206,6 +210,11 @@ export class CodeDisplay extends Display {
 	public Play() {
 		this.Tab.Outputs.RenderRequest(Localized.Get("Trying to run the code"), this.Record).Transparent = true;
 		this.TryTo(() => {
+			var State = this.Editor.GetState();
+			var Mode = this.Editor.Semantics.GetRecognizedMode();
+			console.log(State);
+			console.log(Mode);
+			// Run the code based on the mode
 			
 		});
 	}
@@ -213,7 +222,7 @@ export class CodeDisplay extends Display {
 	public AddToCode() {
 		this.Tab.Outputs.RenderRequest(Localized.Get("Trying to add the code"), this.Record).Transparent = true;
 		this.TryTo(() => {
-			
+
 		});
 	}
 	/** Ask: Try to ask about the code. */

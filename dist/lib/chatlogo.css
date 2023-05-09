@@ -245,6 +245,9 @@
     padding: 0.5rem 0.8rem;
 	background: #f7f7f7;
 	display: block;
+	white-space: pre-wrap;
+	word-break: break-word;
+	overflow-wrap: anywhere;
 }
 
 /** Special: Code ideation */
@@ -285,7 +288,7 @@
 	flex-direction: column;
 }
 .command-code .codemirror {
-	flex-shrink: 1;
+	max-height: 50vh;
 }
 .command-code .hidden-editor {
 	display: none;

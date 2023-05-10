@@ -186,7 +186,7 @@ export class OutputDisplay extends Display {
 							Content: Source
 						});
 					})
-				} else if (Content.Parameter == "-full") {
+				} else if (Content.parameter === "-full") {
 					this.QueueResponse({
 						Type: ChatResponseType.Text,
 						Content: Localized.Get("Showing full text help of _", Content["display_name"])

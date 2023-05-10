@@ -239,6 +239,13 @@
 .command-output .server-error a {
     margin: 0 0 0 0.5rem;
 }
+.command-output .compile-error,
+.command-output .runtime-error {
+	color: #cc2200;
+}
+.command-output .succeeded {
+	color: #007F69;
+}
 .command-output .code code {
 	border: 1px solid #eee;
 	cursor: pointer;
@@ -374,13 +381,6 @@
 .command-output .Help a {
 	text-decoration: none;
 }
-.command-output .CompilationError,
-.command-output .RuntimeError {
-	color: #cc2200;
-}
 .command-output .RuntimeError a {
 	margin: 0 0 0 0.5em;
-}
-.command-output .Succeeded {
-	color: #007F69;
 }

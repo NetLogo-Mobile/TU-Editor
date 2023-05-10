@@ -4,8 +4,11 @@ import { ChatResponseSection, ChatResponseType } from "../../chat/client/chat-re
 import { CodeIdeationRenderer } from "../../chat/ui/code-ideation-renderer";
 import { DiagnosticsRenderer } from "../../chat/ui/diagnostic-renderer";
 import { CodeSectionRenderer } from "../sections/code-section-renderer";
+import { CompileErrorRenderer } from "../sections/compile-error-renderer";
+import { RuntimeErrorRenderer } from "../sections/runtime-error-renderer";
 import { SectionRenderer } from "../sections/section-renderer";
 import { ServerErrorRenderer } from "../sections/server-error-renderer";
+import { SucceededRenderer } from "../sections/succeeded-renderer";
 import { TextSectionRenderer } from "../sections/text-section-renderer";
 import { InputRenderer } from "./input-renderer";
 import { OptionRenderer } from "./option-renderer";
@@ -58,8 +61,8 @@ export class RecordRenderer extends UIRendererOf<ChatRecord> {
         // If this is the first section
         if (this.Children.length == 1) Renderer.SetFirst();
         // Add the renderer
-        Renderer.SetData(Section);
         this.AddChild(Renderer, false);
+        Renderer.SetData(Section);
         // Append to the container
         if (this.OptionContainer) {
             this.OptionContainer.before(Renderer.Container);
@@ -100,12 +103,12 @@ export type RendererChooser = (Record: ChatRecord, Section: ChatResponseSection)
 /** SectionRenderers: The renderers for each section type. */
 export const SectionRenderers: Record<ChatResponseType, RendererChooser[]> = {
     [ChatResponseType.Start]: [],
-    [ChatResponseType.Finish]: [],
+    [ChatResponseType.Finish]: [() => new SucceededRenderer()],
     [ChatResponseType.Text]: [() => new TextSectionRenderer()],
     [ChatResponseType.Code]: [() => new CodeSectionRenderer()],
     [ChatResponseType.JSON]: [CodeIdeationRenderer.GetChooser(), DiagnosticsRenderer.GetChooser()],
     [ChatResponseType.Thought]: [],
-    [ChatResponseType.CompileError]: [],
-    [ChatResponseType.RuntimeError]: [],
+    [ChatResponseType.CompileError]: [() => new CompileErrorRenderer()],
+    [ChatResponseType.RuntimeError]: [() => new RuntimeErrorRenderer()],
     [ChatResponseType.ServerError]: [() => new ServerErrorRenderer()]
 };

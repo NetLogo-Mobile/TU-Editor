@@ -36,8 +36,8 @@ export class NetLogoUtils {
 		// Remove the ```
 		if (Content.startsWith("```")) Content = Content.slice(3);
 		if (Content.indexOf("```") != -1) Content = Content.slice(0, Content.indexOf("```"));
-		// Replace back to `
-		Content = Content.replace(/`/g, '"');
+		// Replace back to "
+		Content = Content.replace(/`/g, '"').replace(/'/g, '"');
 		return this.SharedEditor.Semantics.FixGeneratedCode(Content, Parent);
 	}
 	/** PostprocessLintMessage: Postprocess a lint message. */

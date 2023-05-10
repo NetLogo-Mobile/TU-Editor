@@ -105,7 +105,7 @@ export class TurtleEditor {
     $("body").addClass(Platform);
   }
 	/** Toast: Show a toast. */
-	public Toast = function(Type: string, Content: string, Subject?: string) {
+	public Toast(Type: string, Content: string, Subject?: string) {
 		toastr[Type](Content, Subject);
 	}
   /** Reset: Reset the editor. */

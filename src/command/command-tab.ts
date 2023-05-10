@@ -148,7 +148,6 @@ export class CommandTab extends Tab {
 	}
 	/** SendCommand: Send command to either execute or as a chat message. */
 	public async SendCommand(Objective: string, Content: string) {
-		this.Outputs.ScrollToBottom();
 		// Chatable or not
 		var Chatable = this.ChatManager.Available;
 		if (!Chatable) {
@@ -198,10 +197,15 @@ export class CommandTab extends Tab {
 	/** ExecuteInput: Execute a human-sent command. */
 	private ExecuteInput(Objective: string, Content: string) {
 		// Record command history
-		this.Outputs.PrintInput(Objective, Content, false);
 		this.CommandStack.push([Objective, Content]);
 		this.CurrentCommandIndex = 0;
 		this.CurrentCommand = [];
+		// Execute command
+		this.ExecuteCommand(Objective, Content);
+		this.ClearInput();
+	}
+	/** ExecuteCommand: Execute a command. */
+	public ExecuteCommand(Objective: string, Content: string) {
 		// Transform command
 		switch (Objective.toLowerCase()) {
 			case "turtles":
@@ -216,12 +220,7 @@ export class CommandTab extends Tab {
 		}
 		// Execute command
 		this.Editor.Call({ Type: "CommandExecute", Source: Objective, Command: Content });
-		this.ClearInput();
-	}
-	/** ExecuteCommand: Execute a command. */
-	public ExecuteCommand(Objective: string, Content: string) {
-		this.Editor.Call({ Type: "CommandExecute", Source: Objective, Command: Content });
-		this.Outputs.PrintInput(Objective, Content, false);
+		this.Outputs.PrintCommandInput(Content);
 		this.Outputs.ScrollToBottom();
 	}
 	/** ExplainFull: ExplainFull: Explain the selected text in the command center in full. */
@@ -232,7 +231,7 @@ export class CommandTab extends Tab {
 	}
 	/** FinishExecution: Notify the completion of the command. */
 	public FinishExecution(Status: string, Message: string) {
-		this.Outputs.PrintOutput(Message, Status);
+		this.Outputs.PrintOutput(Status, Status);
 		this.Disabled = false;
 	}
 	// #endregion

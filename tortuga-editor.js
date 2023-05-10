@@ -65,636 +65,6 @@
         }
     }
 
-    // Localized: Localized support.
-    const Localized$1 = function () {
-        var Localized = {};
-        // Initialize: Initialize the manager with given data.
-        Localized.Initialize = function (Data, Language) {
-            Localized.Data = Data;
-            EditorLocalized.Switch(Language);
-            $(".Localized").each((Index, Target) => {
-                $(Target).text(Localized.Get($(Target).text()));
-            });
-        };
-        // Get: Get localized string.
-        Localized.Get = function (Source) {
-            if (Localized.Data && Localized.Data.hasOwnProperty(Source))
-                return Localized.Data[Source];
-            return Source;
-        };
-        return Localized;
-    }();
-    // RotateScreen: Show rotate screen prompt.
-    const RotateScreen = function () {
-        (function ($, undefined$1) {
-            $.fn.asOverlay = function (Timeout = 3000, Animation = 300) {
-                this.Hide = () => this.fadeOut(Animation);
-                this.Show = () => {
-                    clearTimeout(this.timeout);
-                    this.timeout = setTimeout(() => this.fadeOut(Animation), Timeout);
-                    this.fadeIn(Animation);
-                };
-                return this;
-            };
-        })(jQuery);
-        var RotateScreen = $(".rotate-screen");
-        RotateScreen.asOverlay().click(() => RotateScreen.hide());
-        return RotateScreen;
-    };
-
-    /** TransformLinks: Transform the embedded links. */
-    function TransformLinks(Editor, Element) {
-        if (TurtleEditor.PostMessage != null)
-            return;
-        Element.find("a").each((Index, Link) => {
-            var LinkElement = $(Link);
-            var Href = LinkElement.attr("href");
-            LinkElement.attr("href", "javascript:void(0);");
-            LinkElement.on("click", () => Editor.Call({ Type: "Visit", Target: Href }));
-        });
-    }
-    /** MarkdownToHTML: Convert markdown to HTML. */
-    function MarkdownToHTML(Source) {
-        return new showdown.Converter({
-            underline: true,
-            emoji: true
-        }).makeHtml(Source);
-    }
-    /** LinkCommand: Generate a link for another command. */
-    function LinkCommand(Query) {
-        Query.each((Index, Item) => {
-            var Current = $(Item);
-            var Target = Current.attr("target");
-            if (Target == null)
-                Target = Current.text();
-            var Objective = Current.attr("objective");
-            if (!Objective)
-                Objective = "null";
-            Current.attr("href", "javascript:void(0)");
-            Current.attr("onclick", `this.ExecuteCommand(${Objective}, '${Target}')`);
-        });
-        return Query;
-    }
-    /** RenderAgent: Render tips for an agent type. */
-    function RenderAgent(Agent) {
-        var Message = Agent;
-        switch (Agent) {
-            case "turtles":
-                Message = `${Localized$1.Get("海龟")}🐢`;
-                break;
-            case "patches":
-                Message = `${Localized$1.Get("格子")}🔲`;
-                break;
-            case "links":
-                Message = `${Localized$1.Get("链接")}🔗`;
-                break;
-            case "observer":
-                Message = `${Localized$1.Get("观察者")}🔎`;
-                break;
-            case "utilities":
-                Message = `${Localized$1.Get("工具")}🔨`;
-                break;
-        }
-        return Message;
-    }
-
-    /** Display: A display section of Command Center. */
-    class Display {
-        /** Constructor: Create a new output section. */
-        constructor(Tab, Selector) {
-            // Whether it is visible.
-            this.Visible = false;
-            this.Tab = Tab;
-            this.Container = $(Tab.Container).find(Selector).hide();
-            this.ScrollContainer = this.Container;
-            this.Tab.Sections.push(this);
-        }
-        /** Show: Show the section. */
-        Show() {
-            if (this.Visible)
-                return;
-            if (!this.Tab.Visible)
-                this.Tab.Show();
-            this.Tab.HideAllSections();
-            $(this.Container).show();
-            this.Visible = true;
-        }
-        /** Hide: Hide the section. */
-        Hide() {
-            $(this.Container).hide();
-            this.Visible = false;
-        }
-        /** ScrollToBottom: After user entered input, screen view should scroll down to the bottom line. */
-        ScrollToBottom() {
-            this.ScrollContainer.scrollTop(this.ScrollContainer.get(0).scrollHeight);
-        }
-        /** IsAtBottom: Whether the container is scrolled to bottom. */
-        IsAtBottom() {
-            var Element = this.ScrollContainer.get(0);
-            return Math.abs(Element.scrollHeight - Element.clientHeight - Element.scrollTop) < 1;
-        }
-    }
-
-    /** NetLogoUtils: Utilities for the NetLogo language. */
-    class NetLogoUtils {
-        /** AnnotateCodes: Annotate some code elements. */
-        static AnnotateCodes(Targets) {
-            Targets.each(function () {
-                NetLogoUtils.AnnotateCode($(this));
-            });
-        }
-        /** AnnotateCode: Annotate a code element. */
-        static AnnotateCode(Target, Content) {
-            Content = Content ? Content : Target.text();
-            Target.empty().append($(NetLogoUtils.HighlightCode(Content)));
-        }
-        /** HighlightCode: Highlight a code snippet. */
-        static HighlightCode(Content) {
-            this.SharedEditor.SetCode(Content);
-            this.SharedEditor.Semantics.PrettifyAll();
-            console.log(this.SharedEditor.GetCode());
-            return this.SharedEditor.Semantics.Highlight();
-        }
-        /** BuildSnapshot: Build a code snapshot. */
-        static BuildSnapshot(Content) {
-            if (!Content)
-                return undefined;
-            this.SharedEditor.SetCode(Content);
-            return this.SharedEditor.Semantics.BuildSnapshot();
-        }
-        /** FixGeneratedCode: Fix some generated code. */
-        static FixGeneratedCode(Content, Parent) {
-            // Remove the trailing semicolon
-            if (Content.endsWith(';'))
-                Content = Content.slice(0, -1);
-            // Remove the ```
-            if (Content.startsWith("```"))
-                Content = Content.slice(3);
-            if (Content.indexOf("```") != -1)
-                Content = Content.slice(0, Content.indexOf("```"));
-            // Replace back to "
-            Content = Content.replace(/`/g, '"').replace(/'/g, '"');
-            return this.SharedEditor.Semantics.FixGeneratedCode(Content, Parent);
-        }
-        /** PostprocessLintMessage: Postprocess a lint message. */
-        static PostprocessLintMessage(Message) {
-            return Message;
-        }
-    }
-
-    /** FullTextDisplay: Display the full-text help information. */
-    class FullTextDisplay extends Display {
-        /** Constructor: Create a new output section. */
-        constructor(Tab) {
-            super(Tab, ".command-fulltext");
-            /** RequestedTab: The tab that requested the full text. */
-            this.RequestedTab = null;
-        }
-        /** ShowFullText: Show the full text of a command. */
-        ShowFullText(Data) {
-            this.RequestedTab = this.Tab.Editor.CurrentTab;
-            this.Show();
-            // Render the subject
-            this.Container.find("h2 strong").text(Data["display_name"]);
-            this.Container.find("h2 span").text(`(${Data["agents"].map((Agent) => `${RenderAgent(Agent)}`).join(", ")})`);
-            // Render the list
-            var SeeAlso = this.Container.find("ul.SeeAlso").empty();
-            for (var Primitive in Data["see_also"])
-                LinkCommand($(`<li><a class="command" target="help ${Primitive}">${Primitive}</a> - ${Data["see_also"][Primitive]}</li>`).appendTo(SeeAlso).find("a"));
-            // Machine-translation
-            var Translator = this.Container.find(".translator");
-            if (Data["translation"] != null && Data["verified"] != true)
-                Translator.show();
-            else
-                Translator.hide();
-            var Original = Translator.find("a.Original").bind("click", () => {
-                Original.hide();
-                Translation.show();
-                SetCode(Data["content"]);
-            }).parent().show();
-            var Translation = Translator.find("a.Translation").bind("click", () => {
-                Translation.hide();
-                Original.show();
-                SetCode(Data["translation"]);
-            }).parent().hide();
-            // Render the full text
-            var SetCode = (Content) => {
-                if (Content != null)
-                    this.Container.find("div.fulltext")
-                        .html(MarkdownToHTML(Content));
-                NetLogoUtils.AnnotateCodes(this.Container.find("code"));
-                this.Container.scrollTop(0);
-            };
-            SetCode(Data["translation"] != null ? Data["translation"] : Data["content"]);
-            // Acknowledge
-            TransformLinks(this.Tab.Editor, this.Container.find(".Acknowledge").html(Data["acknowledge"]));
-        }
-        /** HideFullText: Hide the full text mode. */
-        HideFullText() {
-            var _a;
-            if (!this.Container.is(":visible"))
-                return;
-            this.Container.hide();
-            (_a = this.RequestedTab) === null || _a === void 0 ? void 0 : _a.Show();
-        }
-    }
-
-    /** UIRenderer: Abstract class for rendering UI elements. */
-    class UIRenderer {
-        /** ContainerInitializer: The initializer for the container. */
-        ContainerInitializer() {
-            return $("<div></div>");
-        }
-        /** Constructor: Create a new UI renderer. */
-        constructor() {
-            /** Dirty: Whether the renderer is dirty and needs to be updated. */
-            this.Dirty = false;
-            /** Children: The children UI renderers. */
-            this.Children = [];
-            this.Container = this.ContainerInitializer();
-        }
-        /** SetDirty: Set the dirty status of the renderer. */
-        SetDirty(Status) {
-            var _a;
-            this.Dirty = Status;
-            if (Status)
-                (_a = this.Parent) === null || _a === void 0 ? void 0 : _a.SetDirty(Status);
-            return this;
-        }
-        /** Render: Render the UI element if it is dirty. */
-        Render() {
-            if (this.Dirty) {
-                for (var Child of this.Children)
-                    Child.Render();
-                this.RenderInternal();
-                this.Dirty = false;
-            }
-            return this;
-        }
-        /** AddChild: Add a child renderer. */
-        AddChild(Renderer, Append = true) {
-            this.Children.push(Renderer);
-            if (Append)
-                this.Container.append(Renderer.Container);
-            Renderer.Parent = this;
-            return this;
-        }
-        /** RemoveChildren: Remove all children that satisfy a condition. */
-        RemoveChildren(Condition) {
-            var Removal = this.Children.filter(Condition);
-            Removal.forEach(Child => Child.Container.remove());
-            this.Children = this.Children.filter((Child) => !Condition(Child));
-            return this;
-        }
-        /** DeactivateAll: Deactivate all renderers. */
-        DeactivateAll(Class) {
-            this.Children.forEach((Child) => {
-                Child.Container.removeClass(Class);
-            });
-            return this;
-        }
-        /** ActivateSelf: Activate the renderer with a class name and deactivate all other renderers. */
-        ActivateSelf(Class) {
-            var _a;
-            (_a = this.Parent) === null || _a === void 0 ? void 0 : _a.Children.forEach((Child) => {
-                if (Child == this)
-                    Child.Container.addClass(Class);
-                else
-                    Child.Container.removeClass(Class);
-            });
-            return this;
-        }
-        /** SetStatus: Set the status of the renderer. */
-        SetStatus(Status) {
-            var _a;
-            (_a = this.Parent) === null || _a === void 0 ? void 0 : _a.SetStatus(Status);
-            return this;
-        }
-    }
-    /** UIRendererOf: Abstract class for rendering UI elements. */
-    class UIRendererOf extends UIRenderer {
-        /** SetData: Set the data to render. */
-        SetData(Data) {
-            this.Data = Data;
-            this.SetDirty(true);
-            return this;
-        }
-        /** GetData: Get the data for rendering. */
-        GetData() {
-            return this.Data;
-        }
-    }
-
-    /** NewChatResponse: Creates a new chat response. */
-    /** ChatResponseType: The type for the chat response. */
-    var ChatResponseType;
-    (function (ChatResponseType) {
-        /** Start: The response is a start message. */
-        ChatResponseType[ChatResponseType["Start"] = -1] = "Start";
-        /** Finish: The response is a finish message. */
-        ChatResponseType[ChatResponseType["Finish"] = -2] = "Finish";
-        /** Text: The response is a text block. */
-        ChatResponseType[ChatResponseType["Text"] = 0] = "Text";
-        /** Code: The response is a code block. */
-        ChatResponseType[ChatResponseType["Code"] = 1] = "Code";
-        /** JSON: The response is a JSON block. */
-        ChatResponseType[ChatResponseType["JSON"] = 2] = "JSON";
-        /** Thought: The response is a thought block. */
-        ChatResponseType[ChatResponseType["Thought"] = 3] = "Thought";
-        /** CompileError: The response is a compile error message. */
-        ChatResponseType[ChatResponseType["CompileError"] = 4] = "CompileError";
-        /** RuntimeError: The response is a runtime error message. */
-        ChatResponseType[ChatResponseType["RuntimeError"] = 5] = "RuntimeError";
-        /** ServerError: The response is a server error message. */
-        ChatResponseType[ChatResponseType["ServerError"] = 6] = "ServerError";
-    })(ChatResponseType || (ChatResponseType = {}));
-    /** IsTextLike: Returns true if the section is text-like. */
-    function IsTextLike(Section) {
-        return Section.Type == ChatResponseType.Text || Section.Type == ChatResponseType.CompileError || Section.Type == ChatResponseType.RuntimeError;
-    }
-    /** SectionsToJSON: Serialize a number of sections to JSON5. */
-    function SectionsToJSON(Sections) {
-        var _a;
-        var Result = "{";
-        for (var Section of Sections) {
-            Result += `${(_a = Section.Field) !== null && _a !== void 0 ? _a : ChatResponseType[Section.Type]}:${Section.Type == ChatResponseType.JSON ? Section.Content : JSON.stringify(Section.Content)}`;
-            if (Section != Sections[Sections.length - 1])
-                Result += ",\n";
-        }
-        return Result + "}";
-    }
-
-    /** ChatThread: Record a conversation between human-AI. */
-    class ChatThread {
-        constructor() {
-            /** Records: The chat records of the thread. */
-            this.Records = {};
-            /** Subthreads: The subthreads of the conversation. */
-            this.Subthreads = [];
-        }
-        /** GetRecord: Get a record by its parent ID. */
-        GetRecord(ParentID) {
-            if (!ParentID)
-                return undefined;
-            return this.Records[ParentID];
-        }
-        /** GetSubthread: Get a specific subthread. */
-        GetSubthread(RootID) {
-            return this.Subthreads.find((Subthread) => Subthread.RootID === RootID);
-        }
-        /** AddToSubthread: Add a record to a subthread. */
-        AddToSubthread(Record) {
-            // Find the parent
-            var Parent = Record;
-            while (Parent.ParentID) {
-                Parent = this.Records[Parent.ParentID];
-            }
-            // Find or create a subthread
-            var Subthread = this.Subthreads.find((Subthread) => (Subthread.RootID === Parent.ID && Subthread.RootID !== undefined) || Subthread.Records[0] === Parent);
-            if (!Subthread) {
-                Subthread = { RootID: Parent.ID, Records: [] };
-                this.Subthreads.push(Subthread);
-            }
-            // Add the record
-            Subthread.Records.push(Record);
-            return Subthread;
-        }
-    }
-
-    /** SSEClient: A simple client for handling Server-Sent Events. */
-    class SSEClient {
-        /** Constructor: Create a new SSEClient instance. */
-        constructor(url, authorization, payload) {
-            this.url = url;
-            this.authorization = authorization;
-            this.lastEventId = '';
-            this.payload = JSON.stringify(payload);
-            this.Request = new XMLHttpRequest();
-        }
-        /**
-         * Listen: Start listening to the SSE stream
-         * @param {Function} onMessage Callback function for handling the received message
-         */
-        Listen(onMessage, onError) {
-            this.Request.open('POST', this.url, true);
-            this.Request.setRequestHeader('Cache-Control', 'no-cache');
-            this.Request.setRequestHeader('Content-Type', 'application/json');
-            this.Request.setRequestHeader('Authorization', `Bearer ${this.authorization}`);
-            this.Request.setRequestHeader('Accept', 'text/event-stream');
-            // If we have a last event ID, set the header to resume from that point
-            if (this.lastEventId) {
-                this.Request.setRequestHeader('Last-Event-ID', this.lastEventId);
-            }
-            // Handle the received message
-            var responseCursor = 0;
-            this.Request.onreadystatechange = () => {
-                if (this.Request.status === 200) {
-                    const messages = this.Request.responseText.substring(responseCursor).trim().split('\n\n');
-                    responseCursor = this.Request.responseText.length;
-                    messages.forEach((message) => {
-                        const data = this.parseMessage(message);
-                        if (data) {
-                            this.lastEventId = data.id;
-                            onMessage(data);
-                        }
-                    });
-                }
-                else {
-                    onError.call(this.Request);
-                }
-            };
-            // Handle errors
-            this.Request.onerror = onError;
-            this.Request.send(this.payload);
-        }
-        /** Close: Stop listening to the SSE stream. */
-        Close() {
-            if (this.Request) {
-                this.Request.abort();
-            }
-        }
-        /**
-         * parseMessage: Parse the received message from the SSE stream
-         * @param {string} message The raw message received from the SSE stream
-         * @returns {StreamData | null} The parsed message as a StreamData object or null if the message is empty
-         */
-        parseMessage(message) {
-            if (!message)
-                return null;
-            const lines = message.split('\n');
-            const data = {
-                id: '',
-                event: '',
-                data: '',
-            };
-            lines.forEach((line) => {
-                const index = line.indexOf(':');
-                var key = line.substring(0, index).trim();
-                var value = line.substring(index + 1).trim();
-                switch (key) {
-                    case 'id':
-                        data.id = value;
-                        break;
-                    case 'event':
-                        data.event = value;
-                        break;
-                    case 'data':
-                        data.data = value;
-                        break;
-                }
-            });
-            return data;
-        }
-    }
-
-    /** ChatNetwork: Class that handles the network communication for the chat. */
-    class ChatNetwork {
-        /** SendRequest: Send a request to the chat backend and handle its outputs. */
-        static SendRequest(Record, Thread, NewSection, UpdateSection, FinishSection) {
-            var _a, _b;
-            return __awaiter(this, void 0, void 0, function* () {
-                // Build the record
-                Record.UserID = Thread.UserID;
-                Record.ThreadID = Thread.ID;
-                Record.Transparent = (_b = (_a = Record.Option) === null || _a === void 0 ? void 0 : _a.Transparent) !== null && _b !== void 0 ? _b : false;
-                Record.Response = { Sections: [], Options: [] };
-                Record.RequestTimestamp = Date.now();
-                // Do the request
-                return new Promise((Resolve, Reject) => {
-                    var Update = {};
-                    var Section = {};
-                    var Client = new SSEClient("http://localhost:3000/request", "", Record);
-                    // Finish the section if possible
-                    var TryFinishSection = () => {
-                        if (Section.Type !== undefined) {
-                            if (Section.Type === ChatResponseType.JSON && Section.Content && !Section.Parsed) {
-                                if (Section.Content.endsWith(","))
-                                    Section.Content = `[${Section.Content.substring(0, Section.Content.length - 1)}]`;
-                                Section.Parsed = ChatNetwork.TryParse(Section.Content);
-                            }
-                            Record.Response.Sections.push(Section);
-                            FinishSection(Section);
-                        }
-                    };
-                    // Parse an element in the array if possible
-                    var TryParseElement = () => {
-                        var _a;
-                        if (Section.Type === ChatResponseType.JSON && Update.Content && Update.Content.endsWith("},")) {
-                            Section.Parsed = (_a = Section.Parsed) !== null && _a !== void 0 ? _a : [];
-                            Section.Parsed.push(ChatNetwork.TryParse(Update.Content.substring(0, Update.Content.length - 1)));
-                        }
-                    };
-                    // Send the request
-                    Client.Listen((Data) => {
-                        try {
-                            Update = JSON.parse(Data.data);
-                            // console.log(Update);
-                        }
-                        catch (Exception) {
-                            console.log("Error: " + Data.data);
-                            return;
-                        }
-                        // Handle the update
-                        switch (Update.Type) {
-                            case ChatResponseType.ServerError:
-                                Reject(Update.Content);
-                                Client.Close();
-                                return;
-                            case ChatResponseType.Start:
-                                if (Update.Content) {
-                                    Record.ID = Update.Content;
-                                    Record.ThreadID = Update.Field;
-                                    Thread.ID = Update.Field;
-                                }
-                                else if (Update.Field) {
-                                    Record.Language = Update.Field;
-                                    Thread.Language = Update.Field;
-                                }
-                                return;
-                            case ChatResponseType.Finish:
-                                TryFinishSection();
-                                Record.ResponseTimestamp = Date.now();
-                                Thread.Records[Record.ID] = Record;
-                                Resolve(Record);
-                                return;
-                            case undefined:
-                                break;
-                            default:
-                                TryFinishSection();
-                                Section = Update;
-                                TryParseElement();
-                                NewSection(Section);
-                                return;
-                        }
-                        // Update the section
-                        if (Update.Content !== undefined)
-                            Section.Content += Update.Content;
-                        if (Update.Field !== undefined)
-                            Section.Field = Update.Field;
-                        if (Update.Options !== undefined)
-                            Record.Response.Options.push(...Update.Options);
-                        TryParseElement();
-                        UpdateSection(Section);
-                    }, (Error) => {
-                        console.log("Server Error: " + Error);
-                        Reject(Error);
-                    });
-                });
-            });
-        }
-        /** TryParse: Try to parse a JSON5 string. */
-        static TryParse(Source) {
-            try {
-                return JSON5.parse(Source);
-            }
-            catch (Exception) {
-                console.log(Source);
-                console.log(Exception);
-                return {};
-            }
-        }
-    }
-
-    /** ChatRole: The role of the speaker. */
-    var ChatRole;
-    (function (ChatRole) {
-        /** System: The system. */
-        ChatRole["System"] = "system";
-        /** User: The user. */
-        ChatRole["User"] = "user";
-        /** Assistant: The assistant. */
-        ChatRole["Assistant"] = "assistant";
-    })(ChatRole || (ChatRole = {}));
-
-    /** ContextMessage: How to inherit an output message for the context. */
-    var ContextMessage;
-    (function (ContextMessage) {
-        /** Nothing: Nothing should be retained. */
-        ContextMessage[ContextMessage["Nothing"] = 0] = "Nothing";
-        /** TextOnly: Only text messages should be retained, in a text format. */
-        ContextMessage[ContextMessage["MessagesAsText"] = 1] = "MessagesAsText";
-        /** MessagesAsJSON: Only text messages should be retained, in a JSON format. */
-        ContextMessage[ContextMessage["MessagesAsJSON"] = 2] = "MessagesAsJSON";
-        /** FirstJSON: Only the first JSON message should be retained. */
-        ContextMessage[ContextMessage["FirstJSON"] = 3] = "FirstJSON";
-        /** AllAsJSON: Except for the code, all should be retained in a JSON format. */
-        ContextMessage[ContextMessage["AllAsJSON"] = 4] = "AllAsJSON";
-    })(ContextMessage || (ContextMessage = {}));
-    /** ContextInheritance: How to inherit the parent context. */
-    var ContextInheritance;
-    (function (ContextInheritance) {
-        /** Drop: Drop the context. */
-        ContextInheritance[ContextInheritance["Drop"] = 0] = "Drop";
-        /** InheritOne: Only inherit the current message segment. */
-        ContextInheritance[ContextInheritance["InheritOne"] = 1] = "InheritOne";
-        /** InheritParent: Only inherit the current message segment and its parent context. */
-        ContextInheritance[ContextInheritance["InheritParent"] = 2] = "InheritParent";
-        /** InheritRecursive: Inherit the current message segment and its parent context, recursively based on the parent's strategy. */
-        ContextInheritance[ContextInheritance["InheritRecursive"] = 3] = "InheritRecursive";
-        /** InheritEntire: Inherit the entire context. */
-        ContextInheritance[ContextInheritance["InheritEntire"] = 4] = "InheritEntire";
-    })(ContextInheritance || (ContextInheritance = {}));
-
     /**
     The data structure for documents. @nonabstract
     */
@@ -28220,7 +27590,7 @@
         }
         // RegisterInternal: Register some built-in explanations.
         RegisterBuiltin(...Args) {
-            Args.map((Arg) => (this.Data[Arg.toLowerCase()] = Localized.Get(Args[0], '{0}')));
+            Args.map((Arg) => (this.Data[Arg.toLowerCase()] = Localized$1.Get(Args[0], '{0}')));
         }
         // Get: Get an explanation from the dictionary.
         Get(Key, Value) {
@@ -28363,11 +27733,11 @@
                     closestTerm == '~Arguments' ||
                     closestTerm == '~ProcedureName') ;
                 else if (Dictionary.Check(`~${name}`) ||
-                    Localized.Get(`~${name}`) != `~${name}`) {
+                    Localized$1.Get(`~${name}`) != `~${name}`) {
                     closestTerm = `~${name}`;
                 }
                 else if (Dictionary.Check(`~${parentName}/${name}`) ||
-                    Localized.Get(`~${parentName}/${name}`) != `~${parentName}/${name}`)
+                    Localized$1.Get(`~${parentName}/${name}`) != `~${parentName}/${name}`)
                     closestTerm = `~${parentName}/${name}`;
                 parentName = name;
             },
@@ -30586,7 +29956,7 @@
     /** AddBreedAction: Return an add a breed action. */
     const AddBreedAction = function (type, plural, singular) {
         return {
-            name: Localized.Get('Add'),
+            name: Localized$1.Get('Add'),
             apply(view, from, to) {
                 new CodeEditing(view).AppendBreed(type, plural, singular);
             },
@@ -30595,7 +29965,7 @@
     /** AddGlobalsAction: Return an add a global action. */
     const AddGlobalsAction = function (type, items) {
         return {
-            name: Localized.Get('Add'),
+            name: Localized$1.Get('Add'),
             apply(view, from, to) {
                 new CodeEditing(view).AppendGlobals(type, items);
             },
@@ -30623,7 +29993,7 @@
                             from: noderef.from,
                             to: noderef.to,
                             severity: 'error',
-                            message: Localized.Get('Unrecognized identifier _', value),
+                            message: Localized$1.Get('Unrecognized identifier _', value),
                         });
                     }
                     else {
@@ -30649,7 +30019,7 @@
                                 from: noderef.from,
                                 to: noderef.to,
                                 severity: 'error',
-                                message: Localized.Get('Unrecognized breed name _', breedinfo.breed),
+                                message: Localized$1.Get('Unrecognized breed name _', breedinfo.breed),
                                 actions: actions,
                             });
                         }
@@ -30710,7 +30080,7 @@
                         from: child.from,
                         to: child.to,
                         severity: 'error',
-                        message: Localized.Get('Improperly placed procedure _', value),
+                        message: Localized$1.Get('Improperly placed procedure _', value),
                     });
                 }
             });
@@ -30726,7 +30096,7 @@
                                 from: child.from,
                                 to: child.to,
                                 severity: 'error',
-                                message: Localized.Get('Duplicate global statement _', key),
+                                message: Localized$1.Get('Duplicate global statement _', key),
                             });
                         }
                     });
@@ -30780,7 +30150,7 @@
                         from: noderef.from,
                         to: noderef.to,
                         severity: 'error',
-                        message: Localized.Get('Unrecognized breed name _', value),
+                        message: Localized$1.Get('Unrecognized breed name _', value),
                         actions: actions,
                     });
                 }
@@ -30904,7 +30274,7 @@
             from: node.from,
             to: node.to,
             severity: severity,
-            message: Localized.Get(message, value),
+            message: Localized$1.Get(message, value),
         };
     };
 
@@ -30983,7 +30353,7 @@
                     from: noderef.from,
                     to: noderef.to,
                     severity: 'error',
-                    message: Localized.Get('Too few right args for _. Expected _, found _.', func, expected.toString(), actual.toString()),
+                    message: Localized$1.Get('Too few right args for _. Expected _, found _.', func, expected.toString(), actual.toString()),
                 });
             }
             else if ((noderef.name == 'ReporterStatement' ||
@@ -30999,7 +30369,7 @@
                         from: Node.from,
                         to: Node.to,
                         severity: 'error',
-                        message: Localized.Get('Missing command before _', value),
+                        message: Localized$1.Get('Missing command before _', value),
                     });
                 }
                 // Checking the arguments
@@ -31053,7 +30423,7 @@
                             from: noderef.from,
                             to: noderef.to,
                             severity: 'error',
-                            message: Localized.Get('Problem identifying primitive _. Expected _, found _.', func.toString(), expected.toString(), actual.toString()),
+                            message: Localized$1.Get('Problem identifying primitive _. Expected _, found _.', func.toString(), expected.toString(), actual.toString()),
                         });
                     }
                     else if (error_type == 'left') {
@@ -31061,7 +30431,7 @@
                             from: noderef.from,
                             to: noderef.to,
                             severity: 'error',
-                            message: Localized.Get('Left args for _. Expected _, found _.', func.toString(), expected.toString(), actual.toString()),
+                            message: Localized$1.Get('Left args for _. Expected _, found _.', func.toString(), expected.toString(), actual.toString()),
                         });
                     }
                     else if (error_type == 'rightmin') {
@@ -31069,7 +30439,7 @@
                             from: noderef.from,
                             to: noderef.to,
                             severity: 'error',
-                            message: Localized.Get('Too few right args for _. Expected _, found _.', func.toString(), expected.toString(), actual.toString()),
+                            message: Localized$1.Get('Too few right args for _. Expected _, found _.', func.toString(), expected.toString(), actual.toString()),
                         });
                     }
                     else if (error_type == 'rightmax') {
@@ -31077,7 +30447,7 @@
                             from: noderef.from,
                             to: noderef.to,
                             severity: 'error',
-                            message: Localized.Get('Too many right args for _. Expected _, found _.', func.toString(), expected.toString(), actual.toString()),
+                            message: Localized$1.Get('Too many right args for _. Expected _, found _.', func.toString(), expected.toString(), actual.toString()),
                         });
                     }
                 }
@@ -31105,7 +30475,7 @@
                             from: Node.from,
                             to: Node.to,
                             severity: 'error',
-                            message: Localized.Get('Infinite loop _', funcName),
+                            message: Localized$1.Get('Infinite loop _', funcName),
                         });
                     }
                 }
@@ -31113,8 +30483,8 @@
         });
         return diagnostics.filter((d) => d.from >= view.state.selection.ranges[0].to ||
             d.to <= view.state.selection.ranges[0].from ||
-            d.message == Localized.Get('Infinite loop _', 'loop') ||
-            d.message == Localized.Get('Infinite loop _', 'while'));
+            d.message == Localized$1.Get('Infinite loop _', 'loop') ||
+            d.message == Localized$1.Get('Infinite loop _', 'while'));
     };
     /** checkLoopEnd: checks if a loop has a stop/die/report statement. */
     const checkLoopEnd = function (view, node) {
@@ -31316,7 +30686,7 @@
                     from: node.from,
                     to: node.to,
                     severity: 'warning',
-                    message: Localized.Get('Unsupported statement _', value),
+                    message: Localized$1.Get('Unsupported statement _', value),
                 });
             }
         });
@@ -31341,7 +30711,7 @@
                             from: child.from,
                             to: child.to,
                             severity: 'warning',
-                            message: Localized.Get('Unsupported extension _.', name),
+                            message: Localized$1.Get('Unsupported extension _.', name),
                         });
                     }
                 });
@@ -31369,8 +30739,8 @@
                     to: noderef.to,
                     severity: 'error',
                     message: !noderef.name.includes('Unsupported')
-                        ? Localized.Get('Missing extension _.', vals[0])
-                        : Localized.Get('Unsupported missing extension _.', vals[0]),
+                        ? Localized$1.Get('Missing extension _.', vals[0])
+                        : Localized$1.Get('Unsupported missing extension _.', vals[0]),
                     actions: [AddGlobalsAction('Extensions', [vals[0]])],
                 });
             }
@@ -31439,7 +30809,7 @@
                         from: noderef.from,
                         to: noderef.to,
                         severity: 'error',
-                        message: Localized.Get('Term _ already used.', value),
+                        message: Localized$1.Get('Term _ already used.', value),
                     });
                 }
                 seen.push(value);
@@ -31455,7 +30825,7 @@
                         from: noderef.from,
                         to: noderef.to,
                         severity: 'error',
-                        message: Localized.Get('Term _ already used.', value),
+                        message: Localized$1.Get('Term _ already used.', value),
                     });
                 }
                 seen.push(value);
@@ -31470,7 +30840,7 @@
                         from: noderef.from,
                         to: noderef.to,
                         severity: 'error',
-                        message: Localized.Get('Term _ already used.', value),
+                        message: Localized$1.Get('Term _ already used.', value),
                     });
                 }
                 seen.push(value);
@@ -31493,7 +30863,7 @@
                                     from: child.from,
                                     to: child.to,
                                     severity: 'error',
-                                    message: Localized.Get('Term _ already used.', name),
+                                    message: Localized$1.Get('Term _ already used.', name),
                                 });
                             }
                             internal_vars.push(name);
@@ -31514,7 +30884,7 @@
                                     from: child.from,
                                     to: child.to,
                                     severity: 'error',
-                                    message: Localized.Get('Term _ already used.', name),
+                                    message: Localized$1.Get('Term _ already used.', name),
                                 });
                             }
                             internal_vars.push(name);
@@ -31534,7 +30904,7 @@
                                     from: child.from,
                                     to: child.to,
                                     severity: 'error',
-                                    message: Localized.Get('Term _ already used.', name),
+                                    message: Localized$1.Get('Term _ already used.', name),
                                 });
                             }
                             all.push(name);
@@ -31554,7 +30924,7 @@
                             from: child.from,
                             to: child.to,
                             severity: 'error',
-                            message: Localized.Get('Term _ already used.', name),
+                            message: Localized$1.Get('Term _ already used.', name),
                         });
                     }
                 }
@@ -31616,7 +30986,7 @@
                     from: node.from,
                     to: node.to,
                     severity: 'error',
-                    message: Localized.Get('Unmatched item _', current, expected),
+                    message: Localized$1.Get('Unmatched item _', current, expected),
                 });
         });
         return diagnostics;
@@ -31688,7 +31058,7 @@
                 from: c.From,
                 to: c.To,
                 severity: 'error',
-                message: Localized.Get('Invalid context _.', contextToString(c.PriorContext), contextToString(c.ConflictingContext), c.Primitive),
+                message: Localized$1.Get('Invalid context _.', contextToString(c.PriorContext), contextToString(c.ConflictingContext), c.Primitive),
             });
         }
         return diagnostics;
@@ -31696,16 +31066,16 @@
     const contextToString = function (context) {
         let contexts = [];
         if (context.Observer) {
-            contexts.push(Localized.Get('Observer'));
+            contexts.push(Localized$1.Get('Observer'));
         }
         if (context.Turtle) {
-            contexts.push(Localized.Get('Turtle'));
+            contexts.push(Localized$1.Get('Turtle'));
         }
         if (context.Patch) {
-            contexts.push(Localized.Get('Patch'));
+            contexts.push(Localized$1.Get('Patch'));
         }
         if (context.Link) {
-            contexts.push(Localized.Get('Link'));
+            contexts.push(Localized$1.Get('Link'));
         }
         return contexts.join('/');
     };
@@ -31787,6 +31157,7 @@
         Patches: () => 'Patches',
         Link: () => 'Link',
         Links: () => 'Links',
+        Utility: () => 'Utility',
         // Help messages
         '~VariableName': (Name) => `A (unknown) variable. `,
         '~ProcedureName': (Name) => `The name of a procedure. `,
@@ -31822,10 +31193,21 @@
         'Trying to add the code': () => `Trying to add the code to the project...`,
         PreviousVersion: () => `Back`,
         NextVersion: () => `Next`,
-        'Connection to server failed _': (Error) => `Sorry, the connection to our server failed. Code ${Error}.`,
         'Expand messages _': (Number) => `Expand ${Number} messages`,
+        FullText: () => `Read more`,
+        SeeAlso: () => `See also`,
+        // Chat and execution messages
+        'Connection to server failed _': (Error) => `Sorry, the connection to our server failed. Code ${Error}.`,
         'Summary of request': () => `Below is a summary of my request: `,
         'We need to fix the following errors _': (Number) => `Sorry, but we need to fix the ${Number} errors in the code (marked with ___red squiggly lines___) before continuing.`,
+        'Successfully executed': () => `Successfully executed the code.`,
+        'Runtime error _': (Error) => `Sorry, the code failed to run: ${Error}`,
+        'Compile error _': (Error) => `Sorry, I cannot understand the code: ${Error}`,
+        'Showing full text help of _': (Name) => `Here is the help information of [${Name}](<observer=help ${Name} -full>).`,
+        // Default messages
+        'Command center welcome (user)': () => `What is here about? Where should I start with?`,
+        'Command center welcome (command)': () => `Here is the command center. You can type in NetLogo code and run it here. Check out the **Code** button to look for the code.`,
+        'Command center welcome (assistant)': () => `Hello! I am your assistant. I can help you learn NetLogo or build your own project. You can also type in NetLogo code and run it here.`,
     };
 
     const zh_cn = {
@@ -31867,6 +31249,7 @@
         Patches: () => '格子们',
         Link: () => '链接',
         Links: () => '链接们',
+        Utility: () => '工具',
         // Help messages
         '~VariableName': (Name) => `一个（未知的）变量。`,
         '~ProcedureName': (Name) => `过程或函数的名称。`,
@@ -31892,7 +31275,7 @@
         '~CustomReporter': (Name) => `代码中定义的一个函数。`,
         '~BreedCommand': (Name) => `关于 "${Name}" 种类的过程。 `,
         '~CustomCommand': (Name) => `代码中定义的一个过程。`,
-        // Chat and AI assistant
+        // Chat and AI interface
         Reconnect: () => `重新连接`,
         RunCode: () => `运行代码`,
         'Trying to run the code': () => `尝试运行代码……`,
@@ -31902,10 +31285,21 @@
         'Trying to add the code': () => `尝试将代码放入作品……`,
         PreviousVersion: () => `后退`,
         NextVersion: () => `前进`,
-        'Connection to server failed _': (Error) => `抱歉，和服务器的连接中断了。代码 ${Error}。`,
         'Expand messages _': (Number) => `展开 ${Number} 条消息`,
+        FullText: () => `阅读全文`,
+        SeeAlso: () => `参见`,
+        // Chat and execution messages
+        'Connection to server failed _': (Error) => `抱歉，和服务器的连接中断了。代码 ${Error}。`,
         'Summary of request': () => `简单总结我的请求的要点：`,
         'We need to fix the following errors _': (Number) => `我们需要先修复代码中的 ${Number} 个错误（用___红色波浪线___标记）。`,
+        'Successfully executed': () => `成功执行了代码。`,
+        'Runtime error _': (Error) => `运行时错误：${Error}`,
+        'Compile error _': (Error) => `抱歉，未能理解你输入的命令：${Error}`,
+        'Showing full text help of _': (Name) => `显示 [${Name}](<observer=help ${Name} -full>) 的帮助文档。`,
+        // Default messages
+        'Command center welcome (user)': () => `这是哪儿？我应该怎么开始使用？`,
+        'Command center welcome (command)': () => `你好！这里是控制台。你可以在这里输入 NetLogo 命令并立即执行。点击**代码**按钮可以切换到作品代码。`,
+        'Command center welcome (assistant)': () => `你好！我是你的助手。我可以帮助你学习 NetLogo 或创作你的作品。你也可以输入 NetLogo 命令并立即执行。`,
     };
 
     /** LocalizationManager: Manage all localized texts. */
@@ -32578,7 +31972,7 @@
     class GalapagosEditor$1 {
         /** Constructor: Create an editor instance. */
         constructor(Parent, Options) {
-            var _a;
+            var _a, _b;
             /** Linters: The linters used in this instance. */
             this.Linters = [];
             // #endregion
@@ -32628,7 +32022,8 @@
                     this.Language = NetLogo(this);
                     Extensions.push(preprocessStateExtension);
                     Extensions.push(stateExtension);
-                    Dictionary.ClickHandler = Options.OnDictionaryClick;
+                    Dictionary.ClickHandler =
+                        (_a = Dictionary.ClickHandler) !== null && _a !== void 0 ? _a : Options.OnDictionaryClick;
                     this.Linters = netlogoLinters.map((linter) => buildLinter(linter, this));
                     // Special case: One-line mode
                     if (!this.Options.OneLine) {
@@ -32663,7 +32058,7 @@
             });
             this.GetPreprocessState().Context = this.PreprocessContext;
             this.GetPreprocessState().SetEditor(this);
-            this.Options.ParseMode = (_a = this.Options.ParseMode) !== null && _a !== void 0 ? _a : ParseMode.Normal;
+            this.Options.ParseMode = (_b = this.Options.ParseMode) !== null && _b !== void 0 ? _b : ParseMode.Normal;
             this.GetState().Mode = this.Options.ParseMode;
             // Create features
             this.Editing = new EditingFeatures(this);
@@ -32951,12 +32346,613 @@
         }
     }
     /** Export classes globally. */
-    const Localized = new LocalizationManager();
+    const Localized$1 = new LocalizationManager();
     try {
         window.GalapagosEditor = GalapagosEditor$1;
-        window.EditorLocalized = Localized;
+        window.EditorLocalized = Localized$1;
     }
     catch (error) { }
+
+    /** MarkdownToHTML: Convert markdown to HTML. */
+    function MarkdownToHTML(Source) {
+        return new showdown.Converter({
+            underline: true,
+            emoji: true
+        }).makeHtml(Source);
+    }
+    /** PostprocessHTML: Postprocess the HTML, esp. links. */
+    function PostprocessHTML(Editor, Source) {
+        Source.find("a").each((Index, Element) => {
+            var Current = $(Element);
+            var Href = Current.attr("href");
+            // Special class: commands
+            if (Current.hasClass("command"))
+                Href = `observer:${Current.text()}`;
+            // Force the link to be disabled
+            Current.attr("href", "javascript:void(0)");
+            if (!Href)
+                return;
+            // Parse the scheme
+            var Delimiter = ":";
+            if (Href.indexOf("=") !== -1 && Href.indexOf(":") === -1)
+                Delimiter = "=";
+            if (Href.indexOf(Delimiter) !== -1) {
+                var Fields = Href.split(Delimiter);
+                var Scheme = Fields[0];
+                var Target = Fields[1];
+                if (Target.startsWith("//"))
+                    Target = Target.slice(2);
+                if (["observer", "turtles", "patches", "links", "help"].indexOf(Scheme) !== -1) {
+                    // Handle commands
+                    Current.on("click", () => Editor.CommandTab.ExecuteCommand(Scheme, Target));
+                }
+                else if (Current.hasClass("external")) {
+                    // Handle external links
+                    Current.on("click", () => Editor.Call({ Type: "Visit", Target: Href }));
+                }
+            }
+        });
+    }
+    /** RenderAgent: Render tips for an agent type. */
+    function RenderAgent(Agent) {
+        var Message = Agent;
+        switch (Agent) {
+            case "turtles":
+                Message = `${Localized$1.Get("Turtle")}🐢`;
+                break;
+            case "patches":
+                Message = `${Localized$1.Get("Patch")}🔲`;
+                break;
+            case "links":
+                Message = `${Localized$1.Get("Link")}🔗`;
+                break;
+            case "observer":
+                Message = `${Localized$1.Get("Observer")}🔎`;
+                break;
+            case "utilities":
+                Message = `${Localized$1.Get("Utility")}🔨`;
+                break;
+        }
+        return Message;
+    }
+
+    /** Display: A display section of Command Center. */
+    class Display {
+        /** Constructor: Create a new output section. */
+        constructor(Tab, Selector) {
+            // Whether it is visible.
+            this.Visible = false;
+            this.Tab = Tab;
+            this.Container = $(Tab.Container).find(Selector).hide();
+            this.ScrollContainer = this.Container;
+            this.Tab.Sections.push(this);
+        }
+        /** Show: Show the section. */
+        Show() {
+            if (this.Visible)
+                return;
+            if (!this.Tab.Visible)
+                this.Tab.Show();
+            this.Tab.HideAllSections();
+            $(this.Container).show();
+            this.Visible = true;
+        }
+        /** Hide: Hide the section. */
+        Hide() {
+            $(this.Container).hide();
+            this.Visible = false;
+        }
+        /** ScrollToBottom: After user entered input, screen view should scroll down to the bottom line. */
+        ScrollToBottom() {
+            this.ScrollContainer.scrollTop(this.ScrollContainer.get(0).scrollHeight);
+        }
+        /** IsAtBottom: Whether the container is scrolled to bottom. */
+        IsAtBottom() {
+            var Element = this.ScrollContainer.get(0);
+            return Math.abs(Element.scrollHeight - Element.clientHeight - Element.scrollTop) < 1;
+        }
+    }
+
+    /** NetLogoUtils: Utilities for the NetLogo language. */
+    class NetLogoUtils {
+        /** AnnotateCodes: Annotate some code elements. */
+        static AnnotateCodes(Targets) {
+            Targets.each(function () {
+                NetLogoUtils.AnnotateCode($(this));
+            });
+        }
+        /** AnnotateCode: Annotate a code element. */
+        static AnnotateCode(Target, Content) {
+            Content = Content ? Content : Target.text();
+            Target.empty().append($(NetLogoUtils.HighlightCode(Content)));
+        }
+        /** HighlightCode: Highlight a code snippet. */
+        static HighlightCode(Content) {
+            this.SharedEditor.SetCode(Content);
+            this.SharedEditor.Semantics.PrettifyAll();
+            console.log(this.SharedEditor.GetCode());
+            return this.SharedEditor.Semantics.Highlight();
+        }
+        /** BuildSnapshot: Build a code snapshot. */
+        static BuildSnapshot(Content) {
+            if (!Content)
+                return undefined;
+            this.SharedEditor.SetCode(Content);
+            return this.SharedEditor.Semantics.BuildSnapshot();
+        }
+        /** FixGeneratedCode: Fix some generated code. */
+        static FixGeneratedCode(Content, Parent) {
+            // Remove the trailing semicolon
+            if (Content.endsWith(';'))
+                Content = Content.slice(0, -1);
+            // Remove the ```
+            if (Content.startsWith("```"))
+                Content = Content.slice(3);
+            if (Content.indexOf("```") != -1)
+                Content = Content.slice(0, Content.indexOf("```"));
+            // Replace back to "
+            Content = Content.replace(/`/g, '"').replace(/'/g, '"');
+            return this.SharedEditor.Semantics.FixGeneratedCode(Content, Parent);
+        }
+        /** PostprocessLintMessage: Postprocess a lint message. */
+        static PostprocessLintMessage(Message) {
+            return Message;
+        }
+    }
+
+    /** FullTextDisplay: Display the full-text help information. */
+    class FullTextDisplay extends Display {
+        /** Constructor: Create a new output section. */
+        constructor(Tab) {
+            super(Tab, ".command-fulltext");
+            /** RequestedTab: The tab that requested the full text. */
+            this.RequestedTab = null;
+        }
+        /** ShowFullText: Show the full text of a command. */
+        ShowFullText(Data) {
+            this.RequestedTab = this.Tab.Editor.CurrentTab;
+            this.Show();
+            // Render the subject
+            this.Container.find("h2 strong").text(Data["display_name"]);
+            this.Container.find("h2 span").text(`(${Data["agents"].map((Agent) => `${RenderAgent(Agent)}`).join(", ")})`);
+            // Render the list
+            var SeeAlso = this.Container.find("ul.SeeAlso").empty();
+            for (var Primitive in Data["see_also"])
+                $(`<li><a href="help:${Primitive}">${Primitive}</a> - ${Data["see_also"][Primitive]}</li>`).appendTo(SeeAlso).find("a");
+            // Machine-translation
+            var Translator = this.Container.find(".translator");
+            if (Data["translation"] != null && Data["verified"] != true)
+                Translator.show();
+            else
+                Translator.hide();
+            var Original = Translator.find("a.Original").bind("click", () => {
+                Original.hide();
+                Translation.show();
+                SetCode(Data["content"]);
+            }).parent().show();
+            var Translation = Translator.find("a.Translation").bind("click", () => {
+                Translation.hide();
+                Original.show();
+                SetCode(Data["translation"]);
+            }).parent().hide();
+            // Render the full text
+            var SetCode = (Content) => {
+                if (Content != null)
+                    this.Container.find("div.fulltext")
+                        .html(MarkdownToHTML(Content));
+                NetLogoUtils.AnnotateCodes(this.Container.find("code"));
+                this.Container.scrollTop(0);
+            };
+            SetCode(Data["translation"] != null ? Data["translation"] : Data["content"]);
+            // Acknowledge
+            this.Container.find(".Acknowledge").html(Data["acknowledge"]);
+            PostprocessHTML(this.Tab.Editor, this.Container);
+        }
+        /** HideFullText: Hide the full text mode. */
+        HideFullText() {
+            var _a;
+            if (!this.Container.is(":visible"))
+                return;
+            this.Container.hide();
+            (_a = this.RequestedTab) === null || _a === void 0 ? void 0 : _a.Show();
+        }
+    }
+
+    /** UIRenderer: Abstract class for rendering UI elements. */
+    class UIRenderer {
+        /** ContainerInitializer: The initializer for the container. */
+        ContainerInitializer() {
+            return $("<div></div>");
+        }
+        /** Constructor: Create a new UI renderer. */
+        constructor() {
+            /** Dirty: Whether the renderer is dirty and needs to be updated. */
+            this.Dirty = false;
+            /** Children: The children UI renderers. */
+            this.Children = [];
+            this.Container = this.ContainerInitializer();
+        }
+        /** SetDirty: Set the dirty status of the renderer. */
+        SetDirty(Status) {
+            var _a;
+            this.Dirty = Status;
+            if (Status)
+                (_a = this.Parent) === null || _a === void 0 ? void 0 : _a.SetDirty(Status);
+            return this;
+        }
+        /** Render: Render the UI element if it is dirty. */
+        Render() {
+            if (this.Dirty) {
+                for (var Child of this.Children)
+                    Child.Render();
+                this.RenderInternal();
+                this.Dirty = false;
+            }
+            return this;
+        }
+        /** AddChild: Add a child renderer. */
+        AddChild(Renderer, Append = true) {
+            this.Children.push(Renderer);
+            if (Append)
+                this.Container.append(Renderer.Container);
+            Renderer.Parent = this;
+            return this;
+        }
+        /** RemoveChildren: Remove all children that satisfy a condition. */
+        RemoveChildren(Condition) {
+            var Removal = this.Children.filter(Condition);
+            Removal.forEach(Child => Child.Container.remove());
+            this.Children = this.Children.filter((Child) => !Condition(Child));
+            return this;
+        }
+        /** DeactivateAll: Deactivate all renderers. */
+        DeactivateAll(Class) {
+            this.Children.forEach((Child) => {
+                Child.Container.removeClass(Class);
+            });
+            return this;
+        }
+        /** ActivateSelf: Activate the renderer with a class name and deactivate all other renderers. */
+        ActivateSelf(Class) {
+            var _a;
+            (_a = this.Parent) === null || _a === void 0 ? void 0 : _a.Children.forEach((Child) => {
+                if (Child == this)
+                    Child.Container.addClass(Class);
+                else
+                    Child.Container.removeClass(Class);
+            });
+            return this;
+        }
+        /** SetStatus: Set the status of the renderer. */
+        SetStatus(Status) {
+            var _a;
+            (_a = this.Parent) === null || _a === void 0 ? void 0 : _a.SetStatus(Status);
+            return this;
+        }
+    }
+    /** UIRendererOf: Abstract class for rendering UI elements. */
+    class UIRendererOf extends UIRenderer {
+        /** SetData: Set the data to render. */
+        SetData(Data) {
+            this.Data = Data;
+            this.SetDirty(true);
+            return this;
+        }
+        /** GetData: Get the data for rendering. */
+        GetData() {
+            return this.Data;
+        }
+    }
+
+    /** NewChatResponse: Creates a new chat response. */
+    /** ChatResponseType: The type for the chat response. */
+    var ChatResponseType;
+    (function (ChatResponseType) {
+        /** Start: The response is a start message. */
+        ChatResponseType[ChatResponseType["Start"] = -1] = "Start";
+        /** Finish: The response is a finish message. */
+        ChatResponseType[ChatResponseType["Finish"] = -2] = "Finish";
+        /** Text: The response is a text block. */
+        ChatResponseType[ChatResponseType["Text"] = 0] = "Text";
+        /** Code: The response is a code block. */
+        ChatResponseType[ChatResponseType["Code"] = 1] = "Code";
+        /** JSON: The response is a JSON block. */
+        ChatResponseType[ChatResponseType["JSON"] = 2] = "JSON";
+        /** Thought: The response is a thought block. */
+        ChatResponseType[ChatResponseType["Thought"] = 3] = "Thought";
+        /** CompileError: The response is a compile error message. */
+        ChatResponseType[ChatResponseType["CompileError"] = 4] = "CompileError";
+        /** RuntimeError: The response is a runtime error message. */
+        ChatResponseType[ChatResponseType["RuntimeError"] = 5] = "RuntimeError";
+        /** ServerError: The response is a server error message. */
+        ChatResponseType[ChatResponseType["ServerError"] = 6] = "ServerError";
+    })(ChatResponseType || (ChatResponseType = {}));
+    /** IsTextLike: Returns true if the section is text-like. */
+    function IsTextLike(Section) {
+        return Section.Type == ChatResponseType.Text || Section.Type == ChatResponseType.CompileError || Section.Type == ChatResponseType.RuntimeError;
+    }
+    /** SectionsToJSON: Serialize a number of sections to JSON5. */
+    function SectionsToJSON(Sections) {
+        var _a;
+        var Result = "{";
+        for (var Section of Sections) {
+            Result += `${(_a = Section.Field) !== null && _a !== void 0 ? _a : ChatResponseType[Section.Type]}:${Section.Type == ChatResponseType.JSON ? Section.Content : JSON.stringify(Section.Content)}`;
+            if (Section != Sections[Sections.length - 1])
+                Result += ",\n";
+        }
+        return Result + "}";
+    }
+
+    /** ChatThread: Record a conversation between human-AI. */
+    class ChatThread {
+        constructor() {
+            /** Records: The chat records of the thread. */
+            this.Records = {};
+            /** Subthreads: The subthreads of the conversation. */
+            this.Subthreads = [];
+        }
+        /** GetRecord: Get a record by its parent ID. */
+        GetRecord(ParentID) {
+            if (!ParentID)
+                return undefined;
+            return this.Records[ParentID];
+        }
+        /** GetSubthread: Get a specific subthread. */
+        GetSubthread(RootID) {
+            return this.Subthreads.find((Subthread) => Subthread.RootID === RootID);
+        }
+        /** AddToSubthread: Add a record to a subthread. */
+        AddToSubthread(Record) {
+            // Find the parent
+            var Parent = Record;
+            while (Parent.ParentID) {
+                Parent = this.Records[Parent.ParentID];
+            }
+            // Find or create a subthread
+            var Subthread = this.Subthreads.find((Subthread) => (Subthread.RootID === Parent.ID && Subthread.RootID !== undefined) || Subthread.Records[0] === Parent);
+            if (!Subthread) {
+                Subthread = { RootID: Parent.ID, Records: [] };
+                this.Subthreads.push(Subthread);
+            }
+            // Add the record
+            Subthread.Records.push(Record);
+            return Subthread;
+        }
+    }
+
+    /** SSEClient: A simple client for handling Server-Sent Events. */
+    class SSEClient {
+        /** Constructor: Create a new SSEClient instance. */
+        constructor(url, authorization, payload) {
+            this.url = url;
+            this.authorization = authorization;
+            this.lastEventId = '';
+            this.payload = JSON.stringify(payload);
+            this.Request = new XMLHttpRequest();
+        }
+        /**
+         * Listen: Start listening to the SSE stream
+         * @param {Function} onMessage Callback function for handling the received message
+         */
+        Listen(onMessage, onError) {
+            this.Request.open('POST', this.url, true);
+            this.Request.setRequestHeader('Cache-Control', 'no-cache');
+            this.Request.setRequestHeader('Content-Type', 'application/json');
+            this.Request.setRequestHeader('Authorization', `Bearer ${this.authorization}`);
+            this.Request.setRequestHeader('Accept', 'text/event-stream');
+            // If we have a last event ID, set the header to resume from that point
+            if (this.lastEventId) {
+                this.Request.setRequestHeader('Last-Event-ID', this.lastEventId);
+            }
+            // Handle the received message
+            var responseCursor = 0;
+            this.Request.onreadystatechange = () => {
+                if (this.Request.status === 200) {
+                    const messages = this.Request.responseText.substring(responseCursor).trim().split('\n\n');
+                    responseCursor = this.Request.responseText.length;
+                    messages.forEach((message) => {
+                        const data = this.parseMessage(message);
+                        if (data) {
+                            this.lastEventId = data.id;
+                            onMessage(data);
+                        }
+                    });
+                }
+                else {
+                    onError.call(this.Request);
+                }
+            };
+            // Handle errors
+            this.Request.onerror = onError;
+            this.Request.send(this.payload);
+        }
+        /** Close: Stop listening to the SSE stream. */
+        Close() {
+            if (this.Request) {
+                this.Request.abort();
+            }
+        }
+        /**
+         * parseMessage: Parse the received message from the SSE stream
+         * @param {string} message The raw message received from the SSE stream
+         * @returns {StreamData | null} The parsed message as a StreamData object or null if the message is empty
+         */
+        parseMessage(message) {
+            if (!message)
+                return null;
+            const lines = message.split('\n');
+            const data = {
+                id: '',
+                event: '',
+                data: '',
+            };
+            lines.forEach((line) => {
+                const index = line.indexOf(':');
+                var key = line.substring(0, index).trim();
+                var value = line.substring(index + 1).trim();
+                switch (key) {
+                    case 'id':
+                        data.id = value;
+                        break;
+                    case 'event':
+                        data.event = value;
+                        break;
+                    case 'data':
+                        data.data = value;
+                        break;
+                }
+            });
+            return data;
+        }
+    }
+
+    /** ChatNetwork: Class that handles the network communication for the chat. */
+    class ChatNetwork {
+        /** SendRequest: Send a request to the chat backend and handle its outputs. */
+        static SendRequest(Record, Thread, NewSection, UpdateSection, FinishSection) {
+            var _a, _b;
+            return __awaiter(this, void 0, void 0, function* () {
+                // Build the record
+                Record.UserID = Thread.UserID;
+                Record.ThreadID = Thread.ID;
+                Record.Transparent = (_b = (_a = Record.Option) === null || _a === void 0 ? void 0 : _a.Transparent) !== null && _b !== void 0 ? _b : false;
+                Record.Response = { Sections: [], Options: [] };
+                Record.RequestTimestamp = Date.now();
+                // Do the request
+                return new Promise((Resolve, Reject) => {
+                    var Update = {};
+                    var Section = {};
+                    var Client = new SSEClient("http://localhost:3000/request", "", Record);
+                    // Finish the section if possible
+                    var TryFinishSection = () => {
+                        if (Section.Type !== undefined) {
+                            if (Section.Type === ChatResponseType.JSON && Section.Content && !Section.Parsed) {
+                                if (Section.Content.endsWith(","))
+                                    Section.Content = `[${Section.Content.substring(0, Section.Content.length - 1)}]`;
+                                Section.Parsed = ChatNetwork.TryParse(Section.Content);
+                            }
+                            Record.Response.Sections.push(Section);
+                            FinishSection(Section);
+                        }
+                    };
+                    // Parse an element in the array if possible
+                    var TryParseElement = () => {
+                        var _a;
+                        if (Section.Type === ChatResponseType.JSON && Update.Content && Update.Content.endsWith("},")) {
+                            Section.Parsed = (_a = Section.Parsed) !== null && _a !== void 0 ? _a : [];
+                            Section.Parsed.push(ChatNetwork.TryParse(Update.Content.substring(0, Update.Content.length - 1)));
+                        }
+                    };
+                    // Send the request
+                    Client.Listen((Data) => {
+                        try {
+                            Update = JSON.parse(Data.data);
+                            // console.log(Update);
+                        }
+                        catch (Exception) {
+                            console.log("Error: " + Data.data);
+                            return;
+                        }
+                        // Handle the update
+                        switch (Update.Type) {
+                            case ChatResponseType.ServerError:
+                                Reject(Update.Content);
+                                Client.Close();
+                                return;
+                            case ChatResponseType.Start:
+                                if (Update.Content) {
+                                    Record.ID = Update.Content;
+                                    Record.ThreadID = Update.Field;
+                                    Thread.ID = Update.Field;
+                                }
+                                else if (Update.Field) {
+                                    Record.Language = Update.Field;
+                                    Thread.Language = Update.Field;
+                                }
+                                return;
+                            case ChatResponseType.Finish:
+                                TryFinishSection();
+                                Record.ResponseTimestamp = Date.now();
+                                Thread.Records[Record.ID] = Record;
+                                Resolve(Record);
+                                return;
+                            case undefined:
+                                break;
+                            default:
+                                TryFinishSection();
+                                Section = Update;
+                                TryParseElement();
+                                NewSection(Section);
+                                return;
+                        }
+                        // Update the section
+                        if (Update.Content !== undefined)
+                            Section.Content += Update.Content;
+                        if (Update.Field !== undefined)
+                            Section.Field = Update.Field;
+                        if (Update.Options !== undefined)
+                            Record.Response.Options.push(...Update.Options);
+                        TryParseElement();
+                        UpdateSection(Section);
+                    }, (Error) => {
+                        console.log("Server Error: " + Error);
+                        Reject(Error);
+                    });
+                });
+            });
+        }
+        /** TryParse: Try to parse a JSON5 string. */
+        static TryParse(Source) {
+            try {
+                return JSON5.parse(Source);
+            }
+            catch (Exception) {
+                console.log(Source);
+                console.log(Exception);
+                return {};
+            }
+        }
+    }
+
+    /** ChatRole: The role of the speaker. */
+    var ChatRole;
+    (function (ChatRole) {
+        /** System: The system. */
+        ChatRole["System"] = "system";
+        /** User: The user. */
+        ChatRole["User"] = "user";
+        /** Assistant: The assistant. */
+        ChatRole["Assistant"] = "assistant";
+    })(ChatRole || (ChatRole = {}));
+
+    /** ContextMessage: How to inherit an output message for the context. */
+    var ContextMessage;
+    (function (ContextMessage) {
+        /** Nothing: Nothing should be retained. */
+        ContextMessage[ContextMessage["Nothing"] = 0] = "Nothing";
+        /** TextOnly: Only text messages should be retained, in a text format. */
+        ContextMessage[ContextMessage["MessagesAsText"] = 1] = "MessagesAsText";
+        /** MessagesAsJSON: Only text messages should be retained, in a JSON format. */
+        ContextMessage[ContextMessage["MessagesAsJSON"] = 2] = "MessagesAsJSON";
+        /** FirstJSON: Only the first JSON message should be retained. */
+        ContextMessage[ContextMessage["FirstJSON"] = 3] = "FirstJSON";
+        /** AllAsJSON: Except for the code, all should be retained in a JSON format. */
+        ContextMessage[ContextMessage["AllAsJSON"] = 4] = "AllAsJSON";
+    })(ContextMessage || (ContextMessage = {}));
+    /** ContextInheritance: How to inherit the parent context. */
+    var ContextInheritance;
+    (function (ContextInheritance) {
+        /** Drop: Drop the context. */
+        ContextInheritance[ContextInheritance["Drop"] = 0] = "Drop";
+        /** InheritOne: Only inherit the current message segment. */
+        ContextInheritance[ContextInheritance["InheritOne"] = 1] = "InheritOne";
+        /** InheritParent: Only inherit the current message segment and its parent context. */
+        ContextInheritance[ContextInheritance["InheritParent"] = 2] = "InheritParent";
+        /** InheritRecursive: Inherit the current message segment and its parent context, recursively based on the parent's strategy. */
+        ContextInheritance[ContextInheritance["InheritRecursive"] = 3] = "InheritRecursive";
+        /** InheritEntire: Inherit the entire context. */
+        ContextInheritance[ContextInheritance["InheritEntire"] = 4] = "InheritEntire";
+    })(ContextInheritance || (ContextInheritance = {}));
 
     /** ChatManager: The interface for connecting to a chat backend. */
     class ChatManager {
@@ -33033,7 +33029,7 @@
                         return;
                     Renderer.AddSection({
                         Type: ChatResponseType.ServerError,
-                        Content: Localized.Get("Connection to server failed _", Error !== null && Error !== void 0 ? Error : Localized.Get("Unknown")),
+                        Content: Localized$1.Get("Connection to server failed _", Error !== null && Error !== void 0 ? Error : Localized$1.Get("Unknown")),
                         Field: SendRequest
                     }).SetFinalized().Render();
                     this.Commands.ShowInput();
@@ -33174,7 +33170,7 @@
             /** PendingRequest: The pending chat request. */
             this.PendingRequest = null;
             /** Available: Whether the chat backend is available. */
-            this.Available = true;
+            this.Available = false;
             this.Commands = Tab;
             this.Outputs = Tab.Outputs;
             this.Reset();
@@ -33304,7 +33300,7 @@
                 Need: (_c = (_b = (_a = Record.Response.Sections.find(Section => Section.Field == "Needs")) === null || _a === void 0 ? void 0 : _a.Parsed) === null || _b === void 0 ? void 0 : _b[0]) !== null && _c !== void 0 ? _c : "Unknown",
                 Parameters: Composed
             });
-            var Friendly = `${Localized.Get("Summary of request")}`;
+            var Friendly = `${Localized$1.Get("Summary of request")}`;
             for (var Parameter in Composed) {
                 Friendly += `\n- ${Parameter}: ${Composed[Parameter]}`;
             }
@@ -33346,7 +33342,7 @@
             if (!Parameter.Options)
                 return;
             var Input = this.Input;
-            $("<span></span>").appendTo(this.Examples).text(Localized.Get("e.g."));
+            $("<span></span>").appendTo(this.Examples).text(Localized$1.Get("e.g."));
             for (var Option of Parameter.Options) {
                 $(`<a href="javascript:void(0)"></a>`).data("option", Option).appendTo(this.Examples).text(Option).on("click", function () {
                     Input.val($(this).data("option"));
@@ -33409,15 +33405,15 @@
             this.Tab.Editor.EditorTabs[0].Galapagos.AddChild(this.Editor);
             // Create the toolbar
             var Toolbar = $(`<div class="toolbar"></div>`).appendTo(this.Container);
-            this.PlayButton = $(`<div class="button run">${Localized.Get("RunCode")}</div>`).on("click", () => this.Play()).appendTo(Toolbar);
+            this.PlayButton = $(`<div class="button run">${Localized$1.Get("RunCode")}</div>`).on("click", () => this.Play()).appendTo(Toolbar);
             // this.FixButton = $(`<div class="button fix">${Localized.Get("FixCode")}</div>`).on("click", () => this.Fix()).appendTo(Toolbar);
-            this.AskButton = $(`<div class="button ask">${Localized.Get("AskCode")}</div>`).on("click", () => this.Ask()).appendTo(Toolbar);
-            this.AddToCodeButton = $(`<div class="button addtocode">${Localized.Get("AddCode")}</div>`).on("click", () => this.AddToCode()).appendTo(Toolbar);
+            this.AskButton = $(`<div class="button ask">${Localized$1.Get("AskCode")}</div>`).on("click", () => this.Ask()).appendTo(Toolbar);
+            this.AddToCodeButton = $(`<div class="button addtocode">${Localized$1.Get("AddCode")}</div>`).on("click", () => this.AddToCode()).appendTo(Toolbar);
             // Create the history
             var History = $(`<div class="history"></div>`).appendTo(Toolbar);
-            this.PreviousButton = $(`<div class="button prev">${Localized.Get("PreviousVersion")}</div>`).on("click", () => this.ShowPrevious()).appendTo(History);
+            this.PreviousButton = $(`<div class="button prev">${Localized$1.Get("PreviousVersion")}</div>`).on("click", () => this.ShowPrevious()).appendTo(History);
             this.HistoryDisplay = $(`<div class="label">0 / 0</div>`).appendTo(History);
-            this.NextButton = $(`<div class="button next">${Localized.Get("NextVersion")}</div>`).on("click", () => this.ShowNext()).appendTo(History);
+            this.NextButton = $(`<div class="button next">${Localized$1.Get("NextVersion")}</div>`).on("click", () => this.ShowNext()).appendTo(History);
             CodeDisplay.Instance = this;
         }
         /** Show: Show the section. */
@@ -33523,7 +33519,7 @@
                         {
                             Type: ChatResponseType.Text,
                             Field: "Message",
-                            Content: Localized.Get("We need to fix the following errors _", Diagnostics.length),
+                            Content: Localized$1.Get("We need to fix the following errors _", Diagnostics.length),
                         },
                         {
                             Type: ChatResponseType.Thought,
@@ -33562,7 +33558,7 @@
         }
         /** Play: Try to play the code. */
         Play() {
-            this.Tab.Outputs.RenderRequest(Localized.Get("Trying to run the code"), this.Record).Transparent = true;
+            this.Tab.Outputs.RenderRequest(Localized$1.Get("Trying to run the code"), this.Record).Transparent = true;
             this.TryTo(() => {
                 var State = this.Editor.GetState();
                 var Mode = this.Editor.Semantics.GetRecognizedMode();
@@ -33573,7 +33569,7 @@
         }
         /** AddToCode: Add the code to the main editor. */
         AddToCode() {
-            this.Tab.Outputs.RenderRequest(Localized.Get("Trying to add the code"), this.Record).Transparent = true;
+            this.Tab.Outputs.RenderRequest(Localized$1.Get("Trying to add the code"), this.Record).Transparent = true;
             this.TryTo(() => {
             });
         }
@@ -33688,6 +33684,30 @@
         }
     }
 
+    /** HelpSectionRenderer: A block that displays the a help response section. */
+    class HelpSectionRenderer extends JSONSectionRenderer {
+        /** Constructor: Create a new UI renderer. */
+        constructor() {
+            super();
+            this.Container.addClass("help");
+        }
+        /** RenderInternal: Render the UI element. */
+        RenderInternal() {
+            var Metadata = this.GetData().Parsed;
+            this.ContentContainer.html(`
+            <p><code>${Metadata.display_name}</code> - ${Metadata.agents.map((Agent) => `${RenderAgent(Agent)}`).join(", ")}</p>
+            <p>${Metadata.short_description} (<a href="observer:help ${Metadata.display_name} -full">${Localized$1.Get("FullText")}</a>)</p>
+            <p>${Localized$1.Get("SeeAlso")}: ${Metadata.see_also.map((Name) => `<a href="observer:help ${Name}">${Name}</a>`).join(", ")}</p>`);
+            PostprocessHTML(OutputDisplay.Instance.Tab.Editor, this.ContentContainer);
+            NetLogoUtils.AnnotateCodes(this.ContentContainer.find("code"));
+        }
+        /** GetChooser: Return the section chooser for this renderer. */
+        static GetChooser() {
+            return (Record, Section) => Section.Field == "Help" && Section.Parsed && Section.Parsed.display_name
+                ? new HelpSectionRenderer() : undefined;
+        }
+    }
+
     /** RuntimeErrorRenderer: A block that displays the a runtime error section. */
     class RuntimeErrorRenderer extends SectionRenderer {
         /** Constructor: Create a new UI renderer. */
@@ -33715,7 +33735,7 @@
             this.ContentContainer.text(Section.Content);
             if (!Section.Field)
                 return;
-            $(`<a href="javascript:void(0)"></a>`).text(Localized.Get("Reconnect"))
+            $(`<a href="javascript:void(0)"></a>`).text(Localized$1.Get("Reconnect"))
                 .appendTo(this.ContentContainer).on("click", () => {
                 Section.Field();
                 this.Parent.RemoveChildren(Child => Child instanceof ServerErrorRenderer);
@@ -33754,6 +33774,7 @@
                 Content = Content.substring(8).trim();
             // Render the text
             this.ContentContainer.html(MarkdownToHTML(Content));
+            PostprocessHTML(OutputDisplay.Instance.Tab.Editor, this.ContentContainer);
             // Remove the section if it's empty
             if (Content == "" && ((_c = (_b = Section.Options) === null || _b === void 0 ? void 0 : _b.length) !== null && _c !== void 0 ? _c : 0) == 0 && this.Finalized)
                 this.Container.remove();
@@ -33778,6 +33799,7 @@
             var Input = (_a = this.GetData().FriendlyInput) !== null && _a !== void 0 ? _a : this.GetData().Input;
             this.Container.toggle(!!Input && Input !== "");
             this.Content.html(MarkdownToHTML(Input));
+            PostprocessHTML(OutputDisplay.Instance.Tab.Editor, this.Content);
             NetLogoUtils.AnnotateCodes(this.Content.find("code"));
         }
     }
@@ -33894,7 +33916,7 @@
         [ChatResponseType.Finish]: [() => new SucceededRenderer()],
         [ChatResponseType.Text]: [() => new TextSectionRenderer()],
         [ChatResponseType.Code]: [() => new CodeSectionRenderer()],
-        [ChatResponseType.JSON]: [CodeIdeationRenderer.GetChooser(), DiagnosticsRenderer.GetChooser()],
+        [ChatResponseType.JSON]: [CodeIdeationRenderer.GetChooser(), DiagnosticsRenderer.GetChooser(), HelpSectionRenderer.GetChooser()],
         [ChatResponseType.Thought]: [],
         [ChatResponseType.CompileError]: [() => new CompileErrorRenderer()],
         [ChatResponseType.RuntimeError]: [() => new RuntimeErrorRenderer()],
@@ -33927,7 +33949,7 @@
             Renderer.SetData(Record);
             Renderer.ActivateSelf("activated");
             // Update the expand button.
-            this.ExpandButton.find("a").text(Localized.Get("Expand messages _", this.Children.length));
+            this.ExpandButton.find("a").text(Localized$1.Get("Expand messages _", this.Children.length));
             return Renderer;
         }
     }
@@ -33940,7 +33962,7 @@
             /** Subthreads: The subthread store. */
             this.Subthreads = new Map();
             // #endregion
-            // #region "Batch Printing Support"
+            // #region "Printing Support"
             /** InBatch: Whether the printing is in a batch. */
             this.InBatch = false;
             /** Sections: The sections in the current batch. */
@@ -34064,12 +34086,10 @@
             else
                 this.RenderResponses([Section]);
         }
-        // #endregion
-        // #region "Single Printing Support"
         /** PrintCommandInput: Print a line of input to the screen. */
-        PrintCommandInput(Content) {
+        PrintCommandInput(Content, Restart = true) {
             var _a;
-            if (!((_a = this.Subthread) === null || _a === void 0 ? void 0 : _a.GetData().RootID))
+            if (Restart && !((_a = this.Subthread) === null || _a === void 0 ? void 0 : _a.GetData().RootID))
                 this.ActivateSubthread();
             this.RenderRequest(`\`${Content.replace("`", "\`")}\``);
         }
@@ -34079,19 +34099,19 @@
                 case "CompileError":
                     this.QueueResponse({
                         Type: ChatResponseType.CompileError,
-                        Content: Localized.Get("Compile error _", Content)
+                        Content: Localized$1.Get("Compile error _", Content)
                     });
                     break;
                 case "RuntimeError":
                     this.QueueResponse({
                         Type: ChatResponseType.RuntimeError,
-                        Content: Localized.Get("Runtime error _", Content)
+                        Content: Localized$1.Get("Runtime error _", Content)
                     });
                     break;
                 case "Succeeded":
                     this.QueueResponse({
                         Type: ChatResponseType.Finish,
-                        Content: Localized.Get("Successfully executed")
+                        Content: Localized$1.Get("Successfully executed")
                     });
                     break;
                 case "Output":
@@ -34101,37 +34121,35 @@
                     });
                     break;
                 case "Help":
-                    /* if (typeof Content === 'string') {
-                        if (Content.indexOf("<div class=\"block\">") >= 0) {
-                            Output = $(Content);
-                        } else {
-                            Output = $(`
-                                <p class="${Class} output">${Content}</p>
-                            `);
-                        }
-                    } else if (Content instanceof Array) {
-                        Output = $(`
-                            <div class="block">
-                                ${Content.map((Source) => `<p class="${Class} output">${Source}</p>`).join("")}
-                            </div>
-                        `);
-                    } else if (Content.Parameter == "-full") {
-                        Output = $(`<p class="Output output">${Localized.Get("显示 {0} 的帮助信息。")
-                            .replace("{0}", `<a class="command" target='help ${Content["display_name"]} -full'">${Content["display_name"]}</a>`)}</p>`);
-                        this.Tab.FullText.ShowFullText(Content);
-                    } else {
-                        Output = $(`
-                            <div class="block">
-                                <p class="${Class} output"><code>${Content["display_name"]}</code> - ${Content["agents"].map((Agent: any) => `${RenderAgent(Agent)}`).join(", ")}</p>
-                                <p class="${Class} output">${Content["short_description"]} (<a class="command" target='help ${Content["display_name"]} -full'">${Localized.Get("阅读全文")}</a>)</p>
-                                <p class="${Class} output">${Localized.Get("参见")}: ${Content["see_also"].map((Name: any) => `<a class="command" target='help ${Name}'>${Name}</a>`).join(", ")}</p>
-                            </div>
-                        `);
+                    if (typeof Content === 'string') {
+                        this.QueueResponse({
+                            Type: ChatResponseType.Text,
+                            Content: Content
+                        });
                     }
-                    if (Output != null) {
-                        LinkCommand(Output.find("a.command"));
-                        NetLogoUtils.AnnotateCodes(Output.find("code"));
-                    } */
+                    else if (Content instanceof Array) {
+                        Content.map(Source => {
+                            this.QueueResponse({
+                                Type: ChatResponseType.Text,
+                                Content: Source
+                            });
+                        });
+                    }
+                    else if (Content.Parameter == "-full") {
+                        this.QueueResponse({
+                            Type: ChatResponseType.Text,
+                            Content: Localized$1.Get("Showing full text help of _", Content["display_name"])
+                        });
+                        this.Tab.FullText.ShowFullText(Content);
+                    }
+                    else {
+                        this.QueueResponse({
+                            Type: ChatResponseType.JSON,
+                            Field: "Help",
+                            Content: JSON.stringify(Content),
+                            Parsed: Content
+                        });
+                    }
                     break;
                 default:
                     this.QueueResponse({
@@ -34139,6 +34157,22 @@
                         Content: Content
                     });
                     break;
+            }
+        }
+        // #endregion
+        // #region "Welcome Message"
+        /** ShowWelcome: Show the initial welcome message. */
+        ShowWelcome() {
+            if (this.Subthread)
+                return;
+            // The user: How should I use this?
+            this.RenderRequest(Localized$1.Get("Command center welcome (user)"));
+            // AI response
+            if (this.Tab.ChatManager.Available) {
+                this.PrintOutput("Output", Localized$1.Get("Command center welcome (assistant)"));
+            }
+            else {
+                this.PrintOutput("Output", Localized$1.Get("Command center welcome (command)"));
             }
         }
     }
@@ -34152,6 +34186,7 @@
             bodyScrollLock.disableBodyScroll(this.Outputs.Container.get(0));
             bodyScrollLock.disableBodyScroll(this.FullText.Container.get(0));
             this.Outputs.Show();
+            this.Outputs.ShowWelcome();
         }
         /** Hide: Hide the command tab. */
         Hide() {
@@ -34179,6 +34214,7 @@
             this.Outputs.Show();
             this.Outputs.Clear();
             this.ChatManager.Reset();
+            this.Outputs.ShowWelcome();
         }
         /** HideAllSections: Hide all sections. */
         HideAllSections() {
@@ -34202,10 +34238,10 @@
             this.CommandLine = $(Container).find(".command-line");
             this.TargetSelect = this.CommandLine.find("select");
             this.TargetSelect.html(`
-		<option value="observer">${Localized.Get("Observer")}</option>
-		<option value="turtles">${Localized.Get("Turtles")}</option>
-		<option value="patches">${Localized.Get("Patches")}</option>
-		<option value="links">${Localized.Get("Links")}</option>`);
+		<option value="observer">${Localized$1.Get("Observer")}</option>
+		<option value="turtles">${Localized$1.Get("Turtles")}</option>
+		<option value="patches">${Localized$1.Get("Patches")}</option>
+		<option value="links">${Localized$1.Get("Links")}</option>`);
             // CodeMirror Editor
             this.Galapagos = new GalapagosEditor(this.CommandLine.find(".command-input").get(0), {
                 OneLine: true,
@@ -34324,11 +34360,11 @@
             this.CurrentCommandIndex = 0;
             this.CurrentCommand = [];
             // Execute command
-            this.ExecuteCommand(Objective, Content);
+            this.ExecuteCommand(Objective, Content, true);
             this.ClearInput();
         }
         /** ExecuteCommand: Execute a command. */
-        ExecuteCommand(Objective, Content) {
+        ExecuteCommand(Objective, Content, Restart = false) {
             // Transform command
             switch (Objective.toLowerCase()) {
                 case "turtles":
@@ -34340,10 +34376,12 @@
                 case "links":
                     Content = `ask links [ ${Content} ]`;
                     break;
+                case "help":
+                    Content = `help ${Content}`;
             }
             // Execute command
             this.Editor.Call({ Type: "CommandExecute", Source: Objective, Command: Content });
-            this.Outputs.PrintCommandInput(Content);
+            this.Outputs.PrintCommandInput(Content, Restart);
             this.Outputs.ScrollToBottom();
         }
         /** ExplainFull: ExplainFull: Explain the selected text in the command center in full. */
@@ -34355,27 +34393,64 @@
         }
         /** FinishExecution: Notify the completion of the command. */
         FinishExecution(Status, Message) {
-            this.Outputs.PrintOutput(Status, Status);
+            this.Outputs.PrintOutput(Status, Message);
             this.Disabled = false;
         }
     }
 
+    // Localized: Localized support.
+    const Localized = function () {
+        var Localized = {};
+        // Initialize: Initialize the manager with given data.
+        Localized.Initialize = function (Data, Language) {
+            Localized.Data = Data;
+            EditorLocalized.Switch(Language);
+            $(".Localized").each((Index, Target) => {
+                $(Target).text(Localized.Get($(Target).text()));
+            });
+        };
+        // Get: Get localized string.
+        Localized.Get = function (Source) {
+            if (Localized.Data && Localized.Data.hasOwnProperty(Source))
+                return Localized.Data[Source];
+            return Source;
+        };
+        return Localized;
+    }();
+    // RotateScreen: Show rotate screen prompt.
+    const RotateScreen = function () {
+        (function ($, undefined$1) {
+            $.fn.asOverlay = function (Timeout = 3000, Animation = 300) {
+                this.Hide = () => this.fadeOut(Animation);
+                this.Show = () => {
+                    clearTimeout(this.timeout);
+                    this.timeout = setTimeout(() => this.fadeOut(Animation), Timeout);
+                    this.fadeIn(Animation);
+                };
+                return this;
+            };
+        })(jQuery);
+        var RotateScreen = $(".rotate-screen");
+        RotateScreen.asOverlay().click(() => RotateScreen.hide());
+        return RotateScreen;
+    };
+
     /** ShowConfirm: Show a confirm dialog. */
     const ShowConfirm = function (Subject, Content, OK, Cancel) {
         $.confirm({
-            title: Localized$1.Get(Subject),
-            content: Localized$1.Get(Content),
+            title: Localized.Get(Subject),
+            content: Localized.Get(Content),
             type: 'green',
             useBootstrap: false,
             buttons: {
                 ok: {
-                    text: Localized$1.Get("确定"),
+                    text: Localized.Get("确定"),
                     btnClass: 'btn-primary',
                     keys: ['enter'],
                     action: OK
                 },
                 cancel: {
-                    text: Localized$1.Get("取消"),
+                    text: Localized.Get("取消"),
                     action: Cancel
                 }
             }
@@ -34503,14 +34578,14 @@
         ShowMenu() {
             var Dialog = $("#Dialog-Procedures");
             var List = Dialog.children("ul").empty();
-            Dialog.children("h4").text(Localized$1.Get("更多功能"));
+            Dialog.children("h4").text(Localized.Get("更多功能"));
             var Features = {};
-            Features[Localized$1.Get("选择全部")] = () => this.Galapagos.Selection.SelectAll();
-            Features[Localized$1.Get("撤销操作")] = () => this.Galapagos.Editing.Undo();
-            Features[Localized$1.Get("重做操作")] = () => this.Galapagos.Editing.Redo();
-            Features[Localized$1.Get("跳转到行")] = () => this.Galapagos.Editing.ShowJumpTo();
-            Features[Localized$1.Get("整理代码")] = () => this.Galapagos.Semantics.PrettifyOrAll();
-            Features[Localized$1.Get("重置代码")] = () => this.ResetCode();
+            Features[Localized.Get("选择全部")] = () => this.Galapagos.Selection.SelectAll();
+            Features[Localized.Get("撤销操作")] = () => this.Galapagos.Editing.Undo();
+            Features[Localized.Get("重做操作")] = () => this.Galapagos.Editing.Redo();
+            Features[Localized.Get("跳转到行")] = () => this.Galapagos.Editing.ShowJumpTo();
+            Features[Localized.Get("整理代码")] = () => this.Galapagos.Semantics.PrettifyOrAll();
+            Features[Localized.Get("重置代码")] = () => this.ResetCode();
             for (var Feature in Features) {
                 $(`<li>${Feature}</li>`).attr("Tag", Feature).appendTo(List).click(function () {
                     Features[$(this).attr("Tag")]();
@@ -34523,12 +34598,12 @@
         ShowProcedures() {
             var Procedures = this.GetProcedures();
             if (Object.keys(Procedures).length == 0) {
-                this.Editor.Toast("warning", Localized$1.Get("代码中还没有任何子程序。"));
+                this.Editor.Toast("warning", Localized.Get("代码中还没有任何子程序。"));
             }
             else {
                 var Dialog = $("#Dialog-Procedures");
                 var List = Dialog.children("ul").empty();
-                Dialog.children("h4").text(Localized$1.Get("跳转到子程序"));
+                Dialog.children("h4").text(Localized.Get("跳转到子程序"));
                 var Handler = () => {
                     this.Galapagos.Selection.Select(parseInt($(this).attr("start")), parseInt($(this).attr("end")));
                     $.modal.close();
@@ -34649,7 +34724,7 @@
     /** Export classes globally. */
     try {
         window.TurtleEditor = TurtleEditor;
-        window.TurtleLocalized = Localized$1;
+        window.TurtleLocalized = Localized;
         window.RotateScreen = RotateScreen();
     }
     catch (error) { }

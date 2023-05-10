@@ -256,6 +256,9 @@
 	word-break: break-word;
 	overflow-wrap: anywhere;
 }
+.command-output ul li {
+	margin-left: 1rem;
+}
 
 /** Special: Code ideation */
 .command-output .code-ideation {
@@ -334,53 +337,4 @@
 }
 .command-output.code-enabled .record.code-hidden .section.code {
 	display: none;
-}
-
-/** Output display (Legacy) */
-.command-output .output {
-	padding: 0 1rem;
-}
-.command-output img.copy-icon {
-	float: right;
-}
-.command-wrapper {
-	padding: 0 1rem;
-	display: flex;
-	flex-direction: row;
-}
-.command-wrapper.active {
-	background-color: #f7f7f7;
-}
-.command-wrapper .icon {
-	align-items: center;
-	width: 1rem;
-	padding: 0 0.5em;
-	display: flex;
-}
-.command-wrapper .content {
-	flex: 1 auto;
-}
-.command-wrapper .icon img {
-	width: 100%;
-}
-.command-output .assistant {
-	color: #2881e0;
-}
-.command-output .you {
-	color: #cc2200;
-}
-.command-output .Comment {
-	color: #333;
-}
-.darkmode--activated .command-output .Comment {
-	color: #111;
-}
-.command-output .Help {
-	color: #333;
-}
-.command-output .Help a {
-	text-decoration: none;
-}
-.command-output .RuntimeError a {
-	margin: 0 0 0 0.5em;
 }

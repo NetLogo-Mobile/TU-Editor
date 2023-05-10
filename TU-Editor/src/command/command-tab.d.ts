@@ -62,7 +62,7 @@ export declare class CommandTab extends Tab {
     /** ExecuteInput: Execute a human-sent command. */
     private ExecuteInput;
     /** ExecuteCommand: Execute a command. */
-    ExecuteCommand(Objective: string, Content: string): void;
+    ExecuteCommand(Objective: string, Content: string, Restart?: boolean): void;
     /** ExplainFull: ExplainFull: Explain the selected text in the command center in full. */
     ExplainFull(Command: string): false | undefined;
     /** FinishExecution: Notify the completion of the command. */

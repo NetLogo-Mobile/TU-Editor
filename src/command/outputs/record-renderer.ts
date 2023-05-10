@@ -5,6 +5,7 @@ import { CodeIdeationRenderer } from "../../chat/ui/code-ideation-renderer";
 import { DiagnosticsRenderer } from "../../chat/ui/diagnostic-renderer";
 import { CodeSectionRenderer } from "../sections/code-section-renderer";
 import { CompileErrorRenderer } from "../sections/compile-error-renderer";
+import { HelpSectionRenderer } from "../sections/help-section-renderer";
 import { RuntimeErrorRenderer } from "../sections/runtime-error-renderer";
 import { SectionRenderer } from "../sections/section-renderer";
 import { ServerErrorRenderer } from "../sections/server-error-renderer";
@@ -106,7 +107,7 @@ export const SectionRenderers: Record<ChatResponseType, RendererChooser[]> = {
     [ChatResponseType.Finish]: [() => new SucceededRenderer()],
     [ChatResponseType.Text]: [() => new TextSectionRenderer()],
     [ChatResponseType.Code]: [() => new CodeSectionRenderer()],
-    [ChatResponseType.JSON]: [CodeIdeationRenderer.GetChooser(), DiagnosticsRenderer.GetChooser()],
+    [ChatResponseType.JSON]: [CodeIdeationRenderer.GetChooser(), DiagnosticsRenderer.GetChooser(), HelpSectionRenderer.GetChooser()],
     [ChatResponseType.Thought]: [],
     [ChatResponseType.CompileError]: [() => new CompileErrorRenderer()],
     [ChatResponseType.RuntimeError]: [() => new RuntimeErrorRenderer()],

@@ -112,7 +112,7 @@ export class OutputDisplay extends Display {
 	}
 	// #endregion
 
-    // #region "Batch Printing Support"
+    // #region "Printing Support"
 	/** InBatch: Whether the printing is in a batch. */
 	private InBatch: boolean = false;
 	/** Sections: The sections in the current batch. */
@@ -141,12 +141,9 @@ export class OutputDisplay extends Display {
 			this.Sections.push(Section);
 		else this.RenderResponses([Section]);
 	}
-    // #endregion
-
-    // #region "Single Printing Support"
 	/** PrintCommandInput: Print a line of input to the screen. */
-	public PrintCommandInput(Content: string) {
-		if (!this.Subthread?.GetData().RootID) this.ActivateSubthread();
+	public PrintCommandInput(Content: string, Restart: boolean = true) {
+		if (Restart && !this.Subthread?.GetData().RootID) this.ActivateSubthread();
 		this.RenderRequest(`\`${Content.replace("`", "\`")}\``);
 	}
 	/** PrintOutput: Provide for Unity to print compiled output. */ 
@@ -177,37 +174,32 @@ export class OutputDisplay extends Display {
 				});
 				break;
 			case "Help":
-				/* if (typeof Content === 'string') {
-					if (Content.indexOf("<div class=\"block\">") >= 0) {
-						Output = $(Content);
-					} else {
-						Output = $(`
-							<p class="${Class} output">${Content}</p>
-						`);
-					}
+				if (typeof Content === 'string') {
+					this.QueueResponse({
+						Type: ChatResponseType.Text,
+						Content: Content
+					});
 				} else if (Content instanceof Array) {
-					Output = $(`
-						<div class="block">
-							${Content.map((Source) => `<p class="${Class} output">${Source}</p>`).join("")}
-						</div>
-					`);
+					Content.map(Source => {
+						this.QueueResponse({
+							Type: ChatResponseType.Text,
+							Content: Source
+						});
+					})
 				} else if (Content.Parameter == "-full") {
-                    Output = $(`<p class="Output output">${Localized.Get("显示 {0} 的帮助信息。")
-                        .replace("{0}", `<a class="command" target='help ${Content["display_name"]} -full'">${Content["display_name"]}</a>`)}</p>`);
+					this.QueueResponse({
+						Type: ChatResponseType.Text,
+						Content: Localized.Get("Showing full text help of _", Content["display_name"])
+					});
 					this.Tab.FullText.ShowFullText(Content);
 				} else {
-					Output = $(`
-						<div class="block">
-							<p class="${Class} output"><code>${Content["display_name"]}</code> - ${Content["agents"].map((Agent: any) => `${RenderAgent(Agent)}`).join(", ")}</p>
-							<p class="${Class} output">${Content["short_description"]} (<a class="command" target='help ${Content["display_name"]} -full'">${Localized.Get("阅读全文")}</a>)</p>
-							<p class="${Class} output">${Localized.Get("参见")}: ${Content["see_also"].map((Name: any) => `<a class="command" target='help ${Name}'>${Name}</a>`).join(", ")}</p>
-						</div>
-					`);
+					this.QueueResponse({
+						Type: ChatResponseType.JSON,
+						Field: "Help",
+						Content: JSON.stringify(Content),
+						Parsed: Content
+					});
 				}
-				if (Output != null) {
-					LinkCommand(Output.find("a.command"));
-					NetLogoUtils.AnnotateCodes(Output.find("code"));
-				} */
 				break;
 			default:
 				this.QueueResponse({
@@ -218,4 +210,19 @@ export class OutputDisplay extends Display {
 		}
 	}
     // #endregion
+
+	// #region "Welcome Message"
+	/** ShowWelcome: Show the initial welcome message. */
+	public ShowWelcome() {
+		if (this.Subthread) return;
+		// The user: How should I use this?
+		this.RenderRequest(Localized.Get("Command center welcome (user)"));
+		// AI response
+		if (this.Tab.ChatManager.Available) {
+			this.PrintOutput("Output", Localized.Get("Command center welcome (assistant)"));
+		} else {
+			this.PrintOutput("Output", Localized.Get("Command center welcome (command)"));
+		}
+	}
+	// #endregion
 }

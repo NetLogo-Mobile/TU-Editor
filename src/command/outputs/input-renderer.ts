@@ -1,6 +1,7 @@
 import { ClientChatRequest } from "../../chat/client/chat-request";
-import { MarkdownToHTML } from "../../utils/element";
+import { MarkdownToHTML, PostprocessHTML } from "../../utils/element";
 import { NetLogoUtils } from "../../utils/netlogo";
+import { OutputDisplay } from "../displays/outputs";
 import { UIRendererOf } from "./ui-renderer";
 
 /** InputRenderer: A block that displays the an user input. */
@@ -24,6 +25,7 @@ export class InputRenderer extends UIRendererOf<ClientChatRequest> {
         var Input = this.GetData().FriendlyInput ?? this.GetData().Input;
         this.Container.toggle(!!Input && Input !== "");
         this.Content.html(MarkdownToHTML(Input));
+        PostprocessHTML(OutputDisplay.Instance.Tab.Editor, this.Content);
         NetLogoUtils.AnnotateCodes(this.Content.find("code"));
     }
 }

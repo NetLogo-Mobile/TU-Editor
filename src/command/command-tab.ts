@@ -34,6 +34,7 @@ export class CommandTab extends Tab {
 		bodyScrollLock.disableBodyScroll(this.Outputs.Container.get(0)!);
 		bodyScrollLock.disableBodyScroll(this.FullText.Container.get(0)!);
 		this.Outputs.Show();
+		this.Outputs.ShowWelcome();
 	}
 	/** Hide: Hide the command tab. */
 	public Hide() {
@@ -61,6 +62,7 @@ export class CommandTab extends Tab {
 		this.Outputs.Show();
 		this.Outputs.Clear();
 		this.ChatManager.Reset();
+		this.Outputs.ShowWelcome();
 	}
 	/** HideAllSections: Hide all sections. */
 	public HideAllSections() {
@@ -201,11 +203,11 @@ export class CommandTab extends Tab {
 		this.CurrentCommandIndex = 0;
 		this.CurrentCommand = [];
 		// Execute command
-		this.ExecuteCommand(Objective, Content);
+		this.ExecuteCommand(Objective, Content, true);
 		this.ClearInput();
 	}
 	/** ExecuteCommand: Execute a command. */
-	public ExecuteCommand(Objective: string, Content: string) {
+	public ExecuteCommand(Objective: string, Content: string, Restart: boolean = false) {
 		// Transform command
 		switch (Objective.toLowerCase()) {
 			case "turtles":
@@ -217,10 +219,12 @@ export class CommandTab extends Tab {
 			case "links":
 				Content = `ask links [ ${Content} ]`;
 				break;
+			case "help":
+				Content = `help ${Content}`;
 		}
 		// Execute command
 		this.Editor.Call({ Type: "CommandExecute", Source: Objective, Command: Content });
-		this.Outputs.PrintCommandInput(Content);
+		this.Outputs.PrintCommandInput(Content, Restart);
 		this.Outputs.ScrollToBottom();
 	}
 	/** ExplainFull: ExplainFull: Explain the selected text in the command center in full. */
@@ -231,7 +235,7 @@ export class CommandTab extends Tab {
 	}
 	/** FinishExecution: Notify the completion of the command. */
 	public FinishExecution(Status: string, Message: string) {
-		this.Outputs.PrintOutput(Status, Status);
+		this.Outputs.PrintOutput(Status, Message);
 		this.Disabled = false;
 	}
 	// #endregion

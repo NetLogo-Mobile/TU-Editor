@@ -1,6 +1,6 @@
-import { MarkdownToHTML } from "../../utils/element";
+import { MarkdownToHTML, PostprocessHTML } from "../../utils/element";
+import { OutputDisplay } from "../displays/outputs";
 import { SectionRenderer } from "./section-renderer";
-declare const { EditorLocalized }: any;
 
 /** TextSectionRenderer: A block that displays the a text response section. */
 export class TextSectionRenderer extends SectionRenderer {
@@ -18,6 +18,7 @@ export class TextSectionRenderer extends SectionRenderer {
             Content = Content.substring(8).trim();
         // Render the text
         this.ContentContainer.html(MarkdownToHTML(Content));
+        PostprocessHTML(OutputDisplay.Instance.Tab.Editor, this.ContentContainer);
         // Remove the section if it's empty
         if (Content == "" && (Section.Options?.length ?? 0) == 0 && this.Finalized)
             this.Container.remove();

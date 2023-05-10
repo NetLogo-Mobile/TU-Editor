@@ -1,5 +1,5 @@
 import { Tab } from "../../tab";
-import { TransformLinks, RenderAgent, LinkCommand, MarkdownToHTML } from "../../utils/element";
+import { RenderAgent, MarkdownToHTML, PostprocessHTML } from "../../utils/element";
 import { Display } from "./display";
 import { CommandTab } from "../command-tab";
 import { NetLogoUtils } from "../../utils/netlogo";
@@ -22,7 +22,7 @@ export class FullTextDisplay extends Display {
 		// Render the list
 		var SeeAlso = this.Container.find("ul.SeeAlso").empty();
 		for (var Primitive in Data["see_also"])
-            LinkCommand($(`<li><a class="command" target="help ${Primitive}">${Primitive}</a> - ${Data["see_also"][Primitive]}</li>`).appendTo(SeeAlso).find("a"));
+            $(`<li><a href="help:${Primitive}">${Primitive}</a> - ${Data["see_also"][Primitive]}</li>`).appendTo(SeeAlso).find("a");
 		// Machine-translation
 		var Translator = this.Container.find(".translator");
 		if (Data["translation"] != null && Data["verified"] != true)
@@ -47,7 +47,8 @@ export class FullTextDisplay extends Display {
 		};
 		SetCode(Data["translation"] != null ? Data["translation"] : Data["content"]);
 		// Acknowledge
-		TransformLinks(this.Tab.Editor, this.Container.find(".Acknowledge").html(Data["acknowledge"]));
+		this.Container.find(".Acknowledge").html(Data["acknowledge"]);
+		PostprocessHTML(this.Tab.Editor, this.Container);
 	}
 	/** HideFullText: Hide the full text mode. */
 	public HideFullText() {

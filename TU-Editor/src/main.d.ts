@@ -39,7 +39,7 @@ export declare class TurtleEditor {
     /** SetPlatform: Set the platform of the editor. */
     SetPlatform(Platform: string): void;
     /** Toast: Show a toast. */
-    Toast: (Type: string, Content: string, Subject?: string) => void;
+    Toast(Type: string, Content: string, Subject?: string): void;
     /** Reset: Reset the editor. */
     Reset(): void;
 }

@@ -1,4 +1,3 @@
-/// <reference types="jquery" />
 import { SubthreadRenderer } from "../outputs/subthread-renderer";
 import { ChatSubthread } from "../../chat/client/chat-thread";
 import { ChatRecord } from "../../chat/client/chat-record";
@@ -24,31 +23,29 @@ export declare class OutputDisplay extends Display {
     /** RenderRecord: Render a new chat record. */
     RenderRecord(Record: ChatRecord, Subthread: ChatSubthread): RecordRenderer;
     /** ActivateSubthread: Activate a subthread. */
-    ActivateSubthread(Subthread: SubthreadRenderer): void;
+    ActivateSubthread(Subthread?: SubthreadRenderer): void;
     /** RenderRequest: Render an offline chat request and return a new record. */
     RenderRequest(Input?: string, Parent?: ChatRecord, FriendlyInput?: string): ChatRecord;
-    /** RenderResponse: Render response sections in the current record. */
-    RenderResponse(Section: ChatResponseSection): void;
-    /** RenderResponses: Render response sections in the current record. */
+    /** RenderResponses: Render response sections immediately in the current record. */
     RenderResponses(Sections: ChatResponseSection[]): void;
     /** RenderOption: Render a response option in the current record. */
     RenderOption(Option: ChatResponseOption): void;
     /** RenderOptions: Render response options in the current record. */
     RenderOptions(Options: ChatResponseOption[]): void;
-    /** Fragment: Batch printing support for batch printing. */
-    private Fragment;
-    /** BufferSize: Buffer size for batch printing. */
-    private BufferSize;
-    /** WriteOutput: Print to a batch. */
-    private WriteOutput;
+    /** InBatch: Whether the printing is in a batch. */
+    private InBatch;
+    /** Sections: The sections in the current batch. */
+    private Sections;
     /** OpenBatch: Open a printing batch. */
     OpenBatch(): void;
     /** CloseBatch: Close a printing batch. */
     CloseBatch(): void;
-    /** PrintInput: Print a line of input to the screen. */
-    PrintInput(Objective: string | null, Content: string, Embedded: boolean): JQuery<HTMLElement>;
+    /** RestartBatch: Restart a printing batch. */
+    RestartBatch(): void;
+    /** RenderResponse: Render response sections in the current record. */
+    QueueResponse(Section: ChatResponseSection): void;
+    /** PrintCommandInput: Print a line of input to the screen. */
+    PrintCommandInput(Content: string): void;
     /** PrintOutput: Provide for Unity to print compiled output. */
-    PrintOutput(Content: any, Class: string): JQuery<HTMLElement>;
-    /** AnnotateInput: Annotate some code inputs. */
-    private AnnotateInput;
+    PrintOutput(Class: string, Content: any): void;
 }

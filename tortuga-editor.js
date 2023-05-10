@@ -232,8 +232,8 @@
                 Content = Content.slice(3);
             if (Content.indexOf("```") != -1)
                 Content = Content.slice(0, Content.indexOf("```"));
-            // Replace back to `
-            Content = Content.replace(/`/g, '"');
+            // Replace back to "
+            Content = Content.replace(/`/g, '"').replace(/'/g, '"');
             return this.SharedEditor.Semantics.FixGeneratedCode(Content, Parent);
         }
         /** PostprocessLintMessage: Postprocess a lint message. */
@@ -33674,6 +33674,34 @@
         }
     }
 
+    /** CompileErrorRenderer: A block that displays the a compile error section. */
+    class CompileErrorRenderer extends SectionRenderer {
+        /** Constructor: Create a new UI renderer. */
+        constructor() {
+            super();
+            this.Container.addClass("compile-error");
+        }
+        /** RenderInternal: Render the UI element. */
+        RenderInternal() {
+            var Section = this.GetData();
+            this.ContentContainer.text(Section.Content);
+        }
+    }
+
+    /** RuntimeErrorRenderer: A block that displays the a runtime error section. */
+    class RuntimeErrorRenderer extends SectionRenderer {
+        /** Constructor: Create a new UI renderer. */
+        constructor() {
+            super();
+            this.Container.addClass("runtime-error");
+        }
+        /** RenderInternal: Render the UI element. */
+        RenderInternal() {
+            var Section = this.GetData();
+            this.ContentContainer.text(Section.Content);
+        }
+    }
+
     /** ServerErrorRenderer: A block that displays the a server error section. */
     class ServerErrorRenderer extends SectionRenderer {
         /** Constructor: Create a new UI renderer. */
@@ -33692,6 +33720,20 @@
                 Section.Field();
                 this.Parent.RemoveChildren(Child => Child instanceof ServerErrorRenderer);
             });
+        }
+    }
+
+    /** SucceededRenderer: A block that displays the a succeeded section. */
+    class SucceededRenderer extends SectionRenderer {
+        /** Constructor: Create a new UI renderer. */
+        constructor() {
+            super();
+            this.Container.addClass("succeeded");
+        }
+        /** RenderInternal: Render the UI element. */
+        RenderInternal() {
+            var Section = this.GetData();
+            this.ContentContainer.text(Section.Content);
         }
     }
 
@@ -33736,6 +33778,7 @@
             var Input = (_a = this.GetData().FriendlyInput) !== null && _a !== void 0 ? _a : this.GetData().Input;
             this.Container.toggle(!!Input && Input !== "");
             this.Content.html(MarkdownToHTML(Input));
+            NetLogoUtils.AnnotateCodes(this.Content.find("code"));
         }
     }
 
@@ -33809,8 +33852,8 @@
             if (this.Children.length == 1)
                 Renderer.SetFirst();
             // Add the renderer
-            Renderer.SetData(Section);
             this.AddChild(Renderer, false);
+            Renderer.SetData(Section);
             // Append to the container
             if (this.OptionContainer) {
                 this.OptionContainer.before(Renderer.Container);
@@ -33848,13 +33891,13 @@
     /** SectionRenderers: The renderers for each section type. */
     const SectionRenderers = {
         [ChatResponseType.Start]: [],
-        [ChatResponseType.Finish]: [],
+        [ChatResponseType.Finish]: [() => new SucceededRenderer()],
         [ChatResponseType.Text]: [() => new TextSectionRenderer()],
         [ChatResponseType.Code]: [() => new CodeSectionRenderer()],
         [ChatResponseType.JSON]: [CodeIdeationRenderer.GetChooser(), DiagnosticsRenderer.GetChooser()],
         [ChatResponseType.Thought]: [],
-        [ChatResponseType.CompileError]: [],
-        [ChatResponseType.RuntimeError]: [],
+        [ChatResponseType.CompileError]: [() => new CompileErrorRenderer()],
+        [ChatResponseType.RuntimeError]: [() => new RuntimeErrorRenderer()],
         [ChatResponseType.ServerError]: [() => new ServerErrorRenderer()]
     };
 
@@ -33898,10 +33941,10 @@
             this.Subthreads = new Map();
             // #endregion
             // #region "Batch Printing Support"
-            /** Fragment: Batch printing support for batch printing. */
-            this.Fragment = null;
-            /** BufferSize: Buffer size for batch printing. */
-            this.BufferSize = 1000;
+            /** InBatch: Whether the printing is in a batch. */
+            this.InBatch = false;
+            /** Sections: The sections in the current batch. */
+            this.Sections = [];
             this.ScrollContainer = this.Container.find(".outputs");
             OutputDisplay.Instance = this;
         }
@@ -33920,6 +33963,8 @@
         RenderRecord(Record, Subthread) {
             var _a, _b, _c;
             var Renderer;
+            // Restart the batch if necessary
+            this.RestartBatch();
             // Create a new subthread if necessary
             if (Subthread != ((_a = this.Subthread) === null || _a === void 0 ? void 0 : _a.GetData())) {
                 (_b = this.Subthread) === null || _b === void 0 ? void 0 : _b.Container.removeClass("activated");
@@ -33947,8 +33992,10 @@
                 this.Subthread.Container.removeClass("activated");
                 this.Subthread.DeactivateAll("activated");
             }
-            Subthread.Container.addClass("activated");
-            Subthread.Children[Subthread.Children.length - 1].ActivateSelf("activated");
+            if (Subthread) {
+                Subthread.Container.addClass("activated");
+                Subthread.Children[Subthread.Children.length - 1].ActivateSelf("activated");
+            }
             this.Subthread = Subthread;
         }
         // #endregion
@@ -33969,17 +34016,14 @@
             this.RenderRecord(Record, Subthread);
             return Record;
         }
-        /** RenderResponse: Render response sections in the current record. */
-        RenderResponse(Section) {
-            this.RenderResponses([Section]);
-        }
-        /** RenderResponses: Render response sections in the current record. */
+        /** RenderResponses: Render response sections immediately in the current record. */
         RenderResponses(Sections) {
+            if (Sections.length == 0)
+                return;
             var LastRecord = this.Subthread.Children[this.Subthread.Children.length - 1];
-            for (var Section in Sections) {
-                var Renderer = LastRecord.AddSection(Sections[Section]);
-                Renderer === null || Renderer === void 0 ? void 0 : Renderer.Render();
-            }
+            for (var Section in Sections)
+                LastRecord.AddSection(Sections[Section]);
+            LastRecord.Render();
             this.ScrollToBottom();
         }
         /** RenderOption: Render a response option in the current record. */
@@ -33993,151 +34037,109 @@
             LastRecord.SetDirty(true);
             LastRecord.Render();
         }
-        /** WriteOutput: Print to a batch. */
-        WriteOutput(Element) {
-            if (this.Fragment == null)
-                this.ScrollContainer.append(Element);
-            else
-                this.Fragment.append(Element);
-        }
         /** OpenBatch: Open a printing batch. */
         OpenBatch() {
-            this.Fragment = $(document.createDocumentFragment());
+            if (this.InBatch && this.Sections.length > 0)
+                this.CloseBatch();
+            this.InBatch = true;
         }
         /** CloseBatch: Close a printing batch. */
         CloseBatch() {
-            if (this.Fragment == null)
+            this.RenderResponses(this.Sections);
+            this.Sections = [];
+            this.InBatch = false;
+            this.ScrollToBottom();
+        }
+        /** RestartBatch: Restart a printing batch. */
+        RestartBatch() {
+            if (!this.InBatch)
                 return;
-            var AtBottom = this.IsAtBottom();
-            // Trim the buffer (should refactor later) & the display
-            var Length = this.Fragment.children().length;
-            if (Length > this.BufferSize) {
-                this.Fragment.children().slice(0, Length - this.BufferSize).remove();
-                this.ScrollContainer.children().remove();
-            }
-            else {
-                var NewLength = this.ScrollContainer.children().length + Length;
-                if (NewLength > this.BufferSize)
-                    this.ScrollContainer.children().slice(0, NewLength - this.BufferSize).remove();
-            }
-            // Append to the display
-            this.ScrollContainer.append(this.Fragment);
-            this.Fragment = null;
-            if (AtBottom)
-                this.ScrollToBottom();
+            this.CloseBatch();
+            this.OpenBatch();
+        }
+        /** RenderResponse: Render response sections in the current record. */
+        QueueResponse(Section) {
+            if (this.InBatch)
+                this.Sections.push(Section);
+            else
+                this.RenderResponses([Section]);
         }
         // #endregion
         // #region "Single Printing Support"
-        /** PrintInput: Print a line of input to the screen. */
-        PrintInput(Objective, Content, Embedded) {
-            // Change the objective
-            if (Objective == null)
-                Objective = this.Tab.TargetSelect.val();
-            else if (Objective != "assistant" && Objective != "you")
-                this.Tab.TargetSelect.val(Objective);
-            // CodeMirror Content
-            var Wrapper = $(`
-			<div class="command-wrapper">
-				<div class="content">
-					<p class="input Code">${Objective}&gt;&nbsp;<span></span></p>
-				</div>
-				<div class="icon">
-					<img class="copy-icon" src="images/copy.png"/>
-				</div>
-			</div>
-		`);
-            // Standalone mode
-            Wrapper.attr("objective", Objective);
-            Wrapper.attr("content", Content);
-            // Click to copy
-            Wrapper.children(".icon").on("click", () => {
-                this.Tab.SetCode(Wrapper.attr("objective"), Wrapper.attr("content"));
-                this.Tab.Editor.Call({ Type: "ClipboardWrite", Content: `${Wrapper.attr("objective")}: ${Wrapper.attr("content")}` });
-            });
-            // Run CodeMirror
-            NetLogoUtils.AnnotateCode(Wrapper.children(".content").children(".Code").children("span"), Content);
-            if (!Embedded)
-                this.WriteOutput(Wrapper);
-            return Wrapper;
+        /** PrintCommandInput: Print a line of input to the screen. */
+        PrintCommandInput(Content) {
+            var _a;
+            if (!((_a = this.Subthread) === null || _a === void 0 ? void 0 : _a.GetData().RootID))
+                this.ActivateSubthread();
+            this.RenderRequest(`\`${Content.replace("`", "\`")}\``);
         }
         /** PrintOutput: Provide for Unity to print compiled output. */
-        PrintOutput(Content, Class) {
-            var AtBottom = this.Fragment == null && this.IsAtBottom();
-            var Output = null;
+        PrintOutput(Class, Content) {
             switch (Class) {
-                case "CompilationError":
-                    Output = $(`
-					<p class="CompilationError output">${Localized$1.Get("抱歉，未能理解你输入的命令")}: ${Content}</p>
-				`);
+                case "CompileError":
+                    this.QueueResponse({
+                        Type: ChatResponseType.CompileError,
+                        Content: Localized.Get("Compile error _", Content)
+                    });
                     break;
                 case "RuntimeError":
-                    Output = $(`<p class="RuntimeError output"></p>`);
-                    Output.get(0).innerText = Localized$1.Get(Content);
+                    this.QueueResponse({
+                        Type: ChatResponseType.RuntimeError,
+                        Content: Localized.Get("Runtime error _", Content)
+                    });
                     break;
                 case "Succeeded":
-                    Output = $(`
-					<p class="Succeeded output">${Localized$1.Get("成功执行了命令。")}</p>
-				`);
+                    this.QueueResponse({
+                        Type: ChatResponseType.Finish,
+                        Content: Localized.Get("Successfully executed")
+                    });
                     break;
                 case "Output":
-                    Output = $(`<p class="Output output"></p>`);
-                    Output.get(0).innerText = Content;
+                    this.QueueResponse({
+                        Type: ChatResponseType.Text,
+                        Content: Content
+                    });
                     break;
                 case "Help":
-                    if (typeof Content === 'string') {
+                    /* if (typeof Content === 'string') {
                         if (Content.indexOf("<div class=\"block\">") >= 0) {
                             Output = $(Content);
-                        }
-                        else {
+                        } else {
                             Output = $(`
-							<p class="${Class} output">${Content}</p>
-						`);
+                                <p class="${Class} output">${Content}</p>
+                            `);
                         }
-                    }
-                    else if (Content instanceof Array) {
+                    } else if (Content instanceof Array) {
                         Output = $(`
-						<div class="block">
-							${Content.map((Source) => `<p class="${Class} output">${Source}</p>`).join("")}
-						</div>
-					`);
-                    }
-                    else if (Content.Parameter == "-full") {
-                        Output = $(`<p class="Output output">${Localized$1.Get("显示 {0} 的帮助信息。")
-                        .replace("{0}", `<a class='command' target='help ${Content["display_name"]} -full'">${Content["display_name"]}</a>`)}</p>`);
+                            <div class="block">
+                                ${Content.map((Source) => `<p class="${Class} output">${Source}</p>`).join("")}
+                            </div>
+                        `);
+                    } else if (Content.Parameter == "-full") {
+                        Output = $(`<p class="Output output">${Localized.Get("显示 {0} 的帮助信息。")
+                            .replace("{0}", `<a class="command" target='help ${Content["display_name"]} -full'">${Content["display_name"]}</a>`)}</p>`);
                         this.Tab.FullText.ShowFullText(Content);
-                    }
-                    else {
+                    } else {
                         Output = $(`
-						<div class="block">
-							<p class="${Class} output"><code>${Content["display_name"]}</code> - ${Content["agents"].map((Agent) => `${RenderAgent(Agent)}`).join(", ")}</p>
-							<p class="${Class} output">${Content["short_description"]} (<a class='command' target='help ${Content["display_name"]} -full'">${Localized$1.Get("阅读全文")}</a>)</p>
-							<p class="${Class} output">${Localized$1.Get("参见")}: ${Content["see_also"].map((Name) => `<a class='command' target='help ${Name}'>${Name}</a>`).join(", ")}</p>
-						</div>
-					`);
+                            <div class="block">
+                                <p class="${Class} output"><code>${Content["display_name"]}</code> - ${Content["agents"].map((Agent: any) => `${RenderAgent(Agent)}`).join(", ")}</p>
+                                <p class="${Class} output">${Content["short_description"]} (<a class="command" target='help ${Content["display_name"]} -full'">${Localized.Get("阅读全文")}</a>)</p>
+                                <p class="${Class} output">${Localized.Get("参见")}: ${Content["see_also"].map((Name: any) => `<a class="command" target='help ${Name}'>${Name}</a>`).join(", ")}</p>
+                            </div>
+                        `);
                     }
                     if (Output != null) {
                         LinkCommand(Output.find("a.command"));
-                        this.AnnotateInput(Output.find("div.command"));
                         NetLogoUtils.AnnotateCodes(Output.find("code"));
-                    }
+                    } */
                     break;
                 default:
-                    Output = $(`
-					<p class="${Class} output">${Content}</p>
-				`);
+                    this.QueueResponse({
+                        Type: ChatResponseType.Text,
+                        Content: Content
+                    });
                     break;
             }
-            this.WriteOutput(Output);
-            if (AtBottom)
-                this.ScrollToBottom();
-            return Output;
-        }
-        /** AnnotateInput: Annotate some code inputs. */
-        AnnotateInput(Query) {
-            Query.each((Index, Item) => {
-                var Current = $(Item);
-                Current.replaceWith(this.PrintInput(Current.attr("objective"), Current.attr("target"), true));
-            });
         }
     }
 
@@ -34268,7 +34270,6 @@
         /** SendCommand: Send command to either execute or as a chat message. */
         SendCommand(Objective, Content) {
             return __awaiter(this, void 0, void 0, function* () {
-                this.Outputs.ScrollToBottom();
                 // Chatable or not
                 var Chatable = this.ChatManager.Available;
                 if (!Chatable) {
@@ -34319,10 +34320,15 @@
         /** ExecuteInput: Execute a human-sent command. */
         ExecuteInput(Objective, Content) {
             // Record command history
-            this.Outputs.PrintInput(Objective, Content, false);
             this.CommandStack.push([Objective, Content]);
             this.CurrentCommandIndex = 0;
             this.CurrentCommand = [];
+            // Execute command
+            this.ExecuteCommand(Objective, Content);
+            this.ClearInput();
+        }
+        /** ExecuteCommand: Execute a command. */
+        ExecuteCommand(Objective, Content) {
             // Transform command
             switch (Objective.toLowerCase()) {
                 case "turtles":
@@ -34337,12 +34343,7 @@
             }
             // Execute command
             this.Editor.Call({ Type: "CommandExecute", Source: Objective, Command: Content });
-            this.ClearInput();
-        }
-        /** ExecuteCommand: Execute a command. */
-        ExecuteCommand(Objective, Content) {
-            this.Editor.Call({ Type: "CommandExecute", Source: Objective, Command: Content });
-            this.Outputs.PrintInput(Objective, Content, false);
+            this.Outputs.PrintCommandInput(Content);
             this.Outputs.ScrollToBottom();
         }
         /** ExplainFull: ExplainFull: Explain the selected text in the command center in full. */
@@ -34354,7 +34355,7 @@
         }
         /** FinishExecution: Notify the completion of the command. */
         FinishExecution(Status, Message) {
-            this.Outputs.PrintOutput(Message, Status);
+            this.Outputs.PrintOutput(Status, Status);
             this.Disabled = false;
         }
     }
@@ -34562,10 +34563,6 @@
             this.EditorTabs = [];
             /** CurrentTab: The visible tab. */
             this.CurrentTab = null;
-            /** Toast: Show a toast. */
-            this.Toast = function (Type, Content, Subject) {
-                toastr[Type](Content, Subject);
-            };
             this.Container = Container;
             TurtleEditor.PostMessage = PostMessage;
             // Initialize the darkmode
@@ -34638,6 +34635,10 @@
         /** SetPlatform: Set the platform of the editor. */
         SetPlatform(Platform) {
             $("body").addClass(Platform);
+        }
+        /** Toast: Show a toast. */
+        Toast(Type, Content, Subject) {
+            toastr[Type](Content, Subject);
         }
         /** Reset: Reset the editor. */
         Reset() {

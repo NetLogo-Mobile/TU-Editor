@@ -34135,7 +34135,7 @@
                             });
                         });
                     }
-                    else if (Content.Parameter == "-full") {
+                    else if (Content.parameter === "-full") {
                         this.QueueResponse({
                             Type: ChatResponseType.Text,
                             Content: Localized$1.Get("Showing full text help of _", Content["display_name"])

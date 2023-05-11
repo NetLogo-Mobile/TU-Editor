@@ -33481,7 +33481,7 @@
             this.PlayButton = $(`<div class="button run">${Localized$1.Get("RunCode")}</div>`).on("click", () => this.Play()).appendTo(Toolbar);
             // this.FixButton = $(`<div class="button fix">${Localized.Get("FixCode")}</div>`).on("click", () => this.Fix()).appendTo(Toolbar);
             this.AskButton = $(`<div class="button ask">${Localized$1.Get("AskCode")}</div>`).on("click", () => this.Ask()).appendTo(Toolbar);
-            this.AddToCodeButton = $(`<div class="button addtocode">${Localized$1.Get("AddCode")}</div>`).on("click", () => this.AddToCode()).appendTo(Toolbar);
+            this.AddToCodeButton = $(`<div class="button addtocode">${Localized$1.Get("AddCode")}</div>`).hide().on("click", () => this.AddToCode()).appendTo(Toolbar);
             // Create the history
             var History = $(`<div class="history"></div>`).appendTo(Toolbar);
             this.PreviousButton = $(`<div class="button prev">${Localized$1.Get("PreviousVersion")}</div>`).on("click", () => this.ShowPrevious()).appendTo(History);
@@ -33539,6 +33539,7 @@
         ShowPrevious() {
             if (this.CurrentIndex == 0) {
                 this.Hide();
+                ChatManager.Instance.RequestOption(ChangeTopic());
             }
             else {
                 this.SaveChanges();
@@ -33633,7 +33634,6 @@
         Play() {
             this.Tab.Outputs.RenderRequest(Localized$1.Get("Trying to run the code"), this.Record).Transparent = true;
             this.TryTo(() => {
-                this.Editor.GetState();
                 var Mode = this.Editor.Semantics.GetRecognizedMode();
                 var Code = this.Editor.GetCode().trim();
                 // If it is a command or reporter, simply run it
@@ -33679,7 +33679,20 @@
         }
         /** PlayProcedures: Try to play the available procedures after compilation. */
         PlayProcedures() {
-            console.log("We are here!!");
+            var State = this.Editor.GetState();
+            var Procedures = [];
+            for (var [Name, Procedure] of State.Procedures) {
+                Procedures.push({
+                    Name: Name,
+                    IsCommand: Procedure.IsCommand,
+                    Arguments: [...Procedure.Arguments]
+                });
+            }
+            this.Tab.Outputs.RenderResponses([{
+                    Type: ChatResponseType.JSON,
+                    Field: "Procedures",
+                    Parsed: Procedures
+                }]);
         }
         /** AddToCode: Add the code to the main editor. */
         AddToCode() {

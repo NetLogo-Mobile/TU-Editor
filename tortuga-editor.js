@@ -33633,11 +33633,12 @@
         Play() {
             this.Tab.Outputs.RenderRequest(Localized$1.Get("Trying to run the code"), this.Record).Transparent = true;
             this.TryTo(() => {
-                var State = this.Editor.GetState();
+                this.Editor.GetState();
                 var Mode = this.Editor.Semantics.GetRecognizedMode();
-                console.log(State);
-                console.log(Mode);
-                // Run the code based on the mode
+                // If it is a command or reporter, simply run it
+                if (Mode == "Command" || Mode == "Reporter") {
+                    this.Tab.ExecuteCommand("observer", this.Editor.GetCode());
+                }
             });
         }
         /** AddToCode: Add the code to the main editor. */
@@ -34421,12 +34422,8 @@
                 Content = (_a = Content === null || Content === void 0 ? void 0 : Content.trim()) !== null && _a !== void 0 ? _a : "";
                 // Chatable or not
                 var Chatable = this.ChatManager.Available;
-                if (!Chatable) {
-                    this.ExecuteInput(Objective, Content);
-                    return;
-                }
                 // Check if it is a command
-                if (Objective != "chat" && Content != "help" && !Content.startsWith("help ") && !/^[\d\.]+$/.test(Content)) {
+                if (!Chatable || (Objective != "chat" && Content != "help" && !Content.startsWith("help ") && !/^[\d\.]+$/.test(Content))) {
                     // If there is no linting issues, assume it is code snippet
                     this.Galapagos.ForceParse();
                     let Diagnostics = yield this.Galapagos.ForceLintAsync();
@@ -34434,6 +34431,10 @@
                     if (Diagnostics.length == 0) {
                         if (Mode == "Reporter" || Mode == "Unknown")
                             Content = `show ${Content}`;
+                        this.ExecuteInput(Objective, Content);
+                        return;
+                    }
+                    else if (!Chatable) {
                         this.ExecuteInput(Objective, Content);
                         return;
                     }

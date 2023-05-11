@@ -33635,11 +33635,51 @@
             this.TryTo(() => {
                 this.Editor.GetState();
                 var Mode = this.Editor.Semantics.GetRecognizedMode();
+                var Code = this.Editor.GetCode().trim();
                 // If it is a command or reporter, simply run it
-                if (Mode == "Command" || Mode == "Reporter") {
-                    this.Tab.ExecuteCommand("observer", this.Editor.GetCode());
+                switch (Mode) {
+                    case "Command":
+                        this.Tab.ExecuteCommand("observer", Code);
+                        break;
+                    case "Reporter":
+                        this.Tab.ExecuteCommand("observer", `show ${Code}`);
+                        break;
+                    default:
+                        this.Tab.Editor.Call({ Type: "RecompileIncremental", Code: Code });
+                        break;
                 }
             });
+        }
+        /** PlayCompiled: The callback after the code to play is compiled. */
+        PlayCompiled(Succeeded, Errors) {
+            if (Succeeded) {
+                this.Tab.Outputs.RenderResponses([{
+                        Type: ChatResponseType.Text,
+                        Content: Localized$1.Get("Successfully compiled")
+                    }]);
+                this.PlayProcedures();
+            }
+            else if (Errors.length == 0) {
+                this.Tab.Outputs.RenderResponses([{
+                        Type: ChatResponseType.CompileError,
+                        Content: Localized$1.Get("Compile error unknown")
+                    }]);
+            }
+            else {
+                this.Tab.Outputs.RenderResponses([{
+                        Type: ChatResponseType.CompileError,
+                        Parsed: Errors
+                    }, {
+                        Type: ChatResponseType.JSON,
+                        Field: "Diagnostics",
+                        Content: JSON.stringify(Errors),
+                        Parsed: Errors
+                    }]);
+            }
+        }
+        /** PlayProcedures: Try to play the available procedures after compilation. */
+        PlayProcedures() {
+            console.log("We are here!!");
         }
         /** AddToCode: Add the code to the main editor. */
         AddToCode() {
@@ -33754,7 +33794,12 @@
         /** RenderInternal: Render the UI element. */
         RenderInternal() {
             var Section = this.GetData();
-            this.ContentContainer.text(Section.Content);
+            if (Section.Parsed) {
+                this.ContentContainer.text(Localized$1.Get("Compile error in snippet _", Section.Parsed.length));
+            }
+            else {
+                this.ContentContainer.text(Section.Content);
+            }
         }
     }
 
@@ -34622,42 +34667,13 @@
         HideTips() {
             this.TipsElement.hide();
         }
-        /** SetCompilerErrors: Show the compiler error linting messages. */
-        SetCompilerErrors(Errors) {
-            if (Errors.length == 0)
-                this.HideTips();
-            /** Temp hack: the Galapagos does not support unknown position errors yet. */
-            if (Errors.length > 0 && Errors[0].start == 2147483647) {
-                this.ShowTips(Errors[0].message);
-                this.Galapagos.SetCompilerErrors([]);
-            }
-            else {
-                if (Errors.length > 0) {
-                    this.Galapagos.Selection.SetCursorPosition(Errors[0].start);
-                }
-                this.Galapagos.SetCompilerErrors(Errors);
-            }
-        }
-        /** SetRuntimeErrors: Show the runtime error linting messages. */
-        SetRuntimeErrors(Errors) {
-            if (Errors.length > 0 && Errors[0].start == 2147483647) {
-                this.ShowTips(Errors[0].message);
-                this.Galapagos.SetRuntimeErrors([]);
-            }
-            else {
-                if (Errors.length > 0) {
-                    this.Galapagos.Selection.SetCursorPosition(Errors[0].start);
-                }
-                this.Galapagos.SetRuntimeErrors(Errors);
-            }
-        }
         /** SetCode: Set the content of the this. */
         SetCode(Content, Unapplied) {
             // Set the content
             if (Content != this.Galapagos.GetCode()) {
                 this.IgnoreUpdate = true;
                 this.Galapagos.SetCode(Content);
-                this.SetCompilerErrors([]);
+                this.Galapagos.SetCompilerErrors([]);
                 this.Galapagos.UpdateContext();
                 if (!this.Visible)
                     this.CodeRefreshed = true;
@@ -34675,7 +34691,7 @@
         }
         /** SetApplied: Set applied status. */
         SetApplied() {
-            this.SetCompilerErrors([]);
+            this.Galapagos.SetCompilerErrors([]);
         }
         // #endregion
         // #region "Editor Functionalities"

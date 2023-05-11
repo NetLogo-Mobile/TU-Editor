@@ -20,10 +20,6 @@ export declare class EditorTab extends Tab {
     private TipsElement;
     ShowTips(Content: string, Callback?: () => void): void;
     HideTips(): void;
-    /** SetCompilerErrors: Show the compiler error linting messages. */
-    SetCompilerErrors(Errors: any[]): void;
-    /** SetRuntimeErrors: Show the runtime error linting messages. */
-    SetRuntimeErrors(Errors: any[]): void;
     private IgnoreUpdate;
     /** CodeRefreshed: Did we refresh the code on the background? */
     private CodeRefreshed;

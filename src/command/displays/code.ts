@@ -9,7 +9,7 @@ import { ChatResponseOption } from "../../chat/client/chat-option";
 import { SubthreadRenderer } from "../outputs/subthread-renderer";
 import { RecordRenderer } from '../outputs/record-renderer';
 import { ChatResponseSection, ChatResponseType } from "../../chat/client/chat-response";
-import { Diagnostic } from "../../chat/client/languages/netlogo-context";
+import { Diagnostic, Procedure } from "../../chat/client/languages/netlogo-context";
 import { ChangeTopic, FixCode } from '../../chat/client/options/option-templates';
 import { RuntimeError } from "../../../../CodeMirror-NetLogo/src/lang/linters/runtime-linter";
 
@@ -53,7 +53,7 @@ export class CodeDisplay extends Display {
 		this.PlayButton = $(`<div class="button run">${Localized.Get("RunCode")}</div>`).on("click", () => this.Play()).appendTo(Toolbar);
 		// this.FixButton = $(`<div class="button fix">${Localized.Get("FixCode")}</div>`).on("click", () => this.Fix()).appendTo(Toolbar);
 		this.AskButton = $(`<div class="button ask">${Localized.Get("AskCode")}</div>`).on("click", () => this.Ask()).appendTo(Toolbar);
-		this.AddToCodeButton = $(`<div class="button addtocode">${Localized.Get("AddCode")}</div>`).on("click", () => this.AddToCode()).appendTo(Toolbar);
+		this.AddToCodeButton = $(`<div class="button addtocode">${Localized.Get("AddCode")}</div>`).hide().on("click", () => this.AddToCode()).appendTo(Toolbar);
 		// Create the history
 		var History = $(`<div class="history"></div>`).appendTo(Toolbar);
 		this.PreviousButton = $(`<div class="button prev">${Localized.Get("PreviousVersion")}</div>`).on("click", () => this.ShowPrevious()).appendTo(History);
@@ -123,6 +123,7 @@ export class CodeDisplay extends Display {
 	private ShowPrevious() {
 		if (this.CurrentIndex == 0) {
 			this.Hide();
+			ChatManager.Instance.RequestOption(ChangeTopic());
 		} else {
 			this.SaveChanges();
 			this.CurrentIndex--;
@@ -211,7 +212,6 @@ export class CodeDisplay extends Display {
 	public Play() {
 		this.Tab.Outputs.RenderRequest(Localized.Get("Trying to run the code"), this.Record).Transparent = true;
 		this.TryTo(() => {
-			var State = this.Editor.GetState();
 			var Mode = this.Editor.Semantics.GetRecognizedMode();
 			var Code = this.Editor.GetCode().trim();
 			// If it is a command or reporter, simply run it
@@ -255,7 +255,20 @@ export class CodeDisplay extends Display {
 	}
 	/** PlayProcedures: Try to play the available procedures after compilation. */
 	private PlayProcedures() {
-		console.log("We are here!!");
+		var State = this.Editor.GetState();
+		var Procedures: Procedure[] = [];
+		for (var [Name, Procedure] of State.Procedures) {
+			Procedures.push({
+				Name: Name,
+				IsCommand: Procedure.IsCommand,
+				Arguments: [...Procedure.Arguments]
+			})
+		}
+		this.Tab.Outputs.RenderResponses([{
+			Type: ChatResponseType.JSON,
+			Field: "Procedures",
+			Parsed: Procedures
+		}]);
 	}
 	/** AddToCode: Add the code to the main editor. */
 	public AddToCode() {

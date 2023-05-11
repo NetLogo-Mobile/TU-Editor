@@ -103,7 +103,7 @@ export class ChatManager {
 
     // #region " Options and Contexts "
     /** RequestOption: Choose a chat option and send the request. */
-    public RequestOption(Option: ChatResponseOption, Record: ChatRecord, Postprocessor?: (Request: ClientChatRequest) => void) {
+    public RequestOption(Option: ChatResponseOption, Record?: ChatRecord, Postprocessor?: (Request: ClientChatRequest) => void) {
         // Construct the request
         this.PendingRequest = {
             Input: Option.ActualInput ?? Option.LocalizedLabel ?? Option.Label,

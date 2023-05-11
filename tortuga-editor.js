@@ -32305,11 +32305,11 @@
                 }
             }
             this.RefreshContexts();
-            if (this.Options.ParseMode == ParseMode.Normal) {
-                console.log(new Error().stack);
-                console.log(this.GetCode());
-                console.log(JSON.parse(JSON.stringify(this.LintContext.Breeds)));
-            }
+            //if (this.Options.ParseMode == ParseMode.Normal) {
+            //console.log(new Error().stack);
+            //console.log(this.GetCode());
+            //console.log(JSON.parse(JSON.stringify(this.LintContext.Breeds)));
+            //}
         }
         /** RefreshContexts: Refresh contexts of the editor. */
         RefreshContexts() {

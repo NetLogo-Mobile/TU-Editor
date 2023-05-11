@@ -3,7 +3,7 @@
 import { TurtleEditor } from "../main";
 import { Tab } from '../tab';
 import { FullTextDisplay } from "./displays/fulltext";
-import { OutputDisplay } from "./displays/outputs";
+import { OutputDisplay } from "./displays/output";
 import { ChatManager } from '../chat/chat-manager';
 import { Display } from "./displays/display";
 import { CodeDisplay } from "./displays/code";

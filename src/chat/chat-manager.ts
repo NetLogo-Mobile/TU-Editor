@@ -94,6 +94,11 @@ export class ChatManager {
         SendRequest();
         this.Outputs.ScrollToBottom();
     }
+    /** GetPendingParent: Get the pending parent record. */
+    public GetPendingParent(): ChatRecord | undefined {
+        if (this.PendingRequest?.ParentID)
+            return this.Thread.GetRecord(this.PendingRequest.ParentID);
+    }
     // #endregion
 
     // #region " Options and Contexts "

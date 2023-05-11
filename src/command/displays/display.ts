@@ -19,7 +19,7 @@ export abstract class Display {
     }
     /** Show: Show the section. */
     public Show() {
-		if (this.Visible) return;
+		if (this.Visible && this.Tab.Visible) return;
         if (!this.Tab.Visible) this.Tab.Show();
         this.Tab.HideAllSections();
         $(this.Container).show();

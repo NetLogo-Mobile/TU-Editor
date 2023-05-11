@@ -5,10 +5,10 @@ import { OutputDisplay } from "./displays/outputs";
 import { ChatManager } from '../chat/chat-manager';
 import { Display } from "./displays/display";
 import { CodeDisplay } from "./displays/code";
-import { Localized } from "../../../CodeMirror-NetLogo/src/editor";
+import { GalapagosEditor, Localized } from "../../../CodeMirror-NetLogo/src/editor";
+import { ParseMode } from "../../../CodeMirror-NetLogo/src/editor-config";
 
-declare const { bodyScrollLock, EditorDictionary, GalapagosEditor }: any;
-type GalapagosEditor = any;
+declare const { bodyScrollLock, EditorDictionary }: any;
 
 /** CommandTab: A tab for the command center. */
 export class CommandTab extends Tab {
@@ -29,6 +29,7 @@ export class CommandTab extends Tab {
 	public readonly ChatManager: ChatManager;
 	/** Show: Show the command tab.  */
 	public Show() {
+		if (!this.Visible) this.Editor.Call({ Type: "TabSwitched", Tab: "$Command$" });
 		super.Show();
 		bodyScrollLock.clearAllBodyScrollLocks();
 		bodyScrollLock.disableBodyScroll(this.Outputs.Container.get(0)!);
@@ -82,7 +83,7 @@ export class CommandTab extends Tab {
 		// CodeMirror Editor
 		this.Galapagos = new GalapagosEditor(this.CommandLine.find(".command-input").get(0)!, {
 			OneLine: true,
-			ParseMode: "Oneline",
+			ParseMode: ParseMode.Oneline,
 			OnKeyUp: (Event: any) => this.InputKeyHandler(Event),
 			OnDictionaryClick: (Text: any) => this.ExplainFull(Text)
 		});
@@ -150,6 +151,7 @@ export class CommandTab extends Tab {
 	}
 	/** SendCommand: Send command to either execute or as a chat message. */
 	public async SendCommand(Objective: string, Content: string) {
+		Content = Content?.trim() ?? "";
 		// Chatable or not
 		var Chatable = this.ChatManager.Available;
 		if (!Chatable) {
@@ -157,7 +159,7 @@ export class CommandTab extends Tab {
 			return;
 		}
 		// Check if it is a command
-		if (Objective != "chat" && !/^[\d\.]+$/.test(Content)) {
+		if (Objective != "chat" && Content != "help" && !Content.startsWith("help ") && !/^[\d\.]+$/.test(Content)) {
 			// If there is no linting issues, assume it is code snippet
 			this.Galapagos.ForceParse();
 			let Diagnostics = await this.Galapagos.ForceLintAsync();
@@ -191,7 +193,7 @@ export class CommandTab extends Tab {
 	public SetCode(Objective: string, Content: string) {
 		this.TargetSelect.val(Objective.toLowerCase());
 		this.Galapagos.SetCode(Content);
-		setTimeout(() => this.Galapagos.SetCursorPosition(Content.length), 1);
+		setTimeout(() => this.Galapagos.Selection.SetCursorPosition(Content.length), 1);
 	}
 	// #endregion
 

@@ -31,7 +31,9 @@ export function PostprocessHTML(Editor: TurtleEditor, Source: JQuery<HTMLElement
             if (Target.startsWith("//")) Target = Target.slice(2);
             if (["observer", "turtles", "patches", "links", "help"].indexOf(Scheme) !== -1) {
                 // Handle commands
-                Current.on("click", () => Editor.CommandTab.ExecuteCommand(Scheme, Target));
+                Current.on("click", () => { 
+                    if (!Editor.CommandTab.Disabled) Editor.CommandTab.ExecuteCommand(Scheme, Target);
+                });
             } else if (Current.hasClass("external")) {
                 // Handle external links
                 Current.on("click", () => Editor.Call({ Type: "Visit", Target: Href }));

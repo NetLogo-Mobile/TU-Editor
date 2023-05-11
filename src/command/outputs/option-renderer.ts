@@ -1,6 +1,7 @@
+import { Localized } from "../../../../CodeMirror-NetLogo/src/editor";
 import { ChatManager } from "../../chat/chat-manager";
 import { ChatResponseOption } from "../../chat/client/chat-option";
-import { SectionRenderer } from "../sections/section-renderer";
+import { MarkdownToHTML } from "../../utils/element";
 import { RecordRenderer } from "./record-renderer";
 import { UIRendererOf } from "./ui-renderer";
 
@@ -12,15 +13,29 @@ export class OptionRenderer extends UIRendererOf<ChatResponseOption> {
         Container.on("click", () => this.ClickHandler());
         return Container;
     }
+    /** SetData: Set the data of the renderer. */
+    public SetData(Data: ChatResponseOption): UIRendererOf<ChatResponseOption> {
+        if (!Data.LocalizedLabel) {
+            var NewLocalized = Localized.Get(Data.Label);
+            if (NewLocalized != Data.Label) Data.LocalizedLabel = NewLocalized;
+        }
+        return super.SetData(Data);
+    }
     /** RenderInternal: Render the UI element. */
     protected RenderInternal(): void {
+        var Option = this.GetData();
         this.Container.addClass(this.GetData().Style?.toLowerCase() ?? "generated").children("a")
-            .text(this.GetData().LocalizedLabel ?? this.GetData().Label);
+            .html(MarkdownToHTML(Option.LocalizedLabel ?? Option.Label));
     }
     /** ClickHandler: The handler for the click event. */
     protected ClickHandler(): void {
         var Record = this.Parent! as RecordRenderer;
-        ChatManager.Instance.RequestOption(this.GetData(), Record.GetData());
+        var Option = this.GetData();
+        if (Option.Callback) {
+            Option.Callback();
+        } else {
+            ChatManager.Instance.RequestOption(Option, Record.GetData());
+        }
         this.ActivateSelf("chosen");
     }
 }

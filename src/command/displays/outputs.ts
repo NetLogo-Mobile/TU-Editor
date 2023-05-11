@@ -108,7 +108,7 @@ export class OutputDisplay extends Display {
 		var LastRecord = this.Subthread!.Children[this.Subthread!.Children.length - 1] as RecordRenderer;
 		LastRecord.GetData().Response.Options.push(...Options);
 		LastRecord.SetDirty(true);
-		LastRecord.Render();
+		this.Subthread!.Render();
 	}
 	// #endregion
 
@@ -143,8 +143,9 @@ export class OutputDisplay extends Display {
 	}
 	/** PrintCommandInput: Print a line of input to the screen. */
 	public PrintCommandInput(Content: string, Restart: boolean = true) {
-		if (Restart && !this.Subthread?.GetData().RootID) this.ActivateSubthread();
-		this.RenderRequest(`\`${Content.replace("`", "\`")}\``);
+		var Parent = this.Tab.ChatManager.GetPendingParent()
+		if (!Parent && Restart && !this.Subthread?.GetData().RootID) this.ActivateSubthread();
+		this.RenderRequest(`\`${Content.replace("`", "\`")}\``, Parent);
 	}
 	/** PrintOutput: Provide for Unity to print compiled output. */ 
 	public PrintOutput(Class: string, Content: any) {
@@ -217,12 +218,32 @@ export class OutputDisplay extends Display {
 		if (this.Subthread) return;
 		// The user: How should I use this?
 		this.RenderRequest(Localized.Get("Command center welcome (user)"));
+		// Default options
+		var Options = [
+			{ Label: "Check out the code tab", Callback: () => this.Tab.Editor.EditorTabs[0].Show() },
+			{ Label: "Run NetLogo code directly", Callback: () => 
+				{
+					if (this.Tab.Galapagos.GetCode() == "")
+						this.Tab.Galapagos.SetCode("print \"Hello World!\"");
+					this.Tab.Galapagos.Focus();
+			 	}
+			}
+		];
 		// AI response
 		if (this.Tab.ChatManager.Available) {
 			this.PrintOutput("Output", Localized.Get("Command center welcome (assistant)"));
+			Options.push({ Label: "Talk to the computer in natural languages", Callback: () => {
+				if (this.Tab.Galapagos.GetCode() == "")
+					this.Tab.Galapagos.SetCode("create some turtles around");
+				this.Tab.Galapagos.Focus();
+			}});
 		} else {
 			this.PrintOutput("Output", Localized.Get("Command center welcome (command)"));
+			Options.push({ Label: "Look for the documentation", Callback: () => {
+				this.Tab.ExecuteCommand("observer", "help", false);
+			}});
 		}
+		this.RenderOptions(Options);
 	}
 	// #endregion
 }

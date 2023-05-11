@@ -11,6 +11,7 @@ export class EditorTab extends Tab {
 	public readonly Galapagos: GalapagosEditor;
 	/** Show: Show the editor tab.  */
     public Show() {
+		if (!this.Visible) this.Editor.Call({ Type: "TabSwitched", Tab: "$Editor$" });
         super.Show();
 		if (this.CodeRefreshed) this.Galapagos.Selection.SetCursorPosition(0);
     }

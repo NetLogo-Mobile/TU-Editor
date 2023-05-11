@@ -24,6 +24,8 @@ export interface ChatResponseOption {
     Transparent?: boolean;
     /** Inheritance: How to inherit the parent context if the option is chosen. Default is InheritEntire. */
     Inheritance?: ContextInheritance;
+    /** Callback: The callback to perform if the option is chosen. Will discard the normal chat behavior. */
+    Callback?: () => void;
 }
 
 /** ContextMessage: How to inherit an output message for the context. */

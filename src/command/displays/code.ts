@@ -212,17 +212,17 @@ export class CodeDisplay extends Display {
 		this.TryTo(() => {
 			var State = this.Editor.GetState();
 			var Mode = this.Editor.Semantics.GetRecognizedMode();
-			console.log(State);
-			console.log(Mode);
-			// Run the code based on the mode
-			
+			// If it is a command or reporter, simply run it
+			if (Mode == "Command" || Mode == "Reporter") {
+				this.Tab.ExecuteCommand("observer", this.Editor.GetCode());
+			}
 		});
 	}
 	/** AddToCode: Add the code to the main editor. */
 	public AddToCode() {
 		this.Tab.Outputs.RenderRequest(Localized.Get("Trying to add the code"), this.Record).Transparent = true;
 		this.TryTo(() => {
-
+			
 		});
 	}
 	/** Ask: Try to ask about the code. */

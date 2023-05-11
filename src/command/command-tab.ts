@@ -154,18 +154,17 @@ export class CommandTab extends Tab {
 		Content = Content?.trim() ?? "";
 		// Chatable or not
 		var Chatable = this.ChatManager.Available;
-		if (!Chatable) {
-			this.ExecuteInput(Objective, Content);
-			return;
-		}
 		// Check if it is a command
-		if (Objective != "chat" && Content != "help" && !Content.startsWith("help ") && !/^[\d\.]+$/.test(Content)) {
+		if (!Chatable || (Objective != "chat" && Content != "help" && !Content.startsWith("help ") && !/^[\d\.]+$/.test(Content))) {
 			// If there is no linting issues, assume it is code snippet
 			this.Galapagos.ForceParse();
 			let Diagnostics = await this.Galapagos.ForceLintAsync();
 			let Mode = this.Galapagos.Semantics.GetRecognizedMode();
 			if (Diagnostics.length == 0) {
 				if (Mode == "Reporter" || Mode == "Unknown") Content = `show ${Content}`;
+				this.ExecuteInput(Objective, Content);
+				return;
+			} else if (!Chatable) {
 				this.ExecuteInput(Objective, Content);
 				return;
 			}

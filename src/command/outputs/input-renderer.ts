@@ -1,7 +1,7 @@
 import { ClientChatRequest } from "../../chat/client/chat-request";
 import { MarkdownToHTML, PostprocessHTML } from "../../utils/element";
 import { NetLogoUtils } from "../../utils/netlogo";
-import { OutputDisplay } from "../displays/outputs";
+import { OutputDisplay } from "../displays/output";
 import { UIRendererOf } from "./ui-renderer";
 
 /** InputRenderer: A block that displays the an user input. */

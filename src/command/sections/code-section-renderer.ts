@@ -1,6 +1,6 @@
 import { NetLogoUtils } from "../../utils/netlogo";
 import { CodeDisplay } from "../displays/code";
-import { OutputDisplay } from "../displays/outputs";
+import { OutputDisplay } from "../displays/output";
 import { SubthreadRenderer } from "../outputs/subthread-renderer";
 import { SectionRenderer } from "./section-renderer";
 

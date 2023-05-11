@@ -1,7 +1,7 @@
 import { Localized } from "../../../../CodeMirror-NetLogo/src/editor";
 import { PostprocessHTML, RenderAgent } from "../../utils/element";
 import { NetLogoUtils } from "../../utils/netlogo";
-import { OutputDisplay } from "../displays/outputs";
+import { OutputDisplay } from "../displays/output";
 import { RendererChooser } from "../outputs/record-renderer";
 import { JSONSectionRenderer } from "./json-section-renderer";
 

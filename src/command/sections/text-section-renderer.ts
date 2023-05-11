@@ -1,5 +1,5 @@
 import { MarkdownToHTML, PostprocessHTML } from "../../utils/element";
-import { OutputDisplay } from "../displays/outputs";
+import { OutputDisplay } from "../displays/output";
 import { SectionRenderer } from "./section-renderer";
 
 /** TextSectionRenderer: A block that displays the a text response section. */

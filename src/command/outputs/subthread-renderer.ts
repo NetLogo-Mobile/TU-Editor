@@ -2,7 +2,7 @@ import { ChatRecord } from "../../chat/client/chat-record";
 import { ChatSubthread } from "../../chat/client/chat-thread";
 import { UIRendererOf } from "./ui-renderer";
 import { RecordRenderer } from "./record-renderer";
-import { OutputDisplay } from "../displays/outputs";
+import { OutputDisplay } from "../displays/output";
 import { Localized } from "../../../../CodeMirror-NetLogo/src/editor";
 
 /** SubthreadRenderer: A block that displays the output of a subthread. */

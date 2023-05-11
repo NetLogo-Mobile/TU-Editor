@@ -59,32 +59,6 @@ export class EditorTab extends Tab {
 	public HideTips() {
 		this.TipsElement.hide();
 	}
-	/** SetCompilerErrors: Show the compiler error linting messages. */
-	public SetCompilerErrors(Errors: any[]) {
-		if (Errors.length == 0) this.HideTips();
-		/** Temp hack: the Galapagos does not support unknown position errors yet. */
-		if (Errors.length > 0 && Errors[0].start == 2147483647) {
-			this.ShowTips(Errors[0].message);
-			this.Galapagos.SetCompilerErrors([]);
-		} else {
-			if (Errors.length > 0) {
-				this.Galapagos.Selection.SetCursorPosition(Errors[0].start);
-			}
-			this.Galapagos.SetCompilerErrors(Errors);
-		}
-	}
-	/** SetRuntimeErrors: Show the runtime error linting messages. */
-	public SetRuntimeErrors(Errors: any[]) {
-		if (Errors.length > 0 && Errors[0].start == 2147483647) {
-			this.ShowTips(Errors[0].message);
-			this.Galapagos.SetRuntimeErrors([]);
-		}else {
-			if (Errors.length > 0) {
-				this.Galapagos.Selection.SetCursorPosition(Errors[0].start);
-			}
-			this.Galapagos.SetRuntimeErrors(Errors);
-		}
-	}
 	private IgnoreUpdate = false;
 	/** CodeRefreshed: Did we refresh the code on the background? */
 	private CodeRefreshed = false;
@@ -94,7 +68,7 @@ export class EditorTab extends Tab {
 		if (Content != this.Galapagos.GetCode()) {
 			this.IgnoreUpdate = true;
 			this.Galapagos.SetCode(Content);
-			this.SetCompilerErrors([]);
+			this.Galapagos.SetCompilerErrors([]);
 			this.Galapagos.UpdateContext();
 			if (!this.Visible) this.CodeRefreshed = true;
 			this.Galapagos.Selection.SetCursorPosition(0);
@@ -110,7 +84,7 @@ export class EditorTab extends Tab {
 	}
 	/** SetApplied: Set applied status. */
 	public SetApplied() {
-		this.SetCompilerErrors([]);
+		this.Galapagos.SetCompilerErrors([]);
 	}
 	// #endregion
 

@@ -1,3 +1,4 @@
+import { Localized } from "../../../../CodeMirror-NetLogo/src/editor";
 import { SectionRenderer } from "./section-renderer";
 
 /** CompileErrorRenderer: A block that displays the a compile error section. */
@@ -10,6 +11,10 @@ export class CompileErrorRenderer extends SectionRenderer {
     /** RenderInternal: Render the UI element. */
     protected RenderInternal(): void {
         var Section = this.GetData();
-        this.ContentContainer.text(Section.Content!);
+        if (Section.Parsed) {
+            this.ContentContainer.text(Localized.Get("Compile error in snippet _", Section.Parsed.length));
+        } else {
+            this.ContentContainer.text(Section.Content!);
+        }
     }
 }

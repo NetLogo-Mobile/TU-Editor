@@ -11,6 +11,7 @@ import { RecordRenderer } from '../outputs/record-renderer';
 import { ChatResponseSection, ChatResponseType } from "../../chat/client/chat-response";
 import { Diagnostic } from "../../chat/client/languages/netlogo-context";
 import { ChangeTopic, FixCode } from '../../chat/client/options/option-templates';
+import { RuntimeError } from "../../../../CodeMirror-NetLogo/src/lang/linters/runtime-linter";
 
 /** CodeDisplay: The interactive code editor section. */
 export class CodeDisplay extends Display {
@@ -212,11 +213,49 @@ export class CodeDisplay extends Display {
 		this.TryTo(() => {
 			var State = this.Editor.GetState();
 			var Mode = this.Editor.Semantics.GetRecognizedMode();
+			var Code = this.Editor.GetCode().trim();
 			// If it is a command or reporter, simply run it
-			if (Mode == "Command" || Mode == "Reporter") {
-				this.Tab.ExecuteCommand("observer", this.Editor.GetCode());
+			switch (Mode) {
+				case "Command":
+					this.Tab.ExecuteCommand("observer", Code);
+					break;
+				case "Reporter":
+					this.Tab.ExecuteCommand("observer", `show ${Code}`);
+					break;
+				default:
+					this.Tab.Editor.Call({ Type: "RecompileIncremental", Code: Code });
+					break;
 			}
 		});
+	}
+	/** PlayCompiled: The callback after the code to play is compiled. */
+	public PlayCompiled(Succeeded: boolean, Errors: RuntimeError[]) {
+		if (Succeeded) {
+			this.Tab.Outputs.RenderResponses([{
+				Type: ChatResponseType.Text,
+				Content: Localized.Get("Successfully compiled")
+			}]);
+			this.PlayProcedures();
+		} else if (Errors.length == 0) {
+			this.Tab.Outputs.RenderResponses([{
+				Type: ChatResponseType.CompileError,
+				Content: Localized.Get("Compile error unknown")
+			}]);
+		} else {
+			this.Tab.Outputs.RenderResponses([{
+				Type: ChatResponseType.CompileError,
+				Parsed: Errors
+			}, {
+				Type: ChatResponseType.JSON,
+				Field: "Diagnostics",
+				Content: JSON.stringify(Errors),
+				Parsed: Errors
+			}]);
+		}
+	}
+	/** PlayProcedures: Try to play the available procedures after compilation. */
+	private PlayProcedures() {
+		console.log("We are here!!");
 	}
 	/** AddToCode: Add the code to the main editor. */
 	public AddToCode() {

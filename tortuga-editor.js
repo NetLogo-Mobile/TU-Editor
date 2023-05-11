@@ -27565,7 +27565,7 @@
             // Built-in types
             this.RegisterBuiltin('~VariableName');
             this.RegisterBuiltin('~ProcedureName');
-            this.RegisterBuiltin('~Arguments/Identifier');
+            this.RegisterBuiltin('~Arguments');
             this.RegisterBuiltin('~PatchVar');
             this.RegisterBuiltin('~TurtleVar');
             this.RegisterBuiltin('~LinkVar');
@@ -27614,7 +27614,8 @@
     /** classifyPrimitive: Identify type of reporter/command for appropriate tooltip. */
     const classifyPrimitive = function (name) {
         //classify all types of reporter as 'breed','custom', or builtin
-        if (name.indexOf('Reporter') != -1) {
+        if (name.indexOf('Reporter') != -1 &&
+            name.indexOf('ReporterStatement') == -1) {
             if (name.indexOf('Special') != -1) {
                 if (name.indexOf('Turtle') != -1 ||
                     name.indexOf('Link') != -1 ||
@@ -27630,7 +27631,7 @@
             }
         }
         //classify all types of commands as 'breed','custom', or builtin
-        if (name.indexOf('Command') != -1) {
+        if (name.indexOf('Command') != -1 && name.indexOf('CommandStatement') == -1) {
             if (name.indexOf('Special') != -1) {
                 if (name.indexOf('Create') != -1) {
                     name = 'BreedCommand';
@@ -30296,13 +30297,14 @@
                 Log(value, node.name, parents);
                 if (((_a = node.node.parent) === null || _a === void 0 ? void 0 : _a.name) == 'Arguments') {
                     let child = node.node.firstChild;
-                    if (child &&
-                        (child.name.startsWith('Command') ||
-                            child.name.startsWith('Reporter'))) {
-                        diagnostics.push(getDiagnostic(view, node, 'Argument is primitive _'));
+                    if (reserved.includes(value) ||
+                        (child &&
+                            (child.name.startsWith('Command') ||
+                                child.name.startsWith('Reporter')))) {
+                        diagnostics.push(getDiagnostic(view, node, 'Argument is reserved _'));
                     }
                     else {
-                        diagnostics.push(getDiagnostic(view, node, 'Argument is unrecognized _'));
+                        diagnostics.push(getDiagnostic(view, node, 'Argument is invalid _'));
                     }
                 }
                 else if (!['[', ']', ')', '(', '"'].includes(value) &&
@@ -30481,10 +30483,14 @@
                 }
             }
         });
-        return diagnostics.filter((d) => d.from >= view.state.selection.ranges[0].to ||
-            d.to <= view.state.selection.ranges[0].from ||
-            d.message == Localized$1.Get('Infinite loop _', 'loop') ||
-            d.message == Localized$1.Get('Infinite loop _', 'while'));
+        return diagnostics;
+        // .filter(
+        //   (d) =>
+        //     d.from >= view.state.selection.ranges[0].to ||
+        //     d.to <= view.state.selection.ranges[0].from ||
+        //     d.message == Localized.Get('Infinite loop _', 'loop') ||
+        //     d.message == Localized.Get('Infinite loop _', 'while')
+        // );
     };
     /** checkLoopEnd: checks if a loop has a stop/die/report statement. */
     const checkLoopEnd = function (view, node) {
@@ -30929,6 +30935,23 @@
                     }
                 }
             }
+            else if (noderef.name == 'Arguments') {
+                let current = [];
+                for (var key of ['Identifier', 'UnsupportedPrim']) {
+                    noderef.node.getChildren(key).map((child) => {
+                        let name = view.state.sliceDoc(child.from, child.to);
+                        if (current.includes(name) || all.includes(name)) {
+                            diagnostics.push({
+                                from: child.from,
+                                to: child.to,
+                                severity: 'error',
+                                message: Localized$1.Get('Term _ already used.', name),
+                            });
+                        }
+                        current.push(name);
+                    });
+                }
+            }
         });
         return diagnostics;
     };
@@ -31147,8 +31170,8 @@
         'Invalid context _.': (Prior, New, Primitive) => `Based on preceding statements, the context of this codeblock is "${Prior}", but "${Primitive}" has a "${New}" context.`,
         'Duplicate global statement _': (Name) => `The global "${Name}" statement is already defined. Do you want to combine into one?`,
         'Infinite loop _': (Name) => `This "${Name}" loop will run forever and likely block the model. Do you want to re-write into a "go" loop?`,
-        'Argument is primitive _': (Name) => `The argument "${Name}" is a built-in primitive. Do you want to replace it?`,
-        'Argument is unrecognized _': (Name) => `The argument "${Name}" is invalid. Do you want to replace it?`,
+        'Argument is reserved _': (Name) => `The argument "${Name}" is a reserved NetLogo keyword. Do you want to replace it?`,
+        'Argument is invalid _': (Name) => `The argument "${Name}" is invalid. Do you want to replace it?`,
         // Agent types
         Observer: () => 'Observer',
         Turtle: () => 'Turtle',
@@ -31206,8 +31229,12 @@
         'Showing full text help of _': (Name) => `Here is the help information of [${Name}](<observer=help ${Name} -full>).`,
         // Default messages
         'Command center welcome (user)': () => `What is here about? Where should I start with?`,
-        'Command center welcome (command)': () => `Here is the command center. You can type in NetLogo code and run it here. Check out the **Code** button to look for the code.`,
-        'Command center welcome (assistant)': () => `Hello! I am your assistant. I can help you learn NetLogo or build your own project. You can also type in NetLogo code and run it here.`,
+        'Command center welcome (command)': () => `Here is the command center. You can type in NetLogo code and run it here, but there is always more to explore. Here are something you can try out.`,
+        'Command center welcome (assistant)': () => `Hello! I am your assistant. I can help you learn NetLogo or build your own project, but there is always more to explore. Here are something you can try out.`,
+        'Run NetLogo code directly': () => `Run **NetLogo** code directly`,
+        'Check out the code tab': () => `Check out the **code** tab of the project`,
+        'Talk to the computer in natural languages': () => `Talk to the computer in **natural languages**`,
+        'Look for the documentation': () => `Look for the **learning materials** of NetLogo`,
     };
 
     const zh_cn = {
@@ -31239,8 +31266,8 @@
         'Invalid context _.': (Prior, New, Primitive) => `根据之前的语句，这段代码中只能使用 "${Prior}" 语句，但 "${Primitive}" 却只能用于 "${New}"。`,
         'Duplicate global statement _': (Name) => `全局声明 "${Name}" 已经被定义过了。你想合并吗？`,
         'Infinite loop _': (Name) => `这个 "${Name}" 循环将永远运行下去，可能会阻塞模型。你想将它改成 "go" 循环吗？`,
-        'Argument is primitive _': (Name) => `The argument "${Name}" is a built-in primitive. Do you want to replace it?`,
-        'Argument is unrecognized _': (Name) => `The argument "${Name}" is invalid. Do you want to replace it?`,
+        'Argument is reserved _': (Name) => `参数名称 "${Name}" 和 NetLogo 的关键字重复了。你想换一个名字吗？`,
+        'Argument is invalid _': (Name) => `参数名称 "${Name}" 不可用。你想换一个名字吗？`,
         // Agent types
         Observer: () => '观察者',
         Turtle: () => '海龟',
@@ -31298,8 +31325,12 @@
         'Showing full text help of _': (Name) => `显示 [${Name}](<observer=help ${Name} -full>) 的帮助文档。`,
         // Default messages
         'Command center welcome (user)': () => `这是哪儿？我应该怎么开始使用？`,
-        'Command center welcome (command)': () => `你好！这里是控制台。你可以在这里输入 NetLogo 命令并立即执行。点击**代码**按钮可以切换到作品代码。`,
-        'Command center welcome (assistant)': () => `你好！我是你的助手。我可以帮助你学习 NetLogo 或创作你的作品。你也可以输入 NetLogo 命令并立即执行。`,
+        'Command center welcome (command)': () => `你好！这里是控制台。你可以在这里输入 NetLogo 命令并立即执行。还有许多值得探索的功能，例如：`,
+        'Command center welcome (assistant)': () => `你好！我是你的助手。我可以帮助你学习 NetLogo 或创作你的作品。还有许多值得探索的功能，例如：`,
+        'Run NetLogo code directly': () => `直接运行 **NetLogo** 代码`,
+        'Check out the code tab': () => `查看作品的**代码**`,
+        'Talk to the computer in natural languages': () => `用**自然语言**写代码`,
+        'Look for the documentation': () => `查看 NetLogo 语言的**帮助文档**`,
     };
 
     /** LocalizationManager: Manage all localized texts. */
@@ -31572,7 +31603,7 @@
     const prettifyAll = function (view) {
         let doc = view.state.doc.toString();
         // eliminate extra spacing
-        let new_doc = initialSpaceRemoval(doc);
+        let new_doc = avoidStrings(doc, initialSpaceRemoval);
         view.dispatch({ changes: { from: 0, to: doc.length, insert: new_doc } });
         // give certain nodes their own lines
         view.dispatch({
@@ -31580,7 +31611,7 @@
         });
         // ensure spacing is correct
         doc = view.state.doc.toString();
-        new_doc = finalSpacing(doc);
+        new_doc = avoidStrings(doc, finalSpacing);
         view.dispatch({ changes: { from: 0, to: doc.length, insert: new_doc } });
         // add indentation
         view.dispatch({
@@ -31589,10 +31620,10 @@
     };
     /** initialSpaceRemoval: Make initial spacing adjustments. */
     const initialSpaceRemoval = function (doc) {
-        let new_doc = doc.replace(/(\[|\])/g, ' $1 ');
-        new_doc = new_doc.replace(/[ ]*\)[ ]*/g, ') ');
-        new_doc = new_doc.replace(/[ ]*\([ ]*/g, ' (');
-        new_doc = new_doc.replace(/\n[ ]+/g, '\n');
+        // let new_doc = doc.replace(/(\[|\])/g, ' $1 ');
+        // new_doc = new_doc.replace(/[ ]*\)[ ]*/g, ') ');
+        // new_doc = new_doc.replace(/[ ]*\([ ]*/g, ' (');
+        let new_doc = doc.replace(/\n[ ]+/g, '\n');
         new_doc = new_doc.replace(/(\n[^;\n]+)(\n\s*\[)/g, '$1 [');
         new_doc = new_doc.replace(/(\n[^;\n]+)(\n\s*\])/g, '$1 ]');
         new_doc = new_doc.replace(/(\[\n\s*)([\w\(])/g, '[ $2');
@@ -31607,9 +31638,25 @@
         let new_doc = doc.replace(/\n[ ]+/g, '\n');
         new_doc = new_doc.replace(/[ ]+\n/g, '\n');
         new_doc = new_doc.replace(/\n\n+/g, '\n\n');
+        new_doc = new_doc.replace(/ +/g, ' ');
         new_doc = new_doc.replace(/(\n+)(\n\nto[ -])/g, '$2');
         new_doc = new_doc.replace(/(\n+)(\n\n[\w-]+-own)/g, '$2');
         return new_doc;
+    };
+    const avoidStrings = function (doc, func) {
+        let pieces = doc.split('"');
+        let index = 0;
+        let final_docs = [];
+        for (var piece of pieces) {
+            if (index % 2 == 0) {
+                final_docs.push(func(piece));
+            }
+            else {
+                final_docs.push(piece);
+            }
+            index++;
+        }
+        return final_docs.join('"');
     };
     /** addSpacing: Give certain types of nodes their own lines. */
     const addSpacing = function (view, from, to) {
@@ -31677,6 +31724,18 @@
                             }
                         });
                     }
+                }
+                else if (node.name == 'OpenParen') {
+                    changes.push({ from: node.from, to: node.to, insert: ' (' });
+                }
+                else if (node.name == 'CloseParen') {
+                    changes.push({ from: node.from, to: node.to, insert: ') ' });
+                }
+                else if (node.name == 'OpenBracket') {
+                    changes.push({ from: node.from, to: node.to, insert: ' [ ' });
+                }
+                else if (node.name == 'CloseBracket') {
+                    changes.push({ from: node.from, to: node.to, insert: ' ] ' });
                 }
                 if (['Extensions', 'Globals', 'BreedsOwn'].includes(node.name)) {
                     if (doc.substring(node.from, node.to).includes('\n')) {
@@ -31969,7 +32028,7 @@
     }
 
     /** GalapagosEditor: The editor component for NetLogo Web / Turtle Universe. */
-    class GalapagosEditor$1 {
+    class GalapagosEditor {
         /** Constructor: Create an editor instance. */
         constructor(Parent, Options) {
             var _a, _b;
@@ -32246,6 +32305,11 @@
                 }
             }
             this.RefreshContexts();
+            if (this.Options.ParseMode == ParseMode.Normal) {
+                console.log(new Error().stack);
+                console.log(this.GetCode());
+                console.log(JSON.parse(JSON.stringify(this.LintContext.Breeds)));
+            }
         }
         /** RefreshContexts: Refresh contexts of the editor. */
         RefreshContexts() {
@@ -32348,7 +32412,7 @@
     /** Export classes globally. */
     const Localized$1 = new LocalizationManager();
     try {
-        window.GalapagosEditor = GalapagosEditor$1;
+        window.GalapagosEditor = GalapagosEditor;
         window.EditorLocalized = Localized$1;
     }
     catch (error) { }
@@ -32384,7 +32448,10 @@
                     Target = Target.slice(2);
                 if (["observer", "turtles", "patches", "links", "help"].indexOf(Scheme) !== -1) {
                     // Handle commands
-                    Current.on("click", () => Editor.CommandTab.ExecuteCommand(Scheme, Target));
+                    Current.on("click", () => {
+                        if (!Editor.CommandTab.Disabled)
+                            Editor.CommandTab.ExecuteCommand(Scheme, Target);
+                    });
                 }
                 else if (Current.hasClass("external")) {
                     // Handle external links
@@ -32429,7 +32496,7 @@
         }
         /** Show: Show the section. */
         Show() {
-            if (this.Visible)
+            if (this.Visible && this.Tab.Visible)
                 return;
             if (!this.Tab.Visible)
                 this.Tab.Show();
@@ -33039,6 +33106,12 @@
             SendRequest();
             this.Outputs.ScrollToBottom();
         }
+        /** GetPendingParent: Get the pending parent record. */
+        GetPendingParent() {
+            var _a;
+            if ((_a = this.PendingRequest) === null || _a === void 0 ? void 0 : _a.ParentID)
+                return this.Thread.GetRecord(this.PendingRequest.ParentID);
+        }
         // #endregion
         // #region " Options and Contexts "
         /** RequestOption: Choose a chat option and send the request. */
@@ -33390,14 +33463,14 @@
             this.CurrentIndex = 0;
             // Create the shared editor if necessary
             if (!NetLogoUtils.SharedEditor) {
-                NetLogoUtils.SharedEditor = new GalapagosEditor$1($(`<div class="hidden-editor"></div>`).appendTo(this.Container).get(0), {
+                NetLogoUtils.SharedEditor = new GalapagosEditor($(`<div class="hidden-editor"></div>`).appendTo(this.Container).get(0), {
                     ParseMode: ParseMode.Generative
                 });
                 NetLogoUtils.SharedEditor.SetVisible(false);
                 this.Tab.Editor.EditorTabs[0].Galapagos.AddChild(NetLogoUtils.SharedEditor);
             }
             // Create the editor
-            this.Editor = new GalapagosEditor$1($(`<div class="codemirror"></div>`).appendTo(this.Container).get(0), {
+            this.Editor = new GalapagosEditor($(`<div class="codemirror"></div>`).appendTo(this.Container).get(0), {
                 Wrapping: true,
                 ParseMode: ParseMode.Generative
             });
@@ -33812,16 +33885,32 @@
             Container.on("click", () => this.ClickHandler());
             return Container;
         }
+        /** SetData: Set the data of the renderer. */
+        SetData(Data) {
+            if (!Data.LocalizedLabel) {
+                var NewLocalized = Localized$1.Get(Data.Label);
+                if (NewLocalized != Data.Label)
+                    Data.LocalizedLabel = NewLocalized;
+            }
+            return super.SetData(Data);
+        }
         /** RenderInternal: Render the UI element. */
         RenderInternal() {
             var _a, _b, _c;
+            var Option = this.GetData();
             this.Container.addClass((_b = (_a = this.GetData().Style) === null || _a === void 0 ? void 0 : _a.toLowerCase()) !== null && _b !== void 0 ? _b : "generated").children("a")
-                .text((_c = this.GetData().LocalizedLabel) !== null && _c !== void 0 ? _c : this.GetData().Label);
+                .html(MarkdownToHTML((_c = Option.LocalizedLabel) !== null && _c !== void 0 ? _c : Option.Label));
         }
         /** ClickHandler: The handler for the click event. */
         ClickHandler() {
             var Record = this.Parent;
-            ChatManager.Instance.RequestOption(this.GetData(), Record.GetData());
+            var Option = this.GetData();
+            if (Option.Callback) {
+                Option.Callback();
+            }
+            else {
+                ChatManager.Instance.RequestOption(Option, Record.GetData());
+            }
             this.ActivateSelf("chosen");
         }
     }
@@ -34057,7 +34146,7 @@
             var LastRecord = this.Subthread.Children[this.Subthread.Children.length - 1];
             LastRecord.GetData().Response.Options.push(...Options);
             LastRecord.SetDirty(true);
-            LastRecord.Render();
+            this.Subthread.Render();
         }
         /** OpenBatch: Open a printing batch. */
         OpenBatch() {
@@ -34089,9 +34178,10 @@
         /** PrintCommandInput: Print a line of input to the screen. */
         PrintCommandInput(Content, Restart = true) {
             var _a;
-            if (Restart && !((_a = this.Subthread) === null || _a === void 0 ? void 0 : _a.GetData().RootID))
+            var Parent = this.Tab.ChatManager.GetPendingParent();
+            if (!Parent && Restart && !((_a = this.Subthread) === null || _a === void 0 ? void 0 : _a.GetData().RootID))
                 this.ActivateSubthread();
-            this.RenderRequest(`\`${Content.replace("`", "\`")}\``);
+            this.RenderRequest(`\`${Content.replace("`", "\`")}\``, Parent);
         }
         /** PrintOutput: Provide for Unity to print compiled output. */
         PrintOutput(Class, Content) {
@@ -34167,13 +34257,32 @@
                 return;
             // The user: How should I use this?
             this.RenderRequest(Localized$1.Get("Command center welcome (user)"));
+            // Default options
+            var Options = [
+                { Label: "Check out the code tab", Callback: () => this.Tab.Editor.EditorTabs[0].Show() },
+                { Label: "Run NetLogo code directly", Callback: () => {
+                        if (this.Tab.Galapagos.GetCode() == "")
+                            this.Tab.Galapagos.SetCode("print \"Hello World!\"");
+                        this.Tab.Galapagos.Focus();
+                    }
+                }
+            ];
             // AI response
             if (this.Tab.ChatManager.Available) {
                 this.PrintOutput("Output", Localized$1.Get("Command center welcome (assistant)"));
+                Options.push({ Label: "Talk to the computer in natural languages", Callback: () => {
+                        if (this.Tab.Galapagos.GetCode() == "")
+                            this.Tab.Galapagos.SetCode("create some turtles around");
+                        this.Tab.Galapagos.Focus();
+                    } });
             }
             else {
                 this.PrintOutput("Output", Localized$1.Get("Command center welcome (command)"));
+                Options.push({ Label: "Look for the documentation", Callback: () => {
+                        this.Tab.ExecuteCommand("observer", "help", false);
+                    } });
             }
+            this.RenderOptions(Options);
         }
     }
 
@@ -34181,6 +34290,8 @@
     class CommandTab extends Tab {
         /** Show: Show the command tab.  */
         Show() {
+            if (!this.Visible)
+                this.Editor.Call({ Type: "TabSwitched", Tab: "$Command$" });
             super.Show();
             bodyScrollLock.clearAllBodyScrollLocks();
             bodyScrollLock.disableBodyScroll(this.Outputs.Container.get(0));
@@ -34245,7 +34356,7 @@
             // CodeMirror Editor
             this.Galapagos = new GalapagosEditor(this.CommandLine.find(".command-input").get(0), {
                 OneLine: true,
-                ParseMode: "Oneline",
+                ParseMode: ParseMode.Oneline,
                 OnKeyUp: (Event) => this.InputKeyHandler(Event),
                 OnDictionaryClick: (Text) => this.ExplainFull(Text)
             });
@@ -34305,7 +34416,9 @@
         }
         /** SendCommand: Send command to either execute or as a chat message. */
         SendCommand(Objective, Content) {
+            var _a;
             return __awaiter(this, void 0, void 0, function* () {
+                Content = (_a = Content === null || Content === void 0 ? void 0 : Content.trim()) !== null && _a !== void 0 ? _a : "";
                 // Chatable or not
                 var Chatable = this.ChatManager.Available;
                 if (!Chatable) {
@@ -34313,7 +34426,7 @@
                     return;
                 }
                 // Check if it is a command
-                if (Objective != "chat" && !/^[\d\.]+$/.test(Content)) {
+                if (Objective != "chat" && Content != "help" && !Content.startsWith("help ") && !/^[\d\.]+$/.test(Content)) {
                     // If there is no linting issues, assume it is code snippet
                     this.Galapagos.ForceParse();
                     let Diagnostics = yield this.Galapagos.ForceLintAsync();
@@ -34349,7 +34462,7 @@
         SetCode(Objective, Content) {
             this.TargetSelect.val(Objective.toLowerCase());
             this.Galapagos.SetCode(Content);
-            setTimeout(() => this.Galapagos.SetCursorPosition(Content.length), 1);
+            setTimeout(() => this.Galapagos.Selection.SetCursorPosition(Content.length), 1);
         }
         // #endregion
         // #region "Command Execution"
@@ -34461,6 +34574,8 @@
     class EditorTab extends Tab {
         /** Show: Show the editor tab.  */
         Show() {
+            if (!this.Visible)
+                this.Editor.Call({ Type: "TabSwitched", Tab: "$Editor$" });
             super.Show();
             if (this.CodeRefreshed)
                 this.Galapagos.Selection.SetCursorPosition(0);
@@ -34487,7 +34602,7 @@
             /** CodeRefreshed: Did we refresh the code on the background? */
             this.CodeRefreshed = false;
             this.TipsElement = $(Container).children(".codemirror-tips");
-            this.Galapagos = new GalapagosEditor$1($(Container).children(".codemirror").get(0), {
+            this.Galapagos = new GalapagosEditor($(Container).children(".codemirror").get(0), {
                 Wrapping: true,
                 OnUpdate: (Changed, Update) => {
                     if (Changed && !this.IgnoreUpdate)

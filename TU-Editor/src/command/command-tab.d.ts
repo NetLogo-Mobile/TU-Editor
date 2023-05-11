@@ -7,8 +7,7 @@ import { OutputDisplay } from "./displays/outputs";
 import { ChatManager } from '../chat/chat-manager';
 import { Display } from "./displays/display";
 import { CodeDisplay } from "./displays/code";
-declare const GalapagosEditor: any;
-type GalapagosEditor = any;
+import { GalapagosEditor } from "../../../CodeMirror-NetLogo/src/editor";
 /** CommandTab: A tab for the command center. */
 export declare class CommandTab extends Tab {
     Disabled: boolean;
@@ -68,4 +67,3 @@ export declare class CommandTab extends Tab {
     /** FinishExecution: Notify the completion of the command. */
     FinishExecution(Status: string, Message: string): void;
 }
-export {};

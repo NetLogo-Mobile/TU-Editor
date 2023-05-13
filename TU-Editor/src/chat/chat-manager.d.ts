@@ -29,7 +29,7 @@ export declare class ChatManager {
     /** Outputs: The outputs area. */
     Outputs: OutputDisplay;
     /** Available: Whether the chat backend is available. */
-    Available: boolean;
+    static Available: boolean;
     /** ThinkProcess: Whether to demonstrate the thinking processes. */
     static ThinkProcess: boolean;
     /** Instance: The chat manager instance. */

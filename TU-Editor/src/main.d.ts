@@ -11,7 +11,7 @@ export declare class TurtleEditor {
     /** Darkmode: The darkmode support. */
     readonly Darkmode: Darkmode;
     /** PostMessage: The function to call to send messages to the facilitator. */
-    static PostMessage: (Message: string) => void | null;
+    static PostMessage: ((Message: string) => void) | null;
     /** Constructor: Constructor. */
     constructor(Container: HTMLElement, PostMessage: (Message: string) => void | null);
     /** Call: Call the facilitator (by default, the Unity Engine). */
@@ -42,5 +42,7 @@ export declare class TurtleEditor {
     Toast(Type: string, Content: string, Subject?: string): void;
     /** Reset: Reset the editor. */
     Reset(): void;
+    /** SetChatBackend: Set the chat backend domain. */
+    static SetChatBackend(Domain: string): void;
 }
 export {};

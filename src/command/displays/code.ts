@@ -12,6 +12,7 @@ import { ChatResponseSection, ChatResponseType } from "../../chat/client/chat-re
 import { Diagnostic, Procedure } from "../../chat/client/languages/netlogo-context";
 import { ChangeTopic, FixCode } from '../../chat/client/options/option-templates';
 import { RuntimeError } from "../../../../CodeMirror-NetLogo/src/lang/linters/runtime-linter";
+import { TurtleEditor } from "../../main";
 
 /** CodeDisplay: The interactive code editor section. */
 export class CodeDisplay extends Display {
@@ -214,6 +215,13 @@ export class CodeDisplay extends Display {
 		this.TryTo(() => {
 			var Mode = this.Editor.Semantics.GetRecognizedMode();
 			var Code = this.Editor.GetCode().trim();
+			// Show Turtle Universe message
+			if (TurtleEditor.PostMessage) {
+				this.Tab.Outputs.RenderResponses([{
+					Type: ChatResponseType.Text,
+					Content: Localized.Get("Please download Turtle Universe _")
+				}])
+			}
 			// If it is a command or reporter, simply run it
 			switch (Mode) {
 				case "Command":

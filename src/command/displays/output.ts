@@ -7,6 +7,7 @@ import { CommandTab } from "../command-tab";
 import { ChatResponseSection, ChatResponseType } from "../../chat/client/chat-response";
 import { ChatResponseOption } from "../../chat/client/chat-option";
 import { Localized } from "../../../../CodeMirror-NetLogo/src/editor";
+import { ChatManager } from "../../chat/chat-manager";
 
 /** OutputDisplay: Display the output section. */
 export class OutputDisplay extends Display {
@@ -230,7 +231,7 @@ export class OutputDisplay extends Display {
 			}
 		];
 		// AI response
-		if (this.Tab.ChatManager.Available) {
+		if (ChatManager.Available) {
 			this.PrintOutput("Output", Localized.Get("Command center welcome (assistant)"));
 			Options.push({ Label: "Talk to the computer in natural languages", Callback: () => {
 				if (this.Tab.Galapagos.GetCode() == "")

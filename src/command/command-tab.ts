@@ -35,7 +35,6 @@ export class CommandTab extends Tab {
 		bodyScrollLock.disableBodyScroll(this.Outputs.Container.get(0)!);
 		bodyScrollLock.disableBodyScroll(this.FullText.Container.get(0)!);
 		this.Outputs.Show();
-		this.Outputs.ShowWelcome();
 	}
 	/** Hide: Hide the command tab. */
 	public Hide() {
@@ -153,7 +152,7 @@ export class CommandTab extends Tab {
 	public async SendCommand(Objective: string, Content: string) {
 		Content = Content?.trim() ?? "";
 		// Chatable or not
-		var Chatable = this.ChatManager.Available;
+		var Chatable = ChatManager.Available;
 		// Check if it is a command
 		if (!Chatable || (Objective != "chat" && Content != "help" && !Content.startsWith("help ") && !/^[\d\.]+$/.test(Content))) {
 			// If there is no linting issues, assume it is code snippet

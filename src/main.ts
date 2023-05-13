@@ -1,3 +1,5 @@
+import { ChatManager } from "./chat/chat-manager";
+import { ChatNetwork } from "./chat/chat-network";
 import { Breed, NetLogoContext, Procedure } from "./chat/client/languages/netlogo-context";
 import { CommandTab } from "./command/command-tab";
 import { EditorTab } from "./editor/editor-tab";
@@ -15,7 +17,7 @@ export class TurtleEditor {
   /** Darkmode: The darkmode support. */
   public readonly Darkmode: Darkmode;
   /** PostMessage: The function to call to send messages to the facilitator. */
-  public static PostMessage: (Message: string) => void | null;
+  public static PostMessage: ((Message: string) => void) | null;
   /** Constructor: Constructor. */
   public constructor(Container: HTMLElement, PostMessage: (Message: string) => void | null) {
     this.Container = Container;
@@ -112,6 +114,11 @@ export class TurtleEditor {
   public Reset() {
     this.CommandTab.Reset();
     this.EditorTabs.forEach(Tab => Tab.Reset());
+  }
+  /** SetChatBackend: Set the chat backend domain. */
+  public static SetChatBackend(Domain: string) {
+    ChatNetwork.Domain = Domain;
+    ChatManager.Available = !!Domain && Domain != "";
   }
   // #endregion
 }

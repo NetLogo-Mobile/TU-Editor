@@ -84,33 +84,36 @@
 			window.modelConfig = {};
 			LoadScript("tortuga-editor.js");
 
-			// Messenger
-			if (navigator.userAgent.indexOf("ZFBrowser") != -1) {
-				window.PostMessage = function(Data) {
-					if (typeof ZFCallback != "undefined") ZFCallback(Data);
-				};
-			} else if (window.location.href.indexOf("localhost") == -1 && window.location.href.indexOf("127.0.0.1") == -1) {
-				if (window && window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.unityControl) {
-					window.PostMessage = function (Result) {
-						window.webkit.messageHandlers.unityControl.postMessage(Result);
-						return Result;
-					};
-				} else {
-					window.PostMessage = function (Result) {
-						window.location = 'unity:' + Result;
-						return Result;
-					}
-				}
-			} else {
-				window.PostMessage = null;
-			}
-
 			// Initialize
 			window.addEventListener("load", function () {
+				// Messenger
+				if (navigator.userAgent.indexOf("ZFBrowser") != -1) {
+					window.PostMessage = function(Data) {
+						if (typeof ZFCallback != "undefined") ZFCallback(Data);
+					};
+				} else if (window.location.href.indexOf("localhost") == -1 && window.location.href.indexOf("127.0.0.1") == -1) {
+					if (window && window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.unityControl) {
+						window.PostMessage = function (Result) {
+							window.webkit.messageHandlers.unityControl.postMessage(Result);
+							return Result;
+						};
+					} else {
+						window.PostMessage = function (Result) {
+							window.location = 'unity:' + Result;
+							return Result;
+						}
+					}
+				} else {
+					window.PostMessage = null;
+					TurtleEditor.SetChatBackend("http://127.0.0.1/");
+				}
+				// Create the editor
 				window.Editor = new TurtleEditor(document.querySelector("div.root-container"), PostMessage);
 				window.EditorTab = window.Editor.EditorTabs[0];
 				window.Commands = window.Editor.CommandTab;
+				// Send back the event
 				if (PostMessage != null) PostMessage(navigator.userAgent);
+				else window.Commands.Reset();
 			});
 		})();
 	</script>

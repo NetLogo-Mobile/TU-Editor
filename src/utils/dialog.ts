@@ -1,4 +1,4 @@
-import { Localized } from "../legacy";
+import { Localized } from "../../../CodeMirror-NetLogo/src/editor";
 
 /** ShowConfirm: Show a confirm dialog. */
 const ShowConfirm = function(Subject: string, Content: string, OK: () => void, Cancel?: () => void) {

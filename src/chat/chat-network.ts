@@ -7,6 +7,8 @@ declare const { JSON5 }: any;
 
 /** ChatNetwork: Class that handles the network communication for the chat. */
 export class ChatNetwork {
+    /** Domain: The domain of the chat backend. */
+    public static Domain: string = "";
     /** SendRequest: Send a request to the chat backend and handle its outputs. */
     public static async SendRequest(Record: ChatRecord, Thread: ChatThread, 
         NewSection: (Section: ChatResponseSection) => void, 
@@ -22,7 +24,7 @@ export class ChatNetwork {
         return new Promise<ChatRecord>((Resolve, Reject) => {
             var Update: ChatResponseSection = { };
             var Section: ChatResponseSection = { };
-            var Client = new SSEClient("http://localhost:3000/request", "", Record as ClientChatRequest);
+            var Client = new SSEClient(`${ChatNetwork.Domain}/request`, "", Record as ClientChatRequest);
             // Finish the section if possible
             var TryFinishSection = () => {
                 if (Section.Type !== undefined) {

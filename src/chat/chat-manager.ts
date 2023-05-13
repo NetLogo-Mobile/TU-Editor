@@ -223,7 +223,7 @@ export class ChatManager {
     /** Outputs: The outputs area. */
     public Outputs: OutputDisplay;
     /** Available: Whether the chat backend is available. */
-    public Available: boolean = false;
+    public static Available: boolean = false;
     /** ThinkProcess: Whether to demonstrate the thinking processes. */
     public static ThinkProcess: boolean = false;
     /** Instance: The chat manager instance. */

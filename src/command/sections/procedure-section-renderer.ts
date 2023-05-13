@@ -1,4 +1,4 @@
-import { Localized } from "../../../dist/CodeMirror-NetLogo/src/editor";
+import { Localized } from "../../../../CodeMirror-NetLogo/src/editor";
 import { Procedure } from "../../chat/client/languages/netlogo-context";
 import { OutputDisplay } from "../displays/output";
 import { RendererChooser } from "../outputs/record-renderer";
@@ -37,7 +37,7 @@ export class ProcedureSectionRenderer extends JSONSectionRenderer<ProcedureMetad
     /** RenderProcedure: Render a procedure. */
     private RenderProcedure(Renderer: JQuery<HTMLElement>, Metadata: ProcedureMetadata, Procedure: Procedure) {
         var Renderer = $("<li></li>").appendTo(this.ContentContainer);
-        $("<a></a>").appendTo(Renderer).text(`${Procedure.IsCommand ? "Command" : "Reporter"} ${Procedure.Name}`)
+        $("<a></a>").appendTo(Renderer).text(`${Localized.Get(Procedure.IsCommand ? "Command" : "Reporter")} ${Procedure.Name}`)
             .on("click", () => Metadata.Callback?.(Procedure));
         $("<span></span>").appendTo(Renderer).text(`[${Procedure.Arguments.join(" ")}]`);
     }

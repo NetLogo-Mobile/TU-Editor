@@ -1,7 +1,7 @@
 declare const { EditorLocalized }: any;
 
-// Localized: Localized support.
-const Localized = function () {
+// LegacyLocalized: Localized support.
+export const LegacyLocalized = function () {
 	var Localized: any = {};
 
 	// Initialize: Initialize the manager with given data.
@@ -24,7 +24,7 @@ const Localized = function () {
 }();
 
 // RotateScreen: Show rotate screen prompt.
-const RotateScreen = function () {
+export const RotateScreen = function () {
 	(function ($, undefined) {
 		($.fn as any).asOverlay = function (Timeout = 3000, Animation = 300) {
 			this.Hide = () => this.fadeOut(Animation);
@@ -41,5 +41,3 @@ const RotateScreen = function () {
 	(RotateScreen as any).asOverlay().click(() => RotateScreen.hide());
 	return RotateScreen;
 };
-
-export { Localized, RotateScreen }

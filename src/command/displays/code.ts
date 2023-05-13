@@ -215,13 +215,8 @@ export class CodeDisplay extends Display {
 		this.TryTo(() => {
 			var Mode = this.Editor.Semantics.GetRecognizedMode();
 			var Code = this.Editor.GetCode().trim();
-			// Show Turtle Universe message
-			if (!TurtleEditor.PostMessage) {
-				this.Tab.Outputs.RenderResponses([{
-					Type: ChatResponseType.Text,
-					Content: Localized.Get("Please download Turtle Universe _")
-				}])
-			}
+			// Check if we really could execute
+			this.Tab.Editor.CheckExecution();
 			// If it is a command or reporter, simply run it
 			switch (Mode) {
 				case "Command":

@@ -1,4 +1,5 @@
 import { Procedure } from "../../chat/client/languages/netlogo-context";
+import { OutputDisplay } from "../displays/output";
 import { RendererChooser } from "../outputs/record-renderer";
 import { JSONSectionRenderer } from "./json-section-renderer";
 
@@ -31,7 +32,6 @@ export class ProcedureSectionRenderer extends JSONSectionRenderer<ProcedureMetad
     }
     /** ExecuteProcedure: Execute the procedure. */
     private ExecuteProcedure(Procedure: Procedure, IsTemporary: boolean): void {
-
     }
     /** GetChooser: Return the section chooser for this renderer. */
     public static GetChooser(): RendererChooser {

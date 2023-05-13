@@ -29,7 +29,7 @@ export class CommandTab extends Tab {
 	public readonly ChatManager: ChatManager;
 	/** Show: Show the command tab.  */
 	public Show() {
-		if (!this.Visible) this.Editor.Call({ Type: "TabSwitched", Tab: "$Command$" });
+		if (!this.Visible) TurtleEditor.Call({ Type: "TabSwitched", Tab: "$Command$" });
 		super.Show();
 		bodyScrollLock.clearAllBodyScrollLocks();
 		bodyScrollLock.disableBodyScroll(this.Outputs.Container.get(0)!);
@@ -211,6 +211,8 @@ export class CommandTab extends Tab {
 		// Execute command
 		this.ExecuteCommand(Objective, Content, true);
 		this.ClearInput();
+		// Check if we really could execute
+		this.Editor.CheckExecution();
 	}
 	/** ExecuteCommand: Execute a command. */
 	public ExecuteCommand(Objective: string, Content: string, Restart: boolean = false) {
@@ -229,7 +231,7 @@ export class CommandTab extends Tab {
 				Content = `help ${Content}`;
 		}
 		// Execute command
-		this.Editor.Call({ Type: "CommandExecute", Source: Objective, Command: Content });
+		TurtleEditor.Call({ Type: "CommandExecute", Source: Objective, Command: Content });
 		this.Outputs.PrintCommandInput(Content, Restart);
 		this.Outputs.ScrollToBottom();
 	}

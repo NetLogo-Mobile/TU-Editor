@@ -1,9 +1,11 @@
+import { Localized } from "../../CodeMirror-NetLogo/src/editor";
 import { ChatManager } from "./chat/chat-manager";
 import { ChatNetwork } from "./chat/chat-network";
+import { ChatResponseType } from "./chat/client/chat-response";
 import { Breed, NetLogoContext, Procedure } from "./chat/client/languages/netlogo-context";
 import { CommandTab } from "./command/command-tab";
 import { EditorTab } from "./editor/editor-tab";
-import { Localized, RotateScreen } from "./legacy";
+import { LegacyLocalized, RotateScreen } from "./legacy";
 import { Tab } from "./tab";
 
 declare const { Darkmode, toastr }: any;
@@ -34,7 +36,7 @@ export class TurtleEditor {
     this.CommandTab.Show();
   }
   /** Call: Call the facilitator (by default, the Unity Engine). */
-  public Call(Message: any) {
+  public static Call(Message: any) {
     if (TurtleEditor.PostMessage)
       TurtleEditor.PostMessage(JSON.stringify(Message));
     else console.log(Message);
@@ -90,6 +92,15 @@ export class TurtleEditor {
 			Breeds: Breeds
 		}
 	}
+  /** CheckExecution: Check whether the execution is allowed. Otherwise, display a message. */
+  public CheckExecution() {
+    if (!TurtleEditor.PostMessage) {
+      this.CommandTab.Outputs.RenderResponses([{
+        Type: ChatResponseType.Text,
+        Content: Localized.Get("Please download Turtle Universe")
+      }])
+    }
+  }
 	// #endregion
 
   // #region "Editor Statuses"
@@ -126,6 +137,6 @@ export class TurtleEditor {
 /** Export classes globally. */
 try {
   (window as any).TurtleEditor = TurtleEditor;
-  (window as any).TurtleLocalized = Localized;
+  (window as any).TurtleLocalized = LegacyLocalized;
   (window as any).RotateScreen = RotateScreen();
 } catch (error) { }

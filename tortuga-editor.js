@@ -204,7 +204,7 @@
                 return new Promise((Resolve, Reject) => {
                     var Update = {};
                     var Section = {};
-                    var Client = new SSEClient(`${ChatNetwork.Domain}/request`, "", Record);
+                    var Client = new SSEClient(`${ChatNetwork.Domain}request`, "", Record);
                     // Finish the section if possible
                     var TryFinishSection = () => {
                         if (Section.Type !== undefined) {
@@ -34535,6 +34535,12 @@
                 Content = (_a = Content === null || Content === void 0 ? void 0 : Content.trim()) !== null && _a !== void 0 ? _a : "";
                 // Chatable or not
                 var Chatable = ChatManager.Available;
+                // Special: set domain
+                if (Content.startsWith("domain:")) {
+                    TurtleEditor.SetChatBackend(Content.substring(7).trim());
+                    this.Reset();
+                    return;
+                }
                 // Check if it is a command
                 if (!Chatable || (Objective != "chat" && Content != "help" && !Content.startsWith("help ") && !/^[\d\.]+$/.test(Content))) {
                     // If there is no linting issues, assume it is code snippet

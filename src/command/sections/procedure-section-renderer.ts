@@ -1,3 +1,4 @@
+import { Localized } from "../../../dist/CodeMirror-NetLogo/src/editor";
 import { Procedure } from "../../chat/client/languages/netlogo-context";
 import { OutputDisplay } from "../displays/output";
 import { RendererChooser } from "../outputs/record-renderer";
@@ -12,7 +13,7 @@ export class ProcedureSectionRenderer extends JSONSectionRenderer<ProcedureMetad
     }
     /** ContentContainerInitializer: The initializer for the container. */
     protected ContentContainerInitializer(): JQuery<HTMLElement> {
-        return $("<li></li>");
+        return $("<ul></ul>");
     }
     /** RenderInternal: Render the UI element. */
     protected RenderInternal(): void {
@@ -29,9 +30,23 @@ export class ProcedureSectionRenderer extends JSONSectionRenderer<ProcedureMetad
             ((Procedure) => this.ExecuteProcedure(Procedure, Metadata.IsTemporary ?? false));
         // Render the procedures
         this.ContentContainer.empty();
+        for (var Procedure of Metadata.Procedures) {
+            this.RenderProcedure(this.ContentContainer, Metadata, Procedure);
+        }
+    }
+    /** RenderProcedure: Render a procedure. */
+    private RenderProcedure(Renderer: JQuery<HTMLElement>, Metadata: ProcedureMetadata, Procedure: Procedure) {
+        var Renderer = $("<li></li>").appendTo(this.ContentContainer);
+        $("<a></a>").appendTo(Renderer).text(`${Procedure.IsCommand ? "Command" : "Reporter"} ${Procedure.Name}`)
+            .on("click", () => Metadata.Callback?.(Procedure));
+        $("<span></span>").appendTo(Renderer).text(`[${Procedure.Arguments.join(" ")}]`);
     }
     /** ExecuteProcedure: Execute the procedure. */
     private ExecuteProcedure(Procedure: Procedure, IsTemporary: boolean): void {
+		var Editor = OutputDisplay.Instance.Tab.Editor;
+        // Check if we can really execute or not
+        Editor.CheckExecution();
+        // Execute the procedure
     }
     /** GetChooser: Return the section chooser for this renderer. */
     public static GetChooser(): RendererChooser {

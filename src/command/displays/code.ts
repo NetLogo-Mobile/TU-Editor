@@ -216,7 +216,11 @@ export class CodeDisplay extends Display {
 			var Mode = this.Editor.Semantics.GetRecognizedMode();
 			var Code = this.Editor.GetCode().trim();
 			// Check if we really could execute
-			this.Tab.Editor.CheckExecution();
+			if (TurtleEditor.PostMessage) {
+				this.PlayCompiled(true, []);
+			} else {
+
+			}
 			// If it is a command or reporter, simply run it
 			switch (Mode) {
 				case "Command":
@@ -226,7 +230,7 @@ export class CodeDisplay extends Display {
 					this.Tab.ExecuteCommand("observer", `show ${Code}`);
 					break;
 				default:
-					this.Tab.Editor.Call({ Type: "RecompileIncremental", Code: Code });
+					TurtleEditor.Call({ Type: "RecompileIncremental", Code: Code });
 					break;
 			}
 		});

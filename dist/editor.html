@@ -23,7 +23,7 @@
 				<div class="command-code"></div>
 				<div class="outputs"></div>
 			</div>
-			<div class="command-fulltext">
+			<div class="command-fulltext" style="display: none;">
 				<h2><strong>Ask</strong><span></span></h2>
 				<p><a href="javascript:void(0)" onclick="Commands.FullText.HideFullText();"><span class="Localized">返回上一页……</span></a></p>
 				<div class="translator">
@@ -91,7 +91,7 @@
 					window.PostMessage = function(Data) {
 						if (typeof ZFCallback != "undefined") ZFCallback(Data);
 					};
-				} else if (window.location.href.indexOf("localhost") == -1 && window.location.href.indexOf("127.0.0.1") == -1) {
+				} else if ( window.location.href.indexOf("127.0.0.1") == -1 && window.location.href.indexOf("github.io") == -1) {
 					if (window && window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.unityControl) {
 						window.PostMessage = function (Result) {
 							window.webkit.messageHandlers.unityControl.postMessage(Result);

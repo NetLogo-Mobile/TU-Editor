@@ -33686,7 +33686,7 @@
                 var Mode = this.Editor.Semantics.GetRecognizedMode();
                 var Code = this.Editor.GetCode().trim();
                 // Show Turtle Universe message
-                if (TurtleEditor.PostMessage) {
+                if (!TurtleEditor.PostMessage) {
                     this.Tab.Outputs.RenderResponses([{
                             Type: ChatResponseType.Text,
                             Content: Localized$1.Get("Please download Turtle Universe _")

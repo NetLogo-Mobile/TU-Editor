@@ -24,7 +24,7 @@ export class ChatNetwork {
         return new Promise<ChatRecord>((Resolve, Reject) => {
             var Update: ChatResponseSection = { };
             var Section: ChatResponseSection = { };
-            var Client = new SSEClient(`${ChatNetwork.Domain}/request`, "", Record as ClientChatRequest);
+            var Client = new SSEClient(`${ChatNetwork.Domain}request`, "", Record as ClientChatRequest);
             // Finish the section if possible
             var TryFinishSection = () => {
                 if (Section.Type !== undefined) {

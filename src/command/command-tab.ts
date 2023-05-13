@@ -153,6 +153,12 @@ export class CommandTab extends Tab {
 		Content = Content?.trim() ?? "";
 		// Chatable or not
 		var Chatable = ChatManager.Available;
+		// Special: set domain
+		if (Content.startsWith("domain:")) {
+			TurtleEditor.SetChatBackend(Content.substring(7).trim());
+			this.Reset();
+			return;
+		}
 		// Check if it is a command
 		if (!Chatable || (Objective != "chat" && Content != "help" && !Content.startsWith("help ") && !/^[\d\.]+$/.test(Content))) {
 			// If there is no linting issues, assume it is code snippet

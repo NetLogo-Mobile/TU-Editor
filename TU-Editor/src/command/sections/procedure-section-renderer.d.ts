@@ -11,6 +11,8 @@ export declare class ProcedureSectionRenderer extends JSONSectionRenderer<Proced
     protected ContentContainerInitializer(): JQuery<HTMLElement>;
     /** RenderInternal: Render the UI element. */
     protected RenderInternal(): void;
+    /** RenderProcedure: Render a procedure. */
+    private RenderProcedure;
     /** ExecuteProcedure: Execute the procedure. */
     private ExecuteProcedure;
     /** GetChooser: Return the section chooser for this renderer. */

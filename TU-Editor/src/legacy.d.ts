@@ -1,4 +1,3 @@
 /// <reference types="jquery" />
-declare const Localized: any;
-declare const RotateScreen: () => JQuery<HTMLElement>;
-export { Localized, RotateScreen };
+export declare const LegacyLocalized: any;
+export declare const RotateScreen: () => JQuery<HTMLElement>;

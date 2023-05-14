@@ -9,6 +9,7 @@ import { Display } from "./displays/display";
 import { CodeDisplay } from "./displays/code";
 import { GalapagosEditor } from "../../../CodeMirror-NetLogo/src/editor";
 import { Procedure } from "../chat/client/languages/netlogo-context";
+import { RuntimeError } from "../../../CodeMirror-NetLogo/src/lang/linters/runtime-linter";
 /** CommandTab: A tab for the command center. */
 export declare class CommandTab extends Tab {
     Disabled: boolean;
@@ -62,7 +63,7 @@ export declare class CommandTab extends Tab {
     /** ExecuteInput: Execute a human-sent command. */
     private ExecuteInput;
     /** ExecuteCommand: Execute a command. */
-    ExecuteCommand(Objective: string, Content: string, Temporary: boolean, Restart?: boolean): void;
+    ExecuteCommand(Objective: string, Content: string, IsTemporary: boolean, Restart?: boolean): void;
     /** ExecuteProcedure: Execute the procedure. */
     ExecuteProcedure(Procedure: Procedure, IsTemporary: boolean): void;
     /** ExecuteProcedureWithArguments: Execute the procedure with arguments. */
@@ -73,4 +74,12 @@ export declare class CommandTab extends Tab {
     ExplainFull(Command: string): false | undefined;
     /** FinishExecution: Notify the completion of the command. */
     FinishExecution(Status: string, Message: string): void;
+    /** RecompileCallback: The callback after the code to play is compiled. */
+    private RecompileCallback?;
+    /** TemporaryCode: The temporary code snippet that is in-use. */
+    private TemporaryCode?;
+    /** RecompileTemporarily Recompile the code snippet temporarily. */
+    RecompileTemporarily(Code: string, Callback: () => void): void;
+    /** PlayCompiled: The callback after the code to play is compiled. */
+    PlayCompiled(Succeeded: boolean, Errors: RuntimeError[]): void;
 }

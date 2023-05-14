@@ -21,7 +21,7 @@ export declare class ChatManager {
     /** GetPendingParent: Get the pending parent record. */
     GetPendingParent(): ChatRecord | undefined;
     /** RequestOption: Choose a chat option and send the request. */
-    RequestOption(Option: ChatResponseOption, Record?: ChatRecord, Postprocessor?: (Request: ClientChatRequest) => void): void;
+    RequestOption(Option: ChatResponseOption, Record?: ChatRecord, Postprocessor?: (Request: ClientChatRequest) => void): boolean;
     /** InheritContext: Inherit the context from the previous request. */
     private InheritContext;
     /** Tab: The command tab. */

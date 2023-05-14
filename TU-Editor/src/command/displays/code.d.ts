@@ -4,7 +4,6 @@ import { GalapagosEditor } from "../../../../CodeMirror-NetLogo/src/editor";
 import { ChatRecord } from "../../chat/client/chat-record";
 import { SubthreadRenderer } from "../outputs/subthread-renderer";
 import { Diagnostic } from "../../chat/client/languages/netlogo-context";
-import { RuntimeError } from "../../../../CodeMirror-NetLogo/src/lang/linters/runtime-linter";
 /** CodeDisplay: The interactive code editor section. */
 export declare class CodeDisplay extends Display {
     /** Editor: The editor instance. */
@@ -56,8 +55,6 @@ export declare class CodeDisplay extends Display {
     ExportDiagnostics(): Promise<Diagnostic[]>;
     /** Play: Try to play the code. */
     Play(): void;
-    /** PlayCompiled: The callback after the code to play is compiled. */
-    PlayCompiled(Succeeded: boolean, Errors: RuntimeError[]): void;
     /** PlayProcedures: Try to play the available procedures after compilation. */
     private PlayProcedures;
     /** AddToCode: Add the code to the main editor. */

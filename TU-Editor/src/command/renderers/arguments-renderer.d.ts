@@ -23,5 +23,5 @@ export interface CodeArguments {
     /** Procedure: The procedure to execute. */
     Procedure: string;
     /** Temporary: Whether the procedure is in the temporary context. */
-    Temporary?: boolean;
+    IsTemporary?: boolean;
 }

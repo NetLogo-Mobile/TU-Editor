@@ -32879,6 +32879,8 @@
                     // Show the input if there are no options
                     if (Record.Response.Options.length == 0)
                         this.Commands.ShowInput();
+                    else
+                        this.Commands.Disabled = false;
                 }).catch((Error) => {
                     if (!ChatManager.IsRequesting)
                         return;
@@ -32905,6 +32907,8 @@
         /** RequestOption: Choose a chat option and send the request. */
         RequestOption(Option, Record, Postprocessor) {
             var _a, _b, _c;
+            if (this.Commands.Disabled)
+                return false;
             // Construct the request
             this.PendingRequest = {
                 Input: (_b = (_a = Option.ActualInput) !== null && _a !== void 0 ? _a : Option.LocalizedLabel) !== null && _b !== void 0 ? _b : Option.Label,
@@ -32941,6 +32945,7 @@
             else {
                 this.SendRequest(this.PendingRequest);
             }
+            return true;
         }
         /** InheritContext: Inherit the context from the previous request. */
         InheritContext(Option, Record, Layers = -1) {
@@ -35230,7 +35235,7 @@
             var _a, _b, _c;
             var Parameter = this.GetData();
             // Render the question
-            this.Question.text((_a = Parameter.Question) !== null && _a !== void 0 ? _a : Parameter.Name);
+            this.Question.text((_a = Parameter.Question) !== null && _a !== void 0 ? _a : `${Localized.Get("Argument")} ${Parameter.Name}`);
             // Sync the input
             if (typeof Parameter.Known === "string" || Parameter.Known instanceof String) {
                 this.Input.val(Parameter.Known);
@@ -35328,7 +35333,8 @@
             // Request the virtual option
             var Manager = ChatManager.Instance;
             var Record = this.GetRecord();
-            Manager.RequestOption(Record.Response.Options[0], Record);
+            if (!Manager.RequestOption(Record.Response.Options[0], Record))
+                return;
             // Build the messages
             var Message = JSON.stringify({
                 Need: (_c = (_b = (_a = Record.Response.Sections.find(Section => Section.Field == "Needs")) === null || _a === void 0 ? void 0 : _a.Parsed) === null || _b === void 0 ? void 0 : _b[0]) !== null && _c !== void 0 ? _c : "Unknown",
@@ -35338,7 +35344,6 @@
             for (var Parameter in Composed) {
                 Friendly += `\n- ${Parameter}: ${Composed[Parameter]}`;
             }
-            console.log(Message);
             Manager.SendMessage(Message, Friendly);
         }
         /** GetChooser: Return the section chooser for this renderer. */
@@ -35556,53 +35561,27 @@
         }
         /** Play: Try to play the code. */
         Play() {
+            if (this.Tab.Disabled)
+                return;
             this.Tab.Outputs.RenderRequest(Localized.Get("Trying to run the code"), this.Record).Transparent = true;
             this.TryTo(() => {
                 var Mode = this.Editor.Semantics.GetRecognizedMode();
                 var Code = this.Editor.GetCode().trim();
-                // Check if we really could execute
-                if (!TurtleEditor.PostMessage)
-                    this.PlayCompiled(true, []);
                 // If it is a command or reporter, simply run it
                 switch (Mode) {
                     case "Command":
+                        this.Tab.Disabled = true;
                         this.Tab.ExecuteCommand("observer", Code, true);
                         break;
                     case "Reporter":
+                        this.Tab.Disabled = true;
                         this.Tab.ExecuteCommand("observer", `show ${Code}`, true);
                         break;
                     default:
-                        TurtleEditor.Call({ Type: "RecompileIncremental", Code: Code });
+                        this.Tab.RecompileTemporarily(Code, this.PlayProcedures);
                         break;
                 }
             });
-        }
-        /** PlayCompiled: The callback after the code to play is compiled. */
-        PlayCompiled(Succeeded, Errors) {
-            if (Succeeded) {
-                this.Tab.Outputs.RenderResponses([{
-                        Type: ChatResponseType.Text,
-                        Content: Localized.Get("Successfully compiled")
-                    }]);
-                this.PlayProcedures();
-            }
-            else if (Errors.length == 0) {
-                this.Tab.Outputs.RenderResponses([{
-                        Type: ChatResponseType.CompileError,
-                        Content: Localized.Get("Compile error unknown")
-                    }]);
-            }
-            else {
-                this.Tab.Outputs.RenderResponses([{
-                        Type: ChatResponseType.CompileError,
-                        Parsed: Errors
-                    }, {
-                        Type: ChatResponseType.JSON,
-                        Field: "Diagnostics",
-                        Content: JSON.stringify(Errors),
-                        Parsed: Errors
-                    }]);
-            }
         }
         /** PlayProcedures: Try to play the available procedures after compilation. */
         PlayProcedures() {
@@ -35620,7 +35599,7 @@
                     Field: "Procedures",
                     Parsed: {
                         Procedures: Procedures,
-                        Temporary: true
+                        IsTemporary: true
                     },
                 }]);
         }
@@ -35945,7 +35924,8 @@
                 Option.Callback();
             }
             else {
-                ChatManager.Instance.RequestOption(Option, Record.GetData());
+                if (!ChatManager.Instance.RequestOption(Option, Record.GetData()))
+                    return;
             }
             this.ActivateSelf("chosen");
         }
@@ -36008,7 +35988,7 @@
             // Send it back to execute
             if (Failed)
                 return;
-            OutputDisplay.Instance.Tab.ExecuteProcedureWithArguments(Package.Procedure, (_a = Package.Temporary) !== null && _a !== void 0 ? _a : false, Composed);
+            OutputDisplay.Instance.Tab.ExecuteProcedureWithArguments(Package.Procedure, (_a = Package.IsTemporary) !== null && _a !== void 0 ? _a : false, Composed);
         }
         /** GetChooser: Return the section chooser for this renderer. */
         static GetChooser() {
@@ -36485,8 +36465,7 @@
                 if (!Content || this.Disabled)
                     return;
                 const Objective = this.TargetSelect.val();
-                if (TurtleEditor.PostMessage != null)
-                    this.Disabled = true;
+                this.Disabled = true;
                 this.Outputs.Show();
                 this.SendCommand(Objective, Content);
             }
@@ -36593,7 +36572,7 @@
             this.ClearInput();
         }
         /** ExecuteCommand: Execute a command. */
-        ExecuteCommand(Objective, Content, Temporary, Restart = false) {
+        ExecuteCommand(Objective, Content, IsTemporary, Restart = false) {
             var _a;
             // Transform command
             switch (Objective.toLowerCase()) {
@@ -36610,7 +36589,7 @@
                     Content = `help ${Content}`;
             }
             // Execute command
-            TurtleEditor.Call({ Type: "CommandExecute", Source: Objective, Command: Content, Temporary: Temporary });
+            TurtleEditor.Call({ Type: "CommandExecute", Source: Objective, Command: Content, IsTemporary: IsTemporary });
             var Record = this.Outputs.PrintCommandInput(Content, Restart);
             Record.Context = (_a = Record.Context) !== null && _a !== void 0 ? _a : { PreviousMessages: [] };
             Record.Context.CodeSnippet = Content;
@@ -36623,7 +36602,7 @@
             if (Procedure.Arguments.length > 0) {
                 var Package = {
                     Procedure: Procedure.Name,
-                    Temporary: IsTemporary,
+                    IsTemporary: IsTemporary,
                     Arguments: Procedure.Arguments.map((Argument) => {
                         return { Name: Argument, };
                     })
@@ -36644,6 +36623,9 @@
         }
         /** ExecuteProcedureWithArguments: Execute the procedure with arguments. */
         ExecuteProcedureWithArguments(Name, IsTemporary, Arguments) {
+            if (this.Disabled)
+                return;
+            this.Disabled = true;
             // Generate the code
             var Code = `${Name} ${Object.keys(Arguments).map(Key => `${this.FormatArgument(Arguments[Key])}`).join(" ")}`;
             // Execute it
@@ -36663,6 +36645,55 @@
         FinishExecution(Status, Message) {
             this.Outputs.PrintOutput(Status, Message);
             this.Disabled = false;
+        }
+        /** RecompileTemporarily Recompile the code snippet temporarily. */
+        RecompileTemporarily(Code, Callback) {
+            if (this.Disabled)
+                return;
+            this.Disabled = true;
+            this.RecompileCallback = Callback;
+            // If the code is not the same, recompile it
+            if (this.TemporaryCode != Code) {
+                TurtleEditor.Call({ Type: "RecompileTemporarily", Code: Code });
+                this.TemporaryCode = Code;
+            }
+            else {
+                // Otherwise, just play it
+                this.PlayCompiled(true, []);
+                return;
+            }
+            // If we do not support, also play it
+            if (!TurtleEditor.PostMessage)
+                this.PlayCompiled(true, []);
+        }
+        /** PlayCompiled: The callback after the code to play is compiled. */
+        PlayCompiled(Succeeded, Errors) {
+            var _a;
+            this.Disabled = false;
+            if (Succeeded) {
+                this.Outputs.RenderResponses([{
+                        Type: ChatResponseType.Text,
+                        Content: Localized.Get("Successfully compiled")
+                    }]);
+                (_a = this.RecompileCallback) === null || _a === void 0 ? void 0 : _a.call(this);
+            }
+            else if (Errors.length == 0) {
+                this.Outputs.RenderResponses([{
+                        Type: ChatResponseType.CompileError,
+                        Content: Localized.Get("Compile error in model")
+                    }]);
+            }
+            else {
+                this.Outputs.RenderResponses([{
+                        Type: ChatResponseType.CompileError,
+                        Parsed: Errors
+                    }, {
+                        Type: ChatResponseType.JSON,
+                        Field: "Diagnostics",
+                        Content: JSON.stringify(Errors),
+                        Parsed: Errors
+                    }]);
+            }
         }
     }
 
@@ -36943,6 +36974,7 @@
                         Type: ChatResponseType.Text,
                         Content: Localized.Get("Please download Turtle Universe")
                     }]);
+                this.CommandTab.Disabled = false;
             }
         }
         // #endregion

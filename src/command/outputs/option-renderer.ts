@@ -34,7 +34,7 @@ export class OptionRenderer extends UIRendererOf<ChatResponseOption> {
         if (Option.Callback) {
             Option.Callback();
         } else {
-            ChatManager.Instance.RequestOption(Option, Record.GetData());
+            if (!ChatManager.Instance.RequestOption(Option, Record.GetData())) return;
         }
         this.ActivateSelf("chosen");
     }

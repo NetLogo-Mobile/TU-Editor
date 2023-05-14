@@ -10,6 +10,7 @@ import { ParseMode } from "../../../CodeMirror-NetLogo/src/editor-config";
 import { Procedure } from "../chat/client/languages/netlogo-context";
 import { CodeArguments } from "./renderers/arguments-renderer";
 import { ChatResponseType } from "../chat/client/chat-response";
+import { RuntimeError } from "../../../CodeMirror-NetLogo/src/lang/linters/runtime-linter";
 
 declare const { bodyScrollLock, EditorDictionary }: any;
 
@@ -119,7 +120,7 @@ export class CommandTab extends Tab {
 			this.Galapagos.CloseCompletion();
 			if (!Content || this.Disabled) return;
 			const Objective = this.TargetSelect.val() as string;
-			if (TurtleEditor.PostMessage != null) this.Disabled = true;
+			this.Disabled = true;
 			this.Outputs.Show();
 			this.SendCommand(Objective, Content);
 		}
@@ -219,7 +220,7 @@ export class CommandTab extends Tab {
 		this.ClearInput();
 	}
 	/** ExecuteCommand: Execute a command. */
-	public ExecuteCommand(Objective: string, Content: string, Temporary: boolean, Restart: boolean = false) {
+	public ExecuteCommand(Objective: string, Content: string, IsTemporary: boolean, Restart: boolean = false) {
 		// Transform command
 		switch (Objective.toLowerCase()) {
 			case "turtles":
@@ -235,7 +236,7 @@ export class CommandTab extends Tab {
 				Content = `help ${Content}`;
 		}
 		// Execute command
-		TurtleEditor.Call({ Type: "CommandExecute", Source: Objective, Command: Content, Temporary: Temporary });
+		TurtleEditor.Call({ Type: "CommandExecute", Source: Objective, Command: Content, IsTemporary: IsTemporary });
 		var Record = this.Outputs.PrintCommandInput(Content, Restart);
 		Record.Context = Record.Context ?? { PreviousMessages: [] };
 		Record.Context.CodeSnippet = Content;
@@ -248,7 +249,7 @@ export class CommandTab extends Tab {
 		if (Procedure.Arguments.length > 0) {
 			var Package: CodeArguments = {
 				Procedure: Procedure.Name,
-				Temporary: IsTemporary,
+				IsTemporary: IsTemporary,
 				Arguments: Procedure.Arguments.map((Argument) => {
 					return { Name: Argument, };
 				})
@@ -270,6 +271,8 @@ export class CommandTab extends Tab {
     }
 	/** ExecuteProcedureWithArguments: Execute the procedure with arguments. */
 	public ExecuteProcedureWithArguments(Name: string, IsTemporary: boolean, Arguments: Record<string, string>): void {
+		if (this.Disabled) return;
+		this.Disabled = true;
 		// Generate the code
 		var Code = `${Name} ${Object.keys(Arguments).map(Key => `${this.FormatArgument(Arguments[Key])}`).join(" ")}`;
 		// Execute it
@@ -288,6 +291,54 @@ export class CommandTab extends Tab {
 	public FinishExecution(Status: string, Message: string) {
 		this.Outputs.PrintOutput(Status, Message);
 		this.Disabled = false;
+	}
+	/** RecompileCallback: The callback after the code to play is compiled. */
+	private RecompileCallback?: (() => void);
+	/** TemporaryCode: The temporary code snippet that is in-use. */
+	private TemporaryCode?: string;
+	/** RecompileTemporarily Recompile the code snippet temporarily. */
+	public RecompileTemporarily(Code: string, Callback: () => void) {
+		if (this.Disabled) return;
+		this.Disabled = true;
+		this.RecompileCallback = Callback;
+		// If the code is not the same, recompile it
+		if (this.TemporaryCode != Code) {
+			TurtleEditor.Call({ Type: "RecompileTemporarily", Code: Code });
+			this.TemporaryCode = Code;
+		} else {
+			// Otherwise, just play it
+			this.PlayCompiled(true, []);
+			return;
+		}
+		// If we do not support, also play it
+		if (!TurtleEditor.PostMessage)
+			this.PlayCompiled(true, []);
+	}
+	/** PlayCompiled: The callback after the code to play is compiled. */
+	public PlayCompiled(Succeeded: boolean, Errors: RuntimeError[]) {
+		this.Disabled = false;
+		if (Succeeded) {
+			this.Outputs.RenderResponses([{
+				Type: ChatResponseType.Text,
+				Content: Localized.Get("Successfully compiled")
+			}]);
+			this.RecompileCallback?.();
+		} else if (Errors.length == 0) {
+			this.Outputs.RenderResponses([{
+				Type: ChatResponseType.CompileError,
+				Content: Localized.Get("Compile error in model")
+			}]);
+		} else {
+			this.Outputs.RenderResponses([{
+				Type: ChatResponseType.CompileError,
+				Parsed: Errors
+			}, {
+				Type: ChatResponseType.JSON,
+				Field: "Diagnostics",
+				Content: JSON.stringify(Errors),
+				Parsed: Errors
+			}]);
+		}
 	}
 	// #endregion
 }

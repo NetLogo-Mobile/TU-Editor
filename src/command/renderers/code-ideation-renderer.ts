@@ -55,7 +55,7 @@ export class CodeIdeationRenderer extends JSONSectionRenderer<CodeParameter[]> {
         // Request the virtual option
         var Manager = ChatManager.Instance;
         var Record = this.GetRecord();
-        Manager.RequestOption(Record.Response.Options[0], Record);
+        if (!Manager.RequestOption(Record.Response.Options[0], Record)) return;
         // Build the messages
         var Message = JSON.stringify({
             Need: Record.Response.Sections.find(Section => Section.Field == "Needs")?.Parsed?.[0] ?? "Unknown",
@@ -65,7 +65,6 @@ export class CodeIdeationRenderer extends JSONSectionRenderer<CodeParameter[]> {
         for (var Parameter in Composed) {
             Friendly += `\n- ${Parameter}: ${Composed[Parameter]}`;
         }
-        console.log(Message);
         Manager.SendMessage(Message, Friendly);
     }
     /** GetChooser: Return the section chooser for this renderer. */

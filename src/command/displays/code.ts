@@ -211,51 +211,26 @@ export class CodeDisplay extends Display {
 	}
 	/** Play: Try to play the code. */
 	public Play() {
+		if (this.Tab.Disabled) return;
 		this.Tab.Outputs.RenderRequest(Localized.Get("Trying to run the code"), this.Record).Transparent = true;
 		this.TryTo(() => {
 			var Mode = this.Editor.Semantics.GetRecognizedMode();
 			var Code = this.Editor.GetCode().trim();
-			// Check if we really could execute
-			if (!TurtleEditor.PostMessage)
-				this.PlayCompiled(true, []);
 			// If it is a command or reporter, simply run it
 			switch (Mode) {
 				case "Command":
+					this.Tab.Disabled = true;
 					this.Tab.ExecuteCommand("observer", Code, true);
 					break;
 				case "Reporter":
+					this.Tab.Disabled = true;
 					this.Tab.ExecuteCommand("observer", `show ${Code}`, true);
 					break;
 				default:
-					TurtleEditor.Call({ Type: "RecompileIncremental", Code: Code });
+					this.Tab.RecompileTemporarily(Code, this.PlayProcedures);
 					break;
 			}
 		});
-	}
-	/** PlayCompiled: The callback after the code to play is compiled. */
-	public PlayCompiled(Succeeded: boolean, Errors: RuntimeError[]) {
-		if (Succeeded) {
-			this.Tab.Outputs.RenderResponses([{
-				Type: ChatResponseType.Text,
-				Content: Localized.Get("Successfully compiled")
-			}]);
-			this.PlayProcedures();
-		} else if (Errors.length == 0) {
-			this.Tab.Outputs.RenderResponses([{
-				Type: ChatResponseType.CompileError,
-				Content: Localized.Get("Compile error unknown")
-			}]);
-		} else {
-			this.Tab.Outputs.RenderResponses([{
-				Type: ChatResponseType.CompileError,
-				Parsed: Errors
-			}, {
-				Type: ChatResponseType.JSON,
-				Field: "Diagnostics",
-				Content: JSON.stringify(Errors),
-				Parsed: Errors
-			}]);
-		}
 	}
 	/** PlayProcedures: Try to play the available procedures after compilation. */
 	private PlayProcedures() {
@@ -273,7 +248,7 @@ export class CodeDisplay extends Display {
 			Field: "Procedures",
 			Parsed: {
 				Procedures: Procedures,
-				Temporary: true
+				IsTemporary: true
 			},
 		}]);
 	}

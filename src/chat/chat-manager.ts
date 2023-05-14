@@ -80,6 +80,7 @@ export class ChatManager {
                 // Show the input if there are no options
                 if (Record.Response.Options.length == 0) 
                     this.Commands.ShowInput();
+                else this.Commands.Disabled = false;
             }).catch((Error) => {
                 if (!ChatManager.IsRequesting) return;
                 Renderer.AddSection({ 
@@ -103,7 +104,8 @@ export class ChatManager {
 
     // #region " Options and Contexts "
     /** RequestOption: Choose a chat option and send the request. */
-    public RequestOption(Option: ChatResponseOption, Record?: ChatRecord, Postprocessor?: (Request: ClientChatRequest) => void) {
+    public RequestOption(Option: ChatResponseOption, Record?: ChatRecord, Postprocessor?: (Request: ClientChatRequest) => void): boolean {
+        if (this.Commands.Disabled) return false;
         // Construct the request
         this.PendingRequest = {
             Input: Option.ActualInput ?? Option.LocalizedLabel ?? Option.Label,
@@ -138,6 +140,7 @@ export class ChatManager {
         } else {
             this.SendRequest(this.PendingRequest);
         }
+        return true;
     }
     /** InheritContext: Inherit the context from the previous request. */
     private InheritContext(Option: ChatResponseOption | undefined, Record: ChatRecord, Layers: number = -1) {

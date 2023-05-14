@@ -4406,7 +4406,9 @@
                 this.focusNode == domSel.focusNode && this.focusOffset == domSel.focusOffset;
         }
         setRange(range) {
-            this.set(range.anchorNode, range.anchorOffset, range.focusNode, range.focusOffset);
+            let { anchorNode, focusNode } = range;
+            // Clip offsets to node size to avoid crashes when Safari reports bogus offsets (#1152)
+            this.set(anchorNode, Math.min(range.anchorOffset, anchorNode ? maxOffset(anchorNode) : 0), focusNode, Math.min(range.focusOffset, focusNode ? maxOffset(focusNode) : 0));
         }
         set(anchorNode, anchorOffset, focusNode, focusOffset) {
             this.anchorNode = anchorNode;
@@ -4479,6 +4481,8 @@
         let node = selection.focusNode, offset = selection.focusOffset;
         if (!node || selection.anchorNode != node || selection.anchorOffset != offset)
             return false;
+        // Safari can report bogus offsets (#1152)
+        offset = Math.min(offset, maxOffset(node));
         for (;;) {
             if (offset) {
                 if (node.nodeType != 1)
@@ -6190,6 +6194,23 @@
     const decorations = /*@__PURE__*/Facet.define();
     const atomicRanges = /*@__PURE__*/Facet.define();
     const scrollMargins = /*@__PURE__*/Facet.define();
+    function getScrollMargins(view) {
+        let left = 0, right = 0, top = 0, bottom = 0;
+        for (let source of view.state.facet(scrollMargins)) {
+            let m = source(view);
+            if (m) {
+                if (m.left != null)
+                    left = Math.max(left, m.left);
+                if (m.right != null)
+                    right = Math.max(right, m.right);
+                if (m.top != null)
+                    top = Math.max(top, m.top);
+                if (m.bottom != null)
+                    bottom = Math.max(bottom, m.bottom);
+            }
+        }
+        return { left, right, top, bottom };
+    }
     const styleModule = /*@__PURE__*/Facet.define();
     class ChangedRange {
         constructor(fromA, toA, fromB, toB) {
@@ -7120,22 +7141,10 @@
             if (!range.empty && (other = this.coordsAt(range.anchor, range.anchor > range.head ? -1 : 1)))
                 rect = { left: Math.min(rect.left, other.left), top: Math.min(rect.top, other.top),
                     right: Math.max(rect.right, other.right), bottom: Math.max(rect.bottom, other.bottom) };
-            let mLeft = 0, mRight = 0, mTop = 0, mBottom = 0;
-            for (let margins of this.view.state.facet(scrollMargins).map(f => f(this.view)))
-                if (margins) {
-                    let { left, right, top, bottom } = margins;
-                    if (left != null)
-                        mLeft = Math.max(mLeft, left);
-                    if (right != null)
-                        mRight = Math.max(mRight, right);
-                    if (top != null)
-                        mTop = Math.max(mTop, top);
-                    if (bottom != null)
-                        mBottom = Math.max(mBottom, bottom);
-                }
+            let margins = getScrollMargins(this.view);
             let targetRect = {
-                left: rect.left - mLeft, top: rect.top - mTop,
-                right: rect.right + mRight, bottom: rect.bottom + mBottom
+                left: rect.left - margins.left, top: rect.top - margins.top,
+                right: rect.right + margins.right, bottom: rect.bottom + margins.bottom
             };
             scrollRectIntoView(this.view.scrollDOM, targetRect, range.head < range.anchor ? -1 : 1, target.x, target.y, target.xMargin, target.yMargin, this.view.textDirection == Direction.LTR);
         }
@@ -7915,13 +7924,14 @@
             let sx = 0, sy = 0;
             let rect = ((_a = this.scrollParent) === null || _a === void 0 ? void 0 : _a.getBoundingClientRect())
                 || { left: 0, top: 0, right: this.view.win.innerWidth, bottom: this.view.win.innerHeight };
-            if (event.clientX <= rect.left + dragScrollMargin)
+            let margins = getScrollMargins(this.view);
+            if (event.clientX - margins.left <= rect.left + dragScrollMargin)
                 sx = -dragScrollSpeed(rect.left - event.clientX);
-            else if (event.clientX >= rect.right - dragScrollMargin)
+            else if (event.clientX + margins.right >= rect.right - dragScrollMargin)
                 sx = dragScrollSpeed(event.clientX - rect.right);
-            if (event.clientY <= rect.top + dragScrollMargin)
+            if (event.clientY - margins.top <= rect.top + dragScrollMargin)
                 sy = -dragScrollSpeed(rect.top - event.clientY);
-            else if (event.clientY >= rect.bottom - dragScrollMargin)
+            else if (event.clientY + margins.bottom >= rect.bottom - dragScrollMargin)
                 sy = dragScrollSpeed(event.clientY - rect.bottom);
             this.setScrollSpeed(sx, sy);
         }
@@ -9962,13 +9972,13 @@
     function applyDOMChange(view, domChange) {
         let change;
         let { newSel } = domChange, sel = view.state.selection.main;
+        let lastKey = view.inputState.lastKeyTime > Date.now() - 100 ? view.inputState.lastKeyCode : -1;
         if (domChange.bounds) {
             let { from, to } = domChange.bounds;
             let preferredPos = sel.from, preferredSide = null;
             // Prefer anchoring to end when Backspace is pressed (or, on
             // Android, when something was deleted)
-            if (view.inputState.lastKeyCode === 8 && view.inputState.lastKeyTime > Date.now() - 100 ||
-                browser.android && domChange.text.length < to - from) {
+            if (lastKey === 8 || browser.android && domChange.text.length < to - from) {
                 preferredPos = sel.to;
                 preferredSide = "end";
             }
@@ -9976,7 +9986,7 @@
             if (diff) {
                 // Chrome inserts two newlines when pressing shift-enter at the
                 // end of a line. DomChange drops one of those.
-                if (browser.chrome && view.inputState.lastKeyCode == 13 &&
+                if (browser.chrome && lastKey == 13 &&
                     diff.toB == diff.from + 2 && domChange.text.slice(diff.from, diff.toB) == LineBreakPlaceholder + LineBreakPlaceholder)
                     diff.toB--;
                 change = { from: from + diff.from, to: from + diff.toA,
@@ -10034,7 +10044,8 @@
                 ((change.from == sel.from && change.to == sel.to &&
                     change.insert.length == 1 && change.insert.lines == 2 &&
                     dispatchKey(view.contentDOM, "Enter", 13)) ||
-                    (change.from == sel.from - 1 && change.to == sel.to && change.insert.length == 0 &&
+                    ((change.from == sel.from - 1 && change.to == sel.to && change.insert.length == 0 ||
+                        lastKey == 8 && change.insert.length < change.to - change.from) &&
                         dispatchKey(view.contentDOM, "Backspace", 8)) ||
                     (change.from == sel.from && change.to == sel.to + 1 && change.insert.length == 0 &&
                         dispatchKey(view.contentDOM, "Delete", 46))))
@@ -10432,7 +10443,10 @@
                     let key = this.delayedAndroidKey;
                     if (key) {
                         this.clearDelayedAndroidKey();
-                        if (!this.flush() && key.force)
+                        this.view.inputState.lastKeyCode = key.keyCode;
+                        this.view.inputState.lastKeyTime = Date.now();
+                        let flushed = this.flush();
+                        if (!flushed && key.force)
                             dispatchKey(this.dom, key.key, key.keyCode);
                     }
                 };
@@ -12591,10 +12605,10 @@
         return EditorView.mouseSelectionStyle.of((view, event) => filter(event) ? rectangleSelectionStyle(view, event) : null);
     }
     const keys = {
-        Alt: [18, e => e.altKey],
-        Control: [17, e => e.ctrlKey],
-        Shift: [16, e => e.shiftKey],
-        Meta: [91, e => e.metaKey]
+        Alt: [18, e => !!e.altKey],
+        Control: [17, e => !!e.ctrlKey],
+        Shift: [16, e => !!e.shiftKey],
+        Meta: [91, e => !!e.metaKey]
     };
     const showCrosshair = { style: "cursor: crosshair" };
     /**
@@ -21117,7 +21131,7 @@
         // is. See `Penalty` above.
         match(word) {
             if (this.pattern.length == 0)
-                return [0];
+                return [-100 /* Penalty.NotFull */];
             if (word.length < this.pattern.length)
                 return null;
             let { chars, folded, any, precise, byWord } = this;
@@ -28256,7 +28270,8 @@
         "LineComment", "BlockComment",
         "VariableDefinition", "TypeDefinition", "Label",
         "PropertyDefinition", "PropertyName",
-        "PrivatePropertyDefinition", "PrivatePropertyName"
+        "PrivatePropertyDefinition", "PrivatePropertyName",
+        ".", "?."
     ];
     /**
     Completion source that looks up locally defined names in
@@ -32929,7 +32944,7 @@
         }
         /** InheritContext: Inherit the context from the previous request. */
         InheritContext(Option, Record, Layers = -1) {
-            var _a, _b, _c;
+            var _a, _b, _c, _d;
             Option = Option !== null && Option !== void 0 ? Option : { Inheritance: ContextInheritance.InheritOne, Label: "" };
             var Context = this.PendingRequest.Context;
             if (Layers == -1) {
@@ -32995,6 +33010,8 @@
                 var Code = Record.Response.Sections.find(Section => Section.Type == ChatResponseType.Code || Section.Field == "Code");
                 if (Code != null)
                     Context.CodeSnippet = Code.Content;
+                else
+                    Context.CodeSnippet = (_d = Record.Context) === null || _d === void 0 ? void 0 : _d.CodeSnippet;
             }
             // Inherit previous messages
             if (Layers == -2 || !Record.ParentID)
@@ -34875,7 +34892,7 @@
                     // Handle commands
                     Current.on("click", () => {
                         if (!Editor.CommandTab.Disabled)
-                            Editor.CommandTab.ExecuteCommand(Scheme, Target);
+                            Editor.CommandTab.ExecuteCommand(Scheme, Target, false);
                     });
                 }
                 else if (Current.hasClass("external") || Href.match(/^(https?:)?\/\/([^.]*?\.|)(turtlesim.com|hicivitas.com|northwestern.edu|netlogoweb.org)\//)) {
@@ -35198,6 +35215,65 @@
         }
     }
 
+    /** ParameterRenderer: A block that displays a parameter. */
+    class ParameterRenderer extends UIRendererOf {
+        /** Constructor: Create a new UI renderer. */
+        constructor() {
+            super();
+            this.Container.addClass("parameter");
+            this.Question = $(`<div class="Question"></div>`).appendTo(this.Container);
+            this.Input = $(`<input type="text" />`).appendTo(this.Container);
+            this.Examples = $(`<div class="Examples"></div>`).appendTo(this.Container);
+        }
+        /** RenderInternal: Render the UI element. */
+        RenderInternal() {
+            var _a, _b, _c;
+            var Parameter = this.GetData();
+            // Render the question
+            this.Question.text((_a = Parameter.Question) !== null && _a !== void 0 ? _a : Parameter.Name);
+            // Sync the input
+            if (typeof Parameter.Known === "string" || Parameter.Known instanceof String) {
+                this.Input.val(Parameter.Known);
+            }
+            else {
+                this.Input.val("");
+            }
+            this.Input.attr("placeholder", (_c = (_b = Parameter.Options) === null || _b === void 0 ? void 0 : _b[0]) !== null && _c !== void 0 ? _c : "");
+            // Render the examples
+            this.Examples.empty();
+            if (!Parameter.Options || Parameter.Options.length == 0)
+                return;
+            var Input = this.Input;
+            $("<span></span>").appendTo(this.Examples).text(Localized.Get("e.g."));
+            for (var Option of Parameter.Options) {
+                $(`<a href="javascript:void(0)"></a>`).data("option", Option).appendTo(this.Examples).text(Option).on("click", function () {
+                    Input.val($(this).data("option"));
+                });
+            }
+        }
+        /** GetOutput: Return the output of the parameter. */
+        GetOutput(AllowEmpty = true) {
+            var Parameter = this.GetData();
+            // Get the value
+            var Value = this.Input.val();
+            if (!Value || Value === "")
+                Value = this.Input.attr("placeholder");
+            // Check emptiness
+            if (!Value || Value === "") {
+                if (AllowEmpty) {
+                    Value = "";
+                }
+                else {
+                    this.Container.addClass("error");
+                    return null;
+                }
+            }
+            this.Container.removeClass("error");
+            // Return the output
+            return [Parameter.Name, Value.toString()];
+        }
+    }
+
     /** CodeIdeationRenderer: A dedicated block for code ideation. */
     class CodeIdeationRenderer extends JSONSectionRenderer {
         /** Constructor: Create a new UI renderer. */
@@ -35211,7 +35287,7 @@
         }
         /** RenderInternal: Render the UI element. */
         RenderInternal() {
-            var _a;
+            var _a, _b;
             var Parameters = this.GetParsed();
             if (this.Finalized) {
                 this.ContentContainer = $(`<div class="parameters"></div>`).replaceAll(this.ContentContainer);
@@ -35234,7 +35310,7 @@
                 this.ContentContainer.empty();
                 // When not finalized, render the questions
                 for (var Parameter of Parameters) {
-                    $("<li></li>").appendTo(this.ContentContainer).text(Parameter.Question);
+                    $("<li></li>").appendTo(this.ContentContainer).text((_b = Parameter.Question) !== null && _b !== void 0 ? _b : Parameter.Name);
                 }
             }
         }
@@ -35245,11 +35321,9 @@
             var Composed = {};
             this.Children.forEach(Renderer => {
                 var Current = Renderer;
-                var Parameter = Current.GetData();
-                var Value = Current.Input.val();
-                if (!Value || Value === "")
-                    Value = Current.Input.attr("placeholder");
-                Composed[Parameter.Name] = Value;
+                var Result = Current.GetOutput(true);
+                if (Result[1] !== "" && Result[1].toLowerCase() !== "default")
+                    Composed[Result[0]] = Result[1];
             });
             // Request the virtual option
             var Manager = ChatManager.Instance;
@@ -35271,43 +35345,6 @@
         static GetChooser() {
             return (Record, Section) => Section.Field == "Parameters" && Section.Parsed && Array.isArray(Section.Parsed) && Section.Parsed.length > 0 &&
                 Section.Parsed[0].Name && Section.Parsed[0].Question ? new CodeIdeationRenderer() : undefined;
-        }
-    }
-    /** ParameterRenderer: A block that displays a parameter. */
-    class ParameterRenderer extends UIRendererOf {
-        /** Constructor: Create a new UI renderer. */
-        constructor() {
-            super();
-            this.Container.addClass("parameter");
-            this.Question = $(`<div class="Question"></div>`).appendTo(this.Container);
-            this.Input = $(`<input type="text" />`).appendTo(this.Container);
-            this.Examples = $(`<div class="Examples"></div>`).appendTo(this.Container);
-        }
-        /** RenderInternal: Render the UI element. */
-        RenderInternal() {
-            var _a, _b;
-            var Parameter = this.GetData();
-            // Render the question
-            this.Question.text(Parameter.Question);
-            // Sync the input
-            if (typeof Parameter.Known === "string" || Parameter.Known instanceof String) {
-                this.Input.val(Parameter.Known);
-            }
-            else {
-                this.Input.val("");
-            }
-            this.Input.attr("placeholder", (_b = (_a = Parameter.Options) === null || _a === void 0 ? void 0 : _a[0]) !== null && _b !== void 0 ? _b : "");
-            // Render the examples
-            this.Examples.empty();
-            if (!Parameter.Options)
-                return;
-            var Input = this.Input;
-            $("<span></span>").appendTo(this.Examples).text(Localized.Get("e.g."));
-            for (var Option of Parameter.Options) {
-                $(`<a href="javascript:void(0)"></a>`).data("option", Option).appendTo(this.Examples).text(Option).on("click", function () {
-                    Input.val($(this).data("option"));
-                });
-            }
         }
     }
 
@@ -35524,16 +35561,15 @@
                 var Mode = this.Editor.Semantics.GetRecognizedMode();
                 var Code = this.Editor.GetCode().trim();
                 // Check if we really could execute
-                if (TurtleEditor.PostMessage) {
+                if (!TurtleEditor.PostMessage)
                     this.PlayCompiled(true, []);
-                }
                 // If it is a command or reporter, simply run it
                 switch (Mode) {
                     case "Command":
-                        this.Tab.ExecuteCommand("observer", Code);
+                        this.Tab.ExecuteCommand("observer", Code, true);
                         break;
                     case "Reporter":
-                        this.Tab.ExecuteCommand("observer", `show ${Code}`);
+                        this.Tab.ExecuteCommand("observer", `show ${Code}`, true);
                         break;
                     default:
                         TurtleEditor.Call({ Type: "RecompileIncremental", Code: Code });
@@ -35582,7 +35618,10 @@
             this.Tab.Outputs.RenderResponses([{
                     Type: ChatResponseType.JSON,
                     Field: "Procedures",
-                    Parsed: Procedures
+                    Parsed: {
+                        Procedures: Procedures,
+                        Temporary: true
+                    },
                 }]);
         }
         /** AddToCode: Add the code to the main editor. */
@@ -35731,6 +35770,53 @@
         }
     }
 
+    /** ProceduresRenderer: A block that displays the a procedures section. */
+    class ProceduresRenderer extends JSONSectionRenderer {
+        /** Constructor: Create a new UI renderer. */
+        constructor() {
+            super();
+            this.Container.addClass("procedures");
+        }
+        /** ContentContainerInitializer: The initializer for the container. */
+        ContentContainerInitializer() {
+            return $("<ul></ul>");
+        }
+        /** RenderInternal: Render the UI element. */
+        RenderInternal() {
+            var _a;
+            // Parse the metadata
+            var Parsed = this.GetData().Parsed;
+            var Metadata;
+            if (Array.isArray(Parsed)) {
+                Metadata = { Procedures: Parsed };
+            }
+            else {
+                Metadata = Parsed;
+            }
+            // Default callback
+            Metadata.Callback = (_a = Metadata.Callback) !== null && _a !== void 0 ? _a : ((Procedure) => { var _a; return OutputDisplay.Instance.Tab.ExecuteProcedure(Procedure, (_a = Metadata.IsTemporary) !== null && _a !== void 0 ? _a : false); });
+            // Render the procedures
+            this.ContentContainer.empty();
+            for (var Procedure of Metadata.Procedures) {
+                this.RenderProcedure(this.ContentContainer, Metadata, Procedure);
+            }
+        }
+        /** RenderProcedure: Render a procedure. */
+        RenderProcedure(Renderer, Metadata, Procedure) {
+            var Renderer = $("<li></li>").appendTo(this.ContentContainer);
+            $("<a></a>").appendTo(Renderer).text(`${Localized.Get(Procedure.IsCommand ? "Run command" : "Run reporter")} ${Procedure.Name}`)
+                .on("click", () => { var _a; return (_a = Metadata.Callback) === null || _a === void 0 ? void 0 : _a.call(Metadata, Procedure); });
+            if (Procedure.Arguments.length > 0)
+                $("<p></p>").appendTo(Renderer).text(`${Localized.Get("Arguments", Procedure.Arguments.length)}: ${Procedure.Arguments.join(", ")}`);
+        }
+        /** GetChooser: Return the section chooser for this renderer. */
+        static GetChooser() {
+            return (Record, Section) => Section.Field == "Procedures" && Section.Parsed &&
+                (Array.isArray(Section.Parsed) || Section.Parsed.Procedures)
+                ? new ProceduresRenderer() : undefined;
+        }
+    }
+
     /** RuntimeErrorRenderer: A block that displays the a runtime error section. */
     class RuntimeErrorRenderer extends SectionRenderer {
         /** Constructor: Create a new UI renderer. */
@@ -35865,6 +35951,71 @@
         }
     }
 
+    /** ArgumentsRenderer: A dedicated block for displaying arguments. */
+    class ArgumentsRenderer extends JSONSectionRenderer {
+        /** Constructor: Create a new UI renderer. */
+        constructor() {
+            super();
+            this.Container.addClass("code-ideation");
+        }
+        /** ContentContainerInitializer: The initializer for the container. */
+        ContentContainerInitializer() {
+            return $("<ul></ul>");
+        }
+        /** RenderInternal: Render the UI element. */
+        RenderInternal() {
+            var _a;
+            var Package = this.GetParsed();
+            if (this.Finalized) {
+                this.ContentContainer = $(`<div class="parameters"></div>`).replaceAll(this.ContentContainer);
+                // When finalized, render the entire HTML structure
+                for (var Parameter of Package.Arguments) {
+                    var Renderer = new ParameterRenderer();
+                    this.AddChild(Renderer, false);
+                    Renderer.Container.appendTo(this.ContentContainer);
+                    Renderer.SetData(Parameter);
+                    Renderer.Render();
+                }
+                var Link = $(`<p><a href="javascript:void(0)">${Localized.Get("Execute the procedure")}</a></p>`)
+                    .appendTo(this.ContentContainer).on("click", () => {
+                    this.SubmitArguments();
+                    Link.addClass("chosen");
+                });
+            }
+            else {
+                this.ContentContainer.empty();
+                // When not finalized, render the questions
+                for (var Parameter of Package.Arguments) {
+                    $("<li></li>").appendTo(this.ContentContainer).text((_a = Parameter.Question) !== null && _a !== void 0 ? _a : Parameter.Name);
+                }
+            }
+        }
+        /** SubmitArguments: Submit the arguments to execute. */
+        SubmitArguments() {
+            var _a;
+            var Package = this.GetParsed();
+            // Compose the input
+            var Failed = false;
+            var Composed = {};
+            this.Children.forEach(Renderer => {
+                var Current = Renderer;
+                var Result = Current.GetOutput(false);
+                if (Result == null)
+                    Failed = true;
+                else
+                    Composed[Result[0]] = Result[1];
+            });
+            // Send it back to execute
+            if (Failed)
+                return;
+            OutputDisplay.Instance.Tab.ExecuteProcedureWithArguments(Package.Procedure, (_a = Package.Temporary) !== null && _a !== void 0 ? _a : false, Composed);
+        }
+        /** GetChooser: Return the section chooser for this renderer. */
+        static GetChooser() {
+            return (Record, Section) => Section.Field == "Arguments" && Section.Parsed && Section.Parsed.Procedure ? new ArgumentsRenderer() : undefined;
+        }
+    }
+
     /** RecordRenderer: A block that displays the output of a request. */
     class RecordRenderer extends UIRendererOf {
         /** Constructor: Create a new UI renderer. */
@@ -35955,7 +36106,13 @@
         [ChatResponseType.Finish]: [() => new SucceededRenderer()],
         [ChatResponseType.Text]: [() => new TextSectionRenderer()],
         [ChatResponseType.Code]: [() => new CodeSectionRenderer()],
-        [ChatResponseType.JSON]: [CodeIdeationRenderer.GetChooser(), DiagnosticsRenderer.GetChooser(), HelpSectionRenderer.GetChooser()],
+        [ChatResponseType.JSON]: [
+            CodeIdeationRenderer.GetChooser(),
+            DiagnosticsRenderer.GetChooser(),
+            HelpSectionRenderer.GetChooser(),
+            ProceduresRenderer.GetChooser(),
+            ArgumentsRenderer.GetChooser()
+        ],
         [ChatResponseType.Thought]: [],
         [ChatResponseType.CompileError]: [() => new CompileErrorRenderer()],
         [ChatResponseType.RuntimeError]: [() => new RuntimeErrorRenderer()],
@@ -36079,11 +36236,12 @@
         }
         /** RenderResponses: Render response sections immediately in the current record. */
         RenderResponses(Sections) {
+            var _a;
             if (Sections.length == 0)
                 return;
             var LastRecord = this.Subthread.Children[this.Subthread.Children.length - 1];
             for (var Section in Sections)
-                LastRecord.AddSection(Sections[Section]);
+                (_a = LastRecord.AddSection(Sections[Section])) === null || _a === void 0 ? void 0 : _a.SetFinalized();
             LastRecord.Render();
             this.ScrollToBottom();
         }
@@ -36131,7 +36289,7 @@
             var Parent = this.Tab.ChatManager.GetPendingParent();
             if (!Parent && Restart && !((_a = this.Subthread) === null || _a === void 0 ? void 0 : _a.GetData().RootID))
                 this.ActivateSubthread();
-            this.RenderRequest(`\`${Content.replace("`", "\`")}\``, Parent);
+            return this.RenderRequest(`\`${Content.replace("`", "\`")}\``, Parent);
         }
         /** PrintOutput: Provide for Unity to print compiled output. */
         PrintOutput(Class, Content) {
@@ -36378,18 +36536,21 @@
                 }
                 // Check if it is a command
                 if (!Chatable || (Objective != "chat" && Content != "help" && !Content.startsWith("help ") && !/^[\d\.]+$/.test(Content))) {
-                    // If there is no linting issues, assume it is code snippet
+                    // Parse the code
                     this.Galapagos.ForceParse();
                     let Diagnostics = yield this.Galapagos.ForceLintAsync();
                     let Mode = this.Galapagos.Semantics.GetRecognizedMode();
+                    // Check if the context is temporary
+                    var Temporary = this.Codes.Visible;
+                    // If there is no linting issues, assume it is code snippet
                     if (Diagnostics.length == 0) {
                         if (Mode == "Reporter" || Mode == "Unknown")
                             Content = `show ${Content}`;
-                        this.ExecuteInput(Objective, Content);
+                        this.ExecuteInput(Objective, Content, Temporary);
                         return;
                     }
                     else if (!Chatable) {
-                        this.ExecuteInput(Objective, Content);
+                        this.ExecuteInput(Objective, Content, Temporary);
                         return;
                     }
                 }
@@ -36422,19 +36583,18 @@
         // #endregion
         // #region "Command Execution"
         /** ExecuteInput: Execute a human-sent command. */
-        ExecuteInput(Objective, Content) {
+        ExecuteInput(Objective, Content, Temporary) {
             // Record command history
             this.CommandStack.push([Objective, Content]);
             this.CurrentCommandIndex = 0;
             this.CurrentCommand = [];
             // Execute command
-            this.ExecuteCommand(Objective, Content, true);
+            this.ExecuteCommand(Objective, Content, Temporary, true);
             this.ClearInput();
-            // Check if we really could execute
-            this.Editor.CheckExecution();
         }
         /** ExecuteCommand: Execute a command. */
-        ExecuteCommand(Objective, Content, Restart = false) {
+        ExecuteCommand(Objective, Content, Temporary, Restart = false) {
+            var _a;
             // Transform command
             switch (Objective.toLowerCase()) {
                 case "turtles":
@@ -36450,16 +36610,54 @@
                     Content = `help ${Content}`;
             }
             // Execute command
-            TurtleEditor.Call({ Type: "CommandExecute", Source: Objective, Command: Content });
-            this.Outputs.PrintCommandInput(Content, Restart);
+            TurtleEditor.Call({ Type: "CommandExecute", Source: Objective, Command: Content, Temporary: Temporary });
+            var Record = this.Outputs.PrintCommandInput(Content, Restart);
+            Record.Context = (_a = Record.Context) !== null && _a !== void 0 ? _a : { PreviousMessages: [] };
+            Record.Context.CodeSnippet = Content;
             this.Outputs.ScrollToBottom();
+            // Check if we really could execute
+            this.Editor.CheckExecution();
+        }
+        /** ExecuteProcedure: Execute the procedure. */
+        ExecuteProcedure(Procedure, IsTemporary) {
+            if (Procedure.Arguments.length > 0) {
+                var Package = {
+                    Procedure: Procedure.Name,
+                    Temporary: IsTemporary,
+                    Arguments: Procedure.Arguments.map((Argument) => {
+                        return { Name: Argument, };
+                    })
+                };
+                this.Outputs.RenderRequest(Localized.Get("Trying to run the procedure _", Procedure.Name));
+                this.Outputs.RenderResponses([{
+                        Type: ChatResponseType.Text,
+                        Content: Localized.Get("Arguments needed for execution _", Procedure.Name, Procedure.Arguments.length)
+                    }, {
+                        Type: ChatResponseType.JSON,
+                        Field: "Arguments",
+                        Parsed: Package
+                    }]);
+            }
+            else {
+                this.ExecuteProcedureWithArguments(Procedure.Name, IsTemporary, {});
+            }
+        }
+        /** ExecuteProcedureWithArguments: Execute the procedure with arguments. */
+        ExecuteProcedureWithArguments(Name, IsTemporary, Arguments) {
+            // Generate the code
+            var Code = `${Name} ${Object.keys(Arguments).map(Key => `${this.FormatArgument(Arguments[Key])}`).join(" ")}`;
+            // Execute it
+            this.ExecuteCommand("observer", Code, IsTemporary);
+        }
+        /** FormatArgument: Format the argument. */
+        FormatArgument(Value) {
+            return !Value.startsWith("[") && Value.indexOf(" ") != -1 && !Value.endsWith("]") ? `"${Value}"` : Value;
         }
         /** ExplainFull: ExplainFull: Explain the selected text in the command center in full. */
         ExplainFull(Command) {
             if (!EditorDictionary.Check(Command))
                 return false;
-            this.Outputs.ScrollToBottom();
-            this.ExecuteCommand("observer", `help ${Command} -full`);
+            this.ExecuteCommand("observer", `help ${Command} -full`, false);
         }
         /** FinishExecution: Notify the completion of the command. */
         FinishExecution(Status, Message) {

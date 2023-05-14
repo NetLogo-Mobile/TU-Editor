@@ -1,9 +1,9 @@
 /// <reference types="jquery" />
 /// <reference types="jquery" />
-import { RendererChooser } from '../../command/outputs/record-renderer';
-import { UIRendererOf } from "../../command/outputs/ui-renderer";
-import { JSONSectionRenderer } from "../../command/sections/json-section-renderer";
-import { Diagnostic } from "../client/languages/netlogo-context";
+import { RendererChooser } from '../outputs/record-renderer';
+import { UIRendererOf } from "../outputs/ui-renderer";
+import { JSONSectionRenderer } from "../sections/json-section-renderer";
+import { Diagnostic } from "../../chat/client/languages/netlogo-context";
 /** DiagnosticsRenderer: A dedicated block for code diagnostics. */
 export declare class DiagnosticsRenderer extends JSONSectionRenderer<Diagnostic[]> {
     /** Constructor: Create a new UI renderer. */

@@ -45,7 +45,7 @@ export declare class OutputDisplay extends Display {
     /** RenderResponse: Render response sections in the current record. */
     QueueResponse(Section: ChatResponseSection): void;
     /** PrintCommandInput: Print a line of input to the screen. */
-    PrintCommandInput(Content: string, Restart?: boolean): void;
+    PrintCommandInput(Content: string, Restart?: boolean): ChatRecord;
     /** PrintOutput: Provide for Unity to print compiled output. */
     PrintOutput(Class: string, Content: any): void;
     /** ShowWelcome: Show the initial welcome message. */

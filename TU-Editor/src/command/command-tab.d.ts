@@ -8,6 +8,7 @@ import { ChatManager } from '../chat/chat-manager';
 import { Display } from "./displays/display";
 import { CodeDisplay } from "./displays/code";
 import { GalapagosEditor } from "../../../CodeMirror-NetLogo/src/editor";
+import { Procedure } from "../chat/client/languages/netlogo-context";
 /** CommandTab: A tab for the command center. */
 export declare class CommandTab extends Tab {
     Disabled: boolean;
@@ -61,7 +62,13 @@ export declare class CommandTab extends Tab {
     /** ExecuteInput: Execute a human-sent command. */
     private ExecuteInput;
     /** ExecuteCommand: Execute a command. */
-    ExecuteCommand(Objective: string, Content: string, Restart?: boolean): void;
+    ExecuteCommand(Objective: string, Content: string, Temporary: boolean, Restart?: boolean): void;
+    /** ExecuteProcedure: Execute the procedure. */
+    ExecuteProcedure(Procedure: Procedure, IsTemporary: boolean): void;
+    /** ExecuteProcedureWithArguments: Execute the procedure with arguments. */
+    ExecuteProcedureWithArguments(Name: string, IsTemporary: boolean, Arguments: Record<string, string>): void;
+    /** FormatArgument: Format the argument. */
+    private FormatArgument;
     /** ExplainFull: ExplainFull: Explain the selected text in the command center in full. */
     ExplainFull(Command: string): false | undefined;
     /** FinishExecution: Notify the completion of the command. */

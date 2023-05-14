@@ -1,7 +1,7 @@
 /// <reference types="jquery" />
 /// <reference types="jquery" />
 import { ChatRecord } from "../../chat/client/chat-record";
-import { ChatResponseSection, ChatResponseType } from "../../chat/client/chat-response";
+import { ChatResponseSection, ChatResponseType } from '../../chat/client/chat-response';
 import { SectionRenderer } from "../sections/section-renderer";
 import { InputRenderer } from "./input-renderer";
 import { OptionRenderer } from "./option-renderer";

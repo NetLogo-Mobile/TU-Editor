@@ -1,21 +1,6 @@
 /// <reference types="jquery" />
 /// <reference types="jquery" />
-import { RendererChooser } from "../../command/outputs/record-renderer";
-import { UIRendererOf } from "../../command/outputs/ui-renderer";
-import { JSONSectionRenderer } from "../../command/sections/json-section-renderer";
-/** CodeIdeationRenderer: A dedicated block for code ideation. */
-export declare class CodeIdeationRenderer extends JSONSectionRenderer<CodeParameter[]> {
-    /** Constructor: Create a new UI renderer. */
-    constructor();
-    /** ContentContainerInitializer: The initializer for the container. */
-    protected ContentContainerInitializer(): JQuery<HTMLElement>;
-    /** RenderInternal: Render the UI element. */
-    protected RenderInternal(): void;
-    /** SubmitParameters: Submit the parameters to the server. */
-    private SubmitParameters;
-    /** GetChooser: Return the section chooser for this renderer. */
-    static GetChooser(): RendererChooser;
-}
+import { UIRendererOf } from "../outputs/ui-renderer";
 /** ParameterRenderer: A block that displays a parameter. */
 export declare class ParameterRenderer extends UIRendererOf<CodeParameter> {
     /** Question: The question mesage of the parameter. */
@@ -28,15 +13,17 @@ export declare class ParameterRenderer extends UIRendererOf<CodeParameter> {
     constructor();
     /** RenderInternal: Render the UI element. */
     protected RenderInternal(): void;
+    /** GetOutput: Return the output of the parameter. */
+    GetOutput(AllowEmpty?: boolean): [string, string] | null;
 }
 /** CodeParameter: A parameter for code ideation. */
 export interface CodeParameter {
     /** Name: The name of the parameter. */
     Name: string;
     /** Question: The question displayed for the user. */
-    Question: string;
+    Question?: string;
     /** Known: The known value of the parameter. */
-    Known: string | boolean;
+    Known?: string | boolean;
     /** Options: The options for the parameter. */
     Options?: string[];
 }

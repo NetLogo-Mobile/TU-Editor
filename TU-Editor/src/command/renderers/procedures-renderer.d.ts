@@ -2,9 +2,9 @@
 /// <reference types="jquery" />
 import { Procedure } from "../../chat/client/languages/netlogo-context";
 import { RendererChooser } from "../outputs/record-renderer";
-import { JSONSectionRenderer } from "./json-section-renderer";
-/** ProcedureSectionRenderer: A block that displays the a procedures section. */
-export declare class ProcedureSectionRenderer extends JSONSectionRenderer<ProcedureMetadata> {
+import { JSONSectionRenderer } from "../sections/json-section-renderer";
+/** ProceduresRenderer: A block that displays the a procedures section. */
+export declare class ProceduresRenderer extends JSONSectionRenderer<ProcedureMetadata> {
     /** Constructor: Create a new UI renderer. */
     constructor();
     /** ContentContainerInitializer: The initializer for the container. */
@@ -13,8 +13,6 @@ export declare class ProcedureSectionRenderer extends JSONSectionRenderer<Proced
     protected RenderInternal(): void;
     /** RenderProcedure: Render a procedure. */
     private RenderProcedure;
-    /** ExecuteProcedure: Execute the procedure. */
-    private ExecuteProcedure;
     /** GetChooser: Return the section chooser for this renderer. */
     static GetChooser(): RendererChooser;
 }

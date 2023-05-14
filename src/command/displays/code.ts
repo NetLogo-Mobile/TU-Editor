@@ -227,7 +227,11 @@ export class CodeDisplay extends Display {
 					this.Tab.ExecuteCommand("observer", `show ${Code}`, true);
 					break;
 				default:
-					this.Tab.RecompileTemporarily(Code, this.PlayProcedures);
+					var State = this.Editor.GetState();
+					var Procedures: string[] = [];
+					for (var [Name, Procedure] of State.Procedures)
+						Procedures.push(Name);
+					this.Tab.RecompileTemporarily(Code, Procedures, () => this.PlayProcedures());
 					break;
 			}
 		});

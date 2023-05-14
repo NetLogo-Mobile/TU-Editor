@@ -280,7 +280,7 @@ export class CommandTab extends Tab {
 	}
 	/** FormatArgument: Format the argument. */
 	private FormatArgument(Value: string): string {
-		return !Value.startsWith("[") && Value.indexOf(" ") != -1 && !Value.endsWith("]") ? `"${Value}"` : Value;
+		return !Value.startsWith("[") && !Value.startsWith("\"") && Value.indexOf(" ") != -1 && !Value.endsWith("]") ? `"${Value}"` : Value;
 	}
 	/** ExplainFull: ExplainFull: Explain the selected text in the command center in full. */
 	public ExplainFull(Command: string) {
@@ -297,13 +297,13 @@ export class CommandTab extends Tab {
 	/** TemporaryCode: The temporary code snippet that is in-use. */
 	private TemporaryCode?: string;
 	/** RecompileTemporarily Recompile the code snippet temporarily. */
-	public RecompileTemporarily(Code: string, Callback: () => void) {
+	public RecompileTemporarily(Code: string, Procedures: string[], Callback: () => void) {
 		if (this.Disabled) return;
 		this.Disabled = true;
 		this.RecompileCallback = Callback;
 		// If the code is not the same, recompile it
 		if (this.TemporaryCode != Code) {
-			TurtleEditor.Call({ Type: "RecompileTemporarily", Code: Code });
+			TurtleEditor.Call({ Type: "RecompileTemporarily", Code: Code, Procedures: Procedures });
 			this.TemporaryCode = Code;
 		} else {
 			// Otherwise, just play it
@@ -315,7 +315,7 @@ export class CommandTab extends Tab {
 			this.PlayCompiled(true, []);
 	}
 	/** PlayCompiled: The callback after the code to play is compiled. */
-	public PlayCompiled(Succeeded: boolean, Errors: RuntimeError[]) {
+	public PlayCompiled(Succeeded: boolean, Errors?: RuntimeError[]) {
 		this.Disabled = false;
 		if (Succeeded) {
 			this.Outputs.RenderResponses([{
@@ -323,7 +323,7 @@ export class CommandTab extends Tab {
 				Content: Localized.Get("Successfully compiled")
 			}]);
 			this.RecompileCallback?.();
-		} else if (Errors.length == 0) {
+		} else if (!Errors || Errors.length == 0) {
 			this.Outputs.RenderResponses([{
 				Type: ChatResponseType.CompileError,
 				Content: Localized.Get("Compile error in model")

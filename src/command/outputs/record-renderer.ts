@@ -34,7 +34,7 @@ export class RecordRenderer extends UIRendererOf<ChatRecord> {
     <div class="avatar"><img src="images/assistant.png" /></div>
     <div class="content"></div>
     <div class="expand-record">↓</div>
-</div>`);
+</div>`).hide();
         Container.find(".expand-record").on("click", () => {
             this.ActivateSelf("activated");
         });
@@ -72,6 +72,7 @@ export class RecordRenderer extends UIRendererOf<ChatRecord> {
         } else {
             this.ContentContainer.append(Renderer.Container);
         }
+        this.ContentContainer.parent().show();
         return Renderer;
     }
     /** OptionContainer: The container of the options. */

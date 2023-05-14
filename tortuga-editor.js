@@ -35578,7 +35578,11 @@
                         this.Tab.ExecuteCommand("observer", `show ${Code}`, true);
                         break;
                     default:
-                        this.Tab.RecompileTemporarily(Code, this.PlayProcedures);
+                        var State = this.Editor.GetState();
+                        var Procedures = [];
+                        for (var [Name, Procedure] of State.Procedures)
+                            Procedures.push(Name);
+                        this.Tab.RecompileTemporarily(Code, Procedures, () => this.PlayProcedures());
                         break;
                 }
             });
@@ -36011,7 +36015,7 @@
     <div class="avatar"><img src="images/assistant.png" /></div>
     <div class="content"></div>
     <div class="expand-record">↓</div>
-</div>`);
+</div>`).hide();
             Container.find(".expand-record").on("click", () => {
                 this.ActivateSelf("activated");
             });
@@ -36053,6 +36057,7 @@
             else {
                 this.ContentContainer.append(Renderer.Container);
             }
+            this.ContentContainer.parent().show();
             return Renderer;
         }
         /** RenderOptions: Render the options of the section. */
@@ -36633,7 +36638,7 @@
         }
         /** FormatArgument: Format the argument. */
         FormatArgument(Value) {
-            return !Value.startsWith("[") && Value.indexOf(" ") != -1 && !Value.endsWith("]") ? `"${Value}"` : Value;
+            return !Value.startsWith("[") && !Value.startsWith("\"") && Value.indexOf(" ") != -1 && !Value.endsWith("]") ? `"${Value}"` : Value;
         }
         /** ExplainFull: ExplainFull: Explain the selected text in the command center in full. */
         ExplainFull(Command) {
@@ -36647,14 +36652,14 @@
             this.Disabled = false;
         }
         /** RecompileTemporarily Recompile the code snippet temporarily. */
-        RecompileTemporarily(Code, Callback) {
+        RecompileTemporarily(Code, Procedures, Callback) {
             if (this.Disabled)
                 return;
             this.Disabled = true;
             this.RecompileCallback = Callback;
             // If the code is not the same, recompile it
             if (this.TemporaryCode != Code) {
-                TurtleEditor.Call({ Type: "RecompileTemporarily", Code: Code });
+                TurtleEditor.Call({ Type: "RecompileTemporarily", Code: Code, Procedures: Procedures });
                 this.TemporaryCode = Code;
             }
             else {
@@ -36677,7 +36682,7 @@
                     }]);
                 (_a = this.RecompileCallback) === null || _a === void 0 ? void 0 : _a.call(this);
             }
-            else if (Errors.length == 0) {
+            else if (!Errors || Errors.length == 0) {
                 this.Outputs.RenderResponses([{
                         Type: ChatResponseType.CompileError,
                         Content: Localized.Get("Compile error in model")

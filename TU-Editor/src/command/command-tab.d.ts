@@ -79,7 +79,7 @@ export declare class CommandTab extends Tab {
     /** TemporaryCode: The temporary code snippet that is in-use. */
     private TemporaryCode?;
     /** RecompileTemporarily Recompile the code snippet temporarily. */
-    RecompileTemporarily(Code: string, Callback: () => void): void;
+    RecompileTemporarily(Code: string, Procedures: string[], Callback: () => void): void;
     /** PlayCompiled: The callback after the code to play is compiled. */
-    PlayCompiled(Succeeded: boolean, Errors: RuntimeError[]): void;
+    PlayCompiled(Succeeded: boolean, Errors?: RuntimeError[]): void;
 }

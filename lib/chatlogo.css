@@ -312,8 +312,8 @@
 	display: flex;
 	flex-direction: column;
 }
-.command-code .codemirror .cm-editor {
-	max-height: 50vh;
+.command-code .codemirror {
+	height: 50vh;
 }
 .command-code .hidden-editor {
 	display: none;

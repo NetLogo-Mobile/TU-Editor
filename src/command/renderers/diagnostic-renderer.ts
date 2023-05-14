@@ -1,9 +1,9 @@
-import { CodeDisplay } from '../../command/displays/code';
-import { RecordRenderer, RendererChooser } from '../../command/outputs/record-renderer';
-import { UIRendererOf } from "../../command/outputs/ui-renderer";
-import { JSONSectionRenderer } from "../../command/sections/json-section-renderer";
-import { ChatManager } from '../chat-manager';
-import { Diagnostic } from "../client/languages/netlogo-context";
+import { CodeDisplay } from '../displays/code';
+import { RecordRenderer, RendererChooser } from '../outputs/record-renderer';
+import { UIRendererOf } from "../outputs/ui-renderer";
+import { JSONSectionRenderer } from "../sections/json-section-renderer";
+import { ChatManager } from '../../chat/chat-manager';
+import { Diagnostic } from "../../chat/client/languages/netlogo-context";
 
 /** DiagnosticsRenderer: A dedicated block for code diagnostics. */
 export class DiagnosticsRenderer extends JSONSectionRenderer<Diagnostic[]> {

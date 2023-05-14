@@ -205,6 +205,7 @@ export class ChatManager {
         if ((Option.CodeInContext ?? true) === true && Context.CodeSnippet === undefined) {
             var Code = Record.Response.Sections.find(Section => Section.Type == ChatResponseType.Code || Section.Field == "Code");
             if (Code != null) Context.CodeSnippet = Code.Content;
+            else Context.CodeSnippet = Record.Context?.CodeSnippet;
         }
         // Inherit previous messages
         if (Layers == -2 || !Record.ParentID) return;

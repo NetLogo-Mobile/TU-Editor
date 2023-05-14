@@ -1,11 +1,12 @@
 import { ChatManager } from "../../chat/chat-manager";
 import { ChatRecord } from "../../chat/client/chat-record";
-import { ChatResponseSection, ChatResponseType } from "../../chat/client/chat-response";
-import { CodeIdeationRenderer } from "../../chat/ui/code-ideation-renderer";
-import { DiagnosticsRenderer } from "../../chat/ui/diagnostic-renderer";
+import { ChatResponseSection, ChatResponseType, GetField } from '../../chat/client/chat-response';
+import { CodeIdeationRenderer } from "../renderers/code-ideation-renderer";
+import { DiagnosticsRenderer } from "../renderers/diagnostic-renderer";
 import { CodeSectionRenderer } from "../sections/code-section-renderer";
 import { CompileErrorRenderer } from "../sections/compile-error-renderer";
 import { HelpSectionRenderer } from "../sections/help-section-renderer";
+import { ProceduresRenderer } from "../renderers/procedures-renderer";
 import { RuntimeErrorRenderer } from "../sections/runtime-error-renderer";
 import { SectionRenderer } from "../sections/section-renderer";
 import { ServerErrorRenderer } from "../sections/server-error-renderer";
@@ -14,6 +15,7 @@ import { TextSectionRenderer } from "../sections/text-section-renderer";
 import { InputRenderer } from "./input-renderer";
 import { OptionRenderer } from "./option-renderer";
 import { UIRendererOf } from "./ui-renderer";
+import { ArgumentsRenderer } from "../renderers/arguments-renderer";
 
 /** RecordRenderer: A block that displays the output of a request. */
 export class RecordRenderer extends UIRendererOf<ChatRecord> {
@@ -107,7 +109,12 @@ export const SectionRenderers: Record<ChatResponseType, RendererChooser[]> = {
     [ChatResponseType.Finish]: [() => new SucceededRenderer()],
     [ChatResponseType.Text]: [() => new TextSectionRenderer()],
     [ChatResponseType.Code]: [() => new CodeSectionRenderer()],
-    [ChatResponseType.JSON]: [CodeIdeationRenderer.GetChooser(), DiagnosticsRenderer.GetChooser(), HelpSectionRenderer.GetChooser()],
+    [ChatResponseType.JSON]: [
+        CodeIdeationRenderer.GetChooser(), 
+        DiagnosticsRenderer.GetChooser(), 
+        HelpSectionRenderer.GetChooser(), 
+        ProceduresRenderer.GetChooser(), 
+        ArgumentsRenderer.GetChooser()],
     [ChatResponseType.Thought]: [],
     [ChatResponseType.CompileError]: [() => new CompileErrorRenderer()],
     [ChatResponseType.RuntimeError]: [() => new RuntimeErrorRenderer()],

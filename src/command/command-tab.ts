@@ -7,6 +7,9 @@ import { Display } from "./displays/display";
 import { CodeDisplay } from "./displays/code";
 import { GalapagosEditor, Localized } from "../../../CodeMirror-NetLogo/src/editor";
 import { ParseMode } from "../../../CodeMirror-NetLogo/src/editor-config";
+import { Procedure } from "../chat/client/languages/netlogo-context";
+import { CodeArguments } from "./renderers/arguments-renderer";
+import { ChatResponseType } from "../chat/client/chat-response";
 
 declare const { bodyScrollLock, EditorDictionary }: any;
 
@@ -161,16 +164,19 @@ export class CommandTab extends Tab {
 		}
 		// Check if it is a command
 		if (!Chatable || (Objective != "chat" && Content != "help" && !Content.startsWith("help ") && !/^[\d\.]+$/.test(Content))) {
-			// If there is no linting issues, assume it is code snippet
+			// Parse the code
 			this.Galapagos.ForceParse();
 			let Diagnostics = await this.Galapagos.ForceLintAsync();
 			let Mode = this.Galapagos.Semantics.GetRecognizedMode();
+			// Check if the context is temporary
+			var Temporary = this.Codes.Visible;
+			// If there is no linting issues, assume it is code snippet
 			if (Diagnostics.length == 0) {
 				if (Mode == "Reporter" || Mode == "Unknown") Content = `show ${Content}`;
-				this.ExecuteInput(Objective, Content);
+				this.ExecuteInput(Objective, Content, Temporary);
 				return;
 			} else if (!Chatable) {
-				this.ExecuteInput(Objective, Content);
+				this.ExecuteInput(Objective, Content, Temporary);
 				return;
 			}
 		}
@@ -203,19 +209,17 @@ export class CommandTab extends Tab {
 
 	// #region "Command Execution"
 	/** ExecuteInput: Execute a human-sent command. */
-	private ExecuteInput(Objective: string, Content: string) {
+	private ExecuteInput(Objective: string, Content: string, Temporary: boolean) {
 		// Record command history
 		this.CommandStack.push([Objective, Content]);
 		this.CurrentCommandIndex = 0;
 		this.CurrentCommand = [];
 		// Execute command
-		this.ExecuteCommand(Objective, Content, true);
+		this.ExecuteCommand(Objective, Content, Temporary, true);
 		this.ClearInput();
-		// Check if we really could execute
-		this.Editor.CheckExecution();
 	}
 	/** ExecuteCommand: Execute a command. */
-	public ExecuteCommand(Objective: string, Content: string, Restart: boolean = false) {
+	public ExecuteCommand(Objective: string, Content: string, Temporary: boolean, Restart: boolean = false) {
 		// Transform command
 		switch (Objective.toLowerCase()) {
 			case "turtles":
@@ -231,15 +235,54 @@ export class CommandTab extends Tab {
 				Content = `help ${Content}`;
 		}
 		// Execute command
-		TurtleEditor.Call({ Type: "CommandExecute", Source: Objective, Command: Content });
-		this.Outputs.PrintCommandInput(Content, Restart);
+		TurtleEditor.Call({ Type: "CommandExecute", Source: Objective, Command: Content, Temporary: Temporary });
+		var Record = this.Outputs.PrintCommandInput(Content, Restart);
+		Record.Context = Record.Context ?? { PreviousMessages: [] };
+		Record.Context.CodeSnippet = Content;
 		this.Outputs.ScrollToBottom();
+		// Check if we really could execute
+		this.Editor.CheckExecution();
+	}
+    /** ExecuteProcedure: Execute the procedure. */
+    public ExecuteProcedure(Procedure: Procedure, IsTemporary: boolean): void {
+		if (Procedure.Arguments.length > 0) {
+			var Package: CodeArguments = {
+				Procedure: Procedure.Name,
+				Temporary: IsTemporary,
+				Arguments: Procedure.Arguments.map((Argument) => {
+					return { Name: Argument, };
+				})
+			};
+			this.Outputs.RenderRequest(
+				Localized.Get("Trying to run the procedure _", Procedure.Name)
+			);
+			this.Outputs.RenderResponses([{
+				Type: ChatResponseType.Text,
+				Content: Localized.Get("Arguments needed for execution _", Procedure.Name, Procedure.Arguments.length)
+			}, {
+				Type: ChatResponseType.JSON,
+				Field: "Arguments",
+				Parsed: Package
+			}]);
+		} else {
+			this.ExecuteProcedureWithArguments(Procedure.Name, IsTemporary, {})
+		}
+    }
+	/** ExecuteProcedureWithArguments: Execute the procedure with arguments. */
+	public ExecuteProcedureWithArguments(Name: string, IsTemporary: boolean, Arguments: Record<string, string>): void {
+		// Generate the code
+		var Code = `${Name} ${Object.keys(Arguments).map(Key => `${this.FormatArgument(Arguments[Key])}`).join(" ")}`;
+		// Execute it
+		this.ExecuteCommand("observer", Code, IsTemporary);
+	}
+	/** FormatArgument: Format the argument. */
+	private FormatArgument(Value: string): string {
+		return !Value.startsWith("[") && Value.indexOf(" ") != -1 && !Value.endsWith("]") ? `"${Value}"` : Value;
 	}
 	/** ExplainFull: ExplainFull: Explain the selected text in the command center in full. */
 	public ExplainFull(Command: string) {
 		if (!EditorDictionary.Check(Command)) return false;
-		this.Outputs.ScrollToBottom();
-		this.ExecuteCommand("observer", `help ${Command} -full`);
+		this.ExecuteCommand("observer", `help ${Command} -full`, false);
 	}
 	/** FinishExecution: Notify the completion of the command. */
 	public FinishExecution(Status: string, Message: string) {

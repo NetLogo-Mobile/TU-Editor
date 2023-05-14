@@ -105,9 +105,9 @@
 					}
 				}
 				// Special
-				if (window.location.href.indexOf("127.0.0.1") != -1) {
+				if (window.location.href.indexOf("127.0.0.1") != -1 || window.location.href.indexOf("localhost") != -1) {
 					window.PostMessage = null;
-					TurtleEditor.SetChatBackend("http://127.0.0.1/");
+					TurtleEditor.SetChatBackend("http://127.0.0.1:3000/");
 				} else if (window.location.href.indexOf("github.io") != -1) {
 					window.PostMessage = null;
 				}

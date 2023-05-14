@@ -25,6 +25,11 @@ code,
 	font-size: 0.95rem;
 	font-family: Consolas, "Droid Sans Mono", "PingFangSC", "Microsoft Yahei", monospace;
 }
+code {
+	white-space: pre-wrap;
+	word-break: break-word;
+	overflow-wrap: anywhere;
+}
 .cm-editor .cm-content {
 	font-size: 1rem;
 }

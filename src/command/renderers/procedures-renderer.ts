@@ -1,11 +1,11 @@
 import { Localized } from "../../../../CodeMirror-NetLogo/src/editor";
 import { Procedure } from "../../chat/client/languages/netlogo-context";
-import { OutputDisplay } from "../displays/output";
+import { OutputDisplay } from '../displays/output';
 import { RendererChooser } from "../outputs/record-renderer";
-import { JSONSectionRenderer } from "./json-section-renderer";
+import { JSONSectionRenderer } from "../sections/json-section-renderer";
 
-/** ProcedureSectionRenderer: A block that displays the a procedures section. */
-export class ProcedureSectionRenderer extends JSONSectionRenderer<ProcedureMetadata> {
+/** ProceduresRenderer: A block that displays the a procedures section. */
+export class ProceduresRenderer extends JSONSectionRenderer<ProcedureMetadata> {
     /** Constructor: Create a new UI renderer. */
     public constructor() {
         super();
@@ -27,7 +27,7 @@ export class ProcedureSectionRenderer extends JSONSectionRenderer<ProcedureMetad
         }
         // Default callback
         Metadata.Callback = Metadata.Callback ?? 
-            ((Procedure) => this.ExecuteProcedure(Procedure, Metadata.IsTemporary ?? false));
+            ((Procedure) => OutputDisplay.Instance.Tab.ExecuteProcedure(Procedure, Metadata.IsTemporary ?? false));
         // Render the procedures
         this.ContentContainer.empty();
         for (var Procedure of Metadata.Procedures) {
@@ -37,22 +37,16 @@ export class ProcedureSectionRenderer extends JSONSectionRenderer<ProcedureMetad
     /** RenderProcedure: Render a procedure. */
     private RenderProcedure(Renderer: JQuery<HTMLElement>, Metadata: ProcedureMetadata, Procedure: Procedure) {
         var Renderer = $("<li></li>").appendTo(this.ContentContainer);
-        $("<a></a>").appendTo(Renderer).text(`${Localized.Get(Procedure.IsCommand ? "Command" : "Reporter")} ${Procedure.Name}`)
+        $("<a></a>").appendTo(Renderer).text(`${Localized.Get(Procedure.IsCommand ? "Run command" : "Run reporter")} ${Procedure.Name}`)
             .on("click", () => Metadata.Callback?.(Procedure));
-        $("<span></span>").appendTo(Renderer).text(`[${Procedure.Arguments.join(" ")}]`);
-    }
-    /** ExecuteProcedure: Execute the procedure. */
-    private ExecuteProcedure(Procedure: Procedure, IsTemporary: boolean): void {
-		var Editor = OutputDisplay.Instance.Tab.Editor;
-        // Check if we can really execute or not
-        Editor.CheckExecution();
-        // Execute the procedure
+        if (Procedure.Arguments.length > 0)
+            $("<p></p>").appendTo(Renderer).text(`${Localized.Get("Arguments", Procedure.Arguments.length)}: ${Procedure.Arguments.join(", ")}`);
     }
     /** GetChooser: Return the section chooser for this renderer. */
     public static GetChooser(): RendererChooser {
         return (Record, Section) => Section.Field == "Procedures" && Section.Parsed && 
             (Array.isArray(Section.Parsed) || Section.Parsed.Procedures)
-            ? new ProcedureSectionRenderer() : undefined;
+            ? new ProceduresRenderer() : undefined;
     }
 }
 

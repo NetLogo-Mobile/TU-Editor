@@ -246,15 +246,15 @@
 .command-output .succeeded {
 	color: #007F69;
 }
+.command-output :not(:first-child).code {
+	margin-top: 0.5rem;
+}
 .command-output .code code {
 	border: 1px solid #eee;
 	cursor: pointer;
     padding: 0.5rem 0.8rem;
 	background: #f7f7f7;
 	display: block;
-	white-space: pre-wrap;
-	word-break: break-word;
-	overflow-wrap: anywhere;
 }
 .command-output ul {
 	margin: 0;
@@ -265,8 +265,8 @@
 }
 
 /** Special: Procedure list */
-.command-output .procedures li span {
-	margin-left: 0.5rem;
+.command-output .procedures li p {
+	color: #333;
 }
 
 /** Special: Code ideation */
@@ -283,9 +283,15 @@
     width: 100%;
     margin: 0.2rem 0 0 0;
     padding: 0.2rem 0.3rem 0.1rem;
-    border: 1px solid #eee;
+    border: 1px solid #333;
     line-height: 1.5;
     max-width: 30rem;
+}
+.command-output .parameter.error div.question {
+    color: #cc2200;
+}
+.command-output .parameter.error input {
+    color: 1px solid #cc2200;
 }
 .command-output .parameter:not(:last-child) {
     padding: 0.3rem 0.3rem 0.5rem 0.3rem;

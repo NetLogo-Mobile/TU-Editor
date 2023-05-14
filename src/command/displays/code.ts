@@ -216,18 +216,15 @@ export class CodeDisplay extends Display {
 			var Mode = this.Editor.Semantics.GetRecognizedMode();
 			var Code = this.Editor.GetCode().trim();
 			// Check if we really could execute
-			if (TurtleEditor.PostMessage) {
+			if (!TurtleEditor.PostMessage)
 				this.PlayCompiled(true, []);
-			} else {
-
-			}
 			// If it is a command or reporter, simply run it
 			switch (Mode) {
 				case "Command":
-					this.Tab.ExecuteCommand("observer", Code);
+					this.Tab.ExecuteCommand("observer", Code, true);
 					break;
 				case "Reporter":
-					this.Tab.ExecuteCommand("observer", `show ${Code}`);
+					this.Tab.ExecuteCommand("observer", `show ${Code}`, true);
 					break;
 				default:
 					TurtleEditor.Call({ Type: "RecompileIncremental", Code: Code });
@@ -274,7 +271,10 @@ export class CodeDisplay extends Display {
 		this.Tab.Outputs.RenderResponses([{
 			Type: ChatResponseType.JSON,
 			Field: "Procedures",
-			Parsed: Procedures
+			Parsed: {
+				Procedures: Procedures,
+				Temporary: true
+			},
 		}]);
 	}
 	/** AddToCode: Add the code to the main editor. */

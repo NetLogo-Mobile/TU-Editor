@@ -96,7 +96,7 @@ export class OutputDisplay extends Display {
 		if (Sections.length == 0) return;
 		var LastRecord = this.Subthread!.Children[this.Subthread!.Children.length - 1] as RecordRenderer;
 		for (var Section in Sections)
-			LastRecord.AddSection(Sections[Section]);
+			LastRecord.AddSection(Sections[Section])?.SetFinalized();
 		LastRecord.Render();
 		this.ScrollToBottom();
 	}
@@ -143,10 +143,10 @@ export class OutputDisplay extends Display {
 		else this.RenderResponses([Section]);
 	}
 	/** PrintCommandInput: Print a line of input to the screen. */
-	public PrintCommandInput(Content: string, Restart: boolean = true) {
+	public PrintCommandInput(Content: string, Restart: boolean = true): ChatRecord {
 		var Parent = this.Tab.ChatManager.GetPendingParent()
 		if (!Parent && Restart && !this.Subthread?.GetData().RootID) this.ActivateSubthread();
-		this.RenderRequest(`\`${Content.replace("`", "\`")}\``, Parent);
+		return this.RenderRequest(`\`${Content.replace("`", "\`")}\``, Parent);
 	}
 	/** PrintOutput: Provide for Unity to print compiled output. */ 
 	public PrintOutput(Class: string, Content: any) {

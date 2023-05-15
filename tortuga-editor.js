@@ -35572,9 +35572,7 @@
                 return Diagnostics.map(Diagnostic => {
                     return {
                         Message: NetLogoUtils.PostprocessLintMessage(Diagnostic.message),
-                        Code: this.Editor.GetCodeSlice(Diagnostic.from, Diagnostic.to),
-                        From: Diagnostic.from,
-                        To: Diagnostic.to
+                        Code: this.Editor.GetCodeSlice(Diagnostic.from, Diagnostic.to)
                     };
                 });
             });

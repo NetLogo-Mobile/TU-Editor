@@ -45,8 +45,4 @@ export interface Diagnostic {
     Message: string;
     /** Code: The code of the diagnostic. */
     Code: string;
-    /** From: The starting position of the diagnostic. */
-    From: number;
-    /** To: The ending position of the diagnostic. */
-    To: number;
 }

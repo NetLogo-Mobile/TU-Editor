@@ -28,13 +28,13 @@ export class ParameterRenderer extends UIRendererOf<CodeParameter> {
         } else {
             this.Input.val("");
         }
-        this.Input.attr("placeholder", Parameter.Options?.[0] ?? "");
+        this.Input.attr("placeholder", Parameter.Examples?.[0] ?? "");
         // Render the examples
         this.Examples.empty();
-        if (!Parameter.Options || Parameter.Options.length == 0) return;
+        if (!Parameter.Examples || Parameter.Examples.length == 0) return;
         var Input = this.Input;
         $("<span></span>").appendTo(this.Examples).text(Localized.Get("e.g."));
-        for (var Option of Parameter.Options) {
+        for (var Option of Parameter.Examples) {
             $(`<a href="javascript:void(0)"></a>`).data("option", Option).appendTo(this.Examples).text(Option).on("click", function() {
                 Input.val($(this).data("option"));
             });
@@ -69,6 +69,6 @@ export interface CodeParameter {
     Question?: string;
     /** Known: The known value of the parameter. */
     Known?: string | boolean;
-    /** Options: The options for the parameter. */
-    Options?: string[];
+    /** Examples: The examples for the parameter. */
+    Examples?: string[];
 }

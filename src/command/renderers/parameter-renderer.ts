@@ -23,8 +23,8 @@ export class ParameterRenderer extends UIRendererOf<CodeParameter> {
         // Render the question
         this.Question.text(Parameter.Question ?? `${Localized.Get("Argument")} ${Parameter.Name}`);
         // Sync the input
-        if (typeof Parameter.Known === "string" || Parameter.Known as any instanceof String) {
-            this.Input.val(Parameter.Known as string);
+        if (typeof Parameter.Value) {
+            this.Input.val(Parameter.Value as string);
         } else {
             this.Input.val("");
         }
@@ -67,8 +67,10 @@ export interface CodeParameter {
     Name: string;
     /** Question: The question displayed for the user. */
     Question?: string;
-    /** Known: The known value of the parameter. */
-    Known?: string | boolean;
+    /** Provided: Is the value provided for the parameter. */
+    Provided?: boolean;
+    /** Value: The provided value for the parameter. */
+    Value?: string;
     /** Examples: The examples for the parameter. */
     Examples?: string[];
 }

@@ -31182,7 +31182,7 @@
         'Infinite loop _': (Name) => `This "${Name}" loop will run forever and likely block the model. Do you want to re-write into a "go" loop?`,
         'Argument is reserved _': (Name) => `The argument "${Name}" is a reserved NetLogo keyword. Do you want to replace it?`,
         'Argument is invalid _': (Name) => `The argument "${Name}" is invalid. Do you want to replace it?`,
-        // Agent types
+        // Agent types and basic names
         Observer: () => 'Observer',
         Turtle: () => 'Turtle',
         Turtles: () => 'Turtles',
@@ -31191,6 +31191,10 @@
         Link: () => 'Link',
         Links: () => 'Links',
         Utility: () => 'Utility',
+        Command: () => 'Command',
+        Reporter: () => 'Reporter',
+        Argument: () => 'Argument',
+        Arguments: (Number) => 'Argument' + (Number > 1 ? 's' : ''),
         // Help messages
         '~VariableName': (Name) => `A (unknown) variable. `,
         '~ProcedureName': (Name) => `The name of a procedure. `,
@@ -31220,17 +31224,21 @@
         Reconnect: () => `Reconnect`,
         RunCode: () => `Run Code`,
         'Trying to run the code': () => `Trying to run the code...`,
+        'Trying to run the procedure _': (Name) => `Trying to run the procedure \`${Name}\`...`,
         FixCode: () => `Fix Code`,
         AskCode: () => `Ask a Question`,
         AddCode: () => `Add to Project`,
         'Trying to add the code': () => `Trying to add the code to the project...`,
         PreviousVersion: () => `Back`,
         NextVersion: () => `Next`,
-        'Expand messages _': (Number) => `Expand ${Number} messages`,
+        'Expand messages _': (Number) => `Expand ${Number} message` + (Number > 1 ? 's' : ''),
         FullText: () => `Read more`,
         SeeAlso: () => `See also`,
         OK: () => `OK`,
         Cancel: () => `Cancel`,
+        'Run command': () => `Run command`,
+        'Run reporter': () => `Run reporter`,
+        'Execute the procedure': () => `Execute the procedure now`,
         // Editor interfaces
         MoreFeatures: () => 'More features',
         SelectAll: () => 'Select all',
@@ -31252,7 +31260,9 @@
         'Compile error _': (Error) => `Sorry, I cannot understand the code: ${Error}`,
         'Compile error in snippet _': (Number) => `Sorry, there are still ${Number} errors in the code snippet.`,
         'Compile error unknown': (Number) => `Sorry, there is an unknown error. Please report it as a bug.`,
+        'Compile error in model': () => `Sorry, there are errors in the open project. Please fix the issue in the code tab first.`,
         'Showing full text help of _': (Name) => `Here is the help information of [${Name}](<observer=help ${Name} -full>).`,
+        'Arguments needed for execution _': (Name, Arguments) => `The "${Name}" procedure needs argument${Arguments > 1 ? 's' : ''} to run. Please provide them.`,
         'Please download Turtle Universe': () => `The feature is unavailable in Web Preview. Please download [Turtle Universe](https://www.turtlesim.com/products/turtle-universe/) to continue.`,
         // Default messages
         'Command center welcome (user)': () => `What is here about? Where should I start with?`,
@@ -31295,7 +31305,7 @@
         'Infinite loop _': (Name) => `这个 "${Name}" 循环将永远运行下去，可能会阻塞模型。你想将它改成 "go" 循环吗？`,
         'Argument is reserved _': (Name) => `参数名称 "${Name}" 和 NetLogo 的关键字重复了。你想换一个名字吗？`,
         'Argument is invalid _': (Name) => `参数名称 "${Name}" 不可用。你想换一个名字吗？`,
-        // Agent types
+        // Agent types and basic names
         Observer: () => '观察者',
         Turtle: () => '海龟',
         Turtles: () => '海龟们',
@@ -31304,6 +31314,10 @@
         Link: () => '链接',
         Links: () => '链接们',
         Utility: () => '工具',
+        Command: () => '命令',
+        Reporter: () => '函数',
+        Argument: () => '参数',
+        Arguments: () => '参数',
         // Help messages
         '~VariableName': (Name) => `一个（未知的）变量。`,
         '~ProcedureName': (Name) => `过程或函数的名称。`,
@@ -31344,6 +31358,7 @@
         Reconnect: () => `重新连接`,
         RunCode: () => `运行代码`,
         'Trying to run the code': () => `尝试运行代码……`,
+        'Trying to run the procedure _': (Name) => `尝试运行子程序 \`${Name}\`……`,
         FixCode: () => `修复代码`,
         AskCode: () => `提问`,
         AddCode: () => `放入作品`,
@@ -31355,6 +31370,9 @@
         SeeAlso: () => `参见`,
         OK: () => `确定`,
         Cancel: () => `取消`,
+        'Run command': () => `执行命令`,
+        'Run reporter': () => `执行函数`,
+        'Execute the procedure': () => `开始执行这段程序`,
         // Chat and execution messages
         'Connection to server failed _': (Error) => `抱歉，和服务器的连接中断了。代码 ${Error}。`,
         'Summary of request': () => `简单总结我的请求的要点：`,
@@ -31365,7 +31383,9 @@
         'Compile error _': (Error) => `抱歉，未能理解你输入的命令：${Error}`,
         'Compile error in snippet _': (Number) => `抱歉，代码中还有 ${Number} 个错误。`,
         'Compile error unknown': (Number) => `抱歉，编译过程中存在未知错误。请将 BUG 报告给开发者。`,
+        'Compile error in model': () => `编译模型时遇到错误。请先修复代码面板中的错误，然后尝试执行。`,
         'Showing full text help of _': (Name) => `显示 [${Name}](<observer=help ${Name} -full>) 的帮助文档。`,
+        'Arguments needed for execution _': (Name, Arguments) => `在执行 \`${Name}\` 之前，需要知道它的参数。`,
         'Please download Turtle Universe': () => `功能在网页模式下不可用。请下载[海龟实验室](https://www.turtlesim.com/products/turtle-universe/index-cn.html)以获得更好的体验。`,
         // Default messages
         'Command center welcome (user)': () => `这是哪儿？我应该怎么开始使用？`,
@@ -35243,14 +35263,14 @@
             else {
                 this.Input.val("");
             }
-            this.Input.attr("placeholder", (_c = (_b = Parameter.Options) === null || _b === void 0 ? void 0 : _b[0]) !== null && _c !== void 0 ? _c : "");
+            this.Input.attr("placeholder", (_c = (_b = Parameter.Examples) === null || _b === void 0 ? void 0 : _b[0]) !== null && _c !== void 0 ? _c : "");
             // Render the examples
             this.Examples.empty();
-            if (!Parameter.Options || Parameter.Options.length == 0)
+            if (!Parameter.Examples || Parameter.Examples.length == 0)
                 return;
             var Input = this.Input;
             $("<span></span>").appendTo(this.Examples).text(Localized.Get("e.g."));
-            for (var Option of Parameter.Options) {
+            for (var Option of Parameter.Examples) {
                 $(`<a href="javascript:void(0)"></a>`).data("option", Option).appendTo(this.Examples).text(Option).on("click", function () {
                     Input.val($(this).data("option"));
                 });

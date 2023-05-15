@@ -24,6 +24,6 @@ export interface CodeParameter {
     Question?: string;
     /** Known: The known value of the parameter. */
     Known?: string | boolean;
-    /** Options: The options for the parameter. */
-    Options?: string[];
+    /** Examples: The examples for the parameter. */
+    Examples?: string[];
 }

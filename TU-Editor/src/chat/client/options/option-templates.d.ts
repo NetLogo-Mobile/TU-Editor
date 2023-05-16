@@ -1,14 +1,16 @@
 import { ChatResponseOption } from "../chat-option";
 /** ChangeTopic: Generate a template change topic option. */
 export declare function ChangeTopic(Label?: string): ChatResponseOption;
+/** NewTopic: Generate a template new topic option. */
+export declare function NewTopic(Input: string, Label?: string): ChatResponseOption;
 /** FollowUp: Generate a template follow-up option. */
 export declare function FollowUp(Label?: string): ChatResponseOption;
+/** AskFurther: Generate a template ask further option. */
+export declare function AskFurther(Label?: string): ChatResponseOption;
 /** EditCode: Generate a template edit code option. */
 export declare function EditCode(Label?: string): ChatResponseOption;
-/** AskExamples: Ask for examples. */
-export declare function AskExamples(Label?: string): ChatResponseOption;
-/** AskOtherExamples: Ask for other examples. */
-export declare function AskOtherExamples(Label?: string): ChatResponseOption;
+/** ExampleCode: Ask for an example code. */
+export declare function ExampleCode(Label?: string): ChatResponseOption;
 /** AskCode: Ask a question about the code. */
 export declare function AskCode(Label?: string, Style?: string): ChatResponseOption;
 /** FixCode: Fix the current code snippet. */

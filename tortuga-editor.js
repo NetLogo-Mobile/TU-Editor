@@ -35514,7 +35514,7 @@
         /** UpdateHistory: Update the history index of the display. */
         UpdateHistory() {
             this.HistoryDisplay.text(`${this.CurrentIndex + 1} / ${this.Records.length}`);
-            this.PreviousButton.toggle(this.CurrentIndex > 1);
+            this.PreviousButton.toggle(this.CurrentIndex >= 1);
             this.NextButton.toggle(this.CurrentIndex < this.Records.length - 1);
         }
         /** UpdateRecords: Update the records. */

@@ -146,7 +146,7 @@ export class OutputDisplay extends Display {
 	public PrintCommandInput(Content: string, Restart: boolean = true): ChatRecord {
 		var Parent = this.Tab.ChatManager.GetPendingParent()
 		if (!Parent && Restart && !this.Subthread?.GetData().RootID) this.ActivateSubthread();
-		return this.RenderRequest(`\`${Content.replace("`", "\`")}\``, Parent);
+		return this.RenderRequest(`\`\`\`\n${Content.replace("`", "\`")}\n\`\`\``, Parent);
 	}
 	/** PrintOutput: Provide for Unity to print compiled output. */ 
 	public PrintOutput(Class: string, Content: any) {

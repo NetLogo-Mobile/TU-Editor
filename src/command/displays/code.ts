@@ -11,8 +11,6 @@ import { RecordRenderer } from '../outputs/record-renderer';
 import { ChatResponseSection, ChatResponseType } from "../../chat/client/chat-response";
 import { Diagnostic, Procedure } from "../../chat/client/languages/netlogo-context";
 import { ChangeTopic, FixCode } from '../../chat/client/options/option-templates';
-import { RuntimeError } from "../../../../CodeMirror-NetLogo/src/lang/linters/runtime-linter";
-import { TurtleEditor } from "../../main";
 
 /** CodeDisplay: The interactive code editor section. */
 export class CodeDisplay extends Display {
@@ -162,6 +160,7 @@ export class CodeDisplay extends Display {
 	// #region "Code Operations"
 	/** TryTo: Try to do something that requires grammatically correct code. */
 	public TryTo(Action: () => void) {
+		this.Editor.Semantics.PrettifyAll();
 		this.ExportDiagnostics().then(Diagnostics => {
 			if (Diagnostics.length == 0) {
 				Action();

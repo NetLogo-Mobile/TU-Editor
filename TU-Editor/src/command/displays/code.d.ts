@@ -10,6 +10,8 @@ export declare class CodeDisplay extends Display {
     Editor: GalapagosEditor;
     /** Instance: The singleton instance. */
     static Instance: CodeDisplay;
+    /** ReturnButton: The return button of the display. */
+    private ReturnButton;
     /** PlayButton: The play button of the display. */
     private PlayButton;
     /** FixButton: The fix button of the display. */
@@ -41,6 +43,8 @@ export declare class CodeDisplay extends Display {
     private UpdateHistory;
     /** UpdateRecords: Update the records. */
     private UpdateRecords;
+    /** Return: Leave the mode immediately. */
+    private Return;
     /** ShowPrevious: Show the previous code section. */
     private ShowPrevious;
     /** ShowNext: Show the next code section. */

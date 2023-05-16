@@ -32181,7 +32181,22 @@
             }));
             // One-line mode
             if (this.Options.OneLine) {
-                Extensions.push(EditorState.transactionFilter.of((tr) => tr.newDoc.lines > 1 ? [] : tr));
+                Extensions.push(EditorState.transactionFilter.of((Transaction) => {
+                    if (Transaction.docChanged && Transaction.newDoc.lines > 1)
+                        return [
+                            {
+                                changes: {
+                                    from: 0,
+                                    to: this.CodeMirror.state.doc.length,
+                                    insert: Transaction.newDoc
+                                        .toString()
+                                        .replace('\n', ' ')
+                                        .trim(),
+                                },
+                            },
+                        ];
+                    return [Transaction];
+                }));
             }
             // Wrapping mode
             if (this.Options.Wrapping) {
@@ -32716,31 +32731,29 @@
                             Section.Parsed.push(ChatNetwork.TryParse(Update.Content.substring(0, Update.Content.length - 1)));
                         }
                     };
-                    // Send the request
-                    Client.Listen((Data) => {
-                        try {
-                            Update = JSON.parse(Data.data);
-                            // console.log(Update);
-                        }
-                        catch (Exception) {
-                            console.log("Error: " + Data.data);
-                            return;
-                        }
-                        // Handle the update
+                    // Try to parse an update
+                    var TryParseUpdate = () => {
                         switch (Update.Type) {
                             case ChatResponseType.ServerError:
                                 Reject(Update.Content);
                                 Client.Close();
                                 return;
                             case ChatResponseType.Start:
-                                if (Update.Content) {
+                                if (Update.Edited && Update.Content) {
                                     Record.ID = Update.Content;
-                                    Record.ThreadID = Update.Field;
-                                    Thread.ID = Update.Field;
+                                    Record.ThreadID = Update.Edited;
+                                    Thread.ID = Update.Edited;
                                 }
-                                else if (Update.Field) {
-                                    Record.Language = Update.Field;
-                                    Thread.Language = Update.Field;
+                                else {
+                                    switch (Update.Field) {
+                                        case "Language":
+                                            Record.Language = Update.Content;
+                                            Thread.Language = Update.Content;
+                                            break;
+                                        case "Transparent":
+                                            Record.Transparent = Update.Content === "true";
+                                            break;
+                                    }
                                 }
                                 return;
                             case ChatResponseType.Finish:
@@ -32767,6 +32780,29 @@
                             Record.Response.Options.push(...Update.Options);
                         TryParseElement();
                         UpdateSection(Section);
+                    };
+                    // Send the request
+                    Client.Listen((Data) => {
+                        var Raw;
+                        // Pause the update
+                        try {
+                            Raw = JSON.parse(Data.data);
+                        }
+                        catch (Exception) {
+                            console.log("Error: " + Data.data);
+                            return;
+                        }
+                        // Handle the update
+                        if (Array.isArray(Raw)) {
+                            Raw.forEach(Current => {
+                                Update = Current;
+                                TryParseUpdate();
+                            });
+                        }
+                        else {
+                            Update = Raw;
+                            TryParseUpdate();
+                        }
                     }, (Error) => {
                         console.log("Server Error: " + Error);
                         Reject(Error);
@@ -35427,6 +35463,7 @@
             this.Tab.Editor.EditorTabs[0].Galapagos.AddChild(this.Editor);
             // Create the toolbar
             var Toolbar = $(`<div class="toolbar"></div>`).appendTo(this.Container);
+            this.ReturnButton = $(`<div class="button return">${Localized.Get("Return")}</div>`).on("click", () => this.Return()).appendTo(Toolbar);
             this.PlayButton = $(`<div class="button run">${Localized.Get("RunCode")}</div>`).on("click", () => this.Play()).appendTo(Toolbar);
             // this.FixButton = $(`<div class="button fix">${Localized.Get("FixCode")}</div>`).on("click", () => this.Fix()).appendTo(Toolbar);
             this.AskButton = $(`<div class="button ask">${Localized.Get("AskCode")}</div>`).on("click", () => this.Ask()).appendTo(Toolbar);
@@ -35464,7 +35501,7 @@
         /** UpdateHistory: Update the history index of the display. */
         UpdateHistory() {
             this.HistoryDisplay.text(`${this.CurrentIndex + 1} / ${this.Records.length}`);
-            this.PreviousButton.toggle(true);
+            this.PreviousButton.toggle(this.CurrentIndex > 1);
             this.NextButton.toggle(this.CurrentIndex < this.Records.length - 1);
         }
         /** UpdateRecords: Update the records. */
@@ -35484,17 +35521,16 @@
             }
             this.UpdateHistory();
         }
+        /** Return: Leave the mode immediately. */
+        Return() {
+            this.Hide();
+            ChatManager.Instance.RequestOption(ChangeTopic());
+        }
         /** ShowPrevious: Show the previous code section. */
         ShowPrevious() {
-            if (this.CurrentIndex == 0) {
-                this.Hide();
-                ChatManager.Instance.RequestOption(ChangeTopic());
-            }
-            else {
-                this.SaveChanges();
-                this.CurrentIndex--;
-                this.UpdateRecords();
-            }
+            this.SaveChanges();
+            this.CurrentIndex--;
+            this.UpdateRecords();
         }
         /** ShowNext: Show the next code section. */
         ShowNext() {
@@ -35884,8 +35920,14 @@
             if (Content.startsWith("Output: "))
                 Content = Content.substring(8).trim();
             // Render the text
-            this.ContentContainer.html(MarkdownToHTML(Content));
-            PostprocessHTML(OutputDisplay.Instance.Tab.Editor, this.ContentContainer);
+            if (this.Finalized) {
+                this.ContentContainer.html(MarkdownToHTML(Content));
+                PostprocessHTML(OutputDisplay.Instance.Tab.Editor, this.ContentContainer);
+                NetLogoUtils.AnnotateCodes(this.ContentContainer.find("code"));
+            }
+            else {
+                this.ContentContainer.text(Content);
+            }
             // Remove the section if it's empty
             if (Content == "" && ((_c = (_b = Section.Options) === null || _b === void 0 ? void 0 : _b.length) !== null && _c !== void 0 ? _c : 0) == 0 && this.Finalized)
                 this.Container.remove();

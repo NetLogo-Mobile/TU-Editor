@@ -35529,6 +35529,7 @@
         // #region "Code Operations"
         /** TryTo: Try to do something that requires grammatically correct code. */
         TryTo(Action) {
+            this.Editor.Semantics.PrettifyAll();
             this.ExportDiagnostics().then(Diagnostics => {
                 if (Diagnostics.length == 0) {
                     Action();
@@ -36292,7 +36293,7 @@
             var Parent = this.Tab.ChatManager.GetPendingParent();
             if (!Parent && Restart && !((_a = this.Subthread) === null || _a === void 0 ? void 0 : _a.GetData().RootID))
                 this.ActivateSubthread();
-            return this.RenderRequest(`\`${Content.replace("`", "\`")}\``, Parent);
+            return this.RenderRequest(`\`\`\`\n${Content.replace("`", "\`")}\n\`\`\``, Parent);
         }
         /** PrintOutput: Provide for Unity to print compiled output. */
         PrintOutput(Class, Content) {

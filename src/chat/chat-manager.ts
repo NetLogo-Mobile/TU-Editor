@@ -1,7 +1,7 @@
 import { CommandTab } from "../command/command-tab";
 import { OutputDisplay } from "../command/displays/output";
 import { ClientChatRequest } from "./client/chat-request";
-import { ChatResponseType, IsTextLike, SectionsToJSON } from "./client/chat-response";
+import { ChatResponseType, ExcludeCode, IsTextLike, SectionsToJSON } from "./client/chat-response";
 import { ChatThread } from "./client/chat-thread";
 import { ChatNetwork } from "./chat-network";
 import { ChatRole } from "./client/chat-context";
@@ -66,6 +66,12 @@ export class ChatManager {
             }, (Section) => {
                 // Finish the section
                 if (!CurrentRenderer) return;
+                // Special handling for ServerErrors
+                if (Section.Type == ChatResponseType.ServerError && Section.Field !== "Irrecoverable") {
+                    if (Section.Field == "Temperature")
+                        Record.Temperature = Record.Temperature ?? 0 + 0.2;
+                    Section.Parsed = SendRequest;
+                }
                 CurrentRenderer.SetFinalized();
                 CurrentRenderer.SetData(Section);
                 CurrentRenderer.Render();
@@ -86,7 +92,7 @@ export class ChatManager {
                 Renderer.AddSection({ 
                     Type: ChatResponseType.ServerError, 
                     Content: Localized.Get("Connection to server failed _", Error ?? Localized.Get("Unknown")),
-                    Field: SendRequest as any
+                    Parsed: SendRequest
                 })!.SetFinalized().Render();
                 this.Commands.ShowInput();
                 ChatManager.IsRequesting = false;
@@ -171,14 +177,14 @@ export class ChatManager {
                 break;
             case ContextMessage.MessagesAsText:
                 Context.PreviousMessages.unshift({ 
-                    Text: Record.Response.Sections.filter(IsTextLike)
+                    Text: Record.Response.Sections.filter(ExcludeCode).filter(IsTextLike)
                         .map(Section => Section.Content).join("\n"), 
                     Role: ChatRole.Assistant
                 });
                 break;
             case ContextMessage.MessagesAsJSON:
                 Context.PreviousMessages.unshift({ 
-                    Text: SectionsToJSON(Record.Response.Sections.filter(IsTextLike)), 
+                    Text: SectionsToJSON(Record.Response.Sections.filter(ExcludeCode).filter(IsTextLike)), 
                     Role: ChatRole.Assistant
                 });
                 break;
@@ -194,7 +200,7 @@ export class ChatManager {
             case ContextMessage.AllAsJSON:
             default:
                 Context.PreviousMessages.unshift({ 
-                    Text: SectionsToJSON(Record.Response.Sections.filter(IsTextLike)), 
+                    Text: SectionsToJSON(Record.Response.Sections.filter(ExcludeCode)), 
                     Role: ChatRole.Assistant
                 });
         }

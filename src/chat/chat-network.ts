@@ -47,10 +47,6 @@ export class ChatNetwork {
             // Try to parse an update
             var TryParseUpdate = () => {
                 switch (Update.Type) {
-                    case ChatResponseType.ServerError:
-                        Reject(Update.Content);
-                        Client.Close();
-                        return;
                     case ChatResponseType.Start:
                         if (Update.Edited && Update.Content) {
                             Record.ID = Update.Content;

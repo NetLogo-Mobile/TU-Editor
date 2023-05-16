@@ -44,29 +44,28 @@ export class ChatNetwork {
                     Section.Parsed.push(ChatNetwork.TryParse(Update.Content.substring(0, Update.Content.length - 1)));
                 }
             };
-            // Send the request
-            Client.Listen((Data) => {
-                try {
-                    Update = JSON.parse(Data.data) as ChatResponseSection;
-                    // console.log(Update);
-                } catch (Exception) {
-                    console.log("Error: " + Data.data);
-                    return;
-                }
-                // Handle the update
+            // Try to parse an update
+            var TryParseUpdate = () => {
                 switch (Update.Type) {
                     case ChatResponseType.ServerError:
                         Reject(Update.Content);
                         Client.Close();
                         return;
                     case ChatResponseType.Start:
-                        if (Update.Content) {
+                        if (Update.Edited && Update.Content) {
                             Record.ID = Update.Content;
-                            Record.ThreadID = Update.Field;
-                            Thread.ID = Update.Field;
-                        } else if (Update.Field) {
-                            Record.Language = Update.Field;
-                            Thread.Language = Update.Field;
+                            Record.ThreadID = Update.Edited;
+                            Thread.ID = Update.Edited;
+                        } else {
+                            switch (Update.Field) {
+                                case "Language":
+                                    Record.Language = Update.Content;
+                                    Thread.Language = Update.Content;
+                                    break;
+                                case "Transparent":
+                                    Record.Transparent = Update.Content === "true";
+                                    break;
+                            }
                         }
                         return;
                     case ChatResponseType.Finish:
@@ -93,6 +92,27 @@ export class ChatNetwork {
                     Record.Response.Options!.push(...Update.Options);
                 TryParseElement();
                 UpdateSection(Section);
+            }
+            // Send the request
+            Client.Listen((Data) => {
+                var Raw: any | any[];
+                // Pause the update
+                try {
+                    Raw = JSON.parse(Data.data);
+                } catch (Exception) {
+                    console.log("Error: " + Data.data);
+                    return;
+                }
+                // Handle the update
+                if (Array.isArray(Raw)) {
+                    Raw.forEach(Current => {
+                        Update = Current;
+                        TryParseUpdate();
+                    });
+                } else {
+                    Update = Raw;
+                    TryParseUpdate();
+                }
             }, (Error) => {
                 console.log("Server Error: " + Error);
                 Reject(Error);

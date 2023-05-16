@@ -19,6 +19,8 @@ export class CodeDisplay extends Display {
 	public Editor: GalapagosEditor;
 	/** Instance: The singleton instance. */
 	public static Instance: CodeDisplay;
+	/** ReturnButton: The return button of the display. */
+	private ReturnButton: JQuery<HTMLElement>;
 	/** PlayButton: The play button of the display. */
 	private PlayButton: JQuery<HTMLElement>;
 	/** FixButton: The fix button of the display. */
@@ -49,6 +51,7 @@ export class CodeDisplay extends Display {
 		this.Tab.Editor.EditorTabs[0].Galapagos.AddChild(this.Editor);
 		// Create the toolbar
 		var Toolbar = $(`<div class="toolbar"></div>`).appendTo(this.Container);
+		this.ReturnButton = $(`<div class="button return">${Localized.Get("Return")}</div>`).on("click", () => this.Return()).appendTo(Toolbar);
 		this.PlayButton = $(`<div class="button run">${Localized.Get("RunCode")}</div>`).on("click", () => this.Play()).appendTo(Toolbar);
 		// this.FixButton = $(`<div class="button fix">${Localized.Get("FixCode")}</div>`).on("click", () => this.Fix()).appendTo(Toolbar);
 		this.AskButton = $(`<div class="button ask">${Localized.Get("AskCode")}</div>`).on("click", () => this.Ask()).appendTo(Toolbar);
@@ -100,7 +103,7 @@ export class CodeDisplay extends Display {
 	/** UpdateHistory: Update the history index of the display. */
 	private UpdateHistory() {
 		this.HistoryDisplay.text(`${this.CurrentIndex + 1} / ${this.Records.length}`);
-		this.PreviousButton.toggle(true);
+		this.PreviousButton.toggle(this.CurrentIndex > 1);
 		this.NextButton.toggle(this.CurrentIndex < this.Records.length - 1);
 	}
 	/** UpdateRecords: Update the records. */
@@ -118,16 +121,16 @@ export class CodeDisplay extends Display {
         }
 		this.UpdateHistory();
 	}
+	/** Return: Leave the mode immediately. */
+	private Return() {
+		this.Hide();
+		ChatManager.Instance.RequestOption(ChangeTopic());
+	}
 	/** ShowPrevious: Show the previous code section. */
 	private ShowPrevious() {
-		if (this.CurrentIndex == 0) {
-			this.Hide();
-			ChatManager.Instance.RequestOption(ChangeTopic());
-		} else {
-			this.SaveChanges();
-			this.CurrentIndex--;
-			this.UpdateRecords();
-		}
+		this.SaveChanges();
+		this.CurrentIndex--;
+		this.UpdateRecords();
 	}
 	/** ShowNext: Show the next code section. */
 	private ShowNext() {

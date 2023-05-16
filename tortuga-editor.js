@@ -35920,14 +35920,10 @@
             if (Content.startsWith("Output: "))
                 Content = Content.substring(8).trim();
             // Render the text
-            if (this.Finalized) {
-                this.ContentContainer.html(MarkdownToHTML(Content));
-                PostprocessHTML(OutputDisplay.Instance.Tab.Editor, this.ContentContainer);
+            this.ContentContainer.html(MarkdownToHTML(Content));
+            PostprocessHTML(OutputDisplay.Instance.Tab.Editor, this.ContentContainer);
+            if (this.Finalized)
                 NetLogoUtils.AnnotateCodes(this.ContentContainer.find("code"));
-            }
-            else {
-                this.ContentContainer.text(Content);
-            }
             // Remove the section if it's empty
             if (Content == "" && ((_c = (_b = Section.Options) === null || _b === void 0 ? void 0 : _b.length) !== null && _c !== void 0 ? _c : 0) == 0 && this.Finalized)
                 this.Container.remove();

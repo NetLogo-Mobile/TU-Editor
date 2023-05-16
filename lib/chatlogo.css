@@ -250,7 +250,7 @@
 	margin-top: 0.5rem;
 }
 .command-output .code code,
-.command-output pre code {
+.command-output .contents pre code {
 	border: 1px solid #eee;
 	cursor: pointer;
     padding: 0.5rem 0.8rem;

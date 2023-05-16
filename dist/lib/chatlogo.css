@@ -249,12 +249,18 @@
 .command-output :not(:first-child).code {
 	margin-top: 0.5rem;
 }
-.command-output .code code {
+.command-output .code code,
+.command-output pre code {
 	border: 1px solid #eee;
 	cursor: pointer;
     padding: 0.5rem 0.8rem;
-	background: #f7f7f7;
 	display: block;
+}
+.command-output code {
+	background: #f7f7f7;
+}
+.command-output pre code {
+	margin: 0.5rem 0;
 }
 .command-output ul {
 	margin: 0;

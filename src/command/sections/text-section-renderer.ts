@@ -18,13 +18,10 @@ export class TextSectionRenderer extends SectionRenderer {
         if (Content.startsWith("Output: "))
             Content = Content.substring(8).trim();
         // Render the text
-        if (this.Finalized) {
-            this.ContentContainer.html(MarkdownToHTML(Content));
-            PostprocessHTML(OutputDisplay.Instance.Tab.Editor, this.ContentContainer);
+        this.ContentContainer.html(MarkdownToHTML(Content));
+        PostprocessHTML(OutputDisplay.Instance.Tab.Editor, this.ContentContainer);
+        if (this.Finalized)
             NetLogoUtils.AnnotateCodes(this.ContentContainer.find("code"));
-        } else {
-            this.ContentContainer.text(Content);
-        }
         // Remove the section if it's empty
         if (Content == "" && (Section.Options?.length ?? 0) == 0 && this.Finalized)
             this.Container.remove();

@@ -14,6 +14,8 @@ export interface ChatRequest {
     Context?: ChatContext;
     /** Language: The language of the request. */
     Language?: string;
+    /** Temperature: The temperature of the request. The default is 0. */
+    Temperature?: number;
 }
 /** ClientChatRequest: A chat request from the client. */
 export interface ClientChatRequest extends ChatRequest {

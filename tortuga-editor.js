@@ -31675,7 +31675,7 @@
         });
         // ensure spacing is correct
         doc = view.state.doc.toString();
-        new_doc = avoidStrings(doc, finalSpacing);
+        new_doc = avoidStrings(doc, finalSpacing).trim();
         view.dispatch({ changes: { from: 0, to: doc.length, insert: new_doc } });
         // add indentation
         view.dispatch({
@@ -32182,19 +32182,24 @@
             // One-line mode
             if (this.Options.OneLine) {
                 Extensions.push(EditorState.transactionFilter.of((Transaction) => {
-                    if (Transaction.docChanged && Transaction.newDoc.lines > 1)
+                    if (Transaction.docChanged && Transaction.newDoc.lines > 1) {
+                        var NewDoc = Transaction.newDoc
+                            .toString()
+                            .replace('\n', ' ')
+                            .trim();
                         return [
                             {
                                 changes: {
                                     from: 0,
                                     to: this.CodeMirror.state.doc.length,
-                                    insert: Transaction.newDoc
-                                        .toString()
-                                        .replace('\n', ' ')
-                                        .trim(),
+                                    insert: NewDoc,
+                                },
+                                selection: {
+                                    anchor: NewDoc.length,
                                 },
                             },
                         ];
+                    }
                     return [Transaction];
                 }));
             }
@@ -32559,6 +32564,11 @@
     function IsTextLike(Section) {
         return Section.Type == ChatResponseType.Text || Section.Type == ChatResponseType.CompileError || Section.Type == ChatResponseType.RuntimeError;
     }
+    /** ExcludeCode: Returns true if the section is not code-like. */
+    function ExcludeCode(Section) {
+        var _a, _b;
+        return Section.Type != ChatResponseType.Code && Section.Type != ChatResponseType.RuntimeError && !((_b = !((_a = Section.Field) === null || _a === void 0 ? void 0 : _a.startsWith("__"))) !== null && _b !== void 0 ? _b : true);
+    }
     /** SectionsToJSON: Serialize a number of sections to JSON5. */
     function SectionsToJSON(Sections) {
         var _a;
@@ -32734,10 +32744,6 @@
                     // Try to parse an update
                     var TryParseUpdate = () => {
                         switch (Update.Type) {
-                            case ChatResponseType.ServerError:
-                                Reject(Update.Content);
-                                Client.Close();
-                                return;
                             case ChatResponseType.Start:
                                 if (Update.Edited && Update.Content) {
                                     Record.ID = Update.Content;
@@ -32917,9 +32923,16 @@
                     CurrentRenderer.Render();
                     this.Outputs.ScrollToBottom();
                 }, (Section) => {
+                    var _a;
                     // Finish the section
                     if (!CurrentRenderer)
                         return;
+                    // Special handling for ServerErrors
+                    if (Section.Type == ChatResponseType.ServerError && Section.Field !== "Irrecoverable") {
+                        if (Section.Field == "Temperature")
+                            Record.Temperature = (_a = Record.Temperature) !== null && _a !== void 0 ? _a : 0 + 0.2;
+                        Section.Parsed = SendRequest;
+                    }
                     CurrentRenderer.SetFinalized();
                     CurrentRenderer.SetData(Section);
                     CurrentRenderer.Render();
@@ -32943,7 +32956,7 @@
                     Renderer.AddSection({
                         Type: ChatResponseType.ServerError,
                         Content: Localized.Get("Connection to server failed _", Error !== null && Error !== void 0 ? Error : Localized.Get("Unknown")),
-                        Field: SendRequest
+                        Parsed: SendRequest
                     }).SetFinalized().Render();
                     this.Commands.ShowInput();
                     ChatManager.IsRequesting = false;
@@ -33033,14 +33046,14 @@
                     break;
                 case ContextMessage.MessagesAsText:
                     Context.PreviousMessages.unshift({
-                        Text: Record.Response.Sections.filter(IsTextLike)
+                        Text: Record.Response.Sections.filter(ExcludeCode).filter(IsTextLike)
                             .map(Section => Section.Content).join("\n"),
                         Role: ChatRole.Assistant
                     });
                     break;
                 case ContextMessage.MessagesAsJSON:
                     Context.PreviousMessages.unshift({
-                        Text: SectionsToJSON(Record.Response.Sections.filter(IsTextLike)),
+                        Text: SectionsToJSON(Record.Response.Sections.filter(ExcludeCode).filter(IsTextLike)),
                         Role: ChatRole.Assistant
                     });
                     break;
@@ -33056,7 +33069,7 @@
                 case ContextMessage.AllAsJSON:
                 default:
                     Context.PreviousMessages.unshift({
-                        Text: SectionsToJSON(Record.Response.Sections.filter(IsTextLike)),
+                        Text: SectionsToJSON(Record.Response.Sections.filter(ExcludeCode)),
                         Role: ChatRole.Assistant
                     });
             }
@@ -35880,11 +35893,11 @@
         RenderInternal() {
             var Section = this.GetData();
             this.ContentContainer.text(Section.Content);
-            if (!Section.Field)
+            if (!Section.Parsed)
                 return;
             $(`<a href="javascript:void(0)"></a>`).text(Localized.Get("Reconnect"))
                 .appendTo(this.ContentContainer).on("click", () => {
-                Section.Field();
+                Section.Parsed();
                 this.Parent.RemoveChildren(Child => Child instanceof ServerErrorRenderer);
             });
         }

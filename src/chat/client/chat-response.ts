@@ -65,7 +65,7 @@ export function IsTextLike(Section: ChatResponseSection): boolean {
 
 /** ExcludeCode: Returns true if the section is not code-like. */
 export function ExcludeCode(Section: ChatResponseSection): boolean {
-    return Section.Type != ChatResponseType.Code && Section.Type != ChatResponseType.RuntimeError && !(!Section.Field?.startsWith("__") ?? true);
+    return Section.Type != ChatResponseType.Code && Section.Type != ChatResponseType.RuntimeError && !(Section.Field?.startsWith("__") ?? true);
 }
 
 /** SectionsToJSON: Serialize a number of sections to JSON5. */

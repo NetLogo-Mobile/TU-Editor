@@ -14,6 +14,21 @@ export function ChangeTopic(Label?: string): ChatResponseOption {
     }
 }
 
+/** NewTopic: Generate a template new topic option. */
+export function NewTopic(Input: string, Label?: string): ChatResponseOption {
+    return {
+        Label: Label ?? "Let's start a new thread for this",
+        ActualInput: Input,
+        Operation: "Generic",
+        Style: "leave",
+        AskInput: false,
+        InputInContext: false,
+        CodeInContext: false,
+        TextInContext: ContextMessage.Nothing,
+        Inheritance: ContextInheritance.Drop
+    }
+}
+
 /** FollowUp: Generate a template follow-up option. */
 export function FollowUp(Label?: string): ChatResponseOption {
     return {
@@ -21,6 +36,17 @@ export function FollowUp(Label?: string): ChatResponseOption {
         Style: "followup",
         AskInput: true,
         Inheritance: ContextInheritance.InheritRecursive
+    }
+}
+
+/** AskFurther: Generate a template ask further option. */
+export function AskFurther(Label?: string): ChatResponseOption {
+    return {
+        Label: Label ?? "Actually, I mean...",
+        Style: "followup",
+        AskInput: true,
+        Inheritance: ContextInheritance.InheritRecursive,
+        Transparent: true
     }
 }
 
@@ -36,23 +62,16 @@ export function EditCode(Label?: string): ChatResponseOption {
     }
 }
 
-/** AskExamples: Ask for examples. */
-export function AskExamples(Label?: string): ChatResponseOption {
+/** ExampleCode: Ask for an example code. */
+export function ExampleCode(Label?: string): ChatResponseOption {
     return {
-        Label: Label ?? "Can you give me some examples?",
+        Label: Label ?? "Can you show me an example code?",
         Style: "followup",
-        SubOperation: "Examples",
+        Operation: "CodeCompose",
         AskInput: false,
-        Transparent: true,
-        Inheritance: ContextInheritance.InheritOne
+        Inheritance: ContextInheritance.InheritParent,
+        TextInContext: ContextMessage.MessagesAsText
     }
-}
-
-/** AskOtherExamples: Ask for other examples. */
-export function AskOtherExamples(Label?: string): ChatResponseOption {
-    var Option = AskExamples(Label ?? "Can you give me some other examples?");
-    Option.Style = "followup-more";
-    return Option;
 }
 
 /** AskCode: Ask a question about the code. */

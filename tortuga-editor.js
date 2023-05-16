@@ -32567,7 +32567,7 @@
     /** ExcludeCode: Returns true if the section is not code-like. */
     function ExcludeCode(Section) {
         var _a, _b;
-        return Section.Type != ChatResponseType.Code && Section.Type != ChatResponseType.RuntimeError && !((_b = !((_a = Section.Field) === null || _a === void 0 ? void 0 : _a.startsWith("__"))) !== null && _b !== void 0 ? _b : true);
+        return Section.Type != ChatResponseType.Code && Section.Type != ChatResponseType.RuntimeError && !((_b = (_a = Section.Field) === null || _a === void 0 ? void 0 : _a.startsWith("__")) !== null && _b !== void 0 ? _b : true);
     }
     /** SectionsToJSON: Serialize a number of sections to JSON5. */
     function SectionsToJSON(Sections) {

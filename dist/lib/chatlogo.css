@@ -231,7 +231,7 @@
 .command-output .record.activated .expand-record {
 	display: none;
 }
-.command-output .record:not(.activated) .section:not(:first-of-type) {
+.command-output .record:not(.activated) .section:not(.first) {
 	display: none;
 }
 .command-output .record:not(.activated) ul.options li:not(.chosen) {

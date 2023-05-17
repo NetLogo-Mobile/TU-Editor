@@ -35926,19 +35926,19 @@
         }
         /** RenderInternal: Render the UI element. */
         RenderInternal() {
-            var _a, _b, _c;
+            var _a, _b, _c, _d;
             var Section = this.GetData();
             var Content = (_a = Section.Content) !== null && _a !== void 0 ? _a : "";
-            // Filter the "output:"
-            if (Content.startsWith("Output: "))
-                Content = Content.substring(8).trim();
+            // Temporary messages
+            if ((_b = Section.Field) === null || _b === void 0 ? void 0 : _b.startsWith("__"))
+                this.Container.addClass("temporary");
             // Render the text
             this.ContentContainer.html(MarkdownToHTML(Content));
             PostprocessHTML(OutputDisplay.Instance.Tab.Editor, this.ContentContainer);
             if (this.Finalized)
                 NetLogoUtils.AnnotateCodes(this.ContentContainer.find("code"));
             // Remove the section if it's empty
-            if (Content == "" && ((_c = (_b = Section.Options) === null || _b === void 0 ? void 0 : _b.length) !== null && _c !== void 0 ? _c : 0) == 0 && this.Finalized)
+            if (Content == "" && ((_d = (_c = Section.Options) === null || _c === void 0 ? void 0 : _c.length) !== null && _d !== void 0 ? _d : 0) == 0 && this.Finalized)
                 this.Container.remove();
         }
     }
@@ -36801,8 +36801,10 @@
             if (!this.Visible)
                 TurtleEditor.Call({ Type: "TabSwitched", Tab: "$Editor$" });
             super.Show();
-            if (this.CodeRefreshed)
+            if (this.CodeRefreshed) {
                 this.Galapagos.Selection.SetCursorPosition(0);
+                this.CodeRefreshed = false;
+            }
         }
         /** Hide: Hide the editor tab.  */
         Hide() {

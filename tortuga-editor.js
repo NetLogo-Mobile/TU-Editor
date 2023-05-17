@@ -12555,6 +12555,49 @@
         decorations: v => v.decorations
     });
 
+    class Placeholder extends WidgetType {
+        constructor(content) {
+            super();
+            this.content = content;
+        }
+        toDOM() {
+            let wrap = document.createElement("span");
+            wrap.className = "cm-placeholder";
+            wrap.style.pointerEvents = "none";
+            wrap.appendChild(typeof this.content == "string" ? document.createTextNode(this.content) : this.content);
+            if (typeof this.content == "string")
+                wrap.setAttribute("aria-label", "placeholder " + this.content);
+            else
+                wrap.setAttribute("aria-hidden", "true");
+            return wrap;
+        }
+        coordsAt(dom) {
+            let rects = dom.firstChild ? clientRectsFor(dom.firstChild) : [];
+            if (!rects.length)
+                return null;
+            let style = window.getComputedStyle(dom.parentNode);
+            let rect = flattenRect(rects[0], style.direction != "rtl");
+            let lineHeight = parseInt(style.lineHeight);
+            if (rect.bottom - rect.top > lineHeight * 1.5)
+                return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.top + lineHeight };
+            return rect;
+        }
+        ignoreEvent() { return false; }
+    }
+    /**
+    Extension that enables a placeholder—a piece of example content
+    to show when the editor is empty.
+    */
+    function placeholder(content) {
+        return ViewPlugin.fromClass(class {
+            constructor(view) {
+                this.view = view;
+                this.placeholder = Decoration.set([Decoration.widget({ widget: new Placeholder(content), side: 1 }).range(0)]);
+            }
+            get decorations() { return this.view.state.doc.length ? Decoration.none : this.placeholder; }
+        }, { decorations: v => v.decorations });
+    }
+
     // Don't compute precise column positions for line offsets above this
     // (since it could get expensive). Assume offset==column for them.
     const MaxOff = 2000;
@@ -31354,12 +31397,12 @@
         '~CustomCommand': (Name) => `A user-defined command. `,
         // Chat and AI assistant
         Reconnect: () => `Reconnect`,
-        RunCode: () => `Run Code`,
+        RunCode: () => `Run`,
         'Trying to run the code': () => `Trying to run the code...`,
         'Trying to run the procedure _': (Name) => `Trying to run the procedure \`${Name}\`...`,
-        FixCode: () => `Fix Code`,
-        AskCode: () => `Ask a Question`,
-        AddCode: () => `Add to Project`,
+        FixCode: () => `Fix`,
+        AskCode: () => `Ask`,
+        AddCode: () => `Add to Code`,
         'Trying to add the code': () => `Trying to add the code to the project...`,
         PreviousVersion: () => `Back`,
         NextVersion: () => `Next`,
@@ -31382,6 +31425,8 @@
         Prettify: () => 'Prettify',
         ResetCode: () => 'Reset code',
         'Do you want to reset the code': () => 'Do you want to reset the code to the last successful compilation?',
+        'Type NetLogo command here': () => 'Type NetLogo command here',
+        'Talk to the computer in NetLogo or natural languages': () => `Talk to the computer in NetLogo or natural languages`,
         // Chat and execution messages
         'Connection to server failed _': (Error) => `Sorry, the connection to our server failed. Code ${Error}.`,
         'Summary of request': () => `Below is a summary of my request: `,
@@ -31399,11 +31444,12 @@
         // Default messages
         'Command center welcome (user)': () => `What is here about? Where should I start with?`,
         'Command center welcome (command)': () => `Here is the command center. You can type in NetLogo code and run it here, but there is always more to explore. Here are something you can try out.`,
-        'Command center welcome (assistant)': () => `Hello! I am your assistant. I can help you learn NetLogo or build your own project, but there is always more to explore. Here are something you can try out.`,
+        'Command center welcome (assistant)': () => `Hello! This is an AI assistant. I can help you learn NetLogo or build your own project, but there is always more to explore. Here are something you can try out.`,
         'Run NetLogo code directly': () => `Run **NetLogo** code directly`,
         'Check out the code tab': () => `Check out the **code** tab of the project`,
         'Talk to the computer in natural languages': () => `Talk to the computer in **natural languages**`,
         'Look for the documentation': () => `Look for the **learning materials** of NetLogo`,
+        'Ask questions about NetLogo': () => `Ask **questions** about NetLogo`,
     };
 
     const zh_cn = {
@@ -31486,12 +31532,14 @@
         Prettify: () => '整理代码',
         ResetCode: () => '重置代码',
         'Do you want to reset the code': () => '是否将代码重置到最后一次成功编译的状态？',
+        'Type NetLogo command here': () => '在这里输入 NetLogo 命令',
+        'Talk to the computer in NetLogo or natural languages': () => `用 NetLogo 或自然语言写代码`,
         // Chat and AI interface
         Reconnect: () => `重新连接`,
-        RunCode: () => `运行代码`,
+        RunCode: () => `运行`,
         'Trying to run the code': () => `尝试运行代码……`,
         'Trying to run the procedure _': (Name) => `尝试运行子程序 \`${Name}\`……`,
-        FixCode: () => `修复代码`,
+        FixCode: () => `修复`,
         AskCode: () => `提问`,
         AddCode: () => `放入作品`,
         'Trying to add the code': () => `尝试将代码放入作品……`,
@@ -31522,11 +31570,12 @@
         // Default messages
         'Command center welcome (user)': () => `这是哪儿？我应该怎么开始使用？`,
         'Command center welcome (command)': () => `你好！这里是控制台。你可以在这里输入 NetLogo 命令并立即执行。还有许多值得探索的功能，例如：`,
-        'Command center welcome (assistant)': () => `你好！我是你的助手。我可以帮助你学习 NetLogo 或创作你的作品。还有许多值得探索的功能，例如：`,
+        'Command center welcome (assistant)': () => `你好！这里是 AI 助手。我可以帮助你学习 NetLogo 或创作你的作品。还有许多值得探索的功能，例如：`,
         'Run NetLogo code directly': () => `直接运行 **NetLogo** 代码`,
         'Check out the code tab': () => `查看作品的**代码**`,
         'Talk to the computer in natural languages': () => `用**自然语言**写代码`,
         'Look for the documentation': () => `查看 NetLogo 语言的**帮助文档**`,
+        'Ask questions about NetLogo': () => `询问关于 NetLogo 的**问题**`,
     };
 
     /** LocalizationManager: Manage all localized texts. */
@@ -32361,9 +32410,11 @@
                 }));
             }
             // Wrapping mode
-            if (this.Options.Wrapping) {
+            if (this.Options.Wrapping)
                 Extensions.push(EditorView.lineWrapping);
-            }
+            // Placeholder
+            if (this.Options.Placeholder)
+                Extensions.push(placeholder(this.Options.Placeholder));
             // Build the editor
             this.CodeMirror = new EditorView({
                 extensions: Extensions,
@@ -35533,7 +35584,7 @@
                     Renderer.Render();
                 }
                 var Option = this.GetRecord().Response.Options[0];
-                var Link = $(`<p><a href="javascript:void(0)">${(_a = Option.LocalizedLabel) !== null && _a !== void 0 ? _a : Option.Label}</a></p>`)
+                var Link = $(`<p>→ <a href="javascript:void(0)">${(_a = Option.LocalizedLabel) !== null && _a !== void 0 ? _a : Option.Label}</a></p>`)
                     .appendTo(this.ContentContainer).on("click", () => {
                     this.SubmitParameters();
                     Link.addClass("chosen");
@@ -35920,7 +35971,7 @@
                 this.Code = Section.Content;
                 // Render the code
                 this.ContentContainer = $(`<code></code>`).replaceAll(this.ContentContainer)
-                    .on("click", () => this.EnterCode());
+                    .on("click", () => this.EnterCode()).addClass("enterable");
                 NetLogoUtils.AnnotateCode(this.ContentContainer, this.Code);
             }
             else {
@@ -36151,7 +36202,7 @@
             var _a, _b, _c;
             var Option = this.GetData();
             this.Container.addClass((_b = (_a = this.GetData().Style) === null || _a === void 0 ? void 0 : _a.toLowerCase()) !== null && _b !== void 0 ? _b : "generated").children("a")
-                .html(MarkdownToHTML((_c = Option.LocalizedLabel) !== null && _c !== void 0 ? _c : Option.Label));
+                .html(MarkdownToHTML((_c = Option.LocalizedLabel) !== null && _c !== void 0 ? _c : Option.Label).replace("<p>", "").replace("</p>", ""));
         }
         /** ClickHandler: The handler for the click event. */
         ClickHandler() {
@@ -36364,7 +36415,7 @@
             Renderer.SetData(Record);
             Renderer.ActivateSelf("activated");
             // Update the expand button.
-            this.ExpandButton.find("a").text(Localized.Get("Expand messages _", this.Children.length));
+            this.ExpandButton.find("a").text(Localized.Get("Expand messages _", this.Children.length) + " ↓");
             return Renderer;
         }
     }
@@ -36596,14 +36647,21 @@
             ];
             // AI response
             if (ChatManager.Available) {
+                this.Tab.Placeholder.innerText = Localized.Get("Talk to the computer in NetLogo or natural languages");
                 this.PrintOutput("Output", Localized.Get("Command center welcome (assistant)"));
                 Options.push({ Label: "Talk to the computer in natural languages", Callback: () => {
                         if (this.Tab.Galapagos.GetCode() == "")
                             this.Tab.Galapagos.SetCode("create some turtles around");
                         this.Tab.Galapagos.Focus();
                     } });
+                Options.push({ Label: "Ask questions about NetLogo", Callback: () => {
+                        if (this.Tab.Galapagos.GetCode() == "")
+                            this.Tab.Galapagos.SetCode("what's different between turtles and patches?");
+                        this.Tab.Galapagos.Focus();
+                    } });
             }
             else {
+                this.Tab.Placeholder.innerText = Localized.Get("Type your command here");
                 this.PrintOutput("Output", Localized.Get("Command center welcome (command)"));
                 Options.push({ Label: "Look for the documentation", Callback: () => {
                         this.Tab.ExecuteCommand("observer", "help", false);
@@ -36679,10 +36737,12 @@
 		<option value="turtles">${Localized.Get("Turtles")}</option>
 		<option value="patches">${Localized.Get("Patches")}</option>
 		<option value="links">${Localized.Get("Links")}</option>`);
+            this.Placeholder = $("<span></span>").get(0);
             // CodeMirror Editor
             this.Galapagos = new GalapagosEditor(this.CommandLine.find(".command-input").get(0), {
                 OneLine: true,
                 ParseMode: ParseMode.Oneline,
+                Placeholder: this.Placeholder,
                 OnKeyUp: (Event) => this.InputKeyHandler(Event),
                 OnDictionaryClick: (Text) => this.ExplainFull(Text)
             });

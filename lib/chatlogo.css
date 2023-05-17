@@ -74,7 +74,7 @@
 	padding-bottom: env(safe-area-inset-bottom);
 	align-items: center;
 	border-top: 1px solid #eee;
-	background-color: #f2f2f2;
+	background-color: #5A648D;
 }
 .darkmode--activated .command-line {
 	background-color: #CCC;
@@ -82,9 +82,10 @@
 .command-line .wrapper {
 	width: 100%;
 	display: flex;
-	padding: 0 0.5rem;
+	padding: 0 1rem;
 }
 .command-line select {
+	display: none;
 	border: none;
 	border-radius: 0.5rem;
 	color: #fff;
@@ -100,23 +101,23 @@
 }
 .command-line .command-input {
 	flex: 1 auto;
-	flex-grow: 1;
-	width: 1.4em;
-	/* Arbitrary width */
 	height: 2rem;
+	padding: 0 0.5rem;
+	flex-grow: 1;
+	background: #FFF;
+	border-radius: 0.24rem;
 }
 .command-line .command-input .cm-editor {
 	height: auto;
 	font-size: 1em;
-	background: #FFF;
 	max-height: 2rem;
-	border-radius: 0.24rem;
 }
 .command-line .command-input .cm-editor .cm-gutters {
 	display: none;
 }
 .command-line .command-input .cm-editor .cm-scroller {
 	line-height: 1.5;
+	overflow-x: hidden;
 	overflow-y: hidden;
 }
 .command-line .command-input .cm-editor .cm-scroller ::-webkit-scrollbar {
@@ -140,7 +141,7 @@
 	cursor: pointer;
 }
 .command-output .chosen a {
-	color: brown;
+	color: #353B53;
 }
 
 /** Subthreads and records */
@@ -153,13 +154,15 @@
 .command-output .subthread .expand a {
 	border: 1px solid #eee;
 	border-top: 0;
-	color: brown;
+	color: #5A648D;
 	margin: 0 1rem;
 	padding: 0.5rem;
 	display: block;
 	text-align: center;
 	background: #f3f3f3;
-	text-decoration: none;;
+	text-decoration: none;
+	border-bottom-left-radius: 1rem;
+	border-bottom-right-radius: 1rem;
 }
 .command-output .subthread:not(.activated) .record:not(:first-of-type) {
 	display: none;
@@ -168,9 +171,9 @@
 	display: none;
 }
 .command-output .record:not(:first-of-type) {
+	margin: 0 1rem;
 	border-left: 1px solid #eee;
 	border-right: 1px solid #eee;
-	margin: 0 1rem;
 }
 .command-output .record .input,
 .command-output .record .contents {
@@ -178,6 +181,15 @@
 	padding: 0.5rem 1rem;
     border-bottom: 1px solid #eee;
 	flex-direction: row;
+}
+.command-output .record:nth-last-child(2) {
+	border-bottom-left-radius: 1rem;
+	border-bottom-right-radius: 1rem;
+}
+.command-output .record:first-child .contents,
+.command-output .record:nth-last-child(2) .contents {
+	border-bottom-left-radius: 1rem;
+	border-bottom-right-radius: 1rem;
 }
 .command-output .record .contents {
 	padding-right: 0.5rem;
@@ -228,6 +240,13 @@
 .command-output .record:not(.activated) ul.options li.leave {
 	display: none;
 }
+.command-output ul.options li {
+	padding: 0 0 0 0.25rem;
+	list-style-type: "❖";
+}
+.command-output ul.options li.leave {
+	list-style-type: "←";
+}
 .command-output ul.options li.hidden {
     display: none;
 }
@@ -257,7 +276,13 @@
 	display: block;
 }
 .command-output code {
-	background: #f7f7f7;
+	background-color: #f7f7f7;
+}
+.command-output code {
+	background-size: 1.5rem;
+	background-image: url(../images/enter.png);
+	background-repeat: no-repeat;
+	background-position: top 0.5rem right 0.5rem;
 }
 .command-output pre code {
 	margin: 0.5rem 0;
@@ -284,6 +309,9 @@
 }
 .command-output .code-ideation p {
     padding: 0.3rem;
+}
+.command-output .code-ideation p:not(.chosen) a {
+	color: #cc2200;
 }
 .command-output .parameter input {
     width: 100%;
@@ -335,7 +363,31 @@
 	color: #2881e0;
 	cursor: pointer;
 	padding: 0.5rem 1rem;
+	margin-right: 1px;
+	background-size: 1rem;
 	background-color: #f7f7f7;
+	background-repeat: no-repeat;
+	background-position: left 0.6rem center;
+}
+.command-code .toolbar div.button.run {
+	background-image: url(../images/play.png);
+}
+.command-code .toolbar div.button.ask {
+	background-image: url(../images/ask.png);
+}
+.command-code .toolbar div.button.addtocode {
+	background-image: url(../images/code.png);
+}
+.command-code .toolbar div.button.run,
+.command-code .toolbar div.button.ask,
+.command-code .toolbar div.button.addtocode {
+	text-indent: 1rem;
+	padding-right: 0.75rem;
+}
+.command-code .toolbar div.button.return {
+	text-indent: -9999px;
+	background-image: url(../images/return.png);
+	background-position: center center;
 }
 .command-code .toolbar div.button:hover {
 	background-color: #f0f0f0;

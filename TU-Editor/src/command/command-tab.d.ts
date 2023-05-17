@@ -25,6 +25,8 @@ export declare class CommandTab extends Tab {
     readonly Sections: Display[];
     /** ChatManager: The chat interface to the backend. */
     readonly ChatManager: ChatManager;
+    /** Placeholder: The placeholder for the command center. */
+    readonly Placeholder: HTMLElement;
     /** Show: Show the command tab.  */
     Show(): void;
     /** Hide: Hide the command tab. */

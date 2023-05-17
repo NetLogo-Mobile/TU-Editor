@@ -17,6 +17,8 @@ select {
 p, pre, ul, ol {
 	margin: 0;
 }
+
+/** Editor Stylesheet */
 pre,
 code,
 .cm-editor .cm-content,
@@ -33,23 +35,12 @@ code {
 .cm-editor .cm-content {
 	font-size: 1rem;
 }
-
-/** Hints **/
-.Mobile .CodeMirror-hints {
-	max-height: 18em;
-	line-height: 1.8;
+.cm-editor .cm-tooltip.cm-tooltip-autocomplete > ul {
+	max-height: 11.4rem;
 }
-@media (max-device-height: 720px) {
-	.CodeMirror-hints,
-	.Mobile .CodeMirror-hints {
-		max-height: 12em;
-	}
-}
-@media (max-device-height: 480px) {
-	.CodeMirror-hints,
-	.Mobile .CodeMirror-hints {
-		max-height: 9em;
-	}
+.Mobile .cm-editor .cm-tooltip.cm-tooltip-autocomplete > ul > li, 
+.Mobile .cm-editor .cm-tooltip.cm-tooltip-autocomplete > ul > completion-section {
+	line-height: 1.5;
 }
 
 /** Multi-Tab Structure */

@@ -29,7 +29,7 @@ export class CodeIdeationRenderer extends JSONSectionRenderer<CodeParameter[]> {
                 Renderer.Render();
             }
             var Option = this.GetRecord().Response.Options[0];
-            var Link = $(`<p><a href="javascript:void(0)">${Option.LocalizedLabel ?? Option.Label}</a></p>`)
+            var Link = $(`<p>→ <a href="javascript:void(0)">${Option.LocalizedLabel ?? Option.Label}</a></p>`)
                 .appendTo(this.ContentContainer).on("click", () => {
                     this.SubmitParameters();
                     Link.addClass("chosen");

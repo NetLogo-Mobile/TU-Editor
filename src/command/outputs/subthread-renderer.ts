@@ -35,7 +35,7 @@ export class SubthreadRenderer extends UIRendererOf<ChatSubthread> {
         Renderer.SetData(Record);
         Renderer.ActivateSelf("activated");
         // Update the expand button.
-        this.ExpandButton.find("a").text(Localized.Get("Expand messages _", this.Children.length));
+        this.ExpandButton.find("a").text(Localized.Get("Expand messages _", this.Children.length) + " ↓");
         return Renderer;
     }
 }

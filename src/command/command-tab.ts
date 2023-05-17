@@ -31,6 +31,8 @@ export class CommandTab extends Tab {
 	public readonly Sections: Display[] = [];
 	/** ChatManager: The chat interface to the backend. */
 	public readonly ChatManager: ChatManager;
+	/** Placeholder: The placeholder for the command center. */
+	public readonly Placeholder: HTMLElement;
 	/** Show: Show the command tab.  */
 	public Show() {
 		if (!this.Visible) TurtleEditor.Call({ Type: "TabSwitched", Tab: "$Command$" });
@@ -83,10 +85,12 @@ export class CommandTab extends Tab {
 		<option value="turtles">${Localized.Get("Turtles")}</option>
 		<option value="patches">${Localized.Get("Patches")}</option>
 		<option value="links">${Localized.Get("Links")}</option>`)
+		this.Placeholder = $("<span></span>").get(0)!;
 		// CodeMirror Editor
 		this.Galapagos = new GalapagosEditor(this.CommandLine.find(".command-input").get(0)!, {
 			OneLine: true,
 			ParseMode: ParseMode.Oneline,
+			Placeholder: this.Placeholder,
 			OnKeyUp: (Event: any) => this.InputKeyHandler(Event),
 			OnDictionaryClick: (Text: any) => this.ExplainFull(Text)
 		});

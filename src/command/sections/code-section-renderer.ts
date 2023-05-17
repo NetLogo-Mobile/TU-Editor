@@ -24,7 +24,7 @@ export class CodeSectionRenderer extends SectionRenderer {
             this.Code = Section.Content;
             // Render the code
             this.ContentContainer = $(`<code></code>`).replaceAll(this.ContentContainer)
-                .on("click", () => this.EnterCode());
+                .on("click", () => this.EnterCode()).addClass("enterable");
             NetLogoUtils.AnnotateCode(this.ContentContainer, this.Code);
         } else {
             this.Code = Section.Content?.trim() ?? "";

@@ -232,13 +232,20 @@ export class OutputDisplay extends Display {
 		];
 		// AI response
 		if (ChatManager.Available) {
+			this.Tab.Placeholder.innerText = Localized.Get("Talk to the computer in NetLogo or natural languages");
 			this.PrintOutput("Output", Localized.Get("Command center welcome (assistant)"));
 			Options.push({ Label: "Talk to the computer in natural languages", Callback: () => {
 				if (this.Tab.Galapagos.GetCode() == "")
 					this.Tab.Galapagos.SetCode("create some turtles around");
 				this.Tab.Galapagos.Focus();
 			}});
+			Options.push({ Label: "Ask questions about NetLogo", Callback: () => {
+				if (this.Tab.Galapagos.GetCode() == "")
+					this.Tab.Galapagos.SetCode("what's different between turtles and patches?");
+				this.Tab.Galapagos.Focus();
+			}});
 		} else {
+			this.Tab.Placeholder.innerText = Localized.Get("Type your command here");
 			this.PrintOutput("Output", Localized.Get("Command center welcome (command)"));
 			Options.push({ Label: "Look for the documentation", Callback: () => {
 				this.Tab.ExecuteCommand("observer", "help", false);

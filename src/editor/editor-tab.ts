@@ -12,7 +12,10 @@ export class EditorTab extends Tab {
     public Show() {
 		if (!this.Visible) TurtleEditor.Call({ Type: "TabSwitched", Tab: "$Editor$" });
         super.Show();
-		if (this.CodeRefreshed) this.Galapagos.Selection.SetCursorPosition(0);
+		if (this.CodeRefreshed) {
+			this.Galapagos.Selection.SetCursorPosition(0);
+			this.CodeRefreshed = false;
+		}
     }
 	/** Hide: Hide the editor tab.  */
     public Hide() {

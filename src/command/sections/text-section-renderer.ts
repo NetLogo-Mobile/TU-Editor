@@ -14,9 +14,9 @@ export class TextSectionRenderer extends SectionRenderer {
     protected RenderInternal(): void {
         var Section = this.GetData();
         var Content = Section.Content ?? "";
-        // Filter the "output:"
-        if (Content.startsWith("Output: "))
-            Content = Content.substring(8).trim();
+        // Temporary messages
+        if (Section.Field?.startsWith("__"))
+            this.Container.addClass("temporary");
         // Render the text
         this.ContentContainer.html(MarkdownToHTML(Content));
         PostprocessHTML(OutputDisplay.Instance.Tab.Editor, this.ContentContainer);

@@ -118,7 +118,7 @@
 			});
 
 			// Initialize
-			var Initialize = function() {
+			window.Initialize = function() {
 				window.Editor = new TurtleEditor(document.querySelector("div.root-container"), PostMessage);
 				window.EditorTab = window.Editor.EditorTabs[0];
 				window.Commands = window.Editor.CommandTab;

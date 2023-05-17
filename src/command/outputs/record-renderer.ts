@@ -61,11 +61,12 @@ export class RecordRenderer extends UIRendererOf<ChatRecord> {
         }
         // If no renderer was chosen, use the default renderer
         Renderer = Renderer ?? new SectionRenderer();
-        // If this is the first section
-        if (this.Children.length == 1) Renderer.SetFirst();
         // Add the renderer
         this.AddChild(Renderer, false);
         Renderer.SetData(Section);
+        // If this is the first section
+        if (this.Children.findIndex(Child => Child instanceof SectionRenderer && 
+            Child.Container.hasClass("first")) === -1) Renderer.SetFirst();
         // Append to the container
         if (this.OptionContainer) {
             this.OptionContainer.before(Renderer.Container);

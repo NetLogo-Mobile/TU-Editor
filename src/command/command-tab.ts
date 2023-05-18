@@ -343,6 +343,7 @@ export class CommandTab extends Tab {
 				Content: JSON.stringify(Errors),
 				Parsed: Errors
 			}]);
+			this.Codes.Editor.SetCompilerErrors(Errors);
 			delete this.TemporaryCode;
 		}
 	}

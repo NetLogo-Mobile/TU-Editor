@@ -23,7 +23,7 @@ export class SubthreadRenderer extends UIRendererOf<ChatSubthread> {
     /** RenderInternal: Render the UI element. */
     protected RenderInternal(): void {
         this.ExpandButton.toggleClass("hidden", 
-            this.Children.length == 0 || (this.Children.length == 1 && this.Children[0].Children.length <= 1));
+            this.Children.length == 0 || (this.Children.length == 1 && this.Children[0].Children.length <= 2));
     }
     /** AddRecord: Add a record to the subthread. */
     public AddRecord(Record: ChatRecord): RecordRenderer {

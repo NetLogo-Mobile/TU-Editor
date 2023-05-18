@@ -97,7 +97,7 @@ export class OutputDisplay extends Display {
 		var LastRecord = this.Subthread!.Children[this.Subthread!.Children.length - 1] as RecordRenderer;
 		for (var Section in Sections)
 			LastRecord.AddSection(Sections[Section])?.SetFinalized();
-		LastRecord.Render();
+		this.Subthread!.Render();
 		this.ScrollToBottom();
 	}
 	/** RenderOption: Render a response option in the current record. */

@@ -5006,15 +5006,15 @@
     }
     // Also used for collapsed ranges that don't have a placeholder widget!
     class WidgetView extends ContentView {
+        static create(widget, length, side) {
+            return new (widget.customView || WidgetView)(widget, length, side);
+        }
         constructor(widget, length, side) {
             super();
             this.widget = widget;
             this.length = length;
             this.side = side;
             this.prevWidget = null;
-        }
-        static create(widget, length, side) {
-            return new (widget.customView || WidgetView)(widget, length, side);
         }
         split(from) {
             let result = WidgetView.create(this.widget, this.length - from, this.side);
@@ -6399,6 +6399,10 @@
     */
     class BidiSpan {
         /**
+        The direction of this span.
+        */
+        get dir() { return this.level % 2 ? RTL : LTR; }
+        /**
         @internal
         */
         constructor(
@@ -6422,10 +6426,6 @@
             this.to = to;
             this.level = level;
         }
-        /**
-        The direction of this span.
-        */
-        get dir() { return this.level % 2 ? RTL : LTR; }
         /**
         @internal
         */
@@ -6664,7 +6664,6 @@
         constructor(points, state) {
             this.points = points;
             this.text = "";
-            console.log("make reader");
             this.lineSeparator = state.facet(EditorState.lineSeparator);
         }
         append(text) {
@@ -6768,6 +6767,7 @@
     }
 
     class DocView extends ContentView {
+        get length() { return this.view.state.doc.length; }
         constructor(view) {
             super();
             this.view = view;
@@ -6798,7 +6798,6 @@
             this.updateDeco();
             this.updateInner([new ChangedRange(0, 0, 0, view.state.doc.length)], 0);
         }
-        get length() { return this.view.state.doc.length; }
         // Update the document view to a given state. scrollIntoView can be
         // used as a hint to compute a new viewport that includes that
         // position, if we know the editor is going to scroll that position
@@ -7659,6 +7658,10 @@
 
     // This will also be where dragging info and such goes
     class InputState {
+        setSelectionOrigin(origin) {
+            this.lastSelectionOrigin = origin;
+            this.lastSelectionTime = Date.now();
+        }
         constructor(view) {
             this.lastKeyCode = 0;
             this.lastKeyTime = 0;
@@ -7754,10 +7757,6 @@
             // issue where the composition vanishes when you press enter.
             if (browser.safari)
                 view.contentDOM.addEventListener("input", () => null);
-        }
-        setSelectionOrigin(origin) {
-            this.lastSelectionOrigin = origin;
-            this.lastSelectionTime = Date.now();
         }
         ensureHandlers(view, plugins) {
             var _a;
@@ -10682,6 +10681,53 @@
     */
     class EditorView {
         /**
+        The current editor state.
+        */
+        get state() { return this.viewState.state; }
+        /**
+        To be able to display large documents without consuming too much
+        memory or overloading the browser, CodeMirror only draws the
+        code that is visible (plus a margin around it) to the DOM. This
+        property tells you the extent of the current drawn viewport, in
+        document positions.
+        */
+        get viewport() { return this.viewState.viewport; }
+        /**
+        When there are, for example, large collapsed ranges in the
+        viewport, its size can be a lot bigger than the actual visible
+        content. Thus, if you are doing something like styling the
+        content in the viewport, it is preferable to only do so for
+        these ranges, which are the subset of the viewport that is
+        actually drawn.
+        */
+        get visibleRanges() { return this.viewState.visibleRanges; }
+        /**
+        Returns false when the editor is entirely scrolled out of view
+        or otherwise hidden.
+        */
+        get inView() { return this.viewState.inView; }
+        /**
+        Indicates whether the user is currently composing text via
+        [IME](https://en.wikipedia.org/wiki/Input_method), and at least
+        one change has been made in the current composition.
+        */
+        get composing() { return this.inputState.composing > 0; }
+        /**
+        Indicates whether the user is currently in composing state. Note
+        that on some platforms, like Android, this will be the case a
+        lot, since just putting the cursor on a word starts a
+        composition there.
+        */
+        get compositionStarted() { return this.inputState.composing >= 0; }
+        /**
+        The document or shadow root that the view lives in.
+        */
+        get root() { return this._root; }
+        /**
+        @internal
+        */
+        get win() { return this.dom.ownerDocument.defaultView || window; }
+        /**
         Construct a new view. You'll want to either provide a `parent`
         option, or put `view.dom` into your document after creating a
         view, so that the user can see the editor.
@@ -10734,56 +10780,10 @@
             if (config.parent)
                 config.parent.appendChild(this.dom);
         }
-        /**
-        The current editor state.
-        */
-        get state() { return this.viewState.state; }
-        /**
-        To be able to display large documents without consuming too much
-        memory or overloading the browser, CodeMirror only draws the
-        code that is visible (plus a margin around it) to the DOM. This
-        property tells you the extent of the current drawn viewport, in
-        document positions.
-        */
-        get viewport() { return this.viewState.viewport; }
-        /**
-        When there are, for example, large collapsed ranges in the
-        viewport, its size can be a lot bigger than the actual visible
-        content. Thus, if you are doing something like styling the
-        content in the viewport, it is preferable to only do so for
-        these ranges, which are the subset of the viewport that is
-        actually drawn.
-        */
-        get visibleRanges() { return this.viewState.visibleRanges; }
-        /**
-        Returns false when the editor is entirely scrolled out of view
-        or otherwise hidden.
-        */
-        get inView() { return this.viewState.inView; }
-        /**
-        Indicates whether the user is currently composing text via
-        [IME](https://en.wikipedia.org/wiki/Input_method), and at least
-        one change has been made in the current composition.
-        */
-        get composing() { return this.inputState.composing > 0; }
-        /**
-        Indicates whether the user is currently in composing state. Note
-        that on some platforms, like Android, this will be the case a
-        lot, since just putting the cursor on a word starts a
-        composition there.
-        */
-        get compositionStarted() { return this.inputState.composing >= 0; }
-        /**
-        The document or shadow root that the view lives in.
-        */
-        get root() { return this._root; }
-        /**
-        @internal
-        */
-        get win() { return this.dom.ownerDocument.defaultView || window; }
         dispatch(...input) {
-            this._dispatch(input.length == 1 && input[0] instanceof Transaction ? input[0]
-                : this.state.update(...input));
+            let tr = input.length == 1 && input[0] instanceof Transaction ? input[0]
+                : this.state.update(...input);
+            this._dispatch(tr, this);
         }
         /**
         Update the view for the given array of transactions. This will
@@ -13055,16 +13055,16 @@
     });
     const showHoverTooltip = /*@__PURE__*/Facet.define();
     class HoverTooltipHost {
+        // Needs to be static so that host tooltip instances always match
+        static create(view) {
+            return new HoverTooltipHost(view);
+        }
         constructor(view) {
             this.view = view;
             this.mounted = false;
             this.dom = document.createElement("div");
             this.dom.classList.add("cm-tooltip-hover");
             this.manager = new TooltipViewManager(view, showHoverTooltip, t => this.createHostedView(t));
-        }
-        // Needs to be static so that host tooltip instances always match
-        static create(view) {
-            return new HoverTooltipHost(view);
         }
         createHostedView(tooltip) {
             let hostedView = tooltip.create(this.view);
@@ -32586,7 +32586,8 @@
             State.RuntimeErrors = [];
             this.ForceLint();
             // Set the cursor position
-            this.Selection.SetCursorPosition(Errors[0].start);
+            if (Errors.length > 0)
+                this.Selection.SetCursorPosition(Errors[0].start);
         }
         /** SetCompilerErrors: Sync the runtime errors and present it on the editor. */
         SetRuntimeErrors(Errors) {
@@ -32599,7 +32600,8 @@
             State.RuntimeErrors = Errors;
             this.ForceLint();
             // Set the cursor position
-            this.Selection.SetCursorPosition(Errors[0].start);
+            if (Errors.length > 0)
+                this.Selection.SetCursorPosition(Errors[0].start);
         }
         /** FixUnknownErrors: Fix the unknown errors. */
         FixUnknownErrors(Errors) {
@@ -36455,7 +36457,7 @@
         }
         /** RenderInternal: Render the UI element. */
         RenderInternal() {
-            this.ExpandButton.toggleClass("hidden", this.Children.length == 0 || (this.Children.length == 1 && this.Children[0].Children.length <= 1));
+            this.ExpandButton.toggleClass("hidden", this.Children.length == 0 || (this.Children.length == 1 && this.Children[0].Children.length <= 2));
         }
         /** AddRecord: Add a record to the subthread. */
         AddRecord(Record) {
@@ -37044,6 +37046,7 @@
                         Content: JSON.stringify(Errors),
                         Parsed: Errors
                     }]);
+                this.Codes.Editor.SetCompilerErrors(Errors);
                 delete this.TemporaryCode;
             }
         }

@@ -332,6 +332,7 @@ export class CommandTab extends Tab {
 				Type: ChatResponseType.CompileError,
 				Content: Localized.Get("Compile error in model")
 			}]);
+			delete this.TemporaryCode;
 		} else {
 			this.Outputs.RenderResponses([{
 				Type: ChatResponseType.CompileError,
@@ -342,6 +343,7 @@ export class CommandTab extends Tab {
 				Content: JSON.stringify(Errors),
 				Parsed: Errors
 			}]);
+			delete this.TemporaryCode;
 		}
 	}
 	// #endregion

@@ -36000,6 +36000,11 @@
             var Section = this.GetData();
             if (Section.Parsed) {
                 this.ContentContainer.text(Localized.Get("Compile error in snippet _", Section.Parsed.length));
+                for (var I = 0; I < Section.Parsed.length; I++) {
+                    var Metadata = Section.Parsed[I];
+                    // $("<code></code>").appendTo(this.ContentContainer).text(Metadata.Code);
+                    $("<li></li>").appendTo($("<ul></ul>").appendTo(this.ContentContainer)).text(Metadata.message);
+                }
             }
             else {
                 this.ContentContainer.text(Section.Content);
@@ -36981,6 +36986,7 @@
                         Type: ChatResponseType.CompileError,
                         Content: Localized.Get("Compile error in model")
                     }]);
+                delete this.TemporaryCode;
             }
             else {
                 this.Outputs.RenderResponses([{
@@ -36992,6 +36998,7 @@
                         Content: JSON.stringify(Errors),
                         Parsed: Errors
                     }]);
+                delete this.TemporaryCode;
             }
         }
     }

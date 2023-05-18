@@ -240,6 +240,7 @@
 .command-output .record:not(.activated) ul.options li.leave {
 	display: none;
 }
+/*
 .command-output ul.options li {
 	padding: 0 0 0 0.25rem;
 	list-style-type: "❖";
@@ -247,6 +248,7 @@
 .command-output ul.options li.leave {
 	list-style-type: "←";
 }
+*/
 .command-output ul.options li.hidden {
     display: none;
 }
@@ -260,6 +262,9 @@
 }
 .command-output .compile-error,
 .command-output .runtime-error {
+	color: #cc2200;
+}
+.command-output .compile-error ul li {
 	color: #cc2200;
 }
 .command-output .succeeded {
@@ -278,7 +283,7 @@
 .command-output code {
 	background-color: #f7f7f7;
 }
-.command-output code {
+.command-output code.enterable {
 	background-size: 1.5rem;
 	background-image: url(../images/enter.png);
 	background-repeat: no-repeat;

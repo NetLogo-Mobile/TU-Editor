@@ -1,5 +1,7 @@
 import { GalapagosEditor } from "../../../CodeMirror-NetLogo/src/editor";
+import { RuntimeError } from "../../../CodeMirror-NetLogo/src/lang/linters/runtime-linter";
 import { CodeSnapshot } from "../../../CodeMirror-NetLogo/src/lang/services/code-snapshot";
+import { Diagnostic } from "../chat/client/languages/netlogo-context";
 
 /** NetLogoUtils: Utilities for the NetLogo language. */
 export class NetLogoUtils {
@@ -44,4 +46,17 @@ export class NetLogoUtils {
 	public static PostprocessLintMessage(Message: string): string {
 		return Message;
 	}
+}
+
+/** ErrorToDiagnostic: Convert a runtime error to a diagnostic. */
+export function ErrorToDiagnostic(Error: RuntimeError): Diagnostic {
+	return {
+		Message: Error.message,
+		Code: Error.code!,
+	};
+}
+
+/** ErrorsToDiagnostics: Convert runtime errors to diagnostics. */
+export function ErrorsToDiagnostics(Errors: RuntimeError[]): Diagnostic[] {
+	return Errors.map(ErrorToDiagnostic);
 }

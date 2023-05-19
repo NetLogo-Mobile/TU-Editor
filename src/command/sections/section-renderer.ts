@@ -1,4 +1,5 @@
 import { ChatManager } from "../../chat/chat-manager";
+import { ChatResponseOption } from "../../chat/client/chat-option";
 import { ChatRecord } from "../../chat/client/chat-record";
 import { ChatResponseSection, ChatResponseType } from "../../chat/client/chat-response";
 import { RecordRenderer } from "../outputs/record-renderer";
@@ -45,5 +46,12 @@ export class SectionRenderer extends UIRendererOf<ChatResponseSection> {
             return;
         } 
         this.ContentContainer.text(`${this.GetData().Field ?? "Empty"}: ${this.GetData().Content ?? ""}`);
+    }
+    /** ShowPseudoOption: Show a pseudo option. */
+    protected ShowPseudoOption(Option: ChatResponseOption, Callback: (Option: ChatResponseOption) => void) {
+        Option.Callback = () => Callback(Option);
+        var Parent = (this.Parent! as RecordRenderer);
+        Parent.GetData().Response.Options!.push(Option);
+        Parent.SetDirty(true);
     }
 }

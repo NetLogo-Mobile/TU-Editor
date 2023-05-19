@@ -9,8 +9,8 @@ import { ChatResponseOption } from "../../chat/client/chat-option";
 import { SubthreadRenderer } from "../outputs/subthread-renderer";
 import { RecordRenderer } from '../outputs/record-renderer';
 import { ChatResponseSection, ChatResponseType } from "../../chat/client/chat-response";
-import { Diagnostic, Procedure } from "../../chat/client/languages/netlogo-context";
-import { ChangeTopic, FixCode } from '../../chat/client/options/option-templates';
+import { DiagnosticType, Diagnostics, Procedure } from "../../chat/client/languages/netlogo-context";
+import { ChangeTopic } from '../../chat/client/options/option-templates';
 
 /** CodeDisplay: The interactive code editor section. */
 export class CodeDisplay extends Display {
@@ -23,8 +23,6 @@ export class CodeDisplay extends Display {
 	private ReturnButton: JQuery<HTMLElement>;
 	/** PlayButton: The play button of the display. */
 	private PlayButton: JQuery<HTMLElement>;
-	/** FixButton: The fix button of the display. */
-	// private FixButton: JQuery<HTMLElement>;
 	/** AskButton: The ask button of the display. */
 	private AskButton: JQuery<HTMLElement>;
 	/** AddToCodeButton: The add to code button of the display. */
@@ -53,7 +51,6 @@ export class CodeDisplay extends Display {
 		var Toolbar = $(`<div class="toolbar"></div>`).appendTo(this.Container);
 		this.ReturnButton = $(`<div class="button return">${Localized.Get("Return")}</div>`).on("click", () => this.Return()).appendTo(Toolbar);
 		this.PlayButton = $(`<div class="button run">${Localized.Get("RunCode")}</div>`).on("click", () => this.Play()).appendTo(Toolbar);
-		// this.FixButton = $(`<div class="button fix">${Localized.Get("FixCode")}</div>`).on("click", () => this.Fix()).appendTo(Toolbar);
 		this.AskButton = $(`<div class="button ask">${Localized.Get("AskCode")}</div>`).on("click", () => this.Ask()).appendTo(Toolbar);
 		this.AddToCodeButton = $(`<div class="button addtocode">${Localized.Get("AddCode")}</div>`).hide().on("click", () => this.AddToCode()).appendTo(Toolbar);
 		// Create the history
@@ -165,33 +162,20 @@ export class CodeDisplay extends Display {
 	public TryTo(Action: () => void) {
 		this.Editor.Semantics.PrettifyAll();
 		this.ExportDiagnostics().then(Diagnostics => {
-			if (Diagnostics.length == 0) {
+			if (Diagnostics.Diagnostics.length == 0) {
 				Action();
 			} else {
-				this.Tab.Outputs.RenderOptions([
-					FixCode(),
-					ChangeTopic()
-				]);
+				Diagnostics.Hidden = true;
+				this.Tab.Outputs.RenderOptions([ ChangeTopic() ]);
 				this.Tab.Outputs.RenderResponses([
 					{
-						Type: ChatResponseType.Text,
+						Type: ChatResponseType.CompileError,
 						Field: "Message",
-						Content: Localized.Get("We need to fix the following errors _", Diagnostics.length),
-					},
-					{
-						Type: ChatResponseType.Thought,
-						Field: "Code",
-						Content: this.Editor.GetCode(),
-					},
-					{
-						Type: ChatResponseType.Thought,
-						Field: "HTML",
-						Content: this.Editor.Semantics.Highlight().innerHTML.trim().split(/\<br\>/g).join("\n"),
+						Content: Localized.Get("We need to fix the following errors _", Diagnostics.Diagnostics.length),
 					},
 					{
 						Type: ChatResponseType.JSON,
 						Field: "Diagnostics",
-						Content: JSON.stringify(Diagnostics),
 						Parsed: Diagnostics
 					}
 				]);
@@ -199,15 +183,19 @@ export class CodeDisplay extends Display {
 		});
 	}
 	/** Fix: Try to fix the code. */
-	public async ExportDiagnostics(): Promise<Diagnostic[]> {
+	public async ExportDiagnostics(): Promise<Diagnostics> {
 		var Diagnostics = await this.Editor.ForceLintAsync();
 			Diagnostics = Diagnostics.filter(Diagnostic => Diagnostic.severity == "error");
-		return Diagnostics.map(Diagnostic => {
-			return {
-				Message: NetLogoUtils.PostprocessLintMessage(Diagnostic.message),
-				Code: this.Editor.GetCodeSlice(Diagnostic.from, Diagnostic.to)
-			};
-		});
+		return {
+			Type: DiagnosticType.Compile,
+			Code: this.Editor.GetCode(),
+			Diagnostics: Diagnostics.map(Diagnostic => {
+				return {
+					Message: NetLogoUtils.PostprocessLintMessage(Diagnostic.message),
+					Code: this.Editor.GetCodeSlice(Diagnostic.from, Diagnostic.to)
+				};
+			})
+		};
 	}
 	/** Play: Try to play the code. */
 	public Play() {

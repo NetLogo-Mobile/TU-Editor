@@ -7,10 +7,11 @@ import { Display } from "./displays/display";
 import { CodeDisplay } from "./displays/code";
 import { GalapagosEditor, Localized } from "../../../CodeMirror-NetLogo/src/editor";
 import { ParseMode } from "../../../CodeMirror-NetLogo/src/editor-config";
-import { Procedure } from "../chat/client/languages/netlogo-context";
+import { Diagnostics, DiagnosticType, Procedure } from "../chat/client/languages/netlogo-context";
 import { CodeArguments } from "./renderers/arguments-renderer";
 import { ChatResponseType } from "../chat/client/chat-response";
 import { RuntimeError } from "../../../CodeMirror-NetLogo/src/lang/linters/runtime-linter";
+import { ErrorsToDiagnostics } from "../utils/netlogo";
 
 declare const { bodyScrollLock, EditorDictionary }: any;
 
@@ -334,14 +335,20 @@ export class CommandTab extends Tab {
 			}]);
 			delete this.TemporaryCode;
 		} else {
+			// Build the diagnostics
+			var Diagnostics: Diagnostics = {
+				Type: DiagnosticType.Compile,
+				Diagnostics: ErrorsToDiagnostics(Errors),
+				Code: this.TemporaryCode
+			};
+			// Show the diagnostics
 			this.Outputs.RenderResponses([{
 				Type: ChatResponseType.CompileError,
-				Parsed: Errors
+				Parsed: Diagnostics.Diagnostics.length
 			}, {
 				Type: ChatResponseType.JSON,
 				Field: "Diagnostics",
-				Content: JSON.stringify(Errors),
-				Parsed: Errors
+				Parsed: Diagnostics
 			}]);
 			this.Codes.Editor.SetCompilerErrors(Errors);
 			delete this.TemporaryCode;

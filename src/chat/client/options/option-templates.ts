@@ -91,7 +91,7 @@ export function AskCode(Label?: string, Style?: string): ChatResponseOption {
 /** FixCode: Fix the current code snippet. */
 export function FixCode(Label?: string): ChatResponseOption {
     return {
-        Label: Label ?? "Can you help me fix the code?",
+        Label: Label ?? "Help me fix this code",
         Operation: "CodeFix",
         Style: "hidden",
         AskInput: true,
@@ -99,6 +99,20 @@ export function FixCode(Label?: string): ChatResponseOption {
         TextInContext: ContextMessage.Nothing,
         CodeInContext: true,
         Transparent: true,
+        Inheritance: ContextInheritance.InheritOne
+    }
+}
+
+/** ExplainErrors: Explain the errors. */
+export function ExplainErrors(Label?: string): ChatResponseOption {
+    return {
+        Label: Label ?? "Explain the error",
+        Operation: "ExplainErrors",
+        Style: "hidden",
+        AskInput: true,
+        InputInContext: false,
+        TextInContext: ContextMessage.Nothing,
+        CodeInContext: true,
         Inheritance: ContextInheritance.InheritOne
     }
 }

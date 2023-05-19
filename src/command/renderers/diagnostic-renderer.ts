@@ -1,12 +1,16 @@
 import { CodeDisplay } from '../displays/code';
-import { RecordRenderer, RendererChooser } from '../outputs/record-renderer';
+import { RendererChooser } from '../outputs/record-renderer';
 import { UIRendererOf } from "../outputs/ui-renderer";
 import { JSONSectionRenderer } from "../sections/json-section-renderer";
 import { ChatManager } from '../../chat/chat-manager';
-import { Diagnostic } from "../../chat/client/languages/netlogo-context";
+import { Diagnostic, DiagnosticType, Diagnostics } from "../../chat/client/languages/netlogo-context";
+import { ChatResponseOption } from '../../chat/client/chat-option';
+import { ExplainErrors, FixCode } from '../../chat/client/options/option-templates';
+import { NetLogoUtils } from '../../utils/netlogo';
+import { Localized } from '../../../../CodeMirror-NetLogo/src/editor';
 
 /** DiagnosticsRenderer: A dedicated block for code diagnostics. */
-export class DiagnosticsRenderer extends JSONSectionRenderer<Diagnostic[]> {
+export class DiagnosticsRenderer extends JSONSectionRenderer<Diagnostics> {
     /** Constructor: Create a new UI renderer. */
     public constructor() {
         super();
@@ -18,51 +22,52 @@ export class DiagnosticsRenderer extends JSONSectionRenderer<Diagnostic[]> {
     }
     /** RenderInternal: Render the UI element. */
     protected RenderInternal(): void { 
-        // For now, we don't render the diagnostics
-        var Record = this.GetRecord();
-        /*var Rendered = Record.Response.Sections.find((Section) => Section.Field == "HTML")!.Content?.split("\n") ?? [];
-        var Diagnostics = this.GetParsed();
-        for (var Diagnostic of Diagnostics) {
-            var Renderer = new DiagnosticRenderer(Rendered);
+        // Render the statistics
+        var Metadata = this.GetParsed();
+        for (var Diagnostic of Metadata.Diagnostics) {
+            var Renderer = new DiagnosticRenderer();
             this.AddChild(Renderer, false);
             Renderer.Container.appendTo(this.ContentContainer);
             Renderer.SetData(Diagnostic);
             Renderer.Render();
-        }*/
-        // Show the option
-        var Option = Record.Response.Options[0];
-        var Link = $(`<li><a href="javascript:void(0)">${Option.LocalizedLabel ?? Option.Label}</a></li>`)
-            .appendTo(this.ContentContainer).on("click", () => {
-                this.SubmitDiagnostics();
-                Link.addClass("chosen");
-            });
+        }
+        NetLogoUtils.AnnotateCodes(this.ContentContainer.find("code"));
+        // Show the options
+        if (Metadata.Type == DiagnosticType.Compile)
+            this.ShowPseudoOption(FixCode(), (Option) => this.SubmitDiagnostics(Option, true));
+        this.ShowPseudoOption(ExplainErrors(), (Option) => this.SubmitDiagnostics(Option, false));
     }
     /** SubmitDiagnostics: Submit the diagnostics to the server. */
-    private SubmitDiagnostics(): void {
+    private SubmitDiagnostics(Option: ChatResponseOption, Fixing: boolean): void {
         var Manager = ChatManager.Instance;
+        var Metadata = this.GetParsed();
         var Record = this.GetRecord();
-        var Option = Record.Response.Options[0];
+        // Request the option
         Manager.RequestOption(Option, Record, (Request) => 
-            Request.Context!.CodeSnippet = CodeDisplay.Instance.Editor.GetCode());
-        CodeDisplay.Instance.ExportDiagnostics().then(Diagnostics =>
-            Manager.SendMessage(JSON.stringify(Diagnostics), Option.LocalizedLabel ?? Option.Label))
+            Request.Context!.CodeSnippet = Metadata.Code ?? CodeDisplay.Instance.Editor.GetCode());
+        // Export the diagnostics
+        if (Metadata.Code) {
+            // Export the diagnostics from the metadata
+            Manager.SendMessage(JSON.stringify(
+                Fixing ? Metadata.Diagnostics : { Diagnostics: Metadata.Diagnostics, Type: Metadata.Type }), 
+                Option.LocalizedLabel ?? Localized.Get(Option.Label));
+        } else {
+            // Re-export the diagnostics from the latest code snippet
+            CodeDisplay.Instance.ExportDiagnostics().then(Diagnostics =>
+                Manager.SendMessage(JSON.stringify(
+                    Fixing ? Diagnostics.Diagnostics : { Diagnostics: Diagnostics.Diagnostics, Type: Diagnostics.Type }), 
+                    Option.LocalizedLabel ?? Localized.Get(Option.Label)));
+        }
     }
     /** GetChooser: Return the section chooser for this renderer. */
     public static GetChooser(): RendererChooser {
-        return (Record, Section) => Section.Field == "Diagnostics" && Section.Parsed && Array.isArray(Section.Parsed) && Section.Parsed.length > 0 &&
-            Section.Parsed[0].Message && Section.Parsed[0].Code ? new DiagnosticsRenderer() : undefined;
+        return (Record, Section) => Section.Field == "Diagnostics" && Section.Parsed && 
+            Section.Parsed.Diagnostics ? new DiagnosticsRenderer() : undefined;
     }
 }
 
 /** DiagnosticRenderer: A block that displays a diagnostic. */
 export class DiagnosticRenderer extends UIRendererOf<Diagnostic> {
-    /** RenderedCode: The HTML rendered code. */
-    private RenderedCode: string[];
-    /** Constructor: Create a new UI renderer. */
-    public constructor(RenderedCode: string[]) {
-        super();
-        this.RenderedCode = RenderedCode;
-    }
     /** ContainerInitializer: The initializer for the container. */
     protected ContainerInitializer(): JQuery<HTMLElement> {
         return $(`<li></li>`);
@@ -70,6 +75,8 @@ export class DiagnosticRenderer extends UIRendererOf<Diagnostic> {
     /** RenderInternal: Render the UI element. */
     protected RenderInternal(): void {
         var Diagnostic = this.GetData();
+        if (Diagnostic.Code)
+            $("<code></code>").appendTo(this.Container).text(Diagnostic.Code);
         $(`<div class="message"></div>`).text(Diagnostic.Message).appendTo(this.Container);
     }
 }

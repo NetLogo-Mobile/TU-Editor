@@ -31,7 +31,7 @@ export class RecordRenderer extends UIRendererOf<ChatRecord> {
         this.AddChild(this.InputRenderer);
         var Container = $(`
 <div class="contents">
-    <div class="avatar"><img src="images/assistant.png" /></div>
+    <div class="avatar"><img src="images/assistant.png" /><div class="dot-stretching"></div></div>
     <div class="content"></div>
     <div class="expand-record">↓</div>
 </div>`).hide();

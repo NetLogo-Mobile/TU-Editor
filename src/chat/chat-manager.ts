@@ -51,6 +51,7 @@ export class ChatManager {
             ChatManager.IsRequesting = true;
             this.Commands.HideInput();
             this.Outputs.ScrollToBottom();
+            Renderer.Container.addClass("loading");
             ChatNetwork.SendRequest(Record, this.Thread, (Section) => {
                 // Create the section
                 Subthread.RootID = Subthread.RootID ?? Record.ID;
@@ -78,6 +79,7 @@ export class ChatManager {
                 this.Outputs.ScrollToBottom();
             }).then((Record) => {
                 console.log(Record);
+                Renderer.Container.removeClass("loading");
                 // Finish the record
                 Renderer.SetData(Record);
                 Renderer.Parent?.Render();
@@ -89,6 +91,7 @@ export class ChatManager {
                 else this.Commands.Disabled = false;
             }).catch((Error) => {
                 if (!ChatManager.IsRequesting) return;
+                Renderer.Container.removeClass("loading");
                 Renderer.AddSection({ 
                     Type: ChatResponseType.ServerError, 
                     Content: Localized.Get("Connection to server failed _", Error ?? Localized.Get("Unknown")),

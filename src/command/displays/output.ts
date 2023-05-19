@@ -96,7 +96,7 @@ export class OutputDisplay extends Display {
 		if (Sections.length == 0) return;
 		var LastRecord = this.Subthread!.Children[this.Subthread!.Children.length - 1] as RecordRenderer;
 		for (var Section in Sections)
-			LastRecord.AddSection(Sections[Section])?.SetFinalized();
+			LastRecord.AddSection(Sections[Section])?.SetFinalized().Render();
 		this.Subthread!.Render();
 		this.ScrollToBottom();
 	}
@@ -220,8 +220,12 @@ export class OutputDisplay extends Display {
 		// The user: How should I use this?
 		this.RenderRequest(Localized.Get("Command center welcome (user)"));
 		// Default options
-		var Options = [
-			{ Label: "Check out the code tab", Callback: () => this.Tab.Editor.EditorTabs[0].Show() },
+		var Options: ChatResponseOption[] = [
+			{ 
+				Label: "Check out the code tab", 
+				Style: "enter",
+				Callback: () => this.Tab.Editor.EditorTabs[0].Show(),
+			 },
 			{ Label: "Run NetLogo code directly", Callback: () => 
 				{
 					if (this.Tab.Galapagos.GetCode() == "")
@@ -245,7 +249,7 @@ export class OutputDisplay extends Display {
 				this.Tab.Galapagos.Focus();
 			}});
 		} else {
-			this.Tab.Placeholder.innerText = Localized.Get("Type your command here");
+			this.Tab.Placeholder.innerText = Localized.Get("Type NetLogo command here");
 			this.PrintOutput("Output", Localized.Get("Command center welcome (command)"));
 			Options.push({ Label: "Look for the documentation", Callback: () => {
 				this.Tab.ExecuteCommand("observer", "help", false);

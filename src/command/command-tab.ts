@@ -292,11 +292,6 @@ export class CommandTab extends Tab {
 		if (!EditorDictionary.Check(Command)) return false;
 		this.ExecuteCommand("observer", `help ${Command} -full`, false);
 	}
-	/** FinishExecution: Notify the completion of the command. */
-	public FinishExecution(Status: string, Message: string) {
-		this.Outputs.PrintOutput(Status, Message);
-		this.Disabled = false;
-	}
 	/** RecompileCallback: The callback after the code to play is compiled. */
 	private RecompileCallback?: (() => void);
 	/** TemporaryCode: The temporary code snippet that is in-use. */
@@ -335,6 +330,7 @@ export class CommandTab extends Tab {
 			}]);
 			delete this.TemporaryCode;
 		} else {
+			this.Codes.Editor.SetCompilerErrors(Errors);
 			// Build the diagnostics
 			var Diagnostics: Diagnostics = {
 				Type: DiagnosticType.Compile,
@@ -350,7 +346,6 @@ export class CommandTab extends Tab {
 				Field: "Diagnostics",
 				Parsed: Diagnostics
 			}]);
-			this.Codes.Editor.SetCompilerErrors(Errors);
 			delete this.TemporaryCode;
 		}
 	}

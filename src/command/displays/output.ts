@@ -8,6 +8,9 @@ import { ChatResponseSection, ChatResponseType } from "../../chat/client/chat-re
 import { ChatResponseOption } from "../../chat/client/chat-option";
 import { Localized } from "../../../../CodeMirror-NetLogo/src/editor";
 import { ChatManager } from "../../chat/chat-manager";
+import { RuntimeError } from "../../../../CodeMirror-NetLogo/src/lang/linters/runtime-linter";
+import { ErrorsToDiagnostics } from "../../utils/netlogo";
+import { DiagnosticType } from "../../chat/client/languages/netlogo-context";
 
 /** OutputDisplay: Display the output section. */
 export class OutputDisplay extends Display {
@@ -147,6 +150,35 @@ export class OutputDisplay extends Display {
 		var Parent = this.Tab.ChatManager.GetPendingParent()
 		if (!Parent && Restart && !this.Subthread?.GetData().RootID) this.ActivateSubthread();
 		return this.RenderRequest(`\`\`\`\n${Content.replace("`", "\`")}\n\`\`\``, Parent);
+	}
+	/** FinishExecution: Notify the completion of the command. */
+	public FinishExecution(Status: string, Code: string, Message: any | RuntimeError[]) {
+		if (Array.isArray(Message) && Message.length > 0) {
+			var Errors = Message as RuntimeError[];
+			Errors.forEach(Error => {
+				if (Error.start == 2147483647) {
+					Error.start = 0;
+					Error.end = Code.length;
+				} else {
+					try {
+					  Error.code = Code.slice(Error.start, Error.end);
+					} catch { }
+				}
+			});
+			var Diagnostics = ErrorsToDiagnostics(Errors);
+			this.RenderResponses([{
+				Type: Status == "CompileError" ? ChatResponseType.CompileError : ChatResponseType.RuntimeError,
+				Parsed: Diagnostics.length
+			}, {
+				Type: ChatResponseType.JSON,
+				Field: "Diagnostics",
+				Parsed: {
+					Diagnostics: Diagnostics,
+					Type: Status == "CompileError" ? DiagnosticType.Compile : DiagnosticType.Runtime,
+				}
+			}]);
+		} else this.PrintOutput(Status, Message);
+		this.Tab.Disabled = false;
 	}
 	/** PrintOutput: Provide for Unity to print compiled output. */ 
 	public PrintOutput(Class: string, Content: any) {

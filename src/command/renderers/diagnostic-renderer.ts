@@ -24,14 +24,16 @@ export class DiagnosticsRenderer extends JSONSectionRenderer<Diagnostics> {
     protected RenderInternal(): void { 
         // Render the statistics
         var Metadata = this.GetParsed();
-        for (var Diagnostic of Metadata.Diagnostics) {
-            var Renderer = new DiagnosticRenderer();
-            this.AddChild(Renderer, false);
-            Renderer.Container.appendTo(this.ContentContainer);
-            Renderer.SetData(Diagnostic);
-            Renderer.Render();
+        if (!Metadata.Hidden) {
+            for (var Diagnostic of Metadata.Diagnostics) {
+                var Renderer = new DiagnosticRenderer();
+                this.AddChild(Renderer, false);
+                Renderer.Container.appendTo(this.ContentContainer);
+                Renderer.SetData(Diagnostic);
+                Renderer.Render();
+            }
+            NetLogoUtils.AnnotateCodes(this.ContentContainer.find("code"));
         }
-        NetLogoUtils.AnnotateCodes(this.ContentContainer.find("code"));
         // Show the options
         this.ShowPseudoOption(ExplainErrors(Metadata.Type), (Option) => this.SubmitDiagnostics(Option, false));
         if (Metadata.Type == DiagnosticType.Compile)

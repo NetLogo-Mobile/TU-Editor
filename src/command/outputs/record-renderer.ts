@@ -23,6 +23,14 @@ export class RecordRenderer extends UIRendererOf<ChatRecord> {
     protected ContentContainer: JQuery<HTMLElement>;
     /** InputRenderer: The renderer of user inputs. */
     protected InputRenderer: InputRenderer;
+    /** Processing: Whether the record is still processing. */
+    public Processing: boolean = true;
+    /** SetFinalized: Set the finalized status of the record. */
+    public SetFinalized(Status: boolean = true): RecordRenderer {
+        this.Processing = !Status;
+        this.Container.toggleClass("loading", !Status);
+        return this;
+    }
     /** Constructor: Create a new UI renderer. */
     public constructor() {
         super();
@@ -30,7 +38,7 @@ export class RecordRenderer extends UIRendererOf<ChatRecord> {
         this.InputRenderer = new InputRenderer();
         this.AddChild(this.InputRenderer);
         var Container = $(`
-<div class="contents">
+<div class="contents loading">
     <div class="avatar"><img src="images/assistant.png" /><div class="dot-stretching"></div></div>
     <div class="content"></div>
     <div class="expand-record">↓</div>

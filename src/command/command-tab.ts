@@ -198,11 +198,13 @@ export class CommandTab extends Tab {
 	/** ShowInput: Show and enable the input box of Command Center. */
 	public ShowInput() {
 		this.CommandLine.show();
+		// this.Galapagos.SetReadOnly(false);
 		this.Disabled = false;
 	}
 	/** HideInput: Hide the input box of Command Center. */
 	public HideInput() {
 		this.CommandLine.hide();
+		// this.Galapagos.SetReadOnly(true);
 		this.Disabled = true;
 	}
 	// Set the content of command input.

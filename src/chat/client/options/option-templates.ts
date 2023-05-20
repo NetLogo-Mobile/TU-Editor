@@ -40,6 +40,18 @@ export function FollowUp(Label?: string): ChatResponseOption {
     }
 }
 
+/** Clarify: Generate a template clarification option. */
+export function Clarify(Label?: string): ChatResponseOption {
+    return {
+        Label: Label ?? "Let me clarify it",
+        Style: Label == undefined ? "followup" : undefined,
+        AskInput: Label == undefined,
+        SubOperation: "Clarify",
+        TextInContext: ContextMessage.MessagesAsText,
+        Inheritance: ContextInheritance.InheritRecursive
+    }
+}
+
 /** AskFurther: Generate a template ask further option. */
 export function AskFurther(Label?: string): ChatResponseOption {
     return {
@@ -107,11 +119,10 @@ export function FixCode(Label?: string): ChatResponseOption {
 export function ExplainErrors(Type: DiagnosticType, Label?: string): ChatResponseOption {
     return {
         Label: Label ?? "Explain the error",
-        Operation: "CodeExplain",
-        SubOperation: Type,
+        Operation: "ExplainErrors",
         AskInput: true,
         InputInContext: false,
-        TextInContext: ContextMessage.MessagesAsText,
+        TextInContext: ContextMessage.Nothing,
         CodeInContext: true,
         Inheritance: ContextInheritance.InheritOne
     }

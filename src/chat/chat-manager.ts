@@ -42,7 +42,7 @@ export class ChatManager {
         // Make it a record and put it in the thread
         var Record = Request as ChatRecord;
         var Subthread = this.Thread.AddToSubthread(Record);
-        var Renderer = this.Outputs.RenderRecord(Record, Subthread);
+        var RecordRenderer = this.Outputs.RenderRecord(Record, Subthread);
         var CurrentRenderer: SectionRenderer | undefined;
         // Project contexts
         Record.Context!.ProjectName = this.Commands.Editor.ProjectName;
@@ -51,13 +51,13 @@ export class ChatManager {
         var SendRequest = () => {
             if (ChatManager.IsRequesting) return;
             ChatManager.IsRequesting = true;
+            RecordRenderer.SetFinalized(false);
             this.Commands.HideInput();
             this.Outputs.ScrollToBottom();
-            Renderer.Container.addClass("loading");
             ChatNetwork.SendRequest(Record, this.Thread, (Section) => {
                 // Create the section
                 Subthread.RootID = Subthread.RootID ?? Record.ID;
-                CurrentRenderer = Renderer.AddSection(Section);
+                CurrentRenderer = RecordRenderer.AddSection(Section);
                 CurrentRenderer?.Render();
                 this.Outputs.ScrollToBottom();
             }, (Section) => {
@@ -81,30 +81,35 @@ export class ChatManager {
                 this.Outputs.ScrollToBottom();
             }).then((Record) => {
                 console.log(Record);
-                Renderer.Container.removeClass("loading");
                 // Finish the record
-                Renderer.SetData(Record);
-                Renderer.Parent?.Render();
-                ChatManager.IsRequesting = false;
-                this.Outputs.ScrollToBottom();
+                RecordRenderer.SetFinalized();
+                RecordRenderer.SetData(Record);
+                RecordRenderer.Parent?.Render();
+                this.FinishRequest();
                 // Show the input if there are no options
                 if (Record.Response.Options.length == 0) 
                     this.Commands.ShowInput();
                 else this.Commands.Disabled = false;
             }).catch((Error) => {
                 if (!ChatManager.IsRequesting) return;
-                Renderer.Container.removeClass("loading");
-                Renderer.AddSection({ 
+                RecordRenderer.SetFinalized();
+                RecordRenderer.AddSection({ 
                     Type: ChatResponseType.ServerError, 
                     Content: Localized.Get("Connection to server failed _", Error ?? Localized.Get("Unknown")),
                     Parsed: SendRequest
                 })!.SetFinalized().Render();
                 this.Commands.ShowInput();
-                ChatManager.IsRequesting = false;
+                this.FinishRequest();
             });
         };
         SendRequest();
         this.Outputs.ScrollToBottom();
+    }
+    /** FinishRequest: Finish the current request. */
+    private FinishRequest() {
+        ChatManager.IsRequesting = false;
+        this.Outputs.ScrollToBottom();
+        this.Outputs.RestartBatch();
     }
     /** GetPendingParent: Get the pending parent record. */
     public GetPendingParent(): ChatRecord | undefined {
@@ -143,6 +148,8 @@ export class ChatManager {
                 if (Option.InputInContext ?? true) 
                     this.PendingRequest.Context.PreviousMessages.shift();
             }
+        } else {
+            this.Outputs.ActivateSubthread();
         }
         // Send request or unlock the input
         Postprocessor?.(this.PendingRequest);

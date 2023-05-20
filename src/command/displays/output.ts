@@ -11,6 +11,7 @@ import { ChatManager } from "../../chat/chat-manager";
 import { RuntimeError } from "../../../../CodeMirror-NetLogo/src/lang/linters/runtime-linter";
 import { ErrorsToDiagnostics } from "../../utils/netlogo";
 import { DiagnosticType } from "../../chat/client/languages/netlogo-context";
+import { GenerateObjectID } from "../../utils/misc";
 
 /** OutputDisplay: Display the output section. */
 export class OutputDisplay extends Display {
@@ -38,12 +39,14 @@ export class OutputDisplay extends Display {
 		this.ScrollContainer.empty();
 		this.Subthreads.clear();
 		delete this.Subthread;
+		this.Sections = [];
+		this.InBatch = false;
 	}
 	/** RenderRecord: Render a new chat record. */
 	public RenderRecord(Record: ChatRecord, Subthread: ChatSubthread): RecordRenderer {
 		var Renderer: RecordRenderer;
 		// Restart the batch if necessary
-		this.RestartBatch();
+		if (!ChatManager.IsRequesting) this.RestartBatch();
 		// Create a new subthread if necessary
 		if (Subthread != this.Subthread?.GetData()) {
 			this.Subthread?.Container.removeClass("activated");
@@ -85,21 +88,29 @@ export class OutputDisplay extends Display {
 		var Thread = this.Tab.ChatManager.Thread;
 		var Record = { Input: Input, FriendlyInput: FriendlyInput } as ChatRecord;
 		var Subthread = this.Subthread?.GetData();
+		Record.ID = GenerateObjectID();
 		Record.RequestTimestamp = Date.now();
 		Record.ThreadID = Thread.ID!;
 		if (!Subthread) Subthread = Thread.AddToSubthread(Record);
 		Record.Language = Thread.Language;
 		Record.ParentID = Parent?.ID ?? Subthread.RootID;
+		if (Record.ParentID == Record.ID) delete Record.ParentID;
 		Record.Response = { Sections: [], Options: [] };
+		this.Tab.ChatManager.Thread.Records[Record.ID] = Record;
 		this.RenderRecord(Record, Subthread);
 		return Record;
 	}
 	/** RenderResponses: Render response sections immediately in the current record. */
-	public RenderResponses(Sections: ChatResponseSection[]) {
-		if (Sections.length == 0) return;
+	public RenderResponses(Sections: ChatResponseSection[], Finalizing: boolean = true) {
+		if (Sections.length == 0 && !Finalizing) return;
 		var LastRecord = this.Subthread!.Children[this.Subthread!.Children.length - 1] as RecordRenderer;
+		// Check if the last record is finished
+		// If so, create a new record
+		if (!LastRecord.Processing) this.RenderRequest();
+		// If not, append to the last record
 		for (var Section in Sections)
 			LastRecord.AddSection(Sections[Section])?.SetFinalized().Render();
+		if (Finalizing) LastRecord.SetFinalized();
 		this.Subthread!.Render();
 		this.ScrollToBottom();
 	}
@@ -128,9 +139,10 @@ export class OutputDisplay extends Display {
 	}
 	/** CloseBatch: Close a printing batch. */
 	public CloseBatch() {
-		this.RenderResponses(this.Sections);
-		this.Sections = [];
+		if (ChatManager.IsRequesting) return;
 		this.InBatch = false;
+		this.RenderResponses(this.Sections, false);
+		this.Sections = [];
 		this.ScrollToBottom();
 	}
 	/** RestartBatch: Restart a printing batch. */
@@ -139,11 +151,11 @@ export class OutputDisplay extends Display {
 		this.CloseBatch();
 		this.OpenBatch();
 	}
-	/** RenderResponse: Render response sections in the current record. */
+	/** QueueResponse: Quere a response section */
 	public QueueResponse(Section: ChatResponseSection) {
 		if (this.InBatch)
 			this.Sections.push(Section);
-		else this.RenderResponses([Section]);
+		else this.RenderResponses([Section], false);
 	}
 	/** PrintCommandInput: Print a line of input to the screen. */
 	public PrintCommandInput(Content: string, Restart: boolean = true): ChatRecord {
@@ -178,7 +190,11 @@ export class OutputDisplay extends Display {
 					Code: Code
 				}
 			}]);
-		} else this.PrintOutput(Status, Message);
+		} else {
+			this.PrintOutput(Status, Message);
+			this.RestartBatch();
+			this.RenderResponses([], true);
+		}
 		this.Tab.Disabled = false;
 	}
 	/** PrintOutput: Provide for Unity to print compiled output. */ 
@@ -270,7 +286,12 @@ export class OutputDisplay extends Display {
 		// AI response
 		if (ChatManager.Available) {
 			this.Tab.Placeholder.innerText = Localized.Get("Talk to the computer in NetLogo or natural languages");
-			this.PrintOutput("Output", Localized.Get("Command center welcome (assistant)"));
+			this.RenderResponses([
+				{
+					Content: Localized.Get("Command center welcome (assistant)"),
+					Type: ChatResponseType.Text
+				}
+			], false);
 			Options.push({ Label: "Talk to the computer in natural languages", Callback: () => {
 				if (this.Tab.Galapagos.GetCode() == "")
 					this.Tab.Galapagos.SetCode("create some turtles around");
@@ -283,12 +304,18 @@ export class OutputDisplay extends Display {
 			}});
 		} else {
 			this.Tab.Placeholder.innerText = Localized.Get("Type NetLogo command here");
-			this.PrintOutput("Output", Localized.Get("Command center welcome (command)"));
+			this.RenderResponses([
+				{
+					Content: Localized.Get("Command center welcome (command)"),
+					Type: ChatResponseType.Text
+				}
+			], false);
 			Options.push({ Label: "Look for the documentation", Callback: () => {
 				this.Tab.ExecuteCommand("observer", "help", false);
 			}});
 		}
 		this.RenderOptions(Options);
+		this.RenderResponses([], true);
 	}
 	// #endregion
 }

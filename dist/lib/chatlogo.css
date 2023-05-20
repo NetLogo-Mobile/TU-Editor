@@ -297,16 +297,22 @@
 }
 
 .command-output ul.options li:before {
-	content: "❖";
-	margin: 0 0.5rem 0 0;
+	content: "💡";
+	width: 1.8rem;
+	text-align: center;
+	display: inline-block;
+}
+
+.command-output ul.options li.followup:before {
+	content: "💬";
 }
 
 .command-output ul.options li.enter:before {
-	content: "→";
+	content: "👉";
 }
 
 .command-output ul.options li.leave:before {
-	content: "←";
+	content: "👈";
 }
 
 .command-output ul.options li.hidden {

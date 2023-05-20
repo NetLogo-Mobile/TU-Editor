@@ -19,7 +19,9 @@ export class ChatManager {
     private PendingRequest: ClientChatRequest | null = null;
     /** Reset: Reset the chat interface. */
     public Reset() {
+        var Language = this.Thread.Language;
         this.Thread = new ChatThread();
+        this.Thread.Language = Language;
         this.PendingRequest = null;
     }
     /** SendMessage: Send a direct message to the chat backend. */ 
@@ -27,7 +29,6 @@ export class ChatManager {
         this.PendingRequest = this.PendingRequest ?? { Input: "" };
         this.PendingRequest.Input = Content;
         this.PendingRequest.FriendlyInput = Friendly;
-        this.PendingRequest.Language = this.Thread.Language;
         this.PendingRequest.Context = this.PendingRequest.Context ?? { PreviousMessages: [] };
         this.SendRequest(this.PendingRequest);
         this.PendingRequest = null;
@@ -37,6 +38,7 @@ export class ChatManager {
     /** SendRequest: Send a request to the chat backend and handle its outputs. */
     private SendRequest(Request: ClientChatRequest) {
         if (ChatManager.IsRequesting) return;
+        Request.Language = this.Thread.Language;
         // Make it a record and put it in the thread
         var Record = Request as ChatRecord;
         var Subthread = this.Thread.AddToSubthread(Record);

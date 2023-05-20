@@ -58,8 +58,8 @@ export interface Diagnostics {
 
 /** DiagnosticType: Type of diagnostics. */
 export enum DiagnosticType {
-    Runtime = "Runtime",
-    Compile = "Compile",
+    Runtime = "RuntimeError",
+    Compile = "CompileError",
 }
 
 /** Diagnostic: A diagnostic message. */

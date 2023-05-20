@@ -33,7 +33,7 @@ export class DiagnosticsRenderer extends JSONSectionRenderer<Diagnostics> {
         }
         NetLogoUtils.AnnotateCodes(this.ContentContainer.find("code"));
         // Show the options
-        this.ShowPseudoOption(ExplainErrors(), (Option) => this.SubmitDiagnostics(Option, false));
+        this.ShowPseudoOption(ExplainErrors(Metadata.Type), (Option) => this.SubmitDiagnostics(Option, false));
         if (Metadata.Type == DiagnosticType.Compile)
             this.ShowPseudoOption(FixCode(), (Option) => this.SubmitDiagnostics(Option, true));
     }
@@ -48,14 +48,12 @@ export class DiagnosticsRenderer extends JSONSectionRenderer<Diagnostics> {
         // Export the diagnostics
         if (Metadata.Code) {
             // Export the diagnostics from the metadata
-            Manager.SendMessage(JSON.stringify(
-                Fixing ? Metadata.Diagnostics : { Diagnostics: Metadata.Diagnostics, Type: Metadata.Type }), 
+            Manager.SendMessage(JSON.stringify(Metadata.Diagnostics), 
                 Option.LocalizedLabel ?? Localized.Get(Option.Label));
         } else {
             // Re-export the diagnostics from the latest code snippet
             CodeDisplay.Instance.ExportDiagnostics().then(Diagnostics =>
-                Manager.SendMessage(JSON.stringify(
-                    Fixing ? Diagnostics.Diagnostics : { Diagnostics: Diagnostics.Diagnostics, Type: Diagnostics.Type }), 
+                Manager.SendMessage(JSON.stringify(Diagnostics.Diagnostics), 
                     Option.LocalizedLabel ?? Localized.Get(Option.Label)));
         }
     }

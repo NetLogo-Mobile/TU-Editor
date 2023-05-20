@@ -1,4 +1,5 @@
 import { ChatResponseOption, ContextInheritance, ContextMessage } from "../chat-option";
+import { DiagnosticType } from "../languages/netlogo-context";
 
 /** ChangeTopic: Generate a template change topic option. */
 export function ChangeTopic(Label?: string): ChatResponseOption {
@@ -103,13 +104,14 @@ export function FixCode(Label?: string): ChatResponseOption {
 }
 
 /** ExplainErrors: Explain the errors. */
-export function ExplainErrors(Label?: string): ChatResponseOption {
+export function ExplainErrors(Type: DiagnosticType, Label?: string): ChatResponseOption {
     return {
         Label: Label ?? "Explain the error",
-        Operation: "ExplainErrors",
+        Operation: "CodeExplain",
+        SubOperation: Type,
         AskInput: true,
         InputInContext: false,
-        TextInContext: ContextMessage.Nothing,
+        TextInContext: ContextMessage.MessagesAsText,
         CodeInContext: true,
         Inheritance: ContextInheritance.InheritOne
     }

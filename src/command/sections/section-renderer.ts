@@ -51,7 +51,7 @@ export class SectionRenderer extends UIRendererOf<ChatResponseSection> {
     protected ShowPseudoOption(Option: ChatResponseOption, Callback: (Option: ChatResponseOption) => void) {
         Option.Callback = () => Callback(Option);
         var Parent = (this.Parent! as RecordRenderer);
-        Parent.GetData().Response.Options!.push(Option);
+        Parent.GetData().Response.Options!.unshift(Option);
         Parent.SetDirty(true);
     }
 }

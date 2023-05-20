@@ -33,9 +33,9 @@ export class DiagnosticsRenderer extends JSONSectionRenderer<Diagnostics> {
         }
         NetLogoUtils.AnnotateCodes(this.ContentContainer.find("code"));
         // Show the options
+        this.ShowPseudoOption(ExplainErrors(), (Option) => this.SubmitDiagnostics(Option, false));
         if (Metadata.Type == DiagnosticType.Compile)
             this.ShowPseudoOption(FixCode(), (Option) => this.SubmitDiagnostics(Option, true));
-        this.ShowPseudoOption(ExplainErrors(), (Option) => this.SubmitDiagnostics(Option, false));
     }
     /** SubmitDiagnostics: Submit the diagnostics to the server. */
     private SubmitDiagnostics(Option: ChatResponseOption, Fixing: boolean): void {

@@ -24,7 +24,7 @@ export class OptionRenderer extends UIRendererOf<ChatResponseOption> {
     /** RenderInternal: Render the UI element. */
     protected RenderInternal(): void {
         var Option = this.GetData();
-        this.Container.addClass(this.GetData().Style?.toLowerCase() ?? "generated").children("a")
+        this.Container.removeClass().addClass(this.GetData().Style?.toLowerCase() ?? "generated").children("a")
             .html(MarkdownToHTML(Option.LocalizedLabel ?? Option.Label).replace("<p>", "").replace("</p>", ""));
     }
     /** ClickHandler: The handler for the click event. */

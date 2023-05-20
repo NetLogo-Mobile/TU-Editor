@@ -93,7 +93,6 @@ export function FixCode(Label?: string): ChatResponseOption {
     return {
         Label: Label ?? "Help me fix this code",
         Operation: "CodeFix",
-        Style: "hidden",
         AskInput: true,
         InputInContext: false,
         TextInContext: ContextMessage.Nothing,
@@ -108,7 +107,6 @@ export function ExplainErrors(Label?: string): ChatResponseOption {
     return {
         Label: Label ?? "Explain the error",
         Operation: "ExplainErrors",
-        Style: "hidden",
         AskInput: true,
         InputInContext: false,
         TextInContext: ContextMessage.Nothing,

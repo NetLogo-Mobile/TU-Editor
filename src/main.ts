@@ -107,7 +107,7 @@ export class TurtleEditor {
   // #region "Editor Statuses"
   /** Resize: Resize the viewport width (on mobile platforms) */
   public Resize(Ratio: number) {
-    $("body").addClass("Mobile");
+    $("body").addClass("mobile");
     $("#viewport").attr("content", `width=device-width,initial-scale=${Ratio},maximum-scale=${Ratio},minimum-scale=${Ratio},user-scalable=no,viewport-fit=cover`);
   }
   /** ToggleDark: Toggle the dark mode. */

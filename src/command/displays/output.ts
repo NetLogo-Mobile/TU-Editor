@@ -175,6 +175,7 @@ export class OutputDisplay extends Display {
 				Parsed: {
 					Diagnostics: Diagnostics,
 					Type: Status == "CompileError" ? DiagnosticType.Compile : DiagnosticType.Runtime,
+					Code: Code
 				}
 			}]);
 		} else this.PrintOutput(Status, Message);

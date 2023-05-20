@@ -122,6 +122,8 @@ export class ChatManager {
             Operation: Option.Operation,
             SubOperation: Option.SubOperation,
         };
+        if (Option.ActualInput)
+            this.PendingRequest.FriendlyInput = Option.LocalizedLabel ?? Option.Label;
         // Find a parent
         this.PendingRequest.Context = { PreviousMessages: [] };
         if (Option.Inheritance !== ContextInheritance.Drop) {

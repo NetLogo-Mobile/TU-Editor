@@ -8,7 +8,7 @@ import { EditorTab } from "./editor/editor-tab";
 import { LegacyLocalized, RotateScreen } from "./legacy";
 import { Tab } from "./tab";
 
-declare const { Darkmode, toastr }: any;
+declare const { Darkmode }: any;
 type Darkmode = any;
 
 /** TurtleEditor: The multi-tab code editor for Turtle Universe. */
@@ -118,10 +118,6 @@ export class TurtleEditor {
   public SetPlatform(Platform: string) {
     $("body").addClass(Platform);
   }
-	/** Toast: Show a toast. */
-	public Toast(Type: string, Content: string, Subject?: string) {
-		toastr[Type](Content, Subject);
-	}
   /** Reset: Reset the editor. */
   public Reset() {
     this.CommandTab.Reset();

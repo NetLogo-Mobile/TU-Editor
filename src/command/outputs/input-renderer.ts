@@ -1,5 +1,6 @@
 import { ClientChatRequest } from "../../chat/client/chat-request";
 import { MarkdownToHTML, PostprocessHTML } from "../../utils/element";
+import { CopyCode } from "../../utils/misc";
 import { NetLogoUtils } from "../../utils/netlogo";
 import { OutputDisplay } from "../displays/output";
 import { UIRendererOf } from "./ui-renderer";
@@ -26,6 +27,7 @@ export class InputRenderer extends UIRendererOf<ClientChatRequest> {
         this.Container.toggle(!!Input && Input !== "");
         this.Content.html(MarkdownToHTML(Input));
         PostprocessHTML(OutputDisplay.Instance.Tab.Editor, this.Content);
-        NetLogoUtils.AnnotateCodes(this.Content.find("code"));
+        NetLogoUtils.AnnotateCodes(this.Content.find("code")
+            .on("click", function() { CopyCode($(this).data("code")); }).addClass("copyable"));
     }
 }

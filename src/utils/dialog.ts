@@ -1,25 +1,29 @@
 import { Localized } from "../../../CodeMirror-NetLogo/src/editor";
+declare const { toastr }: any;
 
 /** ShowConfirm: Show a confirm dialog. */
-const ShowConfirm = function(Subject: string, Content: string, OK: () => void, Cancel?: () => void) {
+export function ShowConfirm(Subject: string, Content: string, OK: () => void, Cancel?: () => void) {
 	($ as any).confirm({
 		title: Localized.Get(Subject),
 		content: Localized.Get(Content),
-		type: 'green',
+		type: 'blue',
 		useBootstrap: false,
 		buttons: {   
 			ok: {
-				text: Localized.Get("确定"),
+				text: Localized.Get("OK"),
 				btnClass: 'btn-primary',
 				keys: ['enter'],
 				action: OK
 			},
 			cancel: {
-				text: Localized.Get("取消"),
+				text: Localized.Get("Cancel"),
 				action: Cancel
 			}
 		}
 	});
 }
 
-export { ShowConfirm }
+/** Toast: Show a toast. */
+export function Toast(Type: string, Content: string, Subject?: string) {
+	toastr[Type](Content, Subject);
+}

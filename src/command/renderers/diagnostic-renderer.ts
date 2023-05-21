@@ -3,7 +3,7 @@ import { RendererChooser } from '../outputs/record-renderer';
 import { UIRendererOf } from "../outputs/ui-renderer";
 import { JSONSectionRenderer } from "../sections/json-section-renderer";
 import { ChatManager } from '../../chat/chat-manager';
-import { Diagnostic, DiagnosticType, Diagnostics } from "../../chat/client/languages/netlogo-context";
+import { Diagnostic, Diagnostics } from "../../chat/client/languages/netlogo-context";
 import { ChatResponseOption } from '../../chat/client/chat-option';
 import { ExplainErrors, FixCode } from '../../chat/client/options/option-templates';
 import { NetLogoUtils } from '../../utils/netlogo';

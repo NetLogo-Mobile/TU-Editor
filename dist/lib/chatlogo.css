@@ -181,10 +181,11 @@
 .command-output .outputs {
 	overflow: auto;
 	flex-grow: 1;
+	scroll-behavior: smooth;
 }
 
 .command-output a {
-	color: #216BBF;
+	color: #2881e0;
 	cursor: pointer;
 }
 
@@ -374,6 +375,7 @@
 
 .command-output :not(:first-child).code {
 	margin-top: 0.5rem;
+	margin-bottom: 0.5rem;
 }
 
 .command-output .code code,
@@ -384,12 +386,21 @@
 	display: block;
 }
 
+.command-output pre code.copyable {
+	cursor: pointer;
+	padding-right: 1.5rem;
+	background-size: 1rem;
+	background-image: url(../images/copy.png);
+	background-repeat: no-repeat;
+	background-position: center right;
+}
+
 .command-output code {
 	background-color: #f7f7f7;
 }
 
 .command-output code.enterable {
-	background-size: 1.5rem;
+	background-size: 1.35rem;
 	background-image: url(../images/enter.png);
 	background-repeat: no-repeat;
 	background-position: top 0.5rem right 0.5rem;

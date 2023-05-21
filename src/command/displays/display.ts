@@ -36,7 +36,7 @@ export abstract class Display {
 	}
     /** ScrollToElement: Scroll to the element. */
     public ScrollToElement(Element: JQuery<HTMLElement>) {
-        this.ScrollContainer.scrollTop(Element.offset()?.top ?? 0);
+        this.ScrollContainer.scrollTop((Element.offset()?.top ?? 0) + (this.ScrollContainer.scrollTop() ?? 0));
     }
 	/** IsAtBottom: Whether the container is scrolled to bottom. */
 	public IsAtBottom(): boolean {

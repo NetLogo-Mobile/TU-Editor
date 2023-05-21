@@ -86,9 +86,10 @@ export class ChatManager {
                 RecordRenderer.SetData(Record);
                 RecordRenderer.Parent?.Render();
                 // Show the input if there are no options
-                if (Record.Response.Options.length == 0) 
+                if (Record.Response.Options.length == 0) {
+                    this.PendingRequest = null;
                     this.Commands.EnableInput();
-                else this.Commands.SetDisabled(false);
+                } else this.Commands.SetDisabled(false);
                 // Finish the request
                 this.FinishRequest();
             }).catch((Error) => {
@@ -99,6 +100,7 @@ export class ChatManager {
                     Content: Localized.Get("Connection to server failed _", Error ?? Localized.Get("Unknown")),
                     Parsed: SendRequest
                 })!.SetFinalized().Render();
+                this.PendingRequest = null;
                 this.Commands.EnableInput();
                 this.FinishRequest();
             });

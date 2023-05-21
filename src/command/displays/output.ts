@@ -77,6 +77,7 @@ export class OutputDisplay extends Display {
 		if (Subthread) {
 			Subthread.Container.addClass("activated");
 			Subthread.Children[Subthread.Children.length - 1].ActivateSelf("activated");
+			this.ScrollToElement(Subthread.Container);
 		}
 		this.Subthread = Subthread;
 	}

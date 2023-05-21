@@ -184,12 +184,12 @@ export class CommandTab extends Tab {
 			// If there is no linting issues, assume it is code snippet
 			if (Diagnostics.length == 0) {
 				if (Mode == "Reporter" || Mode == "Unknown") Content = `show ${Content}`;
-				this.ExecuteInput(Objective, Content, Temporary);
 				this.SetDisabled(true);
+				this.ExecuteInput(Objective, Content, Temporary);
 				return;
 			} else if (!Chatable) {
-				this.ExecuteInput(Objective, Content, Temporary);
 				this.SetDisabled(true);
+				this.ExecuteInput(Objective, Content, Temporary);
 				return;
 			}
 		}

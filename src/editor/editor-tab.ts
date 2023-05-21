@@ -1,6 +1,6 @@
 import { TurtleEditor } from "../main";
 import { Tab } from "../tab";
-import { ShowConfirm } from "../utils/dialog";
+import { ShowConfirm, Toast } from "../utils/dialog";
 import { GalapagosEditor, Localized } from "../../../CodeMirror-NetLogo/src/editor";
 
 /** EditorTab: A tab for the code editor. */
@@ -126,7 +126,7 @@ export class EditorTab extends Tab {
 	public ShowProcedures() {
 		var Procedures = this.GetProcedures();
 		if (Object.keys(Procedures).length == 0) {
-			this.Editor.Toast("warning", Localized.Get("There is no procedure"));
+			Toast("warning", Localized.Get("There is no procedure"));
 		} else {
 			var Dialog = $("#Dialog-Procedures")
 			var List = Dialog.children("ul").empty();

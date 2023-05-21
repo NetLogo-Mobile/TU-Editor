@@ -16,14 +16,15 @@ export class NetLogoUtils {
 	/** AnnotateCode: Annotate a code element. */
 	public static AnnotateCode(Target: JQuery<HTMLElement>, Content?: string) {
         Content = Content ? Content : Target.text();
-        Target.empty().append($(NetLogoUtils.HighlightCode(Content)));
+		var [Element, Code] = NetLogoUtils.HighlightCode(Content);
+        Target.empty().append($(Element)).data("code", Code);
 	}
 	/** HighlightCode: Highlight a code snippet. */
-	public static HighlightCode(Content: string): HTMLElement {
+	public static HighlightCode(Content: string): [HTMLElement, string] {
         this.SharedEditor.SetCode(Content);
         this.SharedEditor.Semantics.PrettifyAll();
-        console.log(this.SharedEditor.GetCode());
-        return this.SharedEditor.Semantics.Highlight();
+        var Element = this.SharedEditor.Semantics.Highlight();
+		return [Element, Content];
 	}
 	/** BuildSnapshot: Build a code snapshot. */
 	public static BuildSnapshot(Content?: string): CodeSnapshot | undefined {

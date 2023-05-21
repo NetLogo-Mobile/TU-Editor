@@ -1,5 +1,6 @@
 import { ChatResponseSection } from "../../chat/client/chat-response";
 import { MarkdownToHTML, PostprocessHTML } from "../../utils/element";
+import { CopyCode } from "../../utils/misc";
 import { NetLogoUtils } from "../../utils/netlogo";
 import { OutputDisplay } from "../displays/output";
 import { UIRendererOf } from "../outputs/ui-renderer";
@@ -25,8 +26,10 @@ export class TextSectionRenderer extends SectionRenderer {
         // Render the text
         this.ContentContainer.html(MarkdownToHTML(Content));
         PostprocessHTML(OutputDisplay.Instance.Tab.Editor, this.ContentContainer);
-        if (this.Finalized)
-            NetLogoUtils.AnnotateCodes(this.ContentContainer.find("code"));
+        if (this.Finalized) {
+            NetLogoUtils.AnnotateCodes(this.ContentContainer.find("code")
+                .on("click", function() { CopyCode($(this).data("code")!); }).addClass("copyable"));
+        }
         // Remove the section if it's empty
         if (Content == "" && (Section.Options?.length ?? 0) == 0 && this.Finalized)
             this.Container.remove();

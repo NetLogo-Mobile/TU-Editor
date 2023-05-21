@@ -16601,7 +16601,7 @@
         });
     }
     /**
-    Syntax node prop used to register sublangauges. Should be added to
+    Syntax node prop used to register sublanguages. Should be added to
     the top level node type for the language.
     */
     const sublanguageProp = /*@__PURE__*/new NodeProp();
@@ -16793,8 +16793,15 @@
             view.dispatch({});
         return !!success;
     }
-    // Lezer-style Input object for a Text document.
+    /**
+    Lezer-style
+    [`Input`](https://lezer.codemirror.net/docs/ref#common.Input)
+    object for a [`Text`](https://codemirror.net/6/docs/ref/#state.Text) object.
+    */
     class DocInput {
+        /**
+        Create an input object for the given document.
+        */
         constructor(doc) {
             this.doc = doc;
             this.cursorPos = 0;
@@ -25411,13 +25418,13 @@
         }
     }
     /** BreedType: Type of the breed. */
-    var BreedType;
+    var BreedType$1;
     (function (BreedType) {
         BreedType[BreedType["Turtle"] = 0] = "Turtle";
         BreedType[BreedType["Patch"] = 1] = "Patch";
         BreedType[BreedType["UndirectedLink"] = 2] = "UndirectedLink";
         BreedType[BreedType["DirectedLink"] = 3] = "DirectedLink";
-    })(BreedType || (BreedType = {}));
+    })(BreedType$1 || (BreedType$1 = {}));
     /** Procedure: Dynamic metadata of a procedure. */
     class Procedure {
         constructor() {
@@ -26381,7 +26388,7 @@
         getBreedCommands(state) {
             let commands = [];
             for (let b of state.Breeds.values()) {
-                if (b.BreedType == BreedType.Turtle || b.BreedType == BreedType.Patch) {
+                if (b.BreedType == BreedType$1.Turtle || b.BreedType == BreedType$1.Patch) {
                     commands.push('hatch-' + b.Plural);
                     commands.push('sprout-' + b.Plural);
                     commands.push('create-' + b.Plural);
@@ -26402,7 +26409,7 @@
         getBreedReporters(state) {
             let reporters = [];
             for (let b of state.Breeds.values()) {
-                if (b.BreedType == BreedType.Turtle || b.BreedType == BreedType.Patch) {
+                if (b.BreedType == BreedType$1.Turtle || b.BreedType == BreedType$1.Patch) {
                     reporters.push(b.Plural + '-at');
                     reporters.push(b.Plural + '-here');
                     reporters.push(b.Plural + '-on');
@@ -27173,9 +27180,9 @@
             this.Extensions = [];
             this.Globals = [];
             this.ContextErrors = [];
-            this.Breeds.set('turtle', new Breed('turtle', 'turtles', [], BreedType.Turtle));
-            this.Breeds.set('patch', new Breed('patch', 'patches', [], BreedType.Patch));
-            this.Breeds.set('link', new Breed('link', 'links', [], BreedType.UndirectedLink));
+            this.Breeds.set('turtle', new Breed('turtle', 'turtles', [], BreedType$1.Turtle));
+            this.Breeds.set('patch', new Breed('patch', 'patches', [], BreedType$1.Patch));
+            this.Breeds.set('link', new Breed('link', 'links', [], BreedType$1.UndirectedLink));
             let tempBreedVars = new Map();
             this.IsDirty = false;
             // Get the cursor
@@ -27218,14 +27225,14 @@
                     // get breeds
                     else if (Cursor.node.name == 'Breed') {
                         // get breed type
-                        let breedType = BreedType.Turtle;
+                        let breedType = BreedType$1.Turtle;
                         Cursor.node.getChildren('BreedStr').map((node) => {
                             let name = this.getText(State, node);
                             if (name.toLowerCase() == 'undirected-link-breed') {
-                                breedType = BreedType.UndirectedLink;
+                                breedType = BreedType$1.UndirectedLink;
                             }
                             else if (name.toLowerCase() == 'directed-link-breed') {
-                                breedType = BreedType.DirectedLink;
+                                breedType = BreedType$1.DirectedLink;
                             }
                         });
                         // get breed names
@@ -27567,8 +27574,8 @@
             return prim;
         }
         getBreedContext(breed) {
-            if (breed.BreedType == BreedType.DirectedLink ||
-                breed.BreedType == BreedType.UndirectedLink) {
+            if (breed.BreedType == BreedType$1.DirectedLink ||
+                breed.BreedType == BreedType$1.UndirectedLink) {
                 return new AgentContexts('---L');
             }
             else if (breed.Singular == 'patch') {
@@ -30055,9 +30062,9 @@
             // TODO: Find the most appropriate place to insert the breed
             // Add the breed
             var Name = 'breed';
-            if (Type == BreedType.DirectedLink)
+            if (Type == BreedType$1.DirectedLink)
                 Name = 'directed-link-breed';
-            if (Type == BreedType.UndirectedLink)
+            if (Type == BreedType$1.UndirectedLink)
                 Name = 'undirected-link-breed';
             this.InsertCode({
                 from: 0,
@@ -30178,8 +30185,8 @@
                                 plural = getPluralName(breedinfo.breed);
                             }
                             actions.push(AddBreedAction(breedinfo.isLink
-                                ? BreedType.UndirectedLink
-                                : BreedType.Turtle, plural, singular));
+                                ? BreedType$1.UndirectedLink
+                                : BreedType$1.Turtle, plural, singular));
                             diagnostics.push({
                                 from: noderef.from,
                                 to: noderef.to,
@@ -30309,7 +30316,7 @@
                             singular = breed_result.breed;
                             plural = getPluralName(breed_result.breed);
                         }
-                        actions.push(AddBreedAction(result.isLink ? BreedType.UndirectedLink : BreedType.Turtle, plural, singular));
+                        actions.push(AddBreedAction(result.isLink ? BreedType$1.UndirectedLink : BreedType$1.Turtle, plural, singular));
                     }
                     diagnostics.push({
                         from: noderef.from,
@@ -30340,8 +30347,8 @@
         let pluralLink = [];
         let singularLink = [];
         for (let b of breeds) {
-            if (b.BreedType == BreedType.DirectedLink ||
-                b.BreedType == BreedType.UndirectedLink) {
+            if (b.BreedType == BreedType$1.DirectedLink ||
+                b.BreedType == BreedType$1.UndirectedLink) {
                 pluralLink.push(b.Plural);
                 singularLink.push(b.Singular);
             }
@@ -30943,7 +30950,7 @@
             'link',
         ];
         for (let b of lintContext.Breeds.values()) {
-            if (b.BreedType == BreedType.Turtle || b.BreedType == BreedType.Patch) {
+            if (b.BreedType == BreedType$1.Turtle || b.BreedType == BreedType$1.Patch) {
                 all.push('hatch-' + b.Plural);
                 all.push('sprout-' + b.Plural);
                 all.push('create-' + b.Plural);
@@ -31143,8 +31150,8 @@
     const getBreedType = (breedName, lintContext) => {
         for (var [name, breed] of lintContext.Breeds) {
             if (breed.Plural.toLowerCase() == breedName.toLowerCase()) {
-                return (breed.BreedType == BreedType.DirectedLink ||
-                    breed.BreedType == BreedType.UndirectedLink);
+                return (breed.BreedType == BreedType$1.DirectedLink ||
+                    breed.BreedType == BreedType$1.UndirectedLink);
             }
         }
         return null;
@@ -31441,6 +31448,9 @@
         'Showing full text help of _': (Name) => `Here is the help information of [${Name}](<observer=help ${Name} -full>).`,
         'Arguments needed for execution _': (Name, Arguments) => `The "${Name}" procedure needs argument${Arguments > 1 ? 's' : ''} to run. Please provide them.`,
         'Please download Turtle Universe': () => `The feature is unavailable in Web Preview. Please download [Turtle Universe](https://www.turtlesim.com/products/turtle-universe/) to continue.`,
+        // Options
+        'Help me fix this code': () => `Help me fix this code`,
+        'Explain the error': () => `Explain the error`,
         // Default messages
         'Command center welcome (user)': () => `What is here about? Where should I start with?`,
         'Command center welcome (command)': () => `Here is the command center. You can type in NetLogo code and run it here, but there is always more to explore. Here are something you can try out.`,
@@ -31561,12 +31571,16 @@
         'Successfully compiled': () => `成功编译了代码。现在可以开始执行了！`,
         'Runtime error _': (Error) => `运行时错误：${Error}`,
         'Compile error _': (Error) => `抱歉，未能理解你输入的命令：${Error}`,
+        'Runtime error in snippet _': (Number) => `抱歉，代码运行时出现了 ${Number} 个错误。`,
         'Compile error in snippet _': (Number) => `抱歉，代码中还有 ${Number} 个错误。`,
         'Compile error unknown': (Number) => `抱歉，编译过程中存在未知错误。请将 BUG 报告给开发者。`,
         'Compile error in model': () => `编译模型时遇到错误。请先修复代码面板中的错误，然后尝试执行。`,
         'Showing full text help of _': (Name) => `显示 [${Name}](<observer=help ${Name} -full>) 的帮助文档。`,
         'Arguments needed for execution _': (Name, Arguments) => `在执行 \`${Name}\` 之前，需要知道它的参数。`,
         'Please download Turtle Universe': () => `功能在网页模式下不可用。请下载[海龟实验室](https://www.turtlesim.com/products/turtle-universe/index-cn.html)以获得更好的体验。`,
+        // Options
+        'Help me fix this code': () => `试试 AI 自动修复代码`,
+        'Explain the error': () => `让 AI 解释错误信息`,
         // Default messages
         'Command center welcome (user)': () => `这是哪儿？我应该怎么开始使用？`,
         'Command center welcome (command)': () => `你好！这里是控制台。你可以在这里输入 NetLogo 命令并立即执行。还有许多值得探索的功能，例如：`,
@@ -32365,6 +32379,8 @@
             var _a, _b;
             /** Linters: The linters used in this instance. */
             this.Linters = [];
+            /** IsReadOnly: Whether the editor is readonly. */
+            this.IsReadOnly = false;
             // #endregion
             // #region "Context Sharing"
             /** ID: ID of the editor. */
@@ -32509,9 +32525,10 @@
             return this.CodeMirror.state.sliceDoc(Start, End);
         }
         /** SetReadOnly: Set the readonly status for the editor. */
-        SetReadOnly(status) {
+        SetReadOnly(Status) {
+            this.IsReadOnly = Status;
             this.CodeMirror.dispatch({
-                effects: this.Editable.reconfigure(EditorView.editable.of(!status)),
+                effects: this.Editable.reconfigure(EditorView.editable.of(!Status)),
             });
         }
         /** AddChild: Add a child editor. */
@@ -32613,6 +32630,12 @@
                 if (Error.start == 2147483647) {
                     Error.start = 0;
                     Error.end = FirstBreak;
+                }
+                else {
+                    try {
+                        Error.code = Code.slice(Error.start, Error.end);
+                    }
+                    catch (_a) { }
                 }
             });
         }
@@ -33133,7 +33156,9 @@
     class ChatManager {
         /** Reset: Reset the chat interface. */
         Reset() {
+            var Language = this.Thread.Language;
             this.Thread = new ChatThread();
+            this.Thread.Language = Language;
             this.PendingRequest = null;
         }
         /** SendMessage: Send a direct message to the chat backend. */
@@ -33142,7 +33167,6 @@
             this.PendingRequest = (_a = this.PendingRequest) !== null && _a !== void 0 ? _a : { Input: "" };
             this.PendingRequest.Input = Content;
             this.PendingRequest.FriendlyInput = Friendly;
-            this.PendingRequest.Language = this.Thread.Language;
             this.PendingRequest.Context = (_b = this.PendingRequest.Context) !== null && _b !== void 0 ? _b : { PreviousMessages: [] };
             this.SendRequest(this.PendingRequest);
             this.PendingRequest = null;
@@ -33151,10 +33175,11 @@
         SendRequest(Request) {
             if (ChatManager.IsRequesting)
                 return;
+            Request.Language = this.Thread.Language;
             // Make it a record and put it in the thread
             var Record = Request;
             var Subthread = this.Thread.AddToSubthread(Record);
-            var Renderer = this.Outputs.RenderRecord(Record, Subthread);
+            var RecordRenderer = this.Outputs.RenderRecord(Record, Subthread);
             var CurrentRenderer;
             // Project contexts
             Record.Context.ProjectName = this.Commands.Editor.ProjectName;
@@ -33164,13 +33189,14 @@
                 if (ChatManager.IsRequesting)
                     return;
                 ChatManager.IsRequesting = true;
-                this.Commands.HideInput();
+                RecordRenderer.SetFinalized(false);
+                this.Commands.DisableInput();
                 this.Outputs.ScrollToBottom();
                 ChatNetwork.SendRequest(Record, this.Thread, (Section) => {
                     var _a;
                     // Create the section
                     Subthread.RootID = (_a = Subthread.RootID) !== null && _a !== void 0 ? _a : Record.ID;
-                    CurrentRenderer = Renderer.AddSection(Section);
+                    CurrentRenderer = RecordRenderer.AddSection(Section);
                     CurrentRenderer === null || CurrentRenderer === void 0 ? void 0 : CurrentRenderer.Render();
                     this.Outputs.ScrollToBottom();
                 }, (Section) => {
@@ -33199,29 +33225,38 @@
                     var _a;
                     console.log(Record);
                     // Finish the record
-                    Renderer.SetData(Record);
-                    (_a = Renderer.Parent) === null || _a === void 0 ? void 0 : _a.Render();
-                    ChatManager.IsRequesting = false;
-                    this.Outputs.ScrollToBottom();
+                    RecordRenderer.SetFinalized();
+                    RecordRenderer.SetData(Record);
+                    (_a = RecordRenderer.Parent) === null || _a === void 0 ? void 0 : _a.Render();
                     // Show the input if there are no options
                     if (Record.Response.Options.length == 0)
-                        this.Commands.ShowInput();
+                        this.Commands.EnableInput();
                     else
-                        this.Commands.Disabled = false;
+                        this.Commands.SetDisabled(false);
+                    // Finish the request
+                    this.FinishRequest();
                 }).catch((Error) => {
                     if (!ChatManager.IsRequesting)
                         return;
-                    Renderer.AddSection({
+                    RecordRenderer.SetFinalized();
+                    RecordRenderer.AddSection({
                         Type: ChatResponseType.ServerError,
                         Content: Localized.Get("Connection to server failed _", Error !== null && Error !== void 0 ? Error : Localized.Get("Unknown")),
                         Parsed: SendRequest
                     }).SetFinalized().Render();
-                    this.Commands.ShowInput();
-                    ChatManager.IsRequesting = false;
+                    this.Commands.EnableInput();
+                    this.FinishRequest();
                 });
             };
             SendRequest();
             this.Outputs.ScrollToBottom();
+        }
+        /** FinishRequest: Finish the current request. */
+        FinishRequest() {
+            ChatManager.IsRequesting = false;
+            this.Outputs.ScrollToBottom();
+            this.Outputs.RestartBatch();
+            this.Outputs.Tab.RefreshPlaceholder();
         }
         /** GetPendingParent: Get the pending parent record. */
         GetPendingParent() {
@@ -33233,7 +33268,7 @@
         // #region " Options and Contexts "
         /** RequestOption: Choose a chat option and send the request. */
         RequestOption(Option, Record, Postprocessor) {
-            var _a, _b, _c;
+            var _a, _b, _c, _d;
             if (this.Commands.Disabled)
                 return false;
             // Construct the request
@@ -33243,6 +33278,8 @@
                 Operation: Option.Operation,
                 SubOperation: Option.SubOperation,
             };
+            if (Option.ActualInput)
+                this.PendingRequest.FriendlyInput = (_c = Option.LocalizedLabel) !== null && _c !== void 0 ? _c : Option.Label;
             // Find a parent
             this.PendingRequest.Context = { PreviousMessages: [] };
             if (Option.Inheritance !== ContextInheritance.Drop) {
@@ -33258,14 +33295,17 @@
                 if (RealParent) {
                     this.PendingRequest.ParentID = RealParent === null || RealParent === void 0 ? void 0 : RealParent.ID;
                     this.InheritContext(Option, RealParent, -1);
-                    if ((_c = Option.InputInContext) !== null && _c !== void 0 ? _c : true)
+                    if ((_d = Option.InputInContext) !== null && _d !== void 0 ? _d : true)
                         this.PendingRequest.Context.PreviousMessages.shift();
                 }
+            }
+            else {
+                this.Outputs.ActivateSubthread();
             }
             // Send request or unlock the input
             Postprocessor === null || Postprocessor === void 0 ? void 0 : Postprocessor(this.PendingRequest);
             if (Option.AskInput) {
-                this.Commands.ShowInput();
+                this.Commands.EnableInput();
                 this.Commands.Galapagos.Focus();
                 this.Commands.Outputs.ScrollToBottom();
             }
@@ -35346,6 +35386,17 @@
             return Message;
         }
     }
+    /** ErrorToDiagnostic: Convert a runtime error to a diagnostic. */
+    function ErrorToDiagnostic(Error) {
+        return {
+            Message: Error.message,
+            Code: Error.code,
+        };
+    }
+    /** ErrorsToDiagnostics: Convert runtime errors to diagnostics. */
+    function ErrorsToDiagnostics(Errors) {
+        return Errors.map(ErrorToDiagnostic);
+    }
 
     /** FullTextDisplay: Display the full-text help information. */
     class FullTextDisplay extends Display {
@@ -35532,6 +35583,13 @@
             }
             this.ContentContainer.text(`${(_a = this.GetData().Field) !== null && _a !== void 0 ? _a : "Empty"}: ${(_b = this.GetData().Content) !== null && _b !== void 0 ? _b : ""}`);
         }
+        /** ShowPseudoOption: Show a pseudo option. */
+        ShowPseudoOption(Option, Callback) {
+            Option.Callback = () => Callback(Option);
+            var Parent = this.Parent;
+            Parent.GetData().Response.Options.unshift(Option);
+            Parent.SetDirty(true);
+        }
     }
 
     /** JSONSectionRenderer: A block that displays the a JSON response section. */
@@ -35682,6 +35740,21 @@
         }
     }
 
+    /** BreedType: Type of the breed. */
+    var BreedType;
+    (function (BreedType) {
+        BreedType[BreedType["Turtle"] = 0] = "Turtle";
+        BreedType[BreedType["Patch"] = 1] = "Patch";
+        BreedType[BreedType["UndirectedLink"] = 2] = "UndirectedLink";
+        BreedType[BreedType["DirectedLink"] = 3] = "DirectedLink";
+    })(BreedType || (BreedType = {}));
+    /** DiagnosticType: Type of diagnostics. */
+    var DiagnosticType;
+    (function (DiagnosticType) {
+        DiagnosticType["Runtime"] = "RuntimeError";
+        DiagnosticType["Compile"] = "CompileError";
+    })(DiagnosticType || (DiagnosticType = {}));
+
     /** ChangeTopic: Generate a template change topic option. */
     function ChangeTopic(Label) {
         return {
@@ -35698,14 +35771,25 @@
     /** FixCode: Fix the current code snippet. */
     function FixCode(Label) {
         return {
-            Label: Label !== null && Label !== void 0 ? Label : "Can you help me fix the code?",
+            Label: Label !== null && Label !== void 0 ? Label : "Help me fix this code",
             Operation: "CodeFix",
-            Style: "hidden",
             AskInput: true,
             InputInContext: false,
             TextInContext: ContextMessage.Nothing,
             CodeInContext: true,
             Transparent: true,
+            Inheritance: ContextInheritance.InheritOne
+        };
+    }
+    /** ExplainErrors: Explain the errors. */
+    function ExplainErrors(Type, Label) {
+        return {
+            Label: Label !== null && Label !== void 0 ? Label : "Explain the error",
+            Operation: "ExplainErrors",
+            AskInput: true,
+            InputInContext: false,
+            TextInContext: ContextMessage.Nothing,
+            CodeInContext: true,
             Inheritance: ContextInheritance.InheritOne
         };
     }
@@ -35738,7 +35822,6 @@
             var Toolbar = $(`<div class="toolbar"></div>`).appendTo(this.Container);
             this.ReturnButton = $(`<div class="button return">${Localized.Get("Return")}</div>`).on("click", () => this.Return()).appendTo(Toolbar);
             this.PlayButton = $(`<div class="button run">${Localized.Get("RunCode")}</div>`).on("click", () => this.Play()).appendTo(Toolbar);
-            // this.FixButton = $(`<div class="button fix">${Localized.Get("FixCode")}</div>`).on("click", () => this.Fix()).appendTo(Toolbar);
             this.AskButton = $(`<div class="button ask">${Localized.Get("AskCode")}</div>`).on("click", () => this.Ask()).appendTo(Toolbar);
             this.AddToCodeButton = $(`<div class="button addtocode">${Localized.Get("AddCode")}</div>`).hide().on("click", () => this.AddToCode()).appendTo(Toolbar);
             // Create the history
@@ -35840,34 +35923,21 @@
         TryTo(Action) {
             this.Editor.Semantics.PrettifyAll();
             this.ExportDiagnostics().then(Diagnostics => {
-                if (Diagnostics.length == 0) {
+                if (Diagnostics.Diagnostics.length == 0) {
                     Action();
                 }
                 else {
-                    this.Tab.Outputs.RenderOptions([
-                        FixCode(),
-                        ChangeTopic()
-                    ]);
+                    Diagnostics.Hidden = true;
+                    this.Tab.Outputs.RenderOptions([ChangeTopic()]);
                     this.Tab.Outputs.RenderResponses([
                         {
-                            Type: ChatResponseType.Text,
+                            Type: ChatResponseType.CompileError,
                             Field: "Message",
-                            Content: Localized.Get("We need to fix the following errors _", Diagnostics.length),
-                        },
-                        {
-                            Type: ChatResponseType.Thought,
-                            Field: "Code",
-                            Content: this.Editor.GetCode(),
-                        },
-                        {
-                            Type: ChatResponseType.Thought,
-                            Field: "HTML",
-                            Content: this.Editor.Semantics.Highlight().innerHTML.trim().split(/\<br\>/g).join("\n"),
+                            Content: Localized.Get("We need to fix the following errors _", Diagnostics.Diagnostics.length),
                         },
                         {
                             Type: ChatResponseType.JSON,
                             Field: "Diagnostics",
-                            Content: JSON.stringify(Diagnostics),
                             Parsed: Diagnostics
                         }
                     ]);
@@ -35879,12 +35949,16 @@
             return __awaiter(this, void 0, void 0, function* () {
                 var Diagnostics = yield this.Editor.ForceLintAsync();
                 Diagnostics = Diagnostics.filter(Diagnostic => Diagnostic.severity == "error");
-                return Diagnostics.map(Diagnostic => {
-                    return {
-                        Message: NetLogoUtils.PostprocessLintMessage(Diagnostic.message),
-                        Code: this.Editor.GetCodeSlice(Diagnostic.from, Diagnostic.to)
-                    };
-                });
+                return {
+                    Type: DiagnosticType.Compile,
+                    Code: this.Editor.GetCode(),
+                    Diagnostics: Diagnostics.map(Diagnostic => {
+                        return {
+                            Message: NetLogoUtils.PostprocessLintMessage(Diagnostic.message),
+                            Code: this.Editor.GetCodeSlice(Diagnostic.from, Diagnostic.to)
+                        };
+                    })
+                };
             });
         }
         /** Play: Try to play the code. */
@@ -35898,11 +35972,11 @@
                 // If it is a command or reporter, simply run it
                 switch (Mode) {
                     case "Command":
-                        this.Tab.Disabled = true;
+                        this.Tab.SetDisabled(true);
                         this.Tab.ExecuteCommand("observer", Code, true);
                         break;
                     case "Reporter":
-                        this.Tab.Disabled = true;
+                        this.Tab.SetDisabled(true);
                         this.Tab.ExecuteCommand("observer", `show ${Code}`, true);
                         break;
                     default:
@@ -35967,38 +36041,62 @@
         }
         /** RenderInternal: Render the UI element. */
         RenderInternal() {
-            var _a;
-            // For now, we don't render the diagnostics
-            var Record = this.GetRecord();
-            /*var Rendered = Record.Response.Sections.find((Section) => Section.Field == "HTML")!.Content?.split("\n") ?? [];
-            var Diagnostics = this.GetParsed();
-            for (var Diagnostic of Diagnostics) {
-                var Renderer = new DiagnosticRenderer(Rendered);
-                this.AddChild(Renderer, false);
-                Renderer.Container.appendTo(this.ContentContainer);
-                Renderer.SetData(Diagnostic);
-                Renderer.Render();
-            }*/
-            // Show the option
-            var Option = Record.Response.Options[0];
-            var Link = $(`<li><a href="javascript:void(0)">${(_a = Option.LocalizedLabel) !== null && _a !== void 0 ? _a : Option.Label}</a></li>`)
-                .appendTo(this.ContentContainer).on("click", () => {
-                this.SubmitDiagnostics();
-                Link.addClass("chosen");
-            });
+            // Render the statistics
+            var Metadata = this.GetParsed();
+            if (!Metadata.Hidden) {
+                for (var Diagnostic of Metadata.Diagnostics) {
+                    var Renderer = new DiagnosticRenderer();
+                    this.AddChild(Renderer, false);
+                    Renderer.Container.appendTo(this.ContentContainer);
+                    Renderer.SetData(Diagnostic);
+                    Renderer.Render();
+                }
+                NetLogoUtils.AnnotateCodes(this.ContentContainer.find("code"));
+            }
+            // Show the options
+            this.ShowPseudoOption(ExplainErrors(Metadata.Type), (Option) => this.SubmitDiagnostics(Option, false));
+            if (Metadata.Type == DiagnosticType.Compile)
+                this.ShowPseudoOption(FixCode(), (Option) => this.SubmitDiagnostics(Option, true));
         }
         /** SubmitDiagnostics: Submit the diagnostics to the server. */
-        SubmitDiagnostics() {
+        SubmitDiagnostics(Option, Fixing) {
+            var _a;
             var Manager = ChatManager.Instance;
+            var Metadata = this.GetParsed();
             var Record = this.GetRecord();
-            var Option = Record.Response.Options[0];
-            Manager.RequestOption(Option, Record, (Request) => Request.Context.CodeSnippet = CodeDisplay.Instance.Editor.GetCode());
-            CodeDisplay.Instance.ExportDiagnostics().then(Diagnostics => { var _a; return Manager.SendMessage(JSON.stringify(Diagnostics), (_a = Option.LocalizedLabel) !== null && _a !== void 0 ? _a : Option.Label); });
+            // Request the option
+            Manager.RequestOption(Option, Record, (Request) => { var _a; return Request.Context.CodeSnippet = (_a = Metadata.Code) !== null && _a !== void 0 ? _a : CodeDisplay.Instance.Editor.GetCode(); });
+            // Export the diagnostics
+            if (Metadata.Code) {
+                // Export the diagnostics from the metadata
+                Manager.SendMessage(JSON.stringify(Metadata.Diagnostics), (_a = Option.LocalizedLabel) !== null && _a !== void 0 ? _a : Localized.Get(Option.Label));
+            }
+            else {
+                // Re-export the diagnostics from the latest code snippet
+                CodeDisplay.Instance.ExportDiagnostics().then(Diagnostics => {
+                    var _a;
+                    return Manager.SendMessage(JSON.stringify(Diagnostics.Diagnostics), (_a = Option.LocalizedLabel) !== null && _a !== void 0 ? _a : Localized.Get(Option.Label));
+                });
+            }
         }
         /** GetChooser: Return the section chooser for this renderer. */
         static GetChooser() {
-            return (Record, Section) => Section.Field == "Diagnostics" && Section.Parsed && Array.isArray(Section.Parsed) && Section.Parsed.length > 0 &&
-                Section.Parsed[0].Message && Section.Parsed[0].Code ? new DiagnosticsRenderer() : undefined;
+            return (Record, Section) => Section.Field == "Diagnostics" && Section.Parsed &&
+                Section.Parsed.Diagnostics ? new DiagnosticsRenderer() : undefined;
+        }
+    }
+    /** DiagnosticRenderer: A block that displays a diagnostic. */
+    class DiagnosticRenderer extends UIRendererOf {
+        /** ContainerInitializer: The initializer for the container. */
+        ContainerInitializer() {
+            return $(`<li></li>`);
+        }
+        /** RenderInternal: Render the UI element. */
+        RenderInternal() {
+            var Diagnostic = this.GetData();
+            if (Diagnostic.Code)
+                $("<code></code>").appendTo(this.Container).text(Diagnostic.Code);
+            $(`<div class="message"></div>`).text(Diagnostic.Message).appendTo(this.Container);
         }
     }
 
@@ -36048,16 +36146,11 @@
         /** RenderInternal: Render the UI element. */
         RenderInternal() {
             var Section = this.GetData();
-            if (Section.Parsed) {
-                this.ContentContainer.text(Localized.Get("Compile error in snippet _", Section.Parsed.length));
-                for (var I = 0; I < Section.Parsed.length; I++) {
-                    var Metadata = Section.Parsed[I];
-                    // $("<code></code>").appendTo(this.ContentContainer).text(Metadata.Code);
-                    $("<li></li>").appendTo($("<ul></ul>").appendTo(this.ContentContainer)).text(Metadata.message);
-                }
+            if (Section.Content) {
+                this.ContentContainer.text(Section.Content);
             }
             else {
-                this.ContentContainer.text(Section.Content);
+                this.ContentContainer.text(Localized.Get("Compile error in snippet _", Section.Parsed));
             }
         }
     }
@@ -36143,7 +36236,12 @@
         /** RenderInternal: Render the UI element. */
         RenderInternal() {
             var Section = this.GetData();
-            this.ContentContainer.text(Section.Content);
+            if (Section.Content) {
+                this.ContentContainer.text(Section.Content);
+            }
+            else {
+                this.ContentContainer.text(Localized.Get("Runtime error in snippet _", Section.Parsed));
+            }
         }
     }
 
@@ -36256,7 +36354,7 @@
         RenderInternal() {
             var _a, _b, _c;
             var Option = this.GetData();
-            this.Container.addClass((_b = (_a = this.GetData().Style) === null || _a === void 0 ? void 0 : _a.toLowerCase()) !== null && _b !== void 0 ? _b : "generated").children("a")
+            this.Container.removeClass().addClass((_b = (_a = this.GetData().Style) === null || _a === void 0 ? void 0 : _a.toLowerCase()) !== null && _b !== void 0 ? _b : "generated").children("a")
                 .html(MarkdownToHTML((_c = Option.LocalizedLabel) !== null && _c !== void 0 ? _c : Option.Label).replace("<p>", "").replace("</p>", ""));
         }
         /** ClickHandler: The handler for the click event. */
@@ -36341,17 +36439,25 @@
 
     /** RecordRenderer: A block that displays the output of a request. */
     class RecordRenderer extends UIRendererOf {
+        /** SetFinalized: Set the finalized status of the record. */
+        SetFinalized(Status = true) {
+            this.Processing = !Status;
+            this.Container.toggleClass("loading", !Status);
+            return this;
+        }
         /** Constructor: Create a new UI renderer. */
         constructor() {
             super();
+            /** Processing: Whether the record is still processing. */
+            this.Processing = true;
             /** OptionRenderers: The renderer of the options. */
             this.OptionRenderers = [];
-            this.Container.addClass("record");
+            this.Container.addClass("record").addClass("loading");
             this.InputRenderer = new InputRenderer();
             this.AddChild(this.InputRenderer);
             var Container = $(`
 <div class="contents">
-    <div class="avatar"><img src="images/assistant.png" /></div>
+    <div class="avatar"><img src="images/assistant.png" /><div class="dot-stretching"></div></div>
     <div class="content"></div>
     <div class="expand-record">↓</div>
 </div>`).hide();
@@ -36473,6 +36579,15 @@
         }
     }
 
+    /** GenerateObjectID: Generate a random object ID. */
+    function GenerateObjectID() {
+        return NumberToHex(Date.now() / 1000) + ' '.repeat(16).replace(/./g, () => NumberToHex(Math.random() * 16));
+    }
+    /** NumberToHex: Convert a number to hex. */
+    function NumberToHex(Value) {
+        return Math.floor(Value).toString(16);
+    }
+
     /** OutputDisplay: Display the output section. */
     class OutputDisplay extends Display {
         /** Constructor: Create a new output section. */
@@ -36499,13 +36614,16 @@
             this.ScrollContainer.empty();
             this.Subthreads.clear();
             delete this.Subthread;
+            this.Sections = [];
+            this.InBatch = false;
         }
         /** RenderRecord: Render a new chat record. */
         RenderRecord(Record, Subthread) {
             var _a, _b, _c;
             var Renderer;
             // Restart the batch if necessary
-            this.RestartBatch();
+            if (!ChatManager.IsRequesting)
+                this.RestartBatch();
             // Create a new subthread if necessary
             if (Subthread != ((_a = this.Subthread) === null || _a === void 0 ? void 0 : _a.GetData())) {
                 (_b = this.Subthread) === null || _b === void 0 ? void 0 : _b.Container.removeClass("activated");
@@ -36547,24 +36665,35 @@
             var Thread = this.Tab.ChatManager.Thread;
             var Record = { Input: Input, FriendlyInput: FriendlyInput };
             var Subthread = (_a = this.Subthread) === null || _a === void 0 ? void 0 : _a.GetData();
+            Record.ID = GenerateObjectID();
             Record.RequestTimestamp = Date.now();
             Record.ThreadID = Thread.ID;
             if (!Subthread)
                 Subthread = Thread.AddToSubthread(Record);
             Record.Language = Thread.Language;
             Record.ParentID = (_b = Parent === null || Parent === void 0 ? void 0 : Parent.ID) !== null && _b !== void 0 ? _b : Subthread.RootID;
+            if (Record.ParentID == Record.ID)
+                delete Record.ParentID;
             Record.Response = { Sections: [], Options: [] };
+            this.Tab.ChatManager.Thread.Records[Record.ID] = Record;
             this.RenderRecord(Record, Subthread);
             return Record;
         }
         /** RenderResponses: Render response sections immediately in the current record. */
-        RenderResponses(Sections) {
+        RenderResponses(Sections, Finalizing = true) {
             var _a;
-            if (Sections.length == 0)
+            if (Sections.length == 0 && !Finalizing)
                 return;
             var LastRecord = this.Subthread.Children[this.Subthread.Children.length - 1];
+            // Check if the last record is finished
+            // If so, create a new record
+            if (!LastRecord.Processing)
+                this.RenderRequest();
+            // If not, append to the last record
             for (var Section in Sections)
-                (_a = LastRecord.AddSection(Sections[Section])) === null || _a === void 0 ? void 0 : _a.SetFinalized();
+                (_a = LastRecord.AddSection(Sections[Section])) === null || _a === void 0 ? void 0 : _a.SetFinalized().Render();
+            if (Finalizing)
+                LastRecord.SetFinalized();
             this.Subthread.Render();
             this.ScrollToBottom();
         }
@@ -36587,9 +36716,11 @@
         }
         /** CloseBatch: Close a printing batch. */
         CloseBatch() {
-            this.RenderResponses(this.Sections);
-            this.Sections = [];
+            if (ChatManager.IsRequesting)
+                return;
             this.InBatch = false;
+            this.RenderResponses(this.Sections, false);
+            this.Sections = [];
             this.ScrollToBottom();
         }
         /** RestartBatch: Restart a printing batch. */
@@ -36599,12 +36730,12 @@
             this.CloseBatch();
             this.OpenBatch();
         }
-        /** RenderResponse: Render response sections in the current record. */
+        /** QueueResponse: Quere a response section */
         QueueResponse(Section) {
             if (this.InBatch)
                 this.Sections.push(Section);
             else
-                this.RenderResponses([Section]);
+                this.RenderResponses([Section], false);
         }
         /** PrintCommandInput: Print a line of input to the screen. */
         PrintCommandInput(Content, Restart = true) {
@@ -36613,6 +36744,43 @@
             if (!Parent && Restart && !((_a = this.Subthread) === null || _a === void 0 ? void 0 : _a.GetData().RootID))
                 this.ActivateSubthread();
             return this.RenderRequest(`\`\`\`\n${Content.replace("`", "\`")}\n\`\`\``, Parent);
+        }
+        /** FinishExecution: Notify the completion of the command. */
+        FinishExecution(Status, Code, Message) {
+            if (Array.isArray(Message) && Message.length > 0) {
+                var Errors = Message;
+                Errors.forEach(Error => {
+                    if (Error.start == 2147483647) {
+                        Error.start = 0;
+                        Error.end = Code.length;
+                    }
+                    else {
+                        try {
+                            Error.code = Code.slice(Error.start, Error.end);
+                        }
+                        catch (_a) { }
+                    }
+                });
+                var Diagnostics = ErrorsToDiagnostics(Errors);
+                this.RenderResponses([{
+                        Type: Status == "CompileError" ? ChatResponseType.CompileError : ChatResponseType.RuntimeError,
+                        Parsed: Diagnostics.length
+                    }, {
+                        Type: ChatResponseType.JSON,
+                        Field: "Diagnostics",
+                        Parsed: {
+                            Diagnostics: Diagnostics,
+                            Type: Status == "CompileError" ? DiagnosticType.Compile : DiagnosticType.Runtime,
+                            Code: Code
+                        }
+                    }]);
+            }
+            else {
+                this.PrintOutput(Status, Message);
+                this.RestartBatch();
+                this.RenderResponses([], true);
+            }
+            this.Tab.SetDisabled(false);
         }
         /** PrintOutput: Provide for Unity to print compiled output. */
         PrintOutput(Class, Content) {
@@ -36690,7 +36858,11 @@
             this.RenderRequest(Localized.Get("Command center welcome (user)"));
             // Default options
             var Options = [
-                { Label: "Check out the code tab", Callback: () => this.Tab.Editor.EditorTabs[0].Show() },
+                {
+                    Label: "Check out the code tab",
+                    Style: "enter",
+                    Callback: () => this.Tab.Editor.EditorTabs[0].Show(),
+                },
                 { Label: "Run NetLogo code directly", Callback: () => {
                         if (this.Tab.Galapagos.GetCode() == "")
                             this.Tab.Galapagos.SetCode("print \"Hello World!\"");
@@ -36700,8 +36872,12 @@
             ];
             // AI response
             if (ChatManager.Available) {
-                this.Tab.Placeholder.innerText = Localized.Get("Talk to the computer in NetLogo or natural languages");
-                this.PrintOutput("Output", Localized.Get("Command center welcome (assistant)"));
+                this.RenderResponses([
+                    {
+                        Content: Localized.Get("Command center welcome (assistant)"),
+                        Type: ChatResponseType.Text
+                    }
+                ], false);
                 Options.push({ Label: "Talk to the computer in natural languages", Callback: () => {
                         if (this.Tab.Galapagos.GetCode() == "")
                             this.Tab.Galapagos.SetCode("create some turtles around");
@@ -36714,13 +36890,19 @@
                     } });
             }
             else {
-                this.Tab.Placeholder.innerText = Localized.Get("Type your command here");
-                this.PrintOutput("Output", Localized.Get("Command center welcome (command)"));
+                this.RenderResponses([
+                    {
+                        Content: Localized.Get("Command center welcome (command)"),
+                        Type: ChatResponseType.Text
+                    }
+                ], false);
                 Options.push({ Label: "Look for the documentation", Callback: () => {
                         this.Tab.ExecuteCommand("observer", "help", false);
                     } });
             }
             this.RenderOptions(Options);
+            this.RenderResponses([], true);
+            this.Tab.RefreshPlaceholder();
         }
     }
 
@@ -36757,7 +36939,7 @@
         /** Reset: Reset the command center. */
         Reset() {
             super.Reset();
-            this.ShowInput();
+            this.EnableInput();
             this.ClearInput();
             this.Outputs.Show();
             this.Outputs.Clear();
@@ -36786,19 +36968,23 @@
             this.CommandLine = $(Container).find(".command-line");
             this.TargetSelect = this.CommandLine.find("select");
             this.TargetSelect.html(`
-		<option value="observer">${Localized.Get("Observer")}</option>
-		<option value="turtles">${Localized.Get("Turtles")}</option>
-		<option value="patches">${Localized.Get("Patches")}</option>
-		<option value="links">${Localized.Get("Links")}</option>`);
-            this.Placeholder = $("<span></span>").get(0);
+			<option value="observer">${Localized.Get("Observer")}</option>
+			<option value="turtles">${Localized.Get("Turtles")}</option>
+			<option value="patches">${Localized.Get("Patches")}</option>
+			<option value="links">${Localized.Get("Links")}</option>`);
             // CodeMirror Editor
+            this.Placeholder = $("<span></span>");
             this.Galapagos = new GalapagosEditor(this.CommandLine.find(".command-input").get(0), {
                 OneLine: true,
                 ParseMode: ParseMode.Oneline,
-                Placeholder: this.Placeholder,
+                Placeholder: this.Placeholder.get(0),
                 OnKeyUp: (Event) => this.InputKeyHandler(Event),
                 OnDictionaryClick: (Text) => this.ExplainFull(Text)
             });
+            // Send button
+            this.SendButton = $(`<div class="command-send"><div class="dot-stretching"></div></div>`).on("click", () => {
+                this.InputKeyHandler({ key: "Enter", code: "Enter" });
+            }).insertAfter($(this.Galapagos.Parent.lastChild));
             // Set up sections
             this.Outputs = new OutputDisplay(this);
             this.Codes = new CodeDisplay(this);
@@ -36817,7 +37003,6 @@
                 if (!Content || this.Disabled)
                     return;
                 const Objective = this.TargetSelect.val();
-                this.Disabled = true;
                 this.Outputs.Show();
                 this.SendCommand(Objective, Content);
             }
@@ -36878,10 +37063,12 @@
                         if (Mode == "Reporter" || Mode == "Unknown")
                             Content = `show ${Content}`;
                         this.ExecuteInput(Objective, Content, Temporary);
+                        this.SetDisabled(true);
                         return;
                     }
                     else if (!Chatable) {
                         this.ExecuteInput(Objective, Content, Temporary);
+                        this.SetDisabled(true);
                         return;
                     }
                 }
@@ -36895,21 +37082,51 @@
         ClearInput() {
             this.Galapagos.SetCode("");
         }
-        /** ShowInput: Show and enable the input box of Command Center. */
-        ShowInput() {
-            this.CommandLine.show();
-            this.Disabled = false;
+        /** EnableInput: Show and enable the input box of Command Center. */
+        EnableInput() {
+            this.Galapagos.SetReadOnly(false);
+            this.SetDisabled(false);
         }
-        /** HideInput: Hide the input box of Command Center. */
-        HideInput() {
-            this.CommandLine.hide();
-            this.Disabled = true;
+        /** DisableInput: Hide the input box of Command Center. */
+        DisableInput() {
+            this.Galapagos.SetReadOnly(true);
+            this.SetDisabled(true);
         }
-        // Set the content of command input.
+        /** SetCode: Set the content of command input. */
         SetCode(Objective, Content) {
             this.TargetSelect.val(Objective.toLowerCase());
             this.Galapagos.SetCode(Content);
             setTimeout(() => this.Galapagos.Selection.SetCursorPosition(Content.length), 1);
+        }
+        /** SetDisabled: Set the disabled state of the command center. */
+        SetDisabled(Disabled) {
+            this.Disabled = Disabled;
+            this.RefreshPlaceholder();
+        }
+        /** RefreshPlaceholder: Refresh the placeholder. */
+        RefreshPlaceholder() {
+            if (this.Disabled) {
+                if (ChatManager.IsRequesting) {
+                    this.Placeholder.text(Localized.Get("Waiting for the AI to respond"));
+                }
+                else {
+                    this.Placeholder.text(Localized.Get("Waiting for the execution to finish"));
+                }
+            }
+            else {
+                if (ChatManager.Available) {
+                    if (this.Galapagos.IsReadOnly) {
+                        this.Placeholder.text(Localized.Get("Please choose one option first"));
+                    }
+                    else {
+                        this.Placeholder.text(Localized.Get("Talk to the computer in NetLogo or natural languages"));
+                    }
+                }
+                else {
+                    this.Placeholder.text(Localized.Get("Type NetLogo command here"));
+                }
+            }
+            this.SendButton.toggleClass("disabled", this.Disabled);
         }
         // #endregion
         // #region "Command Execution"
@@ -36977,7 +37194,7 @@
         ExecuteProcedureWithArguments(Name, IsTemporary, Arguments) {
             if (this.Disabled)
                 return;
-            this.Disabled = true;
+            this.SetDisabled(true);
             // Generate the code
             var Code = `${Name} ${Object.keys(Arguments).map(Key => `${this.FormatArgument(Arguments[Key])}`).join(" ")}`;
             // Execute it
@@ -36993,16 +37210,11 @@
                 return false;
             this.ExecuteCommand("observer", `help ${Command} -full`, false);
         }
-        /** FinishExecution: Notify the completion of the command. */
-        FinishExecution(Status, Message) {
-            this.Outputs.PrintOutput(Status, Message);
-            this.Disabled = false;
-        }
         /** RecompileTemporarily Recompile the code snippet temporarily. */
         RecompileTemporarily(Code, Procedures, Callback) {
             if (this.Disabled)
                 return;
-            this.Disabled = true;
+            this.SetDisabled(true);
             this.RecompileCallback = Callback;
             // If the code is not the same, recompile it
             if (this.TemporaryCode != Code) {
@@ -37021,7 +37233,7 @@
         /** PlayCompiled: The callback after the code to play is compiled. */
         PlayCompiled(Succeeded, Errors) {
             var _a;
-            this.Disabled = false;
+            this.SetDisabled(false);
             if (Succeeded) {
                 this.Outputs.RenderResponses([{
                         Type: ChatResponseType.Text,
@@ -37037,16 +37249,22 @@
                 delete this.TemporaryCode;
             }
             else {
+                this.Codes.Editor.SetCompilerErrors(Errors);
+                // Build the diagnostics
+                var Diagnostics = {
+                    Type: DiagnosticType.Compile,
+                    Diagnostics: ErrorsToDiagnostics(Errors),
+                    Code: this.TemporaryCode
+                };
+                // Show the diagnostics
                 this.Outputs.RenderResponses([{
                         Type: ChatResponseType.CompileError,
-                        Parsed: Errors
+                        Parsed: Diagnostics.Diagnostics.length
                     }, {
                         Type: ChatResponseType.JSON,
                         Field: "Diagnostics",
-                        Content: JSON.stringify(Errors),
-                        Parsed: Errors
+                        Parsed: Diagnostics
                     }]);
-                this.Codes.Editor.SetCompilerErrors(Errors);
                 delete this.TemporaryCode;
             }
         }
@@ -37331,14 +37549,14 @@
                         Type: ChatResponseType.Text,
                         Content: Localized.Get("Please download Turtle Universe")
                     }]);
-                this.CommandTab.Disabled = false;
+                this.CommandTab.SetDisabled(false);
             }
         }
         // #endregion
         // #region "Editor Statuses"
         /** Resize: Resize the viewport width (on mobile platforms) */
         Resize(Ratio) {
-            $("body").addClass("Mobile");
+            $("body").addClass("mobile");
             $("#viewport").attr("content", `width=device-width,initial-scale=${Ratio},maximum-scale=${Ratio},minimum-scale=${Ratio},user-scalable=no,viewport-fit=cover`);
         }
         /** ToggleDark: Toggle the dark mode. */

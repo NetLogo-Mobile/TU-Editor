@@ -12,6 +12,10 @@ export declare class RecordRenderer extends UIRendererOf<ChatRecord> {
     protected ContentContainer: JQuery<HTMLElement>;
     /** InputRenderer: The renderer of user inputs. */
     protected InputRenderer: InputRenderer;
+    /** Processing: Whether the record is still processing. */
+    Processing: boolean;
+    /** SetFinalized: Set the finalized status of the record. */
+    SetFinalized(Status?: boolean): RecordRenderer;
     /** Constructor: Create a new UI renderer. */
     constructor();
     /** RenderInternal: Render the UI element. */

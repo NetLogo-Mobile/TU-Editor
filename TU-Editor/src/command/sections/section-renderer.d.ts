@@ -1,5 +1,6 @@
 /// <reference types="jquery" />
 /// <reference types="jquery" />
+import { ChatResponseOption } from "../../chat/client/chat-option";
 import { ChatRecord } from "../../chat/client/chat-record";
 import { ChatResponseSection } from "../../chat/client/chat-response";
 import { UIRendererOf } from "../outputs/ui-renderer";
@@ -23,4 +24,6 @@ export declare class SectionRenderer extends UIRendererOf<ChatResponseSection> {
     protected ContentContainer: JQuery<HTMLElement>;
     /** RenderInternal: Render the UI element. */
     protected RenderInternal(): void;
+    /** ShowPseudoOption: Show a pseudo option. */
+    protected ShowPseudoOption(Option: ChatResponseOption, Callback: (Option: ChatResponseOption) => void): void;
 }

@@ -18,6 +18,8 @@ export declare class ChatManager {
     static IsRequesting: boolean;
     /** SendRequest: Send a request to the chat backend and handle its outputs. */
     private SendRequest;
+    /** FinishRequest: Finish the current request. */
+    private FinishRequest;
     /** GetPendingParent: Get the pending parent record. */
     GetPendingParent(): ChatRecord | undefined;
     /** RequestOption: Choose a chat option and send the request. */

@@ -3,7 +3,7 @@ import { Display } from "./display";
 import { GalapagosEditor } from "../../../../CodeMirror-NetLogo/src/editor";
 import { ChatRecord } from "../../chat/client/chat-record";
 import { SubthreadRenderer } from "../outputs/subthread-renderer";
-import { Diagnostic } from "../../chat/client/languages/netlogo-context";
+import { Diagnostics } from "../../chat/client/languages/netlogo-context";
 /** CodeDisplay: The interactive code editor section. */
 export declare class CodeDisplay extends Display {
     /** Editor: The editor instance. */
@@ -14,7 +14,6 @@ export declare class CodeDisplay extends Display {
     private ReturnButton;
     /** PlayButton: The play button of the display. */
     private PlayButton;
-    /** FixButton: The fix button of the display. */
     /** AskButton: The ask button of the display. */
     private AskButton;
     /** AddToCodeButton: The add to code button of the display. */
@@ -56,7 +55,7 @@ export declare class CodeDisplay extends Display {
     /** TryTo: Try to do something that requires grammatically correct code. */
     TryTo(Action: () => void): void;
     /** Fix: Try to fix the code. */
-    ExportDiagnostics(): Promise<Diagnostic[]>;
+    ExportDiagnostics(): Promise<Diagnostics>;
     /** Play: Try to play the code. */
     Play(): void;
     /** PlayProcedures: Try to play the available procedures after compilation. */

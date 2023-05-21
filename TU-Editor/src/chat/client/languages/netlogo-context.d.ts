@@ -39,6 +39,22 @@ export interface Procedure {
     /** IsCommand: Is the procedure a command (to) instead of a reporter (to-report)? */
     IsCommand: boolean;
 }
+/** Diagnostics: A list of diagnostics. */
+export interface Diagnostics {
+    /** Diagnostics: The diagnostics. */
+    Diagnostics: Diagnostic[];
+    /** Type: Type of errors. */
+    Type: DiagnosticType;
+    /** Code: Related code snippet. */
+    Code?: string;
+    /** Hidden: Is the diagnostics hidden? */
+    Hidden?: boolean;
+}
+/** DiagnosticType: Type of diagnostics. */
+export declare enum DiagnosticType {
+    Runtime = "RuntimeError",
+    Compile = "CompileError"
+}
 /** Diagnostic: A diagnostic message. */
 export interface Diagnostic {
     /** Message: The message of the diagnostic. */

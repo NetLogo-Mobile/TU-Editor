@@ -3,9 +3,9 @@
 import { RendererChooser } from '../outputs/record-renderer';
 import { UIRendererOf } from "../outputs/ui-renderer";
 import { JSONSectionRenderer } from "../sections/json-section-renderer";
-import { Diagnostic } from "../../chat/client/languages/netlogo-context";
+import { Diagnostic, Diagnostics } from "../../chat/client/languages/netlogo-context";
 /** DiagnosticsRenderer: A dedicated block for code diagnostics. */
-export declare class DiagnosticsRenderer extends JSONSectionRenderer<Diagnostic[]> {
+export declare class DiagnosticsRenderer extends JSONSectionRenderer<Diagnostics> {
     /** Constructor: Create a new UI renderer. */
     constructor();
     /** ContentContainerInitializer: The initializer for the container. */
@@ -19,10 +19,6 @@ export declare class DiagnosticsRenderer extends JSONSectionRenderer<Diagnostic[
 }
 /** DiagnosticRenderer: A block that displays a diagnostic. */
 export declare class DiagnosticRenderer extends UIRendererOf<Diagnostic> {
-    /** RenderedCode: The HTML rendered code. */
-    private RenderedCode;
-    /** Constructor: Create a new UI renderer. */
-    constructor(RenderedCode: string[]);
     /** ContainerInitializer: The initializer for the container. */
     protected ContainerInitializer(): JQuery<HTMLElement>;
     /** RenderInternal: Render the UI element. */

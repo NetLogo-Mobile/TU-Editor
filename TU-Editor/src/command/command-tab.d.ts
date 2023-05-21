@@ -26,7 +26,9 @@ export declare class CommandTab extends Tab {
     /** ChatManager: The chat interface to the backend. */
     readonly ChatManager: ChatManager;
     /** Placeholder: The placeholder for the command center. */
-    readonly Placeholder: HTMLElement;
+    readonly Placeholder: JQuery<HTMLElement>;
+    /** SendButton: The send button. */
+    readonly SendButton: JQuery<HTMLElement>;
     /** Show: Show the command tab.  */
     Show(): void;
     /** Hide: Hide the command tab. */
@@ -57,11 +59,16 @@ export declare class CommandTab extends Tab {
     SendCommand(Objective: string, Content: string): Promise<void>;
     /** ClearInput: Clear the input box of Command Center. */
     ClearInput(): void;
-    /** ShowInput: Show and enable the input box of Command Center. */
-    ShowInput(): void;
-    /** HideInput: Hide the input box of Command Center. */
-    HideInput(): void;
+    /** EnableInput: Show and enable the input box of Command Center. */
+    EnableInput(): void;
+    /** DisableInput: Hide the input box of Command Center. */
+    DisableInput(): void;
+    /** SetCode: Set the content of command input. */
     SetCode(Objective: string, Content: string): void;
+    /** SetDisabled: Set the disabled state of the command center. */
+    SetDisabled(Disabled: boolean): void;
+    /** RefreshPlaceholder: Refresh the placeholder. */
+    RefreshPlaceholder(): void;
     /** ExecuteInput: Execute a human-sent command. */
     private ExecuteInput;
     /** ExecuteCommand: Execute a command. */
@@ -74,8 +81,6 @@ export declare class CommandTab extends Tab {
     private FormatArgument;
     /** ExplainFull: ExplainFull: Explain the selected text in the command center in full. */
     ExplainFull(Command: string): false | undefined;
-    /** FinishExecution: Notify the completion of the command. */
-    FinishExecution(Status: string, Message: string): void;
     /** RecompileCallback: The callback after the code to play is compiled. */
     private RecompileCallback?;
     /** TemporaryCode: The temporary code snippet that is in-use. */

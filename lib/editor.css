@@ -38,9 +38,14 @@ code {
 .cm-editor .cm-tooltip.cm-tooltip-autocomplete > ul {
 	max-height: 11.4rem;
 }
-.Mobile .cm-editor .cm-tooltip.cm-tooltip-autocomplete > ul > li, 
-.Mobile .cm-editor .cm-tooltip.cm-tooltip-autocomplete > ul > completion-section {
+.mobile .cm-editor .cm-tooltip.cm-tooltip-autocomplete > ul > li, 
+.mobile .cm-editor .cm-tooltip.cm-tooltip-autocomplete > ul > completion-section {
 	line-height: 1.5;
+}
+.button {
+	-webkit-user-select: none; 
+	-ms-user-select: none;
+	user-select: none;
 }
 
 /** Multi-Tab Structure */

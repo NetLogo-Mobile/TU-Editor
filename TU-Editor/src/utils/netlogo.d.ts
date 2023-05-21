@@ -13,7 +13,7 @@ export declare class NetLogoUtils {
     /** AnnotateCode: Annotate a code element. */
     static AnnotateCode(Target: JQuery<HTMLElement>, Content?: string): void;
     /** HighlightCode: Highlight a code snippet. */
-    static HighlightCode(Content: string): HTMLElement;
+    static HighlightCode(Content: string): [HTMLElement, string];
     /** BuildSnapshot: Build a code snapshot. */
     static BuildSnapshot(Content?: string): CodeSnapshot | undefined;
     /** FixGeneratedCode: Fix some generated code. */

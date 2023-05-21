@@ -33229,8 +33229,10 @@
                     RecordRenderer.SetData(Record);
                     (_a = RecordRenderer.Parent) === null || _a === void 0 ? void 0 : _a.Render();
                     // Show the input if there are no options
-                    if (Record.Response.Options.length == 0)
+                    if (Record.Response.Options.length == 0) {
+                        this.PendingRequest = null;
                         this.Commands.EnableInput();
+                    }
                     else
                         this.Commands.SetDisabled(false);
                     // Finish the request
@@ -33244,6 +33246,7 @@
                         Content: Localized.Get("Connection to server failed _", Error !== null && Error !== void 0 ? Error : Localized.Get("Unknown")),
                         Parsed: SendRequest
                     }).SetFinalized().Render();
+                    this.PendingRequest = null;
                     this.Commands.EnableInput();
                     this.FinishRequest();
                 });
@@ -35335,8 +35338,8 @@
         }
         /** ScrollToElement: Scroll to the element. */
         ScrollToElement(Element) {
-            var _a, _b;
-            this.ScrollContainer.scrollTop((_b = (_a = Element.offset()) === null || _a === void 0 ? void 0 : _a.top) !== null && _b !== void 0 ? _b : 0);
+            var _a, _b, _c;
+            this.ScrollContainer.scrollTop(((_b = (_a = Element.offset()) === null || _a === void 0 ? void 0 : _a.top) !== null && _b !== void 0 ? _b : 0) + ((_c = this.ScrollContainer.scrollTop()) !== null && _c !== void 0 ? _c : 0));
         }
         /** IsAtBottom: Whether the container is scrolled to bottom. */
         IsAtBottom() {
@@ -35356,14 +35359,15 @@
         /** AnnotateCode: Annotate a code element. */
         static AnnotateCode(Target, Content) {
             Content = Content ? Content : Target.text();
-            Target.empty().append($(NetLogoUtils.HighlightCode(Content)));
+            var [Element, Code] = NetLogoUtils.HighlightCode(Content);
+            Target.empty().append($(Element)).data("code", Code);
         }
         /** HighlightCode: Highlight a code snippet. */
         static HighlightCode(Content) {
             this.SharedEditor.SetCode(Content);
             this.SharedEditor.Semantics.PrettifyAll();
-            console.log(this.SharedEditor.GetCode());
-            return this.SharedEditor.Semantics.Highlight();
+            var Element = this.SharedEditor.Semantics.Highlight();
+            return [Element, Content];
         }
         /** BuildSnapshot: Build a code snapshot. */
         static BuildSnapshot(Content) {
@@ -36285,6 +36289,52 @@
         }
     }
 
+    /** ShowConfirm: Show a confirm dialog. */
+    function ShowConfirm(Subject, Content, OK, Cancel) {
+        $.confirm({
+            title: Localized.Get(Subject),
+            content: Localized.Get(Content),
+            type: 'blue',
+            useBootstrap: false,
+            buttons: {
+                ok: {
+                    text: Localized.Get("OK"),
+                    btnClass: 'btn-primary',
+                    keys: ['enter'],
+                    action: OK
+                },
+                cancel: {
+                    text: Localized.Get("Cancel"),
+                    action: Cancel
+                }
+            }
+        });
+    }
+    /** Toast: Show a toast. */
+    function Toast(Type, Content, Subject) {
+        toastr[Type](Content, Subject);
+    }
+
+    /** GenerateObjectID: Generate a random object ID. */
+    function GenerateObjectID() {
+        return NumberToHex(Date.now() / 1000) + ' '.repeat(16).replace(/./g, () => NumberToHex(Math.random() * 16));
+    }
+    /** NumberToHex: Convert a number to hex. */
+    function NumberToHex(Value) {
+        return Math.floor(Value).toString(16);
+    }
+    /** CopyCode: Copy a code snippet to the clipboard. */
+    function CopyCode(Code) {
+        Code = Code.trim();
+        navigator.clipboard.writeText(Code);
+        if (Code.indexOf("\n") === -1) {
+            OutputDisplay.Instance.Tab.SetCode("observer", Code);
+            OutputDisplay.Instance.Tab.Galapagos.Focus();
+        }
+        else
+            Toast("success", Localized.Get("Copied to clipboard"));
+    }
+
     /** TextSectionRenderer: A block that displays the a text response section. */
     class TextSectionRenderer extends SectionRenderer {
         /** Constructor: Create a new UI renderer. */
@@ -36307,8 +36357,10 @@
             // Render the text
             this.ContentContainer.html(MarkdownToHTML(Content));
             PostprocessHTML(OutputDisplay.Instance.Tab.Editor, this.ContentContainer);
-            if (this.Finalized)
-                NetLogoUtils.AnnotateCodes(this.ContentContainer.find("code"));
+            if (this.Finalized) {
+                NetLogoUtils.AnnotateCodes(this.ContentContainer.find("code")
+                    .on("click", function () { CopyCode($(this).data("code")); }).addClass("copyable"));
+            }
             // Remove the section if it's empty
             if (Content == "" && ((_c = (_b = Section.Options) === null || _b === void 0 ? void 0 : _b.length) !== null && _c !== void 0 ? _c : 0) == 0 && this.Finalized)
                 this.Container.remove();
@@ -36334,7 +36386,8 @@
             this.Container.toggle(!!Input && Input !== "");
             this.Content.html(MarkdownToHTML(Input));
             PostprocessHTML(OutputDisplay.Instance.Tab.Editor, this.Content);
-            NetLogoUtils.AnnotateCodes(this.Content.find("code"));
+            NetLogoUtils.AnnotateCodes(this.Content.find("code")
+                .on("click", function () { CopyCode($(this).data("code")); }).addClass("copyable"));
         }
     }
 
@@ -36585,15 +36638,6 @@
         }
     }
 
-    /** GenerateObjectID: Generate a random object ID. */
-    function GenerateObjectID() {
-        return NumberToHex(Date.now() / 1000) + ' '.repeat(16).replace(/./g, () => NumberToHex(Math.random() * 16));
-    }
-    /** NumberToHex: Convert a number to hex. */
-    function NumberToHex(Value) {
-        return Math.floor(Value).toString(16);
-    }
-
     /** OutputDisplay: Display the output section. */
     class OutputDisplay extends Display {
         /** Constructor: Create a new output section. */
@@ -36660,6 +36704,7 @@
             if (Subthread) {
                 Subthread.Container.addClass("activated");
                 Subthread.Children[Subthread.Children.length - 1].ActivateSelf("activated");
+                this.ScrollToElement(Subthread.Container);
             }
             this.Subthread = Subthread;
         }
@@ -37055,13 +37100,13 @@
                     if (Diagnostics.length == 0) {
                         if (Mode == "Reporter" || Mode == "Unknown")
                             Content = `show ${Content}`;
-                        this.ExecuteInput(Objective, Content, Temporary);
                         this.SetDisabled(true);
+                        this.ExecuteInput(Objective, Content, Temporary);
                         return;
                     }
                     else if (!Chatable) {
-                        this.ExecuteInput(Objective, Content, Temporary);
                         this.SetDisabled(true);
+                        this.ExecuteInput(Objective, Content, Temporary);
                         return;
                     }
                 }
@@ -37263,28 +37308,6 @@
         }
     }
 
-    /** ShowConfirm: Show a confirm dialog. */
-    const ShowConfirm = function (Subject, Content, OK, Cancel) {
-        $.confirm({
-            title: Localized.Get(Subject),
-            content: Localized.Get(Content),
-            type: 'green',
-            useBootstrap: false,
-            buttons: {
-                ok: {
-                    text: Localized.Get("确定"),
-                    btnClass: 'btn-primary',
-                    keys: ['enter'],
-                    action: OK
-                },
-                cancel: {
-                    text: Localized.Get("取消"),
-                    action: Cancel
-                }
-            }
-        });
-    };
-
     /** EditorTab: A tab for the code editor. */
     class EditorTab extends Tab {
         /** Show: Show the editor tab.  */
@@ -37401,7 +37424,7 @@
         ShowProcedures() {
             var Procedures = this.GetProcedures();
             if (Object.keys(Procedures).length == 0) {
-                this.Editor.Toast("warning", Localized.Get("There is no procedure"));
+                Toast("warning", Localized.Get("There is no procedure"));
             }
             else {
                 var Dialog = $("#Dialog-Procedures");
@@ -37560,10 +37583,6 @@
         /** SetPlatform: Set the platform of the editor. */
         SetPlatform(Platform) {
             $("body").addClass(Platform);
-        }
-        /** Toast: Show a toast. */
-        Toast(Type, Content, Subject) {
-            toastr[Type](Content, Subject);
         }
         /** Reset: Reset the editor. */
         Reset() {

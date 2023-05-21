@@ -40,8 +40,6 @@ export declare class TurtleEditor {
     ToggleDark(Status: boolean): void;
     /** SetPlatform: Set the platform of the editor. */
     SetPlatform(Platform: string): void;
-    /** Toast: Show a toast. */
-    Toast(Type: string, Content: string, Subject?: string): void;
     /** Reset: Reset the editor. */
     Reset(): void;
     /** SetChatBackend: Set the chat backend domain. */

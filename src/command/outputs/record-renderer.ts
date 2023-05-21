@@ -34,11 +34,11 @@ export class RecordRenderer extends UIRendererOf<ChatRecord> {
     /** Constructor: Create a new UI renderer. */
     public constructor() {
         super();
-        this.Container.addClass("record");
+        this.Container.addClass("record").addClass("loading");
         this.InputRenderer = new InputRenderer();
         this.AddChild(this.InputRenderer);
         var Container = $(`
-<div class="contents loading">
+<div class="contents">
     <div class="avatar"><img src="images/assistant.png" /><div class="dot-stretching"></div></div>
     <div class="content"></div>
     <div class="expand-record">↓</div>

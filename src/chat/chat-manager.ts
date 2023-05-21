@@ -52,7 +52,7 @@ export class ChatManager {
             if (ChatManager.IsRequesting) return;
             ChatManager.IsRequesting = true;
             RecordRenderer.SetFinalized(false);
-            this.Commands.HideInput();
+            this.Commands.DisableInput();
             this.Outputs.ScrollToBottom();
             ChatNetwork.SendRequest(Record, this.Thread, (Section) => {
                 // Create the section
@@ -85,11 +85,12 @@ export class ChatManager {
                 RecordRenderer.SetFinalized();
                 RecordRenderer.SetData(Record);
                 RecordRenderer.Parent?.Render();
-                this.FinishRequest();
                 // Show the input if there are no options
                 if (Record.Response.Options.length == 0) 
-                    this.Commands.ShowInput();
-                else this.Commands.Disabled = false;
+                    this.Commands.EnableInput();
+                else this.Commands.SetDisabled(false);
+                // Finish the request
+                this.FinishRequest();
             }).catch((Error) => {
                 if (!ChatManager.IsRequesting) return;
                 RecordRenderer.SetFinalized();
@@ -98,7 +99,7 @@ export class ChatManager {
                     Content: Localized.Get("Connection to server failed _", Error ?? Localized.Get("Unknown")),
                     Parsed: SendRequest
                 })!.SetFinalized().Render();
-                this.Commands.ShowInput();
+                this.Commands.EnableInput();
                 this.FinishRequest();
             });
         };
@@ -110,6 +111,7 @@ export class ChatManager {
         ChatManager.IsRequesting = false;
         this.Outputs.ScrollToBottom();
         this.Outputs.RestartBatch();
+        this.Outputs.Tab.RefreshPlaceholder();
     }
     /** GetPendingParent: Get the pending parent record. */
     public GetPendingParent(): ChatRecord | undefined {
@@ -154,7 +156,7 @@ export class ChatManager {
         // Send request or unlock the input
         Postprocessor?.(this.PendingRequest);
         if (Option.AskInput) {
-            this.Commands.ShowInput();
+            this.Commands.EnableInput();
             this.Commands.Galapagos.Focus();
             this.Commands.Outputs.ScrollToBottom();
         } else {

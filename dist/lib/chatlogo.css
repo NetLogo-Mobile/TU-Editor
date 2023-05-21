@@ -116,13 +116,39 @@
 .command-line .command-input {
 	flex: 1 auto;
 	height: 2rem;
-	padding: 0 0.5rem;
+	display: flex;
+	padding: 0 0 0 0.5rem;
 	flex-grow: 1;
 	background: #FFF;
 	border-radius: 0.24rem;
 }
 
+.command-line .command-input .command-send {
+	cursor: pointer;
+	flex-basis: 2.4rem;
+	background-image: url(../images/send.png);
+	background-size: 1.2rem;
+	background-position: center;
+	background-repeat: no-repeat;
+}
+
+.command-line .command-input .command-send:hover {
+	filter: brightness(50%);
+}
+
+.command-line .command-input .command-send.disabled {
+	background: none;
+}
+
+.command-line .command-input .command-send.disabled .dot-stretching {
+	top: 0.8rem;
+	left: 1rem;
+	display: block;
+	filter: brightness(50%);
+}
+
 .command-line .command-input .cm-editor {
+	flex: 1 auto;
 	height: auto;
 	font-size: 1em;
 	max-height: 2rem;
@@ -238,12 +264,17 @@
 	max-width: 1.5rem;
 }
 
-.command-output .record:not(.loading) .contents .avatar .dot-stretching {
-	display: none;
+.command-output .record .avatar .dot-stretching {
+	top: -15px;
+	left: 8.5px;
 }
 
 .command-output .record.loading .contents .avatar img {
 	filter: brightness(50%);
+}
+
+.command-output .record.loading .contents .avatar .dot-stretching {
+	display: block;
 }
 
 .command-output .record .content {
@@ -528,42 +559,38 @@
  * ==============================================
  */
 .dot-stretching {
-	position: relative;
-	width: 7px;
-	height: 7px;
-	border-radius: 3.5px;
-	background-color: #fff;
 	color: #fff;
+	background-color: #fff;
 	opacity: 0.8;
+	display: none;
 	transform: scale(1.25, 1.25);
 	animation: dot-stretching 3s infinite ease-in;
-	top: -15px;
-	left: 8.5px;
+	position: relative;
+}
+
+.dot-stretching,
+.dot-stretching::before,
+.dot-stretching::after {
+	width: 7px;
+	height: 7px;
+	color: #fff;
+	border-radius: 3.5px;
+	background-color: #fff;
 }
 
 .dot-stretching::before,
 .dot-stretching::after {
+	top: 0;
 	content: "";
 	display: inline-block;
 	position: absolute;
-	top: 0;
 }
 
 .dot-stretching::before {
-	width: 7px;
-	height: 7px;
-	border-radius: 3.5px;
-	background-color: #fff;
-	color: #fff;
 	animation: dot-stretching-before 3s infinite ease-in;
 }
 
 .dot-stretching::after {
-	width: 7px;
-	height: 7px;
-	border-radius: 3.5px;
-	background-color: #fff;
-	color: #fff;
 	animation: dot-stretching-after 3s infinite ease-in;
 }
 
@@ -571,7 +598,6 @@
 	0% {
 		transform: scale(1.25, 1.25);
 	}
-
 	50%,
 	60% {
 		transform: scale(0.8, 0.8);

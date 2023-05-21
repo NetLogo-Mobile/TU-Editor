@@ -195,7 +195,7 @@ export class OutputDisplay extends Display {
 			this.RestartBatch();
 			this.RenderResponses([], true);
 		}
-		this.Tab.Disabled = false;
+		this.Tab.SetDisabled(false);
 	}
 	/** PrintOutput: Provide for Unity to print compiled output. */ 
 	public PrintOutput(Class: string, Content: any) {
@@ -285,7 +285,6 @@ export class OutputDisplay extends Display {
 		];
 		// AI response
 		if (ChatManager.Available) {
-			this.Tab.Placeholder.innerText = Localized.Get("Talk to the computer in NetLogo or natural languages");
 			this.RenderResponses([
 				{
 					Content: Localized.Get("Command center welcome (assistant)"),
@@ -303,7 +302,6 @@ export class OutputDisplay extends Display {
 				this.Tab.Galapagos.Focus();
 			}});
 		} else {
-			this.Tab.Placeholder.innerText = Localized.Get("Type NetLogo command here");
 			this.RenderResponses([
 				{
 					Content: Localized.Get("Command center welcome (command)"),
@@ -316,6 +314,7 @@ export class OutputDisplay extends Display {
 		}
 		this.RenderOptions(Options);
 		this.RenderResponses([], true);
+		this.Tab.RefreshPlaceholder();
 	}
 	// #endregion
 }

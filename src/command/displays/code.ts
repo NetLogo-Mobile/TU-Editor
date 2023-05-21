@@ -207,11 +207,11 @@ export class CodeDisplay extends Display {
 			// If it is a command or reporter, simply run it
 			switch (Mode) {
 				case "Command":
-					this.Tab.Disabled = true;
+					this.Tab.SetDisabled(true);
 					this.Tab.ExecuteCommand("observer", Code, true);
 					break;
 				case "Reporter":
-					this.Tab.Disabled = true;
+					this.Tab.SetDisabled(true);
 					this.Tab.ExecuteCommand("observer", `show ${Code}`, true);
 					break;
 				default:

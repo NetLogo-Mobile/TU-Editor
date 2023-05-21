@@ -33,7 +33,9 @@ export class CommandTab extends Tab {
 	/** ChatManager: The chat interface to the backend. */
 	public readonly ChatManager: ChatManager;
 	/** Placeholder: The placeholder for the command center. */
-	public readonly Placeholder: HTMLElement;
+	public readonly Placeholder: JQuery<HTMLElement>;
+	/** SendButton: The send button. */
+	public readonly SendButton: JQuery<HTMLElement>;
 	/** Show: Show the command tab.  */
 	public Show() {
 		if (!this.Visible) TurtleEditor.Call({ Type: "TabSwitched", Tab: "$Command$" });
@@ -64,7 +66,7 @@ export class CommandTab extends Tab {
 	/** Reset: Reset the command center. */
 	public Reset() {
 		super.Reset();
-		this.ShowInput();
+		this.EnableInput();
 		this.ClearInput();
 		this.Outputs.Show();
 		this.Outputs.Clear();
@@ -82,19 +84,23 @@ export class CommandTab extends Tab {
 		this.CommandLine = $(Container).find(".command-line");
 		this.TargetSelect = this.CommandLine.find("select");
 		this.TargetSelect.html(`
-		<option value="observer">${Localized.Get("Observer")}</option>
-		<option value="turtles">${Localized.Get("Turtles")}</option>
-		<option value="patches">${Localized.Get("Patches")}</option>
-		<option value="links">${Localized.Get("Links")}</option>`)
-		this.Placeholder = $("<span></span>").get(0)!;
+			<option value="observer">${Localized.Get("Observer")}</option>
+			<option value="turtles">${Localized.Get("Turtles")}</option>
+			<option value="patches">${Localized.Get("Patches")}</option>
+			<option value="links">${Localized.Get("Links")}</option>`)
 		// CodeMirror Editor
+		this.Placeholder = $("<span></span>");
 		this.Galapagos = new GalapagosEditor(this.CommandLine.find(".command-input").get(0)!, {
 			OneLine: true,
 			ParseMode: ParseMode.Oneline,
-			Placeholder: this.Placeholder,
+			Placeholder: this.Placeholder.get(0),
 			OnKeyUp: (Event: any) => this.InputKeyHandler(Event),
 			OnDictionaryClick: (Text: any) => this.ExplainFull(Text)
 		});
+		// Send button
+		this.SendButton = $(`<div class="command-send"><div class="dot-stretching"></div></div>`).on("click", () => {
+			this.InputKeyHandler({ key: "Enter", code: "Enter" });
+		}).insertAfter($(this.Galapagos.Parent.lastChild!));
 		// Set up sections
 		this.Outputs = new OutputDisplay(this);
 		this.Codes = new CodeDisplay(this);
@@ -116,7 +122,7 @@ export class CommandTab extends Tab {
 	/** CurrentCommandIndex: Store the current command index. */
 	private CurrentCommandIndex = 0;
 	/** InputKeyHandler: Handle the key input. */
-	private InputKeyHandler(Event: KeyboardEvent) {
+	private InputKeyHandler(Event: {key: string, code: string}) {
 		const Key = Event.key;
 		const Code = Event.code;
 		// After press key `Enter`, excute command
@@ -125,7 +131,6 @@ export class CommandTab extends Tab {
 			this.Galapagos.CloseCompletion();
 			if (!Content || this.Disabled) return;
 			const Objective = this.TargetSelect.val() as string;
-			this.Disabled = true;
 			this.Outputs.Show();
 			this.SendCommand(Objective, Content);
 		}
@@ -180,9 +185,11 @@ export class CommandTab extends Tab {
 			if (Diagnostics.length == 0) {
 				if (Mode == "Reporter" || Mode == "Unknown") Content = `show ${Content}`;
 				this.ExecuteInput(Objective, Content, Temporary);
+				this.SetDisabled(true);
 				return;
 			} else if (!Chatable) {
 				this.ExecuteInput(Objective, Content, Temporary);
+				this.SetDisabled(true);
 				return;
 			}
 		}
@@ -195,23 +202,47 @@ export class CommandTab extends Tab {
 	public ClearInput() {
 		this.Galapagos.SetCode("");
 	}
-	/** ShowInput: Show and enable the input box of Command Center. */
-	public ShowInput() {
-		this.CommandLine.show();
-		// this.Galapagos.SetReadOnly(false);
-		this.Disabled = false;
+	/** EnableInput: Show and enable the input box of Command Center. */
+	public EnableInput() {
+		this.Galapagos.SetReadOnly(false);
+		this.SetDisabled(false);
 	}
-	/** HideInput: Hide the input box of Command Center. */
-	public HideInput() {
-		this.CommandLine.hide();
-		// this.Galapagos.SetReadOnly(true);
-		this.Disabled = true;
+	/** DisableInput: Hide the input box of Command Center. */
+	public DisableInput() {
+		this.Galapagos.SetReadOnly(true);
+		this.SetDisabled(true);
 	}
-	// Set the content of command input.
+	/** SetCode: Set the content of command input. */
 	public SetCode(Objective: string, Content: string) {
 		this.TargetSelect.val(Objective.toLowerCase());
 		this.Galapagos.SetCode(Content);
 		setTimeout(() => this.Galapagos.Selection.SetCursorPosition(Content.length), 1);
+	}
+	/** SetDisabled: Set the disabled state of the command center. */
+	public SetDisabled(Disabled: boolean) {
+		this.Disabled = Disabled;
+		this.RefreshPlaceholder();
+	}
+	/** RefreshPlaceholder: Refresh the placeholder. */
+	public RefreshPlaceholder() {
+		if (this.Disabled) {
+			if (ChatManager.IsRequesting) {
+				this.Placeholder.text(Localized.Get("Waiting for the AI to respond"));
+			} else {
+				this.Placeholder.text(Localized.Get("Waiting for the execution to finish"));
+			}
+		} else {
+			if (ChatManager.Available) {
+				if (this.Galapagos.IsReadOnly) {
+					this.Placeholder.text(Localized.Get("Please choose one option first"));
+				} else {
+					this.Placeholder.text(Localized.Get("Talk to the computer in NetLogo or natural languages"));
+				}
+			} else {
+				this.Placeholder.text(Localized.Get("Type NetLogo command here"));
+			}
+		}
+		this.SendButton.toggleClass("disabled", this.Disabled);
 	}
 	// #endregion
 
@@ -279,7 +310,7 @@ export class CommandTab extends Tab {
 	/** ExecuteProcedureWithArguments: Execute the procedure with arguments. */
 	public ExecuteProcedureWithArguments(Name: string, IsTemporary: boolean, Arguments: Record<string, string>): void {
 		if (this.Disabled) return;
-		this.Disabled = true;
+		this.SetDisabled(true);
 		// Generate the code
 		var Code = `${Name} ${Object.keys(Arguments).map(Key => `${this.FormatArgument(Arguments[Key])}`).join(" ")}`;
 		// Execute it
@@ -301,7 +332,7 @@ export class CommandTab extends Tab {
 	/** RecompileTemporarily Recompile the code snippet temporarily. */
 	public RecompileTemporarily(Code: string, Procedures: string[], Callback: () => void) {
 		if (this.Disabled) return;
-		this.Disabled = true;
+		this.SetDisabled(true);
 		this.RecompileCallback = Callback;
 		// If the code is not the same, recompile it
 		if (this.TemporaryCode != Code) {
@@ -318,7 +349,7 @@ export class CommandTab extends Tab {
 	}
 	/** PlayCompiled: The callback after the code to play is compiled. */
 	public PlayCompiled(Succeeded: boolean, Errors?: RuntimeError[]) {
-		this.Disabled = false;
+		this.SetDisabled(false);
 		if (Succeeded) {
 			this.Outputs.RenderResponses([{
 				Type: ChatResponseType.Text,

@@ -18,6 +18,8 @@ export declare abstract class Display {
     Hide(): void;
     /** ScrollToBottom: After user entered input, screen view should scroll down to the bottom line. */
     ScrollToBottom(): void;
+    /** ScrollToElement: Scroll to the element. */
+    ScrollToElement(Element: JQuery<HTMLElement>): void;
     /** IsAtBottom: Whether the container is scrolled to bottom. */
     IsAtBottom(): boolean;
 }

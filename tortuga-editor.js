@@ -35333,6 +35333,11 @@
         ScrollToBottom() {
             this.ScrollContainer.scrollTop(this.ScrollContainer.get(0).scrollHeight);
         }
+        /** ScrollToElement: Scroll to the element. */
+        ScrollToElement(Element) {
+            var _a, _b;
+            this.ScrollContainer.scrollTop((_b = (_a = Element.offset()) === null || _a === void 0 ? void 0 : _a.top) !== null && _b !== void 0 ? _b : 0);
+        }
         /** IsAtBottom: Whether the container is scrolled to bottom. */
         IsAtBottom() {
             var Element = this.ScrollContainer.get(0);
@@ -35785,7 +35790,8 @@
     function ExplainErrors(Type, Label) {
         return {
             Label: Label !== null && Label !== void 0 ? Label : "Explain the error",
-            Operation: "ExplainErrors",
+            Operation: "CodeExplain",
+            SubOperation: Type,
             AskInput: true,
             InputInContext: false,
             TextInContext: ContextMessage.Nothing,
@@ -36055,8 +36061,7 @@
             }
             // Show the options
             this.ShowPseudoOption(ExplainErrors(Metadata.Type), (Option) => this.SubmitDiagnostics(Option, false));
-            if (Metadata.Type == DiagnosticType.Compile)
-                this.ShowPseudoOption(FixCode(), (Option) => this.SubmitDiagnostics(Option, true));
+            this.ShowPseudoOption(FixCode(), (Option) => this.SubmitDiagnostics(Option, true));
         }
         /** SubmitDiagnostics: Submit the diagnostics to the server. */
         SubmitDiagnostics(Option, Fixing) {
@@ -36463,6 +36468,7 @@
 </div>`).hide();
             Container.find(".expand-record").on("click", () => {
                 this.ActivateSelf("activated");
+                OutputDisplay.Instance.ScrollToElement(this.Container);
             });
             this.ContentContainer = Container.appendTo(this.Container).find(".content");
         }
@@ -36748,20 +36754,7 @@
         /** FinishExecution: Notify the completion of the command. */
         FinishExecution(Status, Code, Message) {
             if (Array.isArray(Message) && Message.length > 0) {
-                var Errors = Message;
-                Errors.forEach(Error => {
-                    if (Error.start == 2147483647) {
-                        Error.start = 0;
-                        Error.end = Code.length;
-                    }
-                    else {
-                        try {
-                            Error.code = Code.slice(Error.start, Error.end);
-                        }
-                        catch (_a) { }
-                    }
-                });
-                var Diagnostics = ErrorsToDiagnostics(Errors);
+                var Diagnostics = ErrorsToDiagnostics(Message);
                 this.RenderResponses([{
                         Type: Status == "CompileError" ? ChatResponseType.CompileError : ChatResponseType.RuntimeError,
                         Parsed: Diagnostics.length

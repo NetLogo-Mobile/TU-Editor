@@ -79,7 +79,7 @@ export function EditCode(Label?: string): ChatResponseOption {
 export function ExampleCode(Label?: string): ChatResponseOption {
     return {
         Label: Label ?? "Can you show me an example code?",
-        Style: "followup",
+        Style: "code",
         Operation: "CodeCompose",
         AskInput: false,
         Inheritance: ContextInheritance.InheritParent,
@@ -105,6 +105,7 @@ export function AskCode(Label?: string, Style?: string): ChatResponseOption {
 export function FixCode(Label?: string): ChatResponseOption {
     return {
         Label: Label ?? "Help me fix this code",
+        Style: "code",
         Operation: "CodeFix",
         AskInput: true,
         InputInContext: false,

@@ -16,7 +16,7 @@ export class ChatManager {
     /** Thread: The current chat thread. */
     public Thread: ChatThread = new ChatThread();
     /** PendingRequest: The pending chat request. */
-    private PendingRequest: ClientChatRequest | null = null;
+    public PendingRequest: ClientChatRequest | null = null;
     /** Reset: Reset the chat interface. */
     public Reset() {
         var Language = this.Thread.Language;

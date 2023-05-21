@@ -236,7 +236,8 @@ export class CommandTab extends Tab {
 				if (this.Galapagos.IsReadOnly) {
 					this.Placeholder.text(Localized.Get("Please choose one option first"));
 				} else {
-					this.Placeholder.text(Localized.Get("Talk to the computer in NetLogo or natural languages"));
+					var Text = this.ChatManager.PendingRequest?.FriendlyInput ?? this.ChatManager.PendingRequest?.Input;
+					this.Placeholder.text(Text ?? Localized.Get("Talk to the computer in NetLogo or natural languages"));
 				}
 			} else {
 				this.Placeholder.text(Localized.Get("Type NetLogo command here"));

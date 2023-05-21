@@ -36,8 +36,7 @@ export class DiagnosticsRenderer extends JSONSectionRenderer<Diagnostics> {
         }
         // Show the options
         this.ShowPseudoOption(ExplainErrors(Metadata.Type), (Option) => this.SubmitDiagnostics(Option, false));
-        if (Metadata.Type == DiagnosticType.Compile)
-            this.ShowPseudoOption(FixCode(), (Option) => this.SubmitDiagnostics(Option, true));
+        this.ShowPseudoOption(FixCode(), (Option) => this.SubmitDiagnostics(Option, true));
     }
     /** SubmitDiagnostics: Submit the diagnostics to the server. */
     private SubmitDiagnostics(Option: ChatResponseOption, Fixing: boolean): void {

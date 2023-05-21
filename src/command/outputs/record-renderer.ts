@@ -16,6 +16,7 @@ import { InputRenderer } from "./input-renderer";
 import { OptionRenderer } from "./option-renderer";
 import { UIRendererOf } from "./ui-renderer";
 import { ArgumentsRenderer } from "../renderers/arguments-renderer";
+import { OutputDisplay } from "../displays/output";
 
 /** RecordRenderer: A block that displays the output of a request. */
 export class RecordRenderer extends UIRendererOf<ChatRecord> {
@@ -45,6 +46,7 @@ export class RecordRenderer extends UIRendererOf<ChatRecord> {
 </div>`).hide();
         Container.find(".expand-record").on("click", () => {
             this.ActivateSelf("activated");
+            OutputDisplay.Instance.ScrollToElement(this.Container);
         });
         this.ContentContainer = Container.appendTo(this.Container).find(".content");
     }

@@ -119,7 +119,8 @@ export function FixCode(Label?: string): ChatResponseOption {
 export function ExplainErrors(Type: DiagnosticType, Label?: string): ChatResponseOption {
     return {
         Label: Label ?? "Explain the error",
-        Operation: "ExplainErrors",
+        Operation: "CodeExplain",
+        SubOperation: Type,
         AskInput: true,
         InputInContext: false,
         TextInContext: ContextMessage.Nothing,

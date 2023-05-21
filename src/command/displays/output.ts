@@ -166,18 +166,7 @@ export class OutputDisplay extends Display {
 	/** FinishExecution: Notify the completion of the command. */
 	public FinishExecution(Status: string, Code: string, Message: any | RuntimeError[]) {
 		if (Array.isArray(Message) && Message.length > 0) {
-			var Errors = Message as RuntimeError[];
-			Errors.forEach(Error => {
-				if (Error.start == 2147483647) {
-					Error.start = 0;
-					Error.end = Code.length;
-				} else {
-					try {
-					  Error.code = Code.slice(Error.start, Error.end);
-					} catch { }
-				}
-			});
-			var Diagnostics = ErrorsToDiagnostics(Errors);
+			var Diagnostics = ErrorsToDiagnostics(Message as RuntimeError[]);
 			this.RenderResponses([{
 				Type: Status == "CompileError" ? ChatResponseType.CompileError : ChatResponseType.RuntimeError,
 				Parsed: Diagnostics.length

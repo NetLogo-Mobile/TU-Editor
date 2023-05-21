@@ -336,7 +336,11 @@
 }
 
 .command-output ul.options li.followup:before {
-	content: "💬";
+	content: "🗯";
+}
+
+.command-output ul.options li.code:before {
+	content: "✍️";
 }
 
 .command-output ul.options li.enter:before {

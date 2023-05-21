@@ -9,7 +9,7 @@ export declare class ChatManager {
     /** Thread: The current chat thread. */
     Thread: ChatThread;
     /** PendingRequest: The pending chat request. */
-    private PendingRequest;
+    PendingRequest: ClientChatRequest | null;
     /** Reset: Reset the chat interface. */
     Reset(): void;
     /** SendMessage: Send a direct message to the chat backend. */

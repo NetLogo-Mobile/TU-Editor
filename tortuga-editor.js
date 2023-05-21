@@ -35701,7 +35701,7 @@
                     Renderer.Render();
                 }
                 var Option = this.GetRecord().Response.Options[0];
-                var Link = $(`<p>→ <a href="javascript:void(0)">${(_a = Option.LocalizedLabel) !== null && _a !== void 0 ? _a : Option.Label}</a></p>`)
+                var Link = $(`<p>👍<a href="javascript:void(0)">${(_a = Option.LocalizedLabel) !== null && _a !== void 0 ? _a : Option.Label}</a></p>`)
                     .appendTo(this.ContentContainer).on("click", () => {
                     this.SubmitParameters();
                     Link.addClass("chosen");
@@ -35781,6 +35781,7 @@
     function FixCode(Label) {
         return {
             Label: Label !== null && Label !== void 0 ? Label : "Help me fix this code",
+            Style: "code",
             Operation: "CodeFix",
             AskInput: true,
             InputInContext: false,
@@ -37143,6 +37144,7 @@
         }
         /** RefreshPlaceholder: Refresh the placeholder. */
         RefreshPlaceholder() {
+            var _a, _b, _c;
             if (this.Disabled) {
                 if (ChatManager.IsRequesting) {
                     this.Placeholder.text(Localized.Get("Waiting for the AI to respond"));
@@ -37157,7 +37159,8 @@
                         this.Placeholder.text(Localized.Get("Please choose one option first"));
                     }
                     else {
-                        this.Placeholder.text(Localized.Get("Talk to the computer in NetLogo or natural languages"));
+                        var Text = (_b = (_a = this.ChatManager.PendingRequest) === null || _a === void 0 ? void 0 : _a.FriendlyInput) !== null && _b !== void 0 ? _b : (_c = this.ChatManager.PendingRequest) === null || _c === void 0 ? void 0 : _c.Input;
+                        this.Placeholder.text(Text !== null && Text !== void 0 ? Text : Localized.Get("Talk to the computer in NetLogo or natural languages"));
                     }
                 }
                 else {

@@ -15,7 +15,7 @@ export declare function EditCode(Label?: string): ChatResponseOption;
 /** ExampleCode: Ask for an example code. */
 export declare function ExampleCode(Label?: string): ChatResponseOption;
 /** AskCode: Ask a question about the code. */
-export declare function AskCode(Label?: string, Style?: string): ChatResponseOption;
+export declare function AskCode(Label?: string, Style?: string, Transparent?: boolean): ChatResponseOption;
 /** FixCode: Fix the current code snippet. */
 export declare function FixCode(Label?: string): ChatResponseOption;
 /** ExplainErrors: Explain the errors. */

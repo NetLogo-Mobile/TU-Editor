@@ -31,10 +31,6 @@
     */
     class Text {
         /**
-        @internal
-        */
-        constructor() { }
-        /**
         Get the line description around the given position.
         */
         lineAt(pos) {
@@ -128,7 +124,8 @@
             return new LineCursor(inner);
         }
         /**
-        @internal
+        Return the document as a string, using newline characters to
+        separate lines.
         */
         toString() { return this.sliceString(0); }
         /**
@@ -140,6 +137,10 @@
             this.flatten(lines);
             return lines;
         }
+        /**
+        @internal
+        */
+        constructor() { }
         /**
         Create a `Text` instance for the given array of lines.
         */
@@ -2184,7 +2185,10 @@
         is(type) { return this.type == type; }
         /**
         Define a new effect type. The type parameter indicates the type
-        of values that his effect holds.
+        of values that his effect holds. It should be a type that
+        doesn't include `undefined`, since that is used in
+        [mapping](https://codemirror.net/6/docs/ref/#state.StateEffect.map) to indicate that an effect is
+        removed.
         */
         static define(spec = {}) {
             return new StateEffectType(spec.map || (v => v));
@@ -3327,8 +3331,7 @@
         static compare(oldSets, newSets, 
         /**
         This indicates how the underlying data changed between these
-        ranges, and is needed to synchronize the iteration. `from` and
-        `to` are coordinates in the _new_ space, after these changes.
+        ranges, and is needed to synchronize the iteration.
         */
         textDiff, comparator, 
         /**
@@ -3439,6 +3442,18 @@
     an array of [`Range`](https://codemirror.net/6/docs/ref/#state.Range) objects.
     */
     class RangeSetBuilder {
+        finishChunk(newArrays) {
+            this.chunks.push(new Chunk(this.from, this.to, this.value, this.maxPoint));
+            this.chunkPos.push(this.chunkStart);
+            this.chunkStart = -1;
+            this.setMaxPoint = Math.max(this.setMaxPoint, this.maxPoint);
+            this.maxPoint = -1;
+            if (newArrays) {
+                this.from = [];
+                this.to = [];
+                this.value = [];
+            }
+        }
         /**
         Create an empty builder.
         */
@@ -3455,18 +3470,6 @@
             this.maxPoint = -1;
             this.setMaxPoint = -1;
             this.nextLayer = null;
-        }
-        finishChunk(newArrays) {
-            this.chunks.push(new Chunk(this.from, this.to, this.value, this.maxPoint));
-            this.chunkPos.push(this.chunkStart);
-            this.chunkStart = -1;
-            this.setMaxPoint = Math.max(this.setMaxPoint, this.maxPoint);
-            this.maxPoint = -1;
-            if (newArrays) {
-                this.from = [];
-                this.to = [];
-                this.value = [];
-            }
         }
         /**
         Add a range. Ranges should be added in sorted (by `from` and
@@ -3827,7 +3830,7 @@
             let end = diff < 0 ? a.to + dPos : b.to, clipEnd = Math.min(end, endB);
             if (a.point || b.point) {
                 if (!(a.point && b.point && (a.point == b.point || a.point.eq(b.point)) &&
-                    sameValues(a.activeForPoint(a.to + dPos), b.activeForPoint(b.to))))
+                    sameValues(a.activeForPoint(a.to), b.activeForPoint(b.to))))
                     comparator.comparePoint(pos, clipEnd, a.point, b.point);
             }
             else {
@@ -16081,7 +16084,7 @@
                         break;
                     pos = next.to + start;
                     if (pos > from) {
-                        this.highlightRange(inner.cursor(), Math.max(from, next.from + start), Math.min(to, pos), inheritedClass, innerHighlighters);
+                        this.highlightRange(inner.cursor(), Math.max(from, next.from + start), Math.min(to, pos), "", innerHighlighters);
                         this.startSpan(pos, cls);
                     }
                 }
@@ -16089,6 +16092,8 @@
                     cursor.parent();
             }
             else if (cursor.firstChild()) {
+                if (mounted)
+                    inheritedClass = "";
                 do {
                     if (cursor.to <= from)
                         continue;
@@ -32151,6 +32156,7 @@
         syntaxTree(state)
             .cursor()
             .iterate((noderef) => {
+            var _a, _b;
             //Log(noderef.name, comments);
             //check for misplaced non-global statements at the global level
             //Collect them into intoProcedure, and remove them from the code
@@ -32218,6 +32224,19 @@
                         });
                     }
                 });
+            }
+            if (noderef.name == 'SpecialCommand0Args' &&
+                state.sliceDoc(noderef.from, noderef.to).toLowerCase() == 'setup') {
+                let procedure = (_b = (_a = noderef.node.parent) === null || _a === void 0 ? void 0 : _a.parent) === null || _b === void 0 ? void 0 : _b.parent;
+                let name = procedure === null || procedure === void 0 ? void 0 : procedure.getChild('ProcedureName');
+                if ((procedure === null || procedure === void 0 ? void 0 : procedure.name) == 'Procedure' &&
+                    state.sliceDoc(name === null || name === void 0 ? void 0 : name.from, name === null || name === void 0 ? void 0 : name.to).toLowerCase() == 'go') {
+                    changes.push({
+                        from: commentsStart !== null && commentsStart !== void 0 ? commentsStart : noderef.from,
+                        to: noderef.to + 1,
+                        insert: '',
+                    });
+                }
             }
             // Record the position of the first procedure to know where to add 'play'
             if (!procedureStart && noderef.name == 'Procedure')
@@ -35951,7 +35970,7 @@
                             Field: "Diagnostics",
                             Parsed: Diagnostics
                         }
-                    ]);
+                    ], true);
                 }
             });
         }
@@ -35976,7 +35995,7 @@
         Play() {
             if (this.Tab.Disabled)
                 return;
-            this.Tab.Outputs.RenderRequest(Localized.Get("Trying to run the code"), this.Record).Transparent = true;
+            this.Tab.Outputs.RenderRequest(Localized.Get("Trying to run the code"), this.Record).GetData().Transparent = true;
             this.TryTo(() => {
                 var Mode = this.Editor.Semantics.GetRecognizedMode();
                 var Code = this.Editor.GetCode().trim();
@@ -36018,11 +36037,11 @@
                         Procedures: Procedures,
                         IsTemporary: true
                     },
-                }]);
+                }], true);
         }
         /** AddToCode: Add the code to the main editor. */
         AddToCode() {
-            this.Tab.Outputs.RenderRequest(Localized.Get("Trying to add the code"), this.Record).Transparent = true;
+            this.Tab.Outputs.RenderRequest(Localized.Get("Trying to add the code"), this.Record).GetData().Transparent = true;
             this.TryTo(() => {
             });
         }
@@ -36728,11 +36747,10 @@
                 delete Record.ParentID;
             Record.Response = { Sections: [], Options: [] };
             this.Tab.ChatManager.Thread.Records[Record.ID] = Record;
-            this.RenderRecord(Record, Subthread);
-            return Record;
+            return this.RenderRecord(Record, Subthread);
         }
         /** RenderResponses: Render response sections immediately in the current record. */
-        RenderResponses(Sections, Finalizing = true) {
+        RenderResponses(Sections, Finalizing) {
             var _a;
             if (Sections.length == 0 && !Finalizing)
                 return;
@@ -36740,7 +36758,7 @@
             // Check if the last record is finished
             // If so, create a new record
             if (!LastRecord.Processing)
-                this.RenderRequest();
+                LastRecord = this.RenderRequest();
             // If not, append to the last record
             for (var Section in Sections)
                 (_a = LastRecord.AddSection(Sections[Section])) === null || _a === void 0 ? void 0 : _a.SetFinalized().Render();
@@ -36795,7 +36813,7 @@
             var Parent = this.Tab.ChatManager.GetPendingParent();
             if (!Parent && Restart && !((_a = this.Subthread) === null || _a === void 0 ? void 0 : _a.GetData().RootID))
                 this.ActivateSubthread();
-            return this.RenderRequest(`\`\`\`\n${Content.replace("`", "\`")}\n\`\`\``, Parent);
+            return this.RenderRequest(`\`\`\`\n${Content.replace("`", "\`")}\n\`\`\``, Parent).GetData();
         }
         /** FinishExecution: Notify the completion of the command. */
         FinishExecution(Status, Code, Message) {
@@ -36812,7 +36830,7 @@
                             Type: Status == "CompileError" ? DiagnosticType.Compile : DiagnosticType.Runtime,
                             Code: Code
                         }
-                    }]);
+                    }], true);
             }
             else {
                 this.PrintOutput(Status, Message);
@@ -37225,7 +37243,7 @@
                         Type: ChatResponseType.JSON,
                         Field: "Arguments",
                         Parsed: Package
-                    }]);
+                    }], true);
             }
             else {
                 this.ExecuteProcedureWithArguments(Procedure.Name, IsTemporary, {});
@@ -37279,14 +37297,14 @@
                 this.Outputs.RenderResponses([{
                         Type: ChatResponseType.Text,
                         Content: Localized.Get("Successfully compiled")
-                    }]);
+                    }], false);
                 (_a = this.RecompileCallback) === null || _a === void 0 ? void 0 : _a.call(this);
             }
             else if (!Errors || Errors.length == 0) {
                 this.Outputs.RenderResponses([{
                         Type: ChatResponseType.CompileError,
                         Content: Localized.Get("Compile error in model")
-                    }]);
+                    }], true);
                 delete this.TemporaryCode;
             }
             else {
@@ -37305,7 +37323,7 @@
                         Type: ChatResponseType.JSON,
                         Field: "Diagnostics",
                         Parsed: Diagnostics
-                    }]);
+                    }], true);
                 delete this.TemporaryCode;
             }
         }
@@ -37567,7 +37585,7 @@
                 this.CommandTab.Outputs.RenderResponses([{
                         Type: ChatResponseType.Text,
                         Content: Localized.Get("Please download Turtle Universe")
-                    }]);
+                    }], true);
                 this.CommandTab.SetDisabled(false);
             }
         }

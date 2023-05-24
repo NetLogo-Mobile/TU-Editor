@@ -26,9 +26,9 @@ export declare class OutputDisplay extends Display {
     /** ActivateSubthread: Activate a subthread. */
     ActivateSubthread(Subthread?: SubthreadRenderer): void;
     /** RenderRequest: Render an offline chat request and return a new record. */
-    RenderRequest(Input?: string, Parent?: ChatRecord, FriendlyInput?: string): ChatRecord;
+    RenderRequest(Input?: string, Parent?: ChatRecord, FriendlyInput?: string): RecordRenderer;
     /** RenderResponses: Render response sections immediately in the current record. */
-    RenderResponses(Sections: ChatResponseSection[], Finalizing?: boolean): void;
+    RenderResponses(Sections: ChatResponseSection[], Finalizing: boolean): void;
     /** RenderOption: Render a response option in the current record. */
     RenderOption(Option: ChatResponseOption): void;
     /** RenderOptions: Render response options in the current record. */

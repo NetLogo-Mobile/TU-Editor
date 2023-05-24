@@ -85,7 +85,7 @@ export class OutputDisplay extends Display {
 
 	// #region "Printing Support"
 	/** RenderRequest: Render an offline chat request and return a new record. */
-	public RenderRequest(Input?: string, Parent?: ChatRecord, FriendlyInput?: string): ChatRecord {
+	public RenderRequest(Input?: string, Parent?: ChatRecord, FriendlyInput?: string): RecordRenderer {
 		var Thread = this.Tab.ChatManager.Thread;
 		var Record = { Input: Input, FriendlyInput: FriendlyInput } as ChatRecord;
 		var Subthread = this.Subthread?.GetData();
@@ -98,16 +98,16 @@ export class OutputDisplay extends Display {
 		if (Record.ParentID == Record.ID) delete Record.ParentID;
 		Record.Response = { Sections: [], Options: [] };
 		this.Tab.ChatManager.Thread.Records[Record.ID] = Record;
-		this.RenderRecord(Record, Subthread);
-		return Record;
+		return this.RenderRecord(Record, Subthread);
 	}
 	/** RenderResponses: Render response sections immediately in the current record. */
-	public RenderResponses(Sections: ChatResponseSection[], Finalizing: boolean = true) {
+	public RenderResponses(Sections: ChatResponseSection[], Finalizing: boolean) {
 		if (Sections.length == 0 && !Finalizing) return;
 		var LastRecord = this.Subthread!.Children[this.Subthread!.Children.length - 1] as RecordRenderer;
 		// Check if the last record is finished
 		// If so, create a new record
-		if (!LastRecord.Processing) this.RenderRequest();
+		if (!LastRecord.Processing) 
+			LastRecord = this.RenderRequest();
 		// If not, append to the last record
 		for (var Section in Sections)
 			LastRecord.AddSection(Sections[Section])?.SetFinalized().Render();
@@ -162,7 +162,7 @@ export class OutputDisplay extends Display {
 	public PrintCommandInput(Content: string, Restart: boolean = true): ChatRecord {
 		var Parent = this.Tab.ChatManager.GetPendingParent()
 		if (!Parent && Restart && !this.Subthread?.GetData().RootID) this.ActivateSubthread();
-		return this.RenderRequest(`\`\`\`\n${Content.replace("`", "\`")}\n\`\`\``, Parent);
+		return this.RenderRequest(`\`\`\`\n${Content.replace("`", "\`")}\n\`\`\``, Parent).GetData();
 	}
 	/** FinishExecution: Notify the completion of the command. */
 	public FinishExecution(Status: string, Code: string, Message: any | RuntimeError[]) {
@@ -179,7 +179,7 @@ export class OutputDisplay extends Display {
 					Type: Status == "CompileError" ? DiagnosticType.Compile : DiagnosticType.Runtime,
 					Code: Code
 				}
-			}]);
+			}], true);
 		} else {
 			this.PrintOutput(Status, Message);
 			this.RestartBatch();

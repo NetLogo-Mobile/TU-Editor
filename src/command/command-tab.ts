@@ -303,7 +303,7 @@ export class CommandTab extends Tab {
 				Type: ChatResponseType.JSON,
 				Field: "Arguments",
 				Parsed: Package
-			}]);
+			}], true);
 		} else {
 			this.ExecuteProcedureWithArguments(Procedure.Name, IsTemporary, {})
 		}
@@ -355,13 +355,13 @@ export class CommandTab extends Tab {
 			this.Outputs.RenderResponses([{
 				Type: ChatResponseType.Text,
 				Content: Localized.Get("Successfully compiled")
-			}]);
+			}], false);
 			this.RecompileCallback?.();
 		} else if (!Errors || Errors.length == 0) {
 			this.Outputs.RenderResponses([{
 				Type: ChatResponseType.CompileError,
 				Content: Localized.Get("Compile error in model")
-			}]);
+			}], true);
 			delete this.TemporaryCode;
 		} else {
 			this.Codes.Editor.SetCompilerErrors(Errors);
@@ -379,7 +379,7 @@ export class CommandTab extends Tab {
 				Type: ChatResponseType.JSON,
 				Field: "Diagnostics",
 				Parsed: Diagnostics
-			}]);
+			}], true);
 			delete this.TemporaryCode;
 		}
 	}

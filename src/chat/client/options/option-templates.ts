@@ -88,15 +88,15 @@ export function ExampleCode(Label?: string): ChatResponseOption {
 }
 
 /** AskCode: Ask a question about the code. */
-export function AskCode(Label?: string, Style?: string): ChatResponseOption {
+export function AskCode(Label?: string, Style?: string, Transparent?: boolean): ChatResponseOption {
     return {
         Label: Label ?? "Can I ask a question?",
         Style: Style ?? "followup",
         Operation: "CodeAsk",
         AskInput: true,
-        TextInContext: ContextMessage.Nothing,
+        TextInContext: ContextMessage.MessagesAsText,
         CodeInContext: true,
-        Transparent: true,
+        Transparent: Transparent ?? false,
         Inheritance: ContextInheritance.InheritOne
     }
 }

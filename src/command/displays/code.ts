@@ -178,7 +178,7 @@ export class CodeDisplay extends Display {
 						Field: "Diagnostics",
 						Parsed: Diagnostics
 					}
-				]);
+				], true);
 			}
 		});
 	}
@@ -200,7 +200,7 @@ export class CodeDisplay extends Display {
 	/** Play: Try to play the code. */
 	public Play() {
 		if (this.Tab.Disabled) return;
-		this.Tab.Outputs.RenderRequest(Localized.Get("Trying to run the code"), this.Record).Transparent = true;
+		this.Tab.Outputs.RenderRequest(Localized.Get("Trying to run the code"), this.Record).GetData().Transparent = true;
 		this.TryTo(() => {
 			var Mode = this.Editor.Semantics.GetRecognizedMode();
 			var Code = this.Editor.GetCode().trim();
@@ -242,11 +242,11 @@ export class CodeDisplay extends Display {
 				Procedures: Procedures,
 				IsTemporary: true
 			},
-		}]);
+		}], true);
 	}
 	/** AddToCode: Add the code to the main editor. */
 	public AddToCode() {
-		this.Tab.Outputs.RenderRequest(Localized.Get("Trying to add the code"), this.Record).Transparent = true;
+		this.Tab.Outputs.RenderRequest(Localized.Get("Trying to add the code"), this.Record).GetData().Transparent = true;
 		this.TryTo(() => {
 			
 		});

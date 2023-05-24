@@ -98,7 +98,7 @@ export class TurtleEditor {
       this.CommandTab.Outputs.RenderResponses([{
         Type: ChatResponseType.Text,
         Content: Localized.Get("Please download Turtle Universe")
-      }])
+      }], true);
       this.CommandTab.SetDisabled(false);
     }
   }

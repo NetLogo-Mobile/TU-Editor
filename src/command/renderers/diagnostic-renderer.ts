@@ -35,6 +35,7 @@ export class DiagnosticsRenderer extends JSONSectionRenderer<Diagnostics> {
             NetLogoUtils.AnnotateCodes(this.ContentContainer.find("code"));
         }
         // Show the options
+        if (!ChatManager.Available) return;
         this.ShowPseudoOption(ExplainErrors(Metadata.Type), (Option) => this.SubmitDiagnostics(Option, false));
         this.ShowPseudoOption(FixCode(), (Option) => this.SubmitDiagnostics(Option, true));
     }

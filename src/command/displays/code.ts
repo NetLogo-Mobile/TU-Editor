@@ -165,7 +165,7 @@ export class CodeDisplay extends Display {
 			if (Diagnostics.Diagnostics.length == 0) {
 				Action();
 			} else {
-				Diagnostics.Hidden = true;
+				// Diagnostics.Hidden = true;
 				this.Tab.Outputs.RenderOptions([ ChangeTopic() ]);
 				this.Tab.Outputs.RenderResponses([
 					{

@@ -3,6 +3,7 @@ import { ChatRecord } from "./client/chat-record";
 import { ChatResponseSection, ChatResponseType } from "./client/chat-response";
 import { SSEClient } from "./sse-client";
 import { ClientChatRequest } from "./client/chat-request";
+import { ChatResponse } from '../../dist/TU-Editor/src/chat/client/chat-response';
 declare const { JSON5 }: any;
 
 /** ChatNetwork: Class that handles the network communication for the chat. */
@@ -77,6 +78,12 @@ export class ChatNetwork {
                         Section = Update;
                         TryParseElement();
                         NewSection(Section);
+                        // Irrecoverable error completes the section
+                        if (Section.Type === ChatResponseType.ServerError && Section.Field == "Irrecoverable") {
+                            Record.ResponseTimestamp = Date.now();
+                            Thread.Records[Record.ID] = Record;
+                            Resolve(Record);
+                        }
                         return;
                 }
                 // Update the section

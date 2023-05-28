@@ -16060,7 +16060,7 @@
                 if (rule.mode == 1 /* Inherit */)
                     inheritedClass += (inheritedClass ? " " : "") + tagCls;
             }
-            this.startSpan(cursor.from, cls);
+            this.startSpan(Math.max(from, start), cls);
             if (rule.opaque)
                 return;
             let mounted = cursor.tree && cursor.tree.prop(NodeProp.mounted);
@@ -16085,7 +16085,7 @@
                     pos = next.to + start;
                     if (pos > from) {
                         this.highlightRange(inner.cursor(), Math.max(from, next.from + start), Math.min(to, pos), "", innerHighlighters);
-                        this.startSpan(pos, cls);
+                        this.startSpan(Math.min(to, pos), cls);
                     }
                 }
                 if (hasChild)
@@ -23762,21 +23762,53 @@
         // be done.
         /// @internal
         forceReduce() {
-            let reduce = this.p.parser.stateSlot(this.state, 5 /* ParseState.ForcedReduce */);
+            let { parser } = this.p;
+            let reduce = parser.stateSlot(this.state, 5 /* ParseState.ForcedReduce */);
             if ((reduce & 65536 /* Action.ReduceFlag */) == 0)
                 return false;
-            let { parser } = this.p;
             if (!parser.validAction(this.state, reduce)) {
                 let depth = reduce >> 19 /* Action.ReduceDepthShift */, term = reduce & 65535 /* Action.ValueMask */;
                 let target = this.stack.length - depth * 3;
-                if (target < 0 || parser.getGoto(this.stack[target], term, false) < 0)
-                    return false;
+                if (target < 0 || parser.getGoto(this.stack[target], term, false) < 0) {
+                    let backup = this.findForcedReduction();
+                    if (backup == null)
+                        return false;
+                    reduce = backup;
+                }
                 this.storeNode(0 /* Term.Err */, this.reducePos, this.reducePos, 4, true);
                 this.score -= 100 /* Recover.Reduce */;
             }
             this.reducePos = this.pos;
             this.reduce(reduce);
             return true;
+        }
+        /// Try to scan through the automaton to find some kind of reduction
+        /// that can be applied. Used when the regular ForcedReduce field
+        /// isn't a valid action. @internal
+        findForcedReduction() {
+            let { parser } = this.p, seen = [];
+            let explore = (state, depth) => {
+                if (seen.includes(state))
+                    return;
+                seen.push(state);
+                return parser.allActions(state, (action) => {
+                    if (action & (262144 /* Action.StayFlag */ | 131072 /* Action.GotoFlag */)) ;
+                    else if (action & 65536 /* Action.ReduceFlag */) {
+                        let rDepth = (action >> 19 /* Action.ReduceDepthShift */) - depth;
+                        if (rDepth > 1) {
+                            let term = action & 65535 /* Action.ValueMask */, target = this.stack.length - rDepth * 3;
+                            if (target >= 0 && parser.getGoto(this.stack[target], term, false) >= 0)
+                                return (rDepth << 19 /* Action.ReduceDepthShift */) | 65536 /* Action.ReduceFlag */ | term;
+                        }
+                    }
+                    else {
+                        let found = explore(action, depth + 1);
+                        if (found != null)
+                            return found;
+                    }
+                });
+            };
+            return explore(this.state, 0);
         }
         /// @internal
         forceAll() {
@@ -25002,18 +25034,22 @@
         }
         /// @internal
         validAction(state, action) {
-            if (action == this.stateSlot(state, 4 /* ParseState.DefaultReduce */))
-                return true;
-            for (let i = this.stateSlot(state, 1 /* ParseState.Actions */);; i += 3) {
+            return !!this.allActions(state, a => a == action ? true : null);
+        }
+        /// @internal
+        allActions(state, action) {
+            let deflt = this.stateSlot(state, 4 /* ParseState.DefaultReduce */);
+            let result = deflt ? action(deflt) : undefined;
+            for (let i = this.stateSlot(state, 1 /* ParseState.Actions */); result == null; i += 3) {
                 if (this.data[i] == 65535 /* Seq.End */) {
                     if (this.data[i + 1] == 1 /* Seq.Next */)
                         i = pair(this.data, i + 2);
                     else
-                        return false;
+                        break;
                 }
-                if (action == pair(this.data, i + 1))
-                    return true;
+                result = action(pair(this.data, i + 1));
             }
+            return result;
         }
         /// Get the states that can follow this one through shift actions or
         /// goto jumps. @internal
@@ -26862,17 +26898,27 @@
                 }),
                 // Indentations
                 indentNodeProp.add({
-                    CodeBlock: delimitedIndent({ closing: ']', align: false }),
+                    // LineComment:(context)=>{
+                    //   console.log("HERE")
+                    //   console.log(context.column(context.pos))
+                    //   console.log(context)
+                    //   return context.column(context.pos)
+                    // },
+                    ReporterContent: delimitedIndent({ closing: '[', align: true }),
+                    ReporterStatement: delimitedIndent({ closing: '[', align: true }),
+                    CommandStatement: delimitedIndent({ closing: '[', align: true }),
+                    ProcedureContent: delimitedIndent({ closing: '[' }),
+                    CodeBlock: delimitedIndent({ closing: ']' }),
                     AnonymousProcedure: delimitedIndent({ closing: ']', align: false }),
                     Extensions: delimitedIndent({ closing: ']', align: false }),
                     Globals: delimitedIndent({ closing: ']', align: false }),
                     Breed: delimitedIndent({ closing: ']', align: false }),
                     BreedsOwn: delimitedIndent({ closing: ']', align: false }),
-                    Procedure: (context) => /^\s*[Ee][Nn][Dd]/.test(context.textAfter)
-                        ? context.baseIndent
-                        : context.lineIndent(context.node.from) + context.unit,
-                    ReporterContent: continuedIndent(),
-                    ProcedureContent: continuedIndent(),
+                    Procedure: (context) => {
+                        return /^\s*[Ee][Nn][Dd]/.test(context.textAfter)
+                            ? context.baseIndent
+                            : context.lineIndent(context.node.from) + context.unit;
+                    },
                     // delimitedIndent({ closing: 'end' }),
                     // Doesn't work well with "END" or "eND". Should do a bug report to CM6.
                 }),
@@ -31439,6 +31485,7 @@
         'Do you want to reset the code': () => 'Do you want to reset the code to the last successful compilation?',
         'Type NetLogo command here': () => 'Type NetLogo command here',
         'Talk to the computer in NetLogo or natural languages': () => `Talk to the computer in NetLogo or natural languages`,
+        'Copied to clipboard': () => 'The item has been copied to clipboard.',
         // Chat and execution messages
         'Connection to server failed _': (Error) => `Sorry, the connection to our server failed. Code ${Error}.`,
         'Summary of request': () => `Below is a summary of my request: `,
@@ -31568,6 +31615,7 @@
         'Run command': () => `执行命令`,
         'Run reporter': () => `执行函数`,
         'Execute the procedure': () => `开始执行这段程序`,
+        'Copied to clipboard': () => `内容已复制到剪贴板。`,
         // Chat and execution messages
         'Connection to server failed _': (Error) => `抱歉，和服务器的连接中断了。代码 ${Error}。`,
         'Summary of request': () => `简单总结我的请求的要点：`,
@@ -31864,26 +31912,32 @@
         return view.state.selection.main.to;
     };
     /** prettifyAll: Make whole code file follow formatting standards. */
-    const prettifyAll = function (view) {
+    const prettifyAll = function (view, Editor) {
         let doc = view.state.doc.toString();
         // eliminate extra spacing
         let new_doc = removeSpacing(syntaxTree(view.state), doc);
         view.dispatch({ changes: { from: 0, to: doc.length, insert: new_doc } });
+        Editor.ForceParse();
         // give certain nodes their own lines
         view.dispatch({
             changes: addSpacing(view, 0, new_doc.length),
         });
+        Editor.ForceParse();
+        //console.log(view.state.doc.toString())
         // ensure spacing is correct
-        doc = view.state.doc.toString();
-        new_doc = avoidStrings(doc, finalSpacing).trim();
-        view.dispatch({ changes: { from: 0, to: doc.length, insert: new_doc } });
+        // doc = view.state.doc.toString();
+        // new_doc = avoidStrings(doc, finalSpacing).trim();
+        // view.dispatch({ changes: { from: 0, to: doc.length, insert: new_doc } });
         // add indentation
         view.dispatch({
-            changes: indentRange(view.state, 0, view.state.doc.toString().length),
+            changes: indentRange(view.state, 0, view.state.doc.toString().length), //indent(view.state.doc.toString(),view.state)
         });
+        if (doc != view.state.doc.toString()) {
+            Log('made changes');
+        }
     };
     const doubleLineBreaks = [
-        'LineComment',
+        // 'LineComment',
         'GlobalStr',
         'ExtensionStr',
         'BreedStr',
@@ -31903,7 +31957,7 @@
                     return;
                 var content = doc.substring(noderef.from, noderef.to);
                 // do minimum spacing
-                if (previous !== '(' && content !== ')') {
+                if (previous !== '(' && content !== ')' && noderef.from > 0) {
                     var spacing = doc.substring(lastPosition, noderef.from);
                     if (doubleLineBreaks.indexOf(noderef.node.name) !== -1) {
                         if (spacing.indexOf('\n\n') != -1)
@@ -31912,6 +31966,10 @@
                             result += '\n';
                         else
                             result += ' ';
+                    }
+                    else if (noderef.name == 'LineComment') {
+                        spacing = spacing.replace(/\n\n+/g, '\n\n');
+                        result += spacing;
                     }
                     else {
                         if (spacing.indexOf('\n') != -1)
@@ -31927,7 +31985,7 @@
             },
             mode: IterMode.IncludeAnonymous,
         });
-        console.log(result);
+        //console.log(result);
         return result;
     }
     /** removeSpacing: Make initial spacing adjustments. */
@@ -31954,21 +32012,6 @@
         new_doc = new_doc.replace(/(\n+)(\n\nto[ -])/g, '$2');
         new_doc = new_doc.replace(/(\n+)(\n\n[\w-]+-own)/g, '$2');
         return new_doc;
-    };
-    const avoidStrings = function (doc, func) {
-        let pieces = doc.split('"');
-        let index = 0;
-        let final_docs = [];
-        for (var piece of pieces) {
-            if (index % 2 == 0) {
-                final_docs.push(func(piece));
-            }
-            else {
-                final_docs.push(piece);
-            }
-            index++;
-        }
-        return final_docs.join('"');
     };
     /** addSpacing: Give certain types of nodes their own lines. */
     const addSpacing = function (view, from, to) {
@@ -32037,23 +32080,41 @@
                         });
                     }
                 }
-                else if (node.name == 'OpenParen') {
+                else if (node.name == 'OpenParen' &&
+                    ![' ', '(', '\n'].includes(view.state.sliceDoc(node.from - 1, node.from))) {
                     changes.push({ from: node.from, to: node.to, insert: ' (' });
                 }
-                else if (node.name == 'CloseParen') {
+                else if (node.name == 'CloseParen' &&
+                    ![' ', '\n', ')'].includes(view.state.sliceDoc(node.to, node.to + 1))) {
                     changes.push({ from: node.from, to: node.to, insert: ') ' });
                 }
                 else if (node.name == 'OpenBracket') {
-                    changes.push({ from: node.from, to: node.to, insert: ' [ ' });
+                    let bracket = '';
+                    if (view.state.sliceDoc(node.from - 1, node.from) != ' ') {
+                        bracket += ' ';
+                    }
+                    bracket += '[';
+                    if (![' ', '\n'].includes(view.state.sliceDoc(node.to, node.to + 1))) {
+                        bracket += ' ';
+                    }
+                    changes.push({ from: node.from, to: node.to, insert: bracket });
                 }
                 else if (node.name == 'CloseBracket') {
-                    changes.push({ from: node.from, to: node.to, insert: ' ] ' });
+                    let bracket = '';
+                    if (view.state.sliceDoc(node.from - 1, node.from) != ' ') {
+                        bracket += ' ';
+                    }
+                    bracket += ']';
+                    if (![' ', '\n'].includes(view.state.sliceDoc(node.to, node.to + 1))) {
+                        bracket += ' ';
+                    }
+                    changes.push({ from: node.from, to: node.to, insert: bracket });
                 }
                 if (['Extensions', 'Globals', 'BreedsOwn'].includes(node.name)) {
                     if (doc.substring(node.from, node.to).includes('\n')) {
                         for (var name of ['CloseBracket', 'Extension', 'Identifier']) {
                             node.node.getChildren(name).map((child) => {
-                                if (doc[child.from - 1] != '\n') {
+                                if (doc[child.from - 1] != '\n' && child.from > 0) {
                                     changes.push({
                                         from: child.from,
                                         to: child.from,
@@ -32152,11 +32213,12 @@
         let commentsStart = null;
         let commentFrom = null;
         let procedureStart = null;
+        let reserved = getReserved(Editor.LintContext);
         // Go over the syntax tree
         syntaxTree(state)
             .cursor()
             .iterate((noderef) => {
-            var _a, _b;
+            var _a, _b, _c, _d;
             //Log(noderef.name, comments);
             //check for misplaced non-global statements at the global level
             //Collect them into intoProcedure, and remove them from the code
@@ -32238,6 +32300,38 @@
                     });
                 }
             }
+            if (noderef.name == 'Procedure' &&
+                noderef.node.getChildren('ProcedureContent').length == 1) {
+                let child = (_d = (_c = noderef.node
+                    .getChild('ProcedureContent')) === null || _c === void 0 ? void 0 : _c.getChild('CommandStatement')) === null || _d === void 0 ? void 0 : _d.getChild('SpecialCommand0Args');
+                if (child &&
+                    state.doc
+                        .toString()
+                        .toLowerCase()
+                        .includes('to ' + state.sliceDoc(child.from, child.to))) {
+                    changes.push({
+                        from: noderef.from,
+                        to: noderef.to,
+                        insert: '',
+                    });
+                }
+            }
+            else if (noderef.name == 'Procedure' &&
+                noderef.node.getChildren('ProcedureContent').length == 0) {
+                changes.push({ from: noderef.from, to: noderef.to, insert: '' });
+            }
+            else if (noderef.name == 'ProcedureName') {
+                let name = state.sliceDoc(noderef.from, noderef.to).toLowerCase();
+                if (reserved.includes(name)) {
+                    let pieces = name.split('-');
+                    pieces[0] = 'setup';
+                    changes.push({
+                        from: noderef.from,
+                        to: noderef.to,
+                        insert: pieces.join('-'),
+                    });
+                }
+            }
             // Record the position of the first procedure to know where to add 'play'
             if (!procedureStart && noderef.name == 'Procedure')
                 procedureStart = noderef.from;
@@ -32289,6 +32383,43 @@
             return str;
         else
             return comments.join('\n') + '\n' + str;
+    }
+    function getReserved(lintContext) {
+        let all = [];
+        for (let b of lintContext.Breeds.values()) {
+            if (b.BreedType == BreedType$1.Turtle || b.BreedType == BreedType$1.Patch) {
+                all.push('hatch-' + b.Plural);
+                all.push('sprout-' + b.Plural);
+                all.push('create-' + b.Plural);
+                all.push('create-ordered-' + b.Plural);
+                all.push(b.Plural + '-at');
+                all.push(b.Plural + '-here');
+                all.push(b.Plural + '-on');
+                all.push('is-' + b.Singular + '?');
+            }
+            else {
+                all.push('create-' + b.Plural + '-to');
+                all.push('create-' + b.Singular + '-to');
+                all.push('create-' + b.Plural + '-from');
+                all.push('create-' + b.Singular + '-from');
+                all.push('create-' + b.Plural + '-with');
+                all.push('create-' + b.Singular + '-with');
+                all.push('out-' + b.Singular + '-to');
+                all.push('out-' + b.Singular + '-neighbors');
+                all.push('out-' + b.Singular + '-neighbor?');
+                all.push('in-' + b.Singular + '-from');
+                all.push('in-' + b.Singular + '-neighbors');
+                all.push('in-' + b.Singular + '-neighbor?');
+                all.push('my-' + b.Plural);
+                all.push('my-in-' + b.Plural);
+                all.push('my-out-' + b.Plural);
+                all.push(b.Singular + '-neighbor?');
+                all.push(b.Singular + '-neighbors');
+                all.push(b.Singular + '-with');
+                all.push('is-' + b.Singular + '?');
+            }
+        }
+        return all;
     }
 
     /** SemanticFeatures: The linting, parsing, and highlighting features of the editor. */
@@ -32361,7 +32492,7 @@
         /** PrettifyAll: Prettify all the NetLogo code. */
         PrettifyAll() {
             this.Galapagos.ForceParse();
-            prettifyAll(this.CodeMirror);
+            prettifyAll(this.CodeMirror, this.Galapagos);
         }
         /** PrettifyOrAll: Prettify the selected code. If no code is selected, prettify all. */
         PrettifyOrAll() {
@@ -33075,6 +33206,12 @@
                                 Section = Update;
                                 TryParseElement();
                                 NewSection(Section);
+                                // Irrecoverable error completes the section
+                                if (Section.Type === ChatResponseType.ServerError && Section.Field == "Irrecoverable") {
+                                    Record.ResponseTimestamp = Date.now();
+                                    Thread.Records[Record.ID] = Record;
+                                    Resolve(Record);
+                                }
                                 return;
                         }
                         // Update the section

@@ -160,11 +160,10 @@
 
 .command-line .command-input .cm-editor .cm-scroller {
 	line-height: 1.5;
-	overflow-x: hidden;
 	overflow-y: hidden;
 }
 
-.command-line .command-input .cm-editor .cm-scroller ::-webkit-scrollbar {
+.command-line .command-input .cm-editor .cm-scroller::-webkit-scrollbar {
 	display: none;
 }
 
@@ -182,6 +181,16 @@
 	overflow: auto;
 	flex-grow: 1;
 	scroll-behavior: smooth;
+}
+
+:not(.mobile) .command-output .outputs::-webkit-scrollbar {
+	width: 1rem;
+	height: 1rem;
+	background: #f5f5f5;
+}
+
+:not(.mobile) .command-output .outputs::-webkit-scrollbar-thumb {
+	background: #c5c5c5;
 }
 
 .command-output a {
@@ -613,6 +622,7 @@
 	0% {
 		transform: scale(1.25, 1.25);
 	}
+
 	50%,
 	60% {
 		transform: scale(0.8, 0.8);

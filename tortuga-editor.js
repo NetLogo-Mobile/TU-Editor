@@ -27740,9 +27740,10 @@
                     'Globals',
                     'Breed',
                     'Extensions',
-                ].includes(noderef.name) &&
-                    !this.getText(State, noderef.node).includes('\n')) {
-                    vars.push(this.getText(State, noderef.node));
+                ].includes(noderef.name)) {
+                    var Text = this.getText(State, noderef.node);
+                    if (Text !== '' && !Text.includes('\n'))
+                        vars.push(this.getText(State, noderef.node));
                 }
             });
             return [...new Set(vars)];
@@ -32851,7 +32852,16 @@
                     }
                     for (var [name, breed] of state.Breeds) {
                         breed.EditorID = child.ID;
-                        mainLint.Breeds.set(name, breed);
+                        if (mainLint.Breeds.has(name)) {
+                            var variables = mainLint.Breeds.get(name).Variables;
+                            breed.Variables.forEach((variable) => {
+                                if (!variables.includes(variable))
+                                    variables.push(variable);
+                            });
+                        }
+                        else {
+                            mainLint.Breeds.set(name, breed);
+                        }
                     }
                 }
             }

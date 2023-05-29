@@ -83,6 +83,7 @@
 	flex: 0 0 3rem;
 	padding-bottom: env(safe-area-inset-bottom);
 	align-items: center;
+	box-sizing: border-box;
 	border-top: 1px solid #eee;
 	background-color: #5A648D;
 }
@@ -92,9 +93,11 @@
 }
 
 .command-line .wrapper {
-	width: 100%;
-	display: flex;
+	flex: 1 1 auto;
 	padding: 0 1rem;
+	display: flex;
+	max-width: 100%;
+	box-sizing: border-box;
 }
 
 .command-line select {
@@ -114,11 +117,12 @@
 }
 
 .command-line .command-input {
-	flex: 1 auto;
+	flex: 1 1 auto;
 	height: 2rem;
 	display: flex;
 	padding: 0 0 0 0.5rem;
-	flex-grow: 1;
+	max-width: 100%;
+	box-sizing: border-box;
 	background: #FFF;
 	border-radius: 0.24rem;
 }
@@ -148,10 +152,12 @@
 }
 
 .command-line .command-input .cm-editor {
-	flex: 1 auto;
+	flex: 1 1 auto;
 	height: auto;
 	font-size: 1em;
 	max-height: 2rem;
+	max-width: calc(100% - 2rem);
+	box-sizing: border-box;
 }
 
 .command-line .command-input .cm-editor .cm-gutters {
@@ -160,6 +166,7 @@
 
 .command-line .command-input .cm-editor .cm-scroller {
 	line-height: 1.5;
+	overflow-x: scroll;
 	overflow-y: hidden;
 }
 

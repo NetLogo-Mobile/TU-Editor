@@ -180,6 +180,7 @@ export class CommandTab extends Tab {
 			let Diagnostics = await this.Galapagos.ForceLintAsync();
 			let Mode = this.Galapagos.Semantics.GetRecognizedMode();
 			// Check if the context is temporary
+			// TODO: Compile first if haven't done it yet.
 			var Temporary = this.Codes.Visible;
 			// If there is no linting issues, assume it is code snippet
 			if (Diagnostics.length == 0) {

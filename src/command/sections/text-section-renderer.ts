@@ -24,7 +24,10 @@ export class TextSectionRenderer extends SectionRenderer {
         var Section = this.GetData();
         var Content = Section.Content ?? "";
         // Post-process the text
-        Content = Content.replace(/\'/g, "`").replace(/\n\n([^`]*?)\n\n/gs, "\n```\n$1\n```\n");
+        Content = Content.replace(/\'([^`^\n]+?)\'/g, (Match) => {
+            if (Match.startsWith("'s ")) return Match;
+            return `\`${Match.substring(1, Match.length - 2)}\``; 
+        }).replace(/\n\n([^`]*?)\n\n/gs, "\n```\n$1\n```\n");
         // Render the text
         this.ContentContainer.html(MarkdownToHTML(Content));
         PostprocessHTML(OutputDisplay.Instance.Tab.Editor, this.ContentContainer);

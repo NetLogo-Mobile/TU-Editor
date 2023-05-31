@@ -42,7 +42,7 @@ export class RecordRenderer extends UIRendererOf<ChatRecord> {
 <div class="contents">
     <div class="avatar"><img src="images/assistant.png" /><div class="dot-stretching"></div></div>
     <div class="content"></div>
-    <div class="expand-record">↓</div>
+    <div class="expand-record">︙</div>
 </div>`).hide();
         Container.find(".expand-record").on("click", () => {
             this.ActivateSelf("activated");

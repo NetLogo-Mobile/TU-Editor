@@ -19,5 +19,6 @@ export function CopyCode(Code: string) {
     if (Code.indexOf("\n") === -1) {
         OutputDisplay.Instance.Tab.SetCode("observer", Code);
         OutputDisplay.Instance.Tab.Galapagos.Focus();
+        Toast("success", Localized.Get("Press enter to execute again"));
     } else Toast("success", Localized.Get("Copied to clipboard"));
 }

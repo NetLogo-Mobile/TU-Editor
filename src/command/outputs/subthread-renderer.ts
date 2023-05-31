@@ -18,7 +18,7 @@ export class SubthreadRenderer extends UIRendererOf<ChatSubthread> {
         this.Container.addClass("subthread");
         this.ExpandButton = $(`<div class="expand"></div>`).appendTo(this.Container)
             .append($(`<a href="javascript:void(0)"></a>`)
-                    .on("click", () => this.Outputs.ActivateSubthread(this)));
+                    .on("click", () => this.Outputs.ActivateSubthread(this, true)));
     }
     /** RenderInternal: Render the UI element. */
     protected RenderInternal(): void {

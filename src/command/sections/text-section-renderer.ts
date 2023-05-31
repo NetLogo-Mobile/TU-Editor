@@ -23,6 +23,8 @@ export class TextSectionRenderer extends SectionRenderer {
     protected RenderInternal(): void {
         var Section = this.GetData();
         var Content = Section.Content ?? "";
+        // Post-process the text
+        Content = Content.replace(/\'/g, "`").replace(/\n\n([^`]*?)\n\n/gs, "\n```\n$1\n```\n");
         // Render the text
         this.ContentContainer.html(MarkdownToHTML(Content));
         PostprocessHTML(OutputDisplay.Instance.Tab.Editor, this.ContentContainer);

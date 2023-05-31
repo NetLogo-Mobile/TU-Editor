@@ -279,6 +279,7 @@ export class CommandTab extends Tab {
 		var Record = this.Outputs.PrintCommandInput(Content, Restart);
 		Record.Context = Record.Context ?? { PreviousMessages: [] };
 		Record.Context.CodeSnippet = Content;
+		Record.Operation = "Execute";
 		this.Outputs.ScrollToBottom();
 		// Check if we really could execute
 		this.Editor.CheckExecution();

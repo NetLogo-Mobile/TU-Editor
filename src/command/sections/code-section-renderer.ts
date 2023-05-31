@@ -32,7 +32,7 @@ export class CodeSectionRenderer extends SectionRenderer {
         }
     }
     /** EnterCode: Enter the code mode. */
-    private EnterCode() {
+    public EnterCode() {
         var Subthread = this.Parent!.Parent! as SubthreadRenderer;
         OutputDisplay.Instance.ActivateSubthread(Subthread);
         CodeDisplay.Instance.SetContext(this.GetRecord(), Subthread);

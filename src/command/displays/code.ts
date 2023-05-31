@@ -11,6 +11,7 @@ import { RecordRenderer } from '../outputs/record-renderer';
 import { ChatResponseSection, ChatResponseType } from "../../chat/client/chat-response";
 import { DiagnosticType, Diagnostics, Procedure } from "../../chat/client/languages/netlogo-context";
 import { ChangeTopic } from '../../chat/client/options/option-templates';
+import { CopyCode } from "../../utils/misc";
 
 /** CodeDisplay: The interactive code editor section. */
 export class CodeDisplay extends Display {
@@ -49,15 +50,15 @@ export class CodeDisplay extends Display {
 		this.Tab.Editor.EditorTabs[0].Galapagos.AddChild(this.Editor);
 		// Create the toolbar
 		var Toolbar = $(`<div class="toolbar"></div>`).appendTo(this.Container);
-		this.ReturnButton = $(`<div class="button return">${Localized.Get("Return")}</div>`).on("click", () => this.Return()).appendTo(Toolbar);
 		this.PlayButton = $(`<div class="button run">${Localized.Get("RunCode")}</div>`).on("click", () => this.Play()).appendTo(Toolbar);
-		this.AskButton = $(`<div class="button ask">${Localized.Get("AskCode")}</div>`).on("click", () => this.Ask()).appendTo(Toolbar);
-		this.AddToCodeButton = $(`<div class="button addtocode">${Localized.Get("AddCode")}</div>`).hide().on("click", () => this.AddToCode()).appendTo(Toolbar);
+		this.AskButton = $(`<div class="button ask">${Localized.Get("AskCode")}</div>`).hide().on("click", () => this.Ask()).appendTo(Toolbar);
+		this.AddToCodeButton = $(`<div class="button addtocode">${Localized.Get("AddCode")}</div>`).on("click", () => this.AddToCode()).appendTo(Toolbar);
 		// Create the history
 		var History = $(`<div class="history"></div>`).appendTo(Toolbar);
-		this.PreviousButton = $(`<div class="button prev">${Localized.Get("PreviousVersion")}</div>`).on("click", () => this.ShowPrevious()).appendTo(History);
+		this.PreviousButton = $(`<div class="button prev">&lt;</div>`).on("click", () => this.ShowPrevious()).appendTo(History);
 		this.HistoryDisplay = $(`<div class="label">0 / 0</div>`).appendTo(History);
-		this.NextButton = $(`<div class="button next">${Localized.Get("NextVersion")}</div>`).on("click", () => this.ShowNext()).appendTo(History);
+		this.NextButton = $(`<div class="button next">&gt;</div>`).on("click", () => this.ShowNext()).appendTo(History);
+		this.ReturnButton = $(`<div class="button finish">${Localized.Get("Finish")}</div>`).on("click", () => this.Return()).appendTo(Toolbar);
 		CodeDisplay.Instance = this;
 	}
     /** Show: Show the section. */
@@ -100,8 +101,8 @@ export class CodeDisplay extends Display {
 	/** UpdateHistory: Update the history index of the display. */
 	private UpdateHistory() {
 		this.HistoryDisplay.text(`${this.CurrentIndex + 1} / ${this.Records.length}`);
-		this.PreviousButton.toggle(this.CurrentIndex >= 1);
-		this.NextButton.toggle(this.CurrentIndex < this.Records.length - 1);
+		this.PreviousButton.toggleClass("hidden", this.CurrentIndex < 1);
+		this.NextButton.toggleClass("hidden", this.CurrentIndex >= this.Records.length - 1);
 	}
 	/** UpdateRecords: Update the records. */
 	private UpdateRecords() {
@@ -200,26 +201,60 @@ export class CodeDisplay extends Display {
 	/** Play: Try to play the code. */
 	public Play() {
 		if (this.Tab.Disabled) return;
-		this.Tab.Outputs.RenderRequest(Localized.Get("Trying to run the code"), this.Record).GetData().Transparent = true;
+		// Hide the previous successful and uneventful execution
+		var LastSubthread = this.Tab.Outputs.Subthread;
+		if (LastSubthread && LastSubthread.Children.length > 0) {
+			var LastRecord = LastSubthread.Children[LastSubthread.Children.length - 1] as RecordRenderer;
+			var LastData = LastRecord.GetData();
+			if (LastData.Operation == "Execute" && LastData.Response.Sections.length === 1 && 
+				LastData.Response.Sections[0].Type === ChatResponseType.Finish || LastData.Response.Sections[0].Type === ChatResponseType.Text)
+				LastRecord.Container.hide();
+		}
+		// Create a new record
+		var Record = this.Tab.Outputs.RenderRequest(Localized.Get("Trying to run the code"), this.Record);
+		Record.GetData().Transparent = true;
+		// Try to play the code
 		this.TryTo(() => {
 			var Mode = this.Editor.Semantics.GetRecognizedMode();
 			var Code = this.Editor.GetCode().trim();
+			if (Code === "") return;
+			// ExecuteCommand: Execute the command.
+			var ExecuteCommand = (Code: string) => {
+				Record.Container.hide();
+				this.Tab.SetDisabled(true);
+				this.Tab.ExecuteCommand("observer", Code, true);
+			}
 			// If it is a command or reporter, simply run it
 			switch (Mode) {
 				case "Command":
-					this.Tab.SetDisabled(true);
-					this.Tab.ExecuteCommand("observer", Code, true);
+					ExecuteCommand(Code);
 					break;
 				case "Reporter":
-					this.Tab.SetDisabled(true);
-					this.Tab.ExecuteCommand("observer", `show ${Code}`, true);
+					ExecuteCommand(`show ${Code}`);
 					break;
 				default:
 					var State = this.Editor.GetState();
+					// Names of procedures
 					var Procedures: string[] = [];
-					for (var [Name, Procedure] of State.Procedures)
+					var FirstProcedure: Procedure | null = null;
+					for (var [Name, Procedure] of State.Procedures) {
+						FirstProcedure = FirstProcedure ?? Procedure;
 						Procedures.push(Name);
-					this.Tab.RecompileTemporarily(Code, Procedures, () => this.PlayProcedures());
+					}
+					// Immediate execution
+					if (Procedures.length === 1 && FirstProcedure?.Arguments.length == 0) {
+						if (FirstProcedure.IsCommand) {
+							this.Tab.RecompileTemporarily(Code, Procedures, () => {
+								ExecuteCommand(FirstProcedure!.Name);
+							});
+						} else {
+							this.Tab.RecompileTemporarily(Code, Procedures, () => {
+								ExecuteCommand(`show ${FirstProcedure!.Name}`);
+							});
+						}
+					} else {
+						this.Tab.RecompileTemporarily(Code, Procedures, () => this.PlayProcedures());
+					}
 					break;
 			}
 		});
@@ -246,9 +281,9 @@ export class CodeDisplay extends Display {
 	}
 	/** AddToCode: Add the code to the main editor. */
 	public AddToCode() {
-		this.Tab.Outputs.RenderRequest(Localized.Get("Trying to add the code"), this.Record).GetData().Transparent = true;
+		// this.Tab.Outputs.RenderRequest(Localized.Get("Trying to add the code"), this.Record).GetData().Transparent = true;
 		this.TryTo(() => {
-			
+			CopyCode(this.Editor.GetCode());
 		});
 	}
 	/** Ask: Try to ask about the code. */

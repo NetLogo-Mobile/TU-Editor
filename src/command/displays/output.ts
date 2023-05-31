@@ -12,6 +12,7 @@ import { RuntimeError } from "../../../../CodeMirror-NetLogo/src/lang/linters/ru
 import { ErrorsToDiagnostics } from "../../utils/netlogo";
 import { DiagnosticType } from "../../chat/client/languages/netlogo-context";
 import { GenerateObjectID } from "../../utils/misc";
+import { CodeSectionRenderer } from "../sections/code-section-renderer";
 
 /** OutputDisplay: Display the output section. */
 export class OutputDisplay extends Display {
@@ -26,7 +27,7 @@ export class OutputDisplay extends Display {
 
 	// #region "Threading Support"
 	/** Subthread: The active subthread. */
-	private Subthread?: SubthreadRenderer;
+	public Subthread?: SubthreadRenderer;
 	/** Subthreads: The subthread store. */
 	private Subthreads: Map<ChatSubthread, SubthreadRenderer> = new Map<ChatSubthread, SubthreadRenderer>();
 	/** Show: Show the output region of Command Center. */
@@ -69,17 +70,31 @@ export class OutputDisplay extends Display {
 		return Renderer;
 	}
 	/** ActivateSubthread: Activate a subthread. */
-	public ActivateSubthread(Subthread?: SubthreadRenderer) {
+	public ActivateSubthread(Subthread?: SubthreadRenderer, Expanding?: boolean) {
+		if (this.Subthread === Subthread) return;
 		if (this.Subthread) {
 			this.Subthread.Container.removeClass("activated");
 			this.Subthread.DeactivateAll("activated");
 		}
+		this.Subthread = Subthread;
 		if (Subthread) {
 			Subthread.Container.addClass("activated");
 			Subthread.Children[Subthread.Children.length - 1].ActivateSelf("activated");
 			this.ScrollToElement(Subthread.Container);
+			// If expanding, enter the last code section
+			if (Expanding) {
+				for (var I = Subthread.Children.length - 1; I >= 0; I--) {
+					var Child = Subthread.Children[I] as RecordRenderer;
+					var Code = Child.Children.find(Current => Current instanceof CodeSectionRenderer) as CodeSectionRenderer;
+					if (Code != null) {
+						Code.EnterCode();
+						break;
+					}
+				}
+			}
+		} else {
+			this.Tab.Codes.Hide();
 		}
-		this.Subthread = Subthread;
 	}
 	// #endregion
 

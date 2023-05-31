@@ -35516,8 +35516,8 @@
         }
         /** ScrollToElement: Scroll to the element. */
         ScrollToElement(Element) {
-            var _a, _b, _c, _d, _e, _f;
-            this.ScrollContainer.scrollTop(((_b = (_a = Element.offset()) === null || _a === void 0 ? void 0 : _a.top) !== null && _b !== void 0 ? _b : 0) + ((_c = this.ScrollContainer.scrollTop()) !== null && _c !== void 0 ? _c : 0) - ((_f = (_e = (_d = this.ScrollContainer.parent()) === null || _d === void 0 ? void 0 : _d.offset()) === null || _e === void 0 ? void 0 : _e.top) !== null && _f !== void 0 ? _f : 0));
+            var _a, _b, _c, _d, _e;
+            this.ScrollContainer.scrollTop(((_b = (_a = Element.offset()) === null || _a === void 0 ? void 0 : _a.top) !== null && _b !== void 0 ? _b : 0) + ((_c = this.ScrollContainer.scrollTop()) !== null && _c !== void 0 ? _c : 0) - ((_e = (_d = this.ScrollContainer.offset()) === null || _d === void 0 ? void 0 : _d.top) !== null && _e !== void 0 ? _e : 0));
         }
         /** IsAtBottom: Whether the container is scrolled to bottom. */
         IsAtBottom() {
@@ -36020,7 +36020,6 @@
     /** CopyCode: Copy a code snippet to the clipboard. */
     function CopyCode(Code) {
         Code = Code.trim();
-        navigator.clipboard.writeText(Code);
         if (Code.indexOf("\n") === -1) {
             OutputDisplay.Instance.Tab.SetCode("observer", Code);
             OutputDisplay.Instance.Tab.Galapagos.Focus();
@@ -36028,6 +36027,12 @@
         }
         else
             Toast("success", Localized.Get("Copied to clipboard"));
+        try {
+            navigator.clipboard.writeText(Code);
+        }
+        catch (_a) {
+            TurtleEditor.Call({ Type: "ClipboardWrite", Content: Code });
+        }
     }
 
     /** CodeDisplay: The interactive code editor section. */
@@ -36577,7 +36582,11 @@
             var Section = this.GetData();
             var Content = (_a = Section.Content) !== null && _a !== void 0 ? _a : "";
             // Post-process the text
-            Content = Content.replace(/\'/g, "`").replace(/\n\n([^`]*?)\n\n/gs, "\n```\n$1\n```\n");
+            Content = Content.replace(/\'([^`^\n]+?)\'/g, (Match) => {
+                if (Match.startsWith("'s "))
+                    return Match;
+                return `\`${Match.substring(1, Match.length - 2)}\``;
+            }).replace(/\n\n([^`]*?)\n\n/gs, "\n```\n$1\n```\n");
             // Render the text
             this.ContentContainer.html(MarkdownToHTML(Content));
             PostprocessHTML(OutputDisplay.Instance.Tab.Editor, this.ContentContainer);
@@ -37335,6 +37344,7 @@
                     let Diagnostics = yield this.Galapagos.ForceLintAsync();
                     let Mode = this.Galapagos.Semantics.GetRecognizedMode();
                     // Check if the context is temporary
+                    // TODO: Compile first if haven't done it yet.
                     var Temporary = this.Codes.Visible;
                     // If there is no linting issues, assume it is code snippet
                     if (Diagnostics.length == 0) {

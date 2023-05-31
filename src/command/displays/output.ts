@@ -124,8 +124,9 @@ export class OutputDisplay extends Display {
 		if (!LastRecord.Processing) 
 			LastRecord = this.RenderRequest();
 		// If not, append to the last record
-		for (var Section in Sections)
+		for (var Section in Sections) {
 			LastRecord.AddSection(Sections[Section])?.SetFinalized().Render();
+		}
 		if (Finalizing) LastRecord.SetFinalized();
 		this.Subthread!.Render();
 		this.ScrollToBottom();

@@ -12,6 +12,7 @@ import { ChatResponseSection, ChatResponseType } from "../../chat/client/chat-re
 import { DiagnosticType, Diagnostics, Procedure } from "../../chat/client/languages/netlogo-context";
 import { ChangeTopic } from '../../chat/client/options/option-templates';
 import { CopyCode } from "../../utils/misc";
+import { SectionRenderer } from "../sections/section-renderer";
 
 /** CodeDisplay: The interactive code editor section. */
 export class CodeDisplay extends Display {
@@ -206,9 +207,11 @@ export class CodeDisplay extends Display {
 		if (LastSubthread && LastSubthread.Children.length > 0) {
 			var LastRecord = LastSubthread.Children[LastSubthread.Children.length - 1] as RecordRenderer;
 			var LastData = LastRecord.GetData();
-			if (LastData.Operation == "Execute" && LastData.Response.Sections.length === 1 && 
-				LastData.Response.Sections[0].Type === ChatResponseType.Finish || LastData.Response.Sections[0].Type === ChatResponseType.Text)
-				LastRecord.Container.hide();
+			if (LastData.Operation === "Execute" && LastRecord.Children.length >= 2) {
+				var FirstType = (LastRecord.Children[1] as SectionRenderer).GetData().Type;
+				if (FirstType === ChatResponseType.Finish || FirstType === ChatResponseType.Text)
+					LastRecord.Container.hide();
+			}
 		}
 		// Create a new record
 		var Record = this.Tab.Outputs.RenderRequest(Localized.Get("Trying to run the code"), this.Record);

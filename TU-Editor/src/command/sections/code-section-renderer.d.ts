@@ -8,5 +8,5 @@ export declare class CodeSectionRenderer extends SectionRenderer {
     /** RenderInternal: Render the UI element. */
     protected RenderInternal(): void;
     /** EnterCode: Enter the code mode. */
-    private EnterCode;
+    EnterCode(): void;
 }

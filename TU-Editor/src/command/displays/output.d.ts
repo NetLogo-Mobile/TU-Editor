@@ -14,7 +14,7 @@ export declare class OutputDisplay extends Display {
     /** Constructor: Create a new output section. */
     constructor(Tab: CommandTab);
     /** Subthread: The active subthread. */
-    private Subthread?;
+    Subthread?: SubthreadRenderer;
     /** Subthreads: The subthread store. */
     private Subthreads;
     /** Show: Show the output region of Command Center. */
@@ -24,7 +24,7 @@ export declare class OutputDisplay extends Display {
     /** RenderRecord: Render a new chat record. */
     RenderRecord(Record: ChatRecord, Subthread: ChatSubthread): RecordRenderer;
     /** ActivateSubthread: Activate a subthread. */
-    ActivateSubthread(Subthread?: SubthreadRenderer): void;
+    ActivateSubthread(Subthread?: SubthreadRenderer, Expanding?: boolean): void;
     /** RenderRequest: Render an offline chat request and return a new record. */
     RenderRequest(Input?: string, Parent?: ChatRecord, FriendlyInput?: string): RecordRenderer;
     /** RenderResponses: Render response sections immediately in the current record. */

@@ -36583,9 +36583,9 @@
             var Content = (_a = Section.Content) !== null && _a !== void 0 ? _a : "";
             // Post-process the text
             Content = Content.replace(/\'([^`^\n]+?)\'/g, (Match) => {
-                if (Match.startsWith("'s "))
+                if (Match.length == 3 || Match.match(/\'\S /g))
                     return Match;
-                return `\`${Match.substring(1, Match.length - 2)}\``;
+                return `\`${Match.substring(1, Match.length - 1)}\``;
             }).replace(/\n\n([^`]*?)\n\n/gs, "\n```\n$1\n```\n");
             // Render the text
             this.ContentContainer.html(MarkdownToHTML(Content));

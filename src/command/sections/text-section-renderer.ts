@@ -25,8 +25,8 @@ export class TextSectionRenderer extends SectionRenderer {
         var Content = Section.Content ?? "";
         // Post-process the text
         Content = Content.replace(/\'([^`^\n]+?)\'/g, (Match) => {
-            if (Match.startsWith("'s ")) return Match;
-            return `\`${Match.substring(1, Match.length - 2)}\``; 
+            if (Match.length == 3 || Match.match(/\'\S /g)) return Match;
+            return `\`${Match.substring(1, Match.length - 1)}\``; 
         }).replace(/\n\n([^`]*?)\n\n/gs, "\n```\n$1\n```\n");
         // Render the text
         this.ContentContainer.html(MarkdownToHTML(Content));

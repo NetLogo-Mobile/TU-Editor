@@ -1,5 +1,4 @@
 import { Localized } from "../../../CodeMirror-NetLogo/src/editor";
-import { OutputDisplay } from "../command/displays/output";
 import { TurtleEditor } from "../main";
 import { Toast } from "./dialog";
 
@@ -16,11 +15,7 @@ export function NumberToHex(Value: number) {
 /** CopyCode: Copy a code snippet to the clipboard. */
 export function CopyCode(Code: string) {
     Code = Code.trim();
-    if (Code.indexOf("\n") === -1) {
-        OutputDisplay.Instance.Tab.SetCode("observer", Code);
-        OutputDisplay.Instance.Tab.Galapagos.Focus();
-        Toast("success", Localized.Get("Press enter to execute again"));
-    } else Toast("success", Localized.Get("Copied to clipboard"));
+    Toast("success", Localized.Get("Copied to clipboard"));
     try {
         navigator.clipboard.writeText(Code);
     } catch {

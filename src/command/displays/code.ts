@@ -69,6 +69,7 @@ export class CodeDisplay extends Display {
 		// Show the output tab as well
 		this.Tab.Outputs.Show();
 		this.Tab.Outputs.Container.addClass("code-enabled");
+		this.Editor.SyncContext(this.Tab.Galapagos);
 		// Show myself
         $(this.Container).show();
         this.Visible = true;
@@ -79,6 +80,7 @@ export class CodeDisplay extends Display {
 		if (!this.Visible) return;
         $(this.Container).hide();
 		this.Tab.Outputs.Container.removeClass("code-enabled");
+		this.Tab.Editor.EditorTabs[0].Galapagos.SyncContext(this.Tab.Galapagos);
         this.Visible = false;
 		this.Editor.SetVisible(false);
 	}
@@ -200,7 +202,7 @@ export class CodeDisplay extends Display {
 		};
 	}
 	/** Play: Try to play the code. */
-	public Play() {
+	public Play(Callback?: () => void) {
 		if (this.Tab.Disabled) return;
 		// Hide the previous successful and uneventful execution
 		var LastSubthread = this.Tab.Outputs.Subthread;
@@ -208,16 +210,25 @@ export class CodeDisplay extends Display {
 			var LastRecord = LastSubthread.Children[LastSubthread.Children.length - 1] as RecordRenderer;
 			var LastData = LastRecord.GetData();
 			if (LastData.Operation === "Execute" && LastRecord.Children.length >= 2) {
-				var FirstType = (LastRecord.Children[1] as SectionRenderer).GetData().Type;
+				var FirstType = (LastRecord.Children[LastRecord.Children.length] as SectionRenderer).GetData().Type;
 				if (FirstType === ChatResponseType.Finish || FirstType === ChatResponseType.Text)
 					LastRecord.Container.hide();
-			}
+			} else if (LastData.Operation === "TryExecute")
+				LastRecord.Container.hide();
 		}
 		// Create a new record
 		var Record = this.Tab.Outputs.RenderRequest(Localized.Get("Trying to run the code"), this.Record);
+		Record.GetData().Operation = "TryExecute";
 		Record.GetData().Transparent = true;
 		// Try to play the code
 		this.TryTo(() => {
+			// Custom callback
+			if (Callback !== undefined) {
+				Callback();
+				Record.Container.hide();
+				return;
+			}
+			// Get the code
 			var Mode = this.Editor.Semantics.GetRecognizedMode();
 			var Code = this.Editor.GetCode().trim();
 			if (Code === "") return;

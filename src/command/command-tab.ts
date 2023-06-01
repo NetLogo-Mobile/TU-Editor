@@ -12,6 +12,7 @@ import { CodeArguments } from "./renderers/arguments-renderer";
 import { ChatResponseType } from "../chat/client/chat-response";
 import { RuntimeError } from "../../../CodeMirror-NetLogo/src/lang/linters/runtime-linter";
 import { ErrorsToDiagnostics } from "../utils/netlogo";
+import { ChangeTopic } from "../chat/client/options/option-templates";
 
 declare const { bodyScrollLock, EditorDictionary }: any;
 
@@ -173,6 +174,11 @@ export class CommandTab extends Tab {
 			this.Reset();
 			return;
 		}
+		// Execute
+		var Execute = (Objective: string, Content: string, Temporary: boolean) => {
+			this.SetDisabled(true);
+			this.ExecuteInput(Objective, Content, Temporary);
+		};
 		// Check if it is a command
 		if (!Chatable || (Objective != "chat" && Content != "help" && !Content.startsWith("help ") && !/^[\d\.]+$/.test(Content))) {
 			// Parse the code
@@ -180,17 +186,16 @@ export class CommandTab extends Tab {
 			let Diagnostics = await this.Galapagos.ForceLintAsync();
 			let Mode = this.Galapagos.Semantics.GetRecognizedMode();
 			// Check if the context is temporary
-			// TODO: Compile first if haven't done it yet.
 			var Temporary = this.Codes.Visible;
 			// If there is no linting issues, assume it is code snippet
-			if (Diagnostics.length == 0) {
+			if (Diagnostics.length == 0 || !Chatable) {
 				if (Mode == "Reporter" || Mode == "Unknown") Content = `show ${Content}`;
-				this.SetDisabled(true);
-				this.ExecuteInput(Objective, Content, Temporary);
-				return;
-			} else if (!Chatable) {
-				this.SetDisabled(true);
-				this.ExecuteInput(Objective, Content, Temporary);
+				// Try to compile first, if it is in a temporary context
+				if (Temporary) {
+					this.Codes.Play(() => Execute(Objective, Content, Temporary));
+				} else {
+					Execute(Objective, Content, false);
+				}
 				return;
 			}
 		}
@@ -283,7 +288,18 @@ export class CommandTab extends Tab {
 		Record.Operation = "Execute";
 		this.Outputs.ScrollToBottom();
 		// Check if we really could execute
-		this.Editor.CheckExecution();
+		this.CheckExecution();
+	}
+	/** CheckExecution: Check whether the execution is allowed. Otherwise, display a message. */
+	public CheckExecution() {
+	  if (!TurtleEditor.PostMessage) {
+		this.Outputs.RenderResponses([{
+		  Type: ChatResponseType.Text,
+		  Content: Localized.Get("Please download Turtle Universe")
+		}], true);
+		this.Outputs.RenderOptions([ ChangeTopic() ]);
+		this.SetDisabled(false);
+	  }
 	}
     /** ExecuteProcedure: Execute the procedure. */
     public ExecuteProcedure(Procedure: Procedure, IsTemporary: boolean): void {

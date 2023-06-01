@@ -38,7 +38,10 @@ export class ProceduresRenderer extends JSONSectionRenderer<ProcedureMetadata> {
     private RenderProcedure(Renderer: JQuery<HTMLElement>, Metadata: ProcedureMetadata, Procedure: Procedure) {
         var Renderer = $("<li></li>").appendTo(this.ContentContainer);
         $("<a></a>").appendTo(Renderer).text(`${Localized.Get(Procedure.IsCommand ? "Run command" : "Run reporter")} ${Procedure.Name}`)
-            .on("click", () => Metadata.Callback?.(Procedure));
+            .on("click", () => {
+                Metadata.Callback?.(Procedure);
+                this.Parent?.Container.hide();
+            });
         if (Procedure.Arguments.length > 0)
             $("<p></p>").appendTo(Renderer).text(`${Localized.Get("Arguments", Procedure.Arguments.length)}: ${Procedure.Arguments.join(", ")}`);
     }

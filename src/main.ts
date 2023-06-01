@@ -92,16 +92,6 @@ export class TurtleEditor {
 			Breeds: Breeds
 		}
 	}
-  /** CheckExecution: Check whether the execution is allowed. Otherwise, display a message. */
-  public CheckExecution() {
-    if (!TurtleEditor.PostMessage) {
-      this.CommandTab.Outputs.RenderResponses([{
-        Type: ChatResponseType.Text,
-        Content: Localized.Get("Please download Turtle Universe")
-      }], true);
-      this.CommandTab.SetDisabled(false);
-    }
-  }
 	// #endregion
 
   // #region "Editor Statuses"

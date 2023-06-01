@@ -430,12 +430,14 @@
 	margin: 0.5rem 0;
 }
 
-.command-output ul {
+.command-output ul,
+.command-output ol {
 	margin: 0;
 	padding: 0;
 }
 
-.command-output ul li {
+.command-output ul li,
+.command-output ol li {
 	margin: 0.1rem 0 0 1rem;
 }
 

@@ -23,6 +23,8 @@ export class NetLogoUtils {
 	public static HighlightCode(Content: string): [HTMLElement, string] {
         this.SharedEditor.SetCode(Content);
         this.SharedEditor.Semantics.PrettifyAll();
+		// TODO: Remove it when it is done
+        this.SharedEditor.SetCode(this.SharedEditor.GetCode().trim());
         var Element = this.SharedEditor.Semantics.Highlight();
 		return [Element, Content];
 	}

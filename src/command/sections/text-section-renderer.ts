@@ -3,6 +3,7 @@ import { MarkdownToHTML, PostprocessHTML } from "../../utils/element";
 import { CopyCode } from "../../utils/misc";
 import { NetLogoUtils } from "../../utils/netlogo";
 import { OutputDisplay } from "../displays/output";
+import { RecordRenderer } from "../outputs/record-renderer";
 import { UIRendererOf } from "../outputs/ui-renderer";
 import { SectionRenderer } from "./section-renderer";
 
@@ -23,11 +24,13 @@ export class TextSectionRenderer extends SectionRenderer {
     protected RenderInternal(): void {
         var Section = this.GetData();
         var Content = Section.Content ?? "";
-        // Post-process the text
-        Content = Content.replace(/\'([^`^\n]+?)\'/g, (Match) => {
-            if (Match.length == 3 || Match.match(/\'\S /g)) return Match;
-            return `\`${Match.substring(1, Match.length - 1)}\``; 
-        }).replace(/\n\n([^`]*?)\n\n/gs, "\n```\n$1\n```\n");
+        // Only post-process when it is finalized & sent by AI
+        if (this.Finalized && this.GetRecord().Operation) {
+            Content = Content.replace(/\'([^`^\n]+?)\'/g, (Match) => {
+                if (Match.length == 3 || Match.match(/\'\S /g)) return Match;
+                return `\`${Match.substring(1, Match.length - 1)}\``; 
+            }).replace(/\n\n([^`]*?)\n\n/gs, "\n```\n$1\n```\n");
+        }
         // Render the text
         this.ContentContainer.html(MarkdownToHTML(Content));
         PostprocessHTML(OutputDisplay.Instance.Tab.Editor, this.ContentContainer);

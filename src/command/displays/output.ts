@@ -13,6 +13,7 @@ import { ErrorsToDiagnostics } from "../../utils/netlogo";
 import { DiagnosticType } from "../../chat/client/languages/netlogo-context";
 import { GenerateObjectID } from "../../utils/misc";
 import { CodeSectionRenderer } from "../sections/code-section-renderer";
+import { AskCode, ChangeTopic } from "../../chat/client/options/option-templates";
 
 /** OutputDisplay: Display the output section. */
 export class OutputDisplay extends Display {
@@ -199,6 +200,10 @@ export class OutputDisplay extends Display {
 		} else {
 			this.PrintOutput(Status, Message);
 			this.RestartBatch();
+			if (ChatManager.Available) {
+				this.RenderOptions([ AskCode() ]);
+				this.RenderOptions([ ChangeTopic() ]);
+			}
 			this.RenderResponses([], true);
 		}
 		this.Tab.SetDisabled(false);

@@ -105,7 +105,7 @@ export function PostprocessHTML(Editor: TurtleEditor, Source: JQuery<HTMLElement
             if (Target.startsWith("//")) Target = Target.slice(2);
             if (["observer", "turtles", "patches", "links", "help"].indexOf(Scheme) !== -1) {
                 // Handle commands
-                Current.on("click", () => { 
+                Current.on("click", () => {
                     if (!Editor.CommandTab.Disabled) Editor.CommandTab.ExecuteCommand(Scheme, Target, false);
                 });
             } else if (Current.hasClass("external") || Href.match(/^(https?:)?\/\/([^.]*?\.|)(turtlesim.com|hicivitas.com|northwestern.edu|netlogoweb.org)\//)) {

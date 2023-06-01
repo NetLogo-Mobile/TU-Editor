@@ -210,7 +210,7 @@ export class CodeDisplay extends Display {
 			var LastRecord = LastSubthread.Children[LastSubthread.Children.length - 1] as RecordRenderer;
 			var LastData = LastRecord.GetData();
 			if (LastData.Operation === "Execute" && LastRecord.Children.length >= 2) {
-				var FirstType = (LastRecord.Children[LastRecord.Children.length] as SectionRenderer).GetData().Type;
+				var FirstType = (LastRecord.Children[1] as SectionRenderer).GetData().Type;
 				if (FirstType === ChatResponseType.Finish || FirstType === ChatResponseType.Text)
 					LastRecord.Container.hide();
 			} else if (LastData.Operation === "TryExecute")

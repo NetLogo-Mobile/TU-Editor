@@ -32,8 +32,6 @@ export declare class TurtleEditor {
     ProjectName?: string;
     /** GetContext: Get the NetLogo context. */
     GetContext(): NetLogoContext;
-    /** CheckExecution: Check whether the execution is allowed. Otherwise, display a message. */
-    CheckExecution(): void;
     /** Resize: Resize the viewport width (on mobile platforms) */
     Resize(Ratio: number): void;
     /** ToggleDark: Toggle the dark mode. */

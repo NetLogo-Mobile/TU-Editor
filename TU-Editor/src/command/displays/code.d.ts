@@ -57,7 +57,7 @@ export declare class CodeDisplay extends Display {
     /** Fix: Try to fix the code. */
     ExportDiagnostics(): Promise<Diagnostics>;
     /** Play: Try to play the code. */
-    Play(): void;
+    Play(Callback?: () => void): void;
     /** PlayProcedures: Try to play the available procedures after compilation. */
     private PlayProcedures;
     /** AddToCode: Add the code to the main editor. */

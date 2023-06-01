@@ -73,6 +73,8 @@ export declare class CommandTab extends Tab {
     private ExecuteInput;
     /** ExecuteCommand: Execute a command. */
     ExecuteCommand(Objective: string, Content: string, IsTemporary: boolean, Restart?: boolean): void;
+    /** CheckExecution: Check whether the execution is allowed. Otherwise, display a message. */
+    CheckExecution(): void;
     /** ExecuteProcedure: Execute the procedure. */
     ExecuteProcedure(Procedure: Procedure, IsTemporary: boolean): void;
     /** ExecuteProcedureWithArguments: Execute the procedure with arguments. */

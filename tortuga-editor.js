@@ -1,6 +1,87 @@
 (function (exports) {
     'use strict';
 
+    /** NewChatResponse: Creates a new chat response. */
+    /** ChatResponseType: The type for the chat response. */
+    var ChatResponseType;
+    (function (ChatResponseType) {
+        /** Start: The response is a start message. */
+        ChatResponseType[ChatResponseType["Start"] = -1] = "Start";
+        /** Finish: The response is a finish message. */
+        ChatResponseType[ChatResponseType["Finish"] = -2] = "Finish";
+        /** Text: The response is a text block. */
+        ChatResponseType[ChatResponseType["Text"] = 0] = "Text";
+        /** Code: The response is a code block. */
+        ChatResponseType[ChatResponseType["Code"] = 1] = "Code";
+        /** JSON: The response is a JSON block. */
+        ChatResponseType[ChatResponseType["JSON"] = 2] = "JSON";
+        /** Thought: The response is a thought block. */
+        ChatResponseType[ChatResponseType["Thought"] = 3] = "Thought";
+        /** CompileError: The response is a compile error message. */
+        ChatResponseType[ChatResponseType["CompileError"] = 4] = "CompileError";
+        /** RuntimeError: The response is a runtime error message. */
+        ChatResponseType[ChatResponseType["RuntimeError"] = 5] = "RuntimeError";
+        /** ServerError: The response is a server error message. */
+        ChatResponseType[ChatResponseType["ServerError"] = 6] = "ServerError";
+    })(ChatResponseType || (ChatResponseType = {}));
+    /** IsTextLike: Returns true if the section is text-like. */
+    function IsTextLike(Section) {
+        return Section.Type == ChatResponseType.Text || Section.Type == ChatResponseType.CompileError || Section.Type == ChatResponseType.RuntimeError;
+    }
+    /** ExcludeCode: Returns true if the section is not code-like. */
+    function ExcludeCode(Section) {
+        var _a, _b;
+        return Section.Type != ChatResponseType.Code && Section.Type != ChatResponseType.RuntimeError && !((_b = (_a = Section.Field) === null || _a === void 0 ? void 0 : _a.startsWith("__")) !== null && _b !== void 0 ? _b : true);
+    }
+    /** SectionsToJSON: Serialize a number of sections to JSON5. */
+    function SectionsToJSON(Sections) {
+        var _a;
+        var Result = "{";
+        for (var Section of Sections) {
+            Result += `${(_a = Section.Field) !== null && _a !== void 0 ? _a : ChatResponseType[Section.Type]}:${Section.Type == ChatResponseType.JSON ? Section.Content : JSON.stringify(Section.Content)}`;
+            if (Section != Sections[Sections.length - 1])
+                Result += ",\n";
+        }
+        return Result + "}";
+    }
+
+    /** ChatThread: Record a conversation between human-AI. */
+    class ChatThread {
+        constructor() {
+            /** Records: The chat records of the thread. */
+            this.Records = {};
+            /** Subthreads: The subthreads of the conversation. */
+            this.Subthreads = [];
+        }
+        /** GetRecord: Get a record by its parent ID. */
+        GetRecord(ParentID) {
+            if (!ParentID)
+                return undefined;
+            return this.Records[ParentID];
+        }
+        /** GetSubthread: Get a specific subthread. */
+        GetSubthread(RootID) {
+            return this.Subthreads.find((Subthread) => Subthread.RootID === RootID);
+        }
+        /** AddToSubthread: Add a record to a subthread. */
+        AddToSubthread(Record) {
+            // Find the parent
+            var Parent = Record;
+            while (Parent.ParentID) {
+                Parent = this.Records[Parent.ParentID];
+            }
+            // Find or create a subthread
+            var Subthread = this.Subthreads.find((Subthread) => (Subthread.RootID === Parent.ID && Subthread.RootID !== undefined) || Subthread.Records[0] === Parent);
+            if (!Subthread) {
+                Subthread = { RootID: Parent.ID, Records: [] };
+                this.Subthreads.push(Subthread);
+            }
+            // Add the record
+            Subthread.Records.push(Record);
+            return Subthread;
+        }
+    }
+
     /******************************************************************************
     Copyright (c) Microsoft Corporation.
 
@@ -25,6 +106,265 @@
             step((generator = generator.apply(thisArg, _arguments || [])).next());
         });
     }
+
+    /** SSEClient: A simple client for handling Server-Sent Events. */
+    class SSEClient {
+        /** Constructor: Create a new SSEClient instance. */
+        constructor(url, authorization, payload) {
+            this.url = url;
+            this.authorization = authorization;
+            this.lastEventId = '';
+            this.payload = JSON.stringify(payload);
+            this.Request = new XMLHttpRequest();
+        }
+        /**
+         * Listen: Start listening to the SSE stream
+         * @param {Function} onMessage Callback function for handling the received message
+         */
+        Listen(onMessage, onError) {
+            this.Request.open('POST', this.url, true);
+            this.Request.setRequestHeader('Cache-Control', 'no-cache');
+            this.Request.setRequestHeader('Content-Type', 'application/json');
+            this.Request.setRequestHeader('Authorization', `Bearer ${this.authorization}`);
+            this.Request.setRequestHeader('Accept', 'text/event-stream');
+            // If we have a last event ID, set the header to resume from that point
+            if (this.lastEventId) {
+                this.Request.setRequestHeader('Last-Event-ID', this.lastEventId);
+            }
+            // Handle the received message
+            var responseCursor = 0;
+            this.Request.onreadystatechange = () => {
+                if (this.Request.status === 200) {
+                    const messages = this.Request.responseText.substring(responseCursor).trim().split('\n\n');
+                    responseCursor = this.Request.responseText.length;
+                    messages.forEach((message) => {
+                        const data = this.parseMessage(message);
+                        if (data) {
+                            this.lastEventId = data.id;
+                            onMessage(data);
+                        }
+                    });
+                }
+                else {
+                    onError.call(this.Request);
+                }
+            };
+            // Handle errors
+            this.Request.onerror = onError;
+            this.Request.send(this.payload);
+        }
+        /** Close: Stop listening to the SSE stream. */
+        Close() {
+            if (this.Request) {
+                this.Request.abort();
+            }
+        }
+        /**
+         * parseMessage: Parse the received message from the SSE stream
+         * @param {string} message The raw message received from the SSE stream
+         * @returns {StreamData | null} The parsed message as a StreamData object or null if the message is empty
+         */
+        parseMessage(message) {
+            if (!message)
+                return null;
+            const lines = message.split('\n');
+            const data = {
+                id: '',
+                event: '',
+                data: '',
+            };
+            lines.forEach((line) => {
+                const index = line.indexOf(':');
+                var key = line.substring(0, index).trim();
+                var value = line.substring(index + 1).trim();
+                switch (key) {
+                    case 'id':
+                        data.id = value;
+                        break;
+                    case 'event':
+                        data.event = value;
+                        break;
+                    case 'data':
+                        data.data = value;
+                        break;
+                }
+            });
+            return data;
+        }
+    }
+
+    /** ChatNetwork: Class that handles the network communication for the chat. */
+    class ChatNetwork {
+        /** SendRequest: Send a request to the chat backend and handle its outputs. */
+        static SendRequest(Record, Thread, NewSection, UpdateSection, FinishSection) {
+            var _a, _b;
+            return __awaiter(this, void 0, void 0, function* () {
+                // Build the record
+                Record.UserID = Thread.UserID;
+                Record.ThreadID = Thread.ID;
+                Record.Transparent = (_b = (_a = Record.Option) === null || _a === void 0 ? void 0 : _a.Transparent) !== null && _b !== void 0 ? _b : false;
+                Record.Response = { Sections: [], Options: [] };
+                Record.RequestTimestamp = Date.now();
+                // Do the request
+                return new Promise((Resolve, Reject) => {
+                    var Update = {};
+                    var Section = {};
+                    var Client = new SSEClient(`${ChatNetwork.Domain}request`, "", Record);
+                    // Finish the section if possible
+                    var TryFinishSection = () => {
+                        if (Section.Type !== undefined) {
+                            if (Section.Type === ChatResponseType.JSON && Section.Content && !Section.Parsed) {
+                                if (Section.Content.endsWith(","))
+                                    Section.Content = `[${Section.Content.substring(0, Section.Content.length - 1)}]`;
+                                Section.Parsed = ChatNetwork.TryParse(Section.Content);
+                            }
+                            Record.Response.Sections.push(Section);
+                            FinishSection(Section);
+                        }
+                    };
+                    // Parse an element in the array if possible
+                    var TryParseElement = () => {
+                        var _a;
+                        if (Section.Type === ChatResponseType.JSON && Update.Content && Update.Content.endsWith("},")) {
+                            Section.Parsed = (_a = Section.Parsed) !== null && _a !== void 0 ? _a : [];
+                            Section.Parsed.push(ChatNetwork.TryParse(Update.Content.substring(0, Update.Content.length - 1)));
+                        }
+                    };
+                    // Try to parse an update
+                    var TryParseUpdate = () => {
+                        switch (Update.Type) {
+                            case ChatResponseType.Start:
+                                if (Update.Edited && Update.Content) {
+                                    Record.ID = Update.Content;
+                                    Record.ThreadID = Update.Edited;
+                                    Thread.ID = Update.Edited;
+                                }
+                                else {
+                                    switch (Update.Field) {
+                                        case "Language":
+                                            Record.Language = Update.Content;
+                                            Thread.Language = Update.Content;
+                                            break;
+                                        case "Transparent":
+                                            Record.Transparent = Update.Content === "true";
+                                            break;
+                                    }
+                                }
+                                return;
+                            case ChatResponseType.Finish:
+                                TryFinishSection();
+                                Record.ResponseTimestamp = Date.now();
+                                Thread.Records[Record.ID] = Record;
+                                Resolve(Record);
+                                return;
+                            case undefined:
+                                break;
+                            default:
+                                TryFinishSection();
+                                Section = Update;
+                                TryParseElement();
+                                NewSection(Section);
+                                // Irrecoverable error completes the section
+                                if (Section.Type === ChatResponseType.ServerError && Section.Field == "Irrecoverable") {
+                                    Record.ResponseTimestamp = Date.now();
+                                    Thread.Records[Record.ID] = Record;
+                                    Resolve(Record);
+                                }
+                                return;
+                        }
+                        // Update the section
+                        if (Update.Content !== undefined)
+                            Section.Content += Update.Content;
+                        if (Update.Field !== undefined)
+                            Section.Field = Update.Field;
+                        if (Update.Options !== undefined)
+                            Record.Response.Options.push(...Update.Options);
+                        TryParseElement();
+                        UpdateSection(Section);
+                    };
+                    // Send the request
+                    Client.Listen((Data) => {
+                        var Raw;
+                        // Pause the update
+                        try {
+                            Raw = JSON.parse(Data.data);
+                        }
+                        catch (Exception) {
+                            console.log("Error: " + Data.data);
+                            return;
+                        }
+                        // Handle the update
+                        if (Array.isArray(Raw)) {
+                            Raw.forEach(Current => {
+                                Update = Current;
+                                TryParseUpdate();
+                            });
+                        }
+                        else {
+                            Update = Raw;
+                            TryParseUpdate();
+                        }
+                    }, (Error) => {
+                        console.log("Server Error: " + Error);
+                        Reject(Error);
+                    });
+                });
+            });
+        }
+        /** TryParse: Try to parse a JSON5 string. */
+        static TryParse(Source) {
+            try {
+                return JSON5.parse(Source);
+            }
+            catch (Exception) {
+                console.log(Source);
+                console.log(Exception);
+                return {};
+            }
+        }
+    }
+    /** Domain: The domain of the chat backend. */
+    ChatNetwork.Domain = "";
+
+    /** ChatRole: The role of the speaker. */
+    var ChatRole;
+    (function (ChatRole) {
+        /** System: The system. */
+        ChatRole["System"] = "system";
+        /** User: The user. */
+        ChatRole["User"] = "user";
+        /** Assistant: The assistant. */
+        ChatRole["Assistant"] = "assistant";
+    })(ChatRole || (ChatRole = {}));
+
+    /** ContextMessage: How to inherit an output message for the context. */
+    var ContextMessage;
+    (function (ContextMessage) {
+        /** Nothing: Nothing should be retained. */
+        ContextMessage[ContextMessage["Nothing"] = 0] = "Nothing";
+        /** TextOnly: Only text messages should be retained, in a text format. */
+        ContextMessage[ContextMessage["MessagesAsText"] = 1] = "MessagesAsText";
+        /** MessagesAsJSON: Only text messages should be retained, in a JSON format. */
+        ContextMessage[ContextMessage["MessagesAsJSON"] = 2] = "MessagesAsJSON";
+        /** FirstJSON: Only the first JSON message should be retained. */
+        ContextMessage[ContextMessage["FirstJSON"] = 3] = "FirstJSON";
+        /** AllAsJSON: Except for the code, all should be retained in a JSON format. */
+        ContextMessage[ContextMessage["AllAsJSON"] = 4] = "AllAsJSON";
+    })(ContextMessage || (ContextMessage = {}));
+    /** ContextInheritance: How to inherit the parent context. */
+    var ContextInheritance;
+    (function (ContextInheritance) {
+        /** Drop: Drop the context. */
+        ContextInheritance[ContextInheritance["Drop"] = 0] = "Drop";
+        /** InheritOne: Only inherit the current message segment. */
+        ContextInheritance[ContextInheritance["InheritOne"] = 1] = "InheritOne";
+        /** InheritParent: Only inherit the current message segment and its parent context. */
+        ContextInheritance[ContextInheritance["InheritParent"] = 2] = "InheritParent";
+        /** InheritRecursive: Inherit the current message segment and its parent context, recursively based on the parent's strategy. */
+        ContextInheritance[ContextInheritance["InheritRecursive"] = 3] = "InheritRecursive";
+        /** InheritEntire: Inherit the entire context. */
+        ContextInheritance[ContextInheritance["InheritEntire"] = 4] = "InheritEntire";
+    })(ContextInheritance || (ContextInheritance = {}));
 
     /**
     The data structure for documents. @nonabstract
@@ -25714,7 +26054,7 @@
             let foundText = false;
             let seenBracket = false;
             let nextToken = '';
-            while (isValidKeyword(input.peek(offset)) || !foundText) {
+            while (offset < 100 && (isValidKeyword(input.peek(offset)) || !foundText)) {
                 if (isValidKeyword(input.peek(offset))) {
                     nextToken += String.fromCharCode(input.peek(offset));
                     foundText = true;
@@ -32695,15 +33035,24 @@
             });
         }
         /** AddChild: Add a child editor. */
-        AddChild(child) {
-            if (child.Children.length > 0)
+        AddChild(Child) {
+            if (Child.Children.length > 0)
                 throw new Error('Cannot add an editor that already has children as child.');
-            this.Children.push(child);
-            child.ID = this.Children.length;
-            child.ParentEditor = this;
-            child.PreprocessContext = this.PreprocessContext;
-            child.LintContext = this.LintContext;
-            child.GetPreprocessState().Context = this.PreprocessContext;
+            this.Children.push(Child);
+            Child.ID = this.Children.length;
+            Child.ParentEditor = this;
+            // Generative editors are sort of independent
+            if (Child.Options.ParseMode !== ParseMode.Generative) {
+                Child.LintContext = this.LintContext;
+                Child.PreprocessContext = this.PreprocessContext;
+                Child.GetPreprocessState().Context = this.PreprocessContext;
+            }
+        }
+        /** SyncContext: Sync the context of the child editor. */
+        SyncContext(Child) {
+            Child.LintContext = this.LintContext;
+            Child.PreprocessContext = this.PreprocessContext;
+            Child.GetPreprocessState().Context = this.PreprocessContext;
         }
         /** Blur: Make the editor lose the focus (if any). */
         Blur() {
@@ -32878,11 +33227,6 @@
                 }
             }
             this.RefreshContexts();
-            //if (this.Options.ParseMode == ParseMode.Normal) {
-            //console.log(new Error().stack);
-            //console.log(this.GetCode());
-            //console.log(JSON.parse(JSON.stringify(this.LintContext.Breeds)));
-            //}
         }
         /** RefreshContexts: Refresh contexts of the editor. */
         RefreshContexts() {
@@ -32989,346 +33333,6 @@
         window.EditorLocalized = Localized;
     }
     catch (error) { }
-
-    /** NewChatResponse: Creates a new chat response. */
-    /** ChatResponseType: The type for the chat response. */
-    var ChatResponseType;
-    (function (ChatResponseType) {
-        /** Start: The response is a start message. */
-        ChatResponseType[ChatResponseType["Start"] = -1] = "Start";
-        /** Finish: The response is a finish message. */
-        ChatResponseType[ChatResponseType["Finish"] = -2] = "Finish";
-        /** Text: The response is a text block. */
-        ChatResponseType[ChatResponseType["Text"] = 0] = "Text";
-        /** Code: The response is a code block. */
-        ChatResponseType[ChatResponseType["Code"] = 1] = "Code";
-        /** JSON: The response is a JSON block. */
-        ChatResponseType[ChatResponseType["JSON"] = 2] = "JSON";
-        /** Thought: The response is a thought block. */
-        ChatResponseType[ChatResponseType["Thought"] = 3] = "Thought";
-        /** CompileError: The response is a compile error message. */
-        ChatResponseType[ChatResponseType["CompileError"] = 4] = "CompileError";
-        /** RuntimeError: The response is a runtime error message. */
-        ChatResponseType[ChatResponseType["RuntimeError"] = 5] = "RuntimeError";
-        /** ServerError: The response is a server error message. */
-        ChatResponseType[ChatResponseType["ServerError"] = 6] = "ServerError";
-    })(ChatResponseType || (ChatResponseType = {}));
-    /** IsTextLike: Returns true if the section is text-like. */
-    function IsTextLike(Section) {
-        return Section.Type == ChatResponseType.Text || Section.Type == ChatResponseType.CompileError || Section.Type == ChatResponseType.RuntimeError;
-    }
-    /** ExcludeCode: Returns true if the section is not code-like. */
-    function ExcludeCode(Section) {
-        var _a, _b;
-        return Section.Type != ChatResponseType.Code && Section.Type != ChatResponseType.RuntimeError && !((_b = (_a = Section.Field) === null || _a === void 0 ? void 0 : _a.startsWith("__")) !== null && _b !== void 0 ? _b : true);
-    }
-    /** SectionsToJSON: Serialize a number of sections to JSON5. */
-    function SectionsToJSON(Sections) {
-        var _a;
-        var Result = "{";
-        for (var Section of Sections) {
-            Result += `${(_a = Section.Field) !== null && _a !== void 0 ? _a : ChatResponseType[Section.Type]}:${Section.Type == ChatResponseType.JSON ? Section.Content : JSON.stringify(Section.Content)}`;
-            if (Section != Sections[Sections.length - 1])
-                Result += ",\n";
-        }
-        return Result + "}";
-    }
-
-    /** ChatThread: Record a conversation between human-AI. */
-    class ChatThread {
-        constructor() {
-            /** Records: The chat records of the thread. */
-            this.Records = {};
-            /** Subthreads: The subthreads of the conversation. */
-            this.Subthreads = [];
-        }
-        /** GetRecord: Get a record by its parent ID. */
-        GetRecord(ParentID) {
-            if (!ParentID)
-                return undefined;
-            return this.Records[ParentID];
-        }
-        /** GetSubthread: Get a specific subthread. */
-        GetSubthread(RootID) {
-            return this.Subthreads.find((Subthread) => Subthread.RootID === RootID);
-        }
-        /** AddToSubthread: Add a record to a subthread. */
-        AddToSubthread(Record) {
-            // Find the parent
-            var Parent = Record;
-            while (Parent.ParentID) {
-                Parent = this.Records[Parent.ParentID];
-            }
-            // Find or create a subthread
-            var Subthread = this.Subthreads.find((Subthread) => (Subthread.RootID === Parent.ID && Subthread.RootID !== undefined) || Subthread.Records[0] === Parent);
-            if (!Subthread) {
-                Subthread = { RootID: Parent.ID, Records: [] };
-                this.Subthreads.push(Subthread);
-            }
-            // Add the record
-            Subthread.Records.push(Record);
-            return Subthread;
-        }
-    }
-
-    /** SSEClient: A simple client for handling Server-Sent Events. */
-    class SSEClient {
-        /** Constructor: Create a new SSEClient instance. */
-        constructor(url, authorization, payload) {
-            this.url = url;
-            this.authorization = authorization;
-            this.lastEventId = '';
-            this.payload = JSON.stringify(payload);
-            this.Request = new XMLHttpRequest();
-        }
-        /**
-         * Listen: Start listening to the SSE stream
-         * @param {Function} onMessage Callback function for handling the received message
-         */
-        Listen(onMessage, onError) {
-            this.Request.open('POST', this.url, true);
-            this.Request.setRequestHeader('Cache-Control', 'no-cache');
-            this.Request.setRequestHeader('Content-Type', 'application/json');
-            this.Request.setRequestHeader('Authorization', `Bearer ${this.authorization}`);
-            this.Request.setRequestHeader('Accept', 'text/event-stream');
-            // If we have a last event ID, set the header to resume from that point
-            if (this.lastEventId) {
-                this.Request.setRequestHeader('Last-Event-ID', this.lastEventId);
-            }
-            // Handle the received message
-            var responseCursor = 0;
-            this.Request.onreadystatechange = () => {
-                if (this.Request.status === 200) {
-                    const messages = this.Request.responseText.substring(responseCursor).trim().split('\n\n');
-                    responseCursor = this.Request.responseText.length;
-                    messages.forEach((message) => {
-                        const data = this.parseMessage(message);
-                        if (data) {
-                            this.lastEventId = data.id;
-                            onMessage(data);
-                        }
-                    });
-                }
-                else {
-                    onError.call(this.Request);
-                }
-            };
-            // Handle errors
-            this.Request.onerror = onError;
-            this.Request.send(this.payload);
-        }
-        /** Close: Stop listening to the SSE stream. */
-        Close() {
-            if (this.Request) {
-                this.Request.abort();
-            }
-        }
-        /**
-         * parseMessage: Parse the received message from the SSE stream
-         * @param {string} message The raw message received from the SSE stream
-         * @returns {StreamData | null} The parsed message as a StreamData object or null if the message is empty
-         */
-        parseMessage(message) {
-            if (!message)
-                return null;
-            const lines = message.split('\n');
-            const data = {
-                id: '',
-                event: '',
-                data: '',
-            };
-            lines.forEach((line) => {
-                const index = line.indexOf(':');
-                var key = line.substring(0, index).trim();
-                var value = line.substring(index + 1).trim();
-                switch (key) {
-                    case 'id':
-                        data.id = value;
-                        break;
-                    case 'event':
-                        data.event = value;
-                        break;
-                    case 'data':
-                        data.data = value;
-                        break;
-                }
-            });
-            return data;
-        }
-    }
-
-    /** ChatNetwork: Class that handles the network communication for the chat. */
-    class ChatNetwork {
-        /** SendRequest: Send a request to the chat backend and handle its outputs. */
-        static SendRequest(Record, Thread, NewSection, UpdateSection, FinishSection) {
-            var _a, _b;
-            return __awaiter(this, void 0, void 0, function* () {
-                // Build the record
-                Record.UserID = Thread.UserID;
-                Record.ThreadID = Thread.ID;
-                Record.Transparent = (_b = (_a = Record.Option) === null || _a === void 0 ? void 0 : _a.Transparent) !== null && _b !== void 0 ? _b : false;
-                Record.Response = { Sections: [], Options: [] };
-                Record.RequestTimestamp = Date.now();
-                // Do the request
-                return new Promise((Resolve, Reject) => {
-                    var Update = {};
-                    var Section = {};
-                    var Client = new SSEClient(`${ChatNetwork.Domain}request`, "", Record);
-                    // Finish the section if possible
-                    var TryFinishSection = () => {
-                        if (Section.Type !== undefined) {
-                            if (Section.Type === ChatResponseType.JSON && Section.Content && !Section.Parsed) {
-                                if (Section.Content.endsWith(","))
-                                    Section.Content = `[${Section.Content.substring(0, Section.Content.length - 1)}]`;
-                                Section.Parsed = ChatNetwork.TryParse(Section.Content);
-                            }
-                            Record.Response.Sections.push(Section);
-                            FinishSection(Section);
-                        }
-                    };
-                    // Parse an element in the array if possible
-                    var TryParseElement = () => {
-                        var _a;
-                        if (Section.Type === ChatResponseType.JSON && Update.Content && Update.Content.endsWith("},")) {
-                            Section.Parsed = (_a = Section.Parsed) !== null && _a !== void 0 ? _a : [];
-                            Section.Parsed.push(ChatNetwork.TryParse(Update.Content.substring(0, Update.Content.length - 1)));
-                        }
-                    };
-                    // Try to parse an update
-                    var TryParseUpdate = () => {
-                        switch (Update.Type) {
-                            case ChatResponseType.Start:
-                                if (Update.Edited && Update.Content) {
-                                    Record.ID = Update.Content;
-                                    Record.ThreadID = Update.Edited;
-                                    Thread.ID = Update.Edited;
-                                }
-                                else {
-                                    switch (Update.Field) {
-                                        case "Language":
-                                            Record.Language = Update.Content;
-                                            Thread.Language = Update.Content;
-                                            break;
-                                        case "Transparent":
-                                            Record.Transparent = Update.Content === "true";
-                                            break;
-                                    }
-                                }
-                                return;
-                            case ChatResponseType.Finish:
-                                TryFinishSection();
-                                Record.ResponseTimestamp = Date.now();
-                                Thread.Records[Record.ID] = Record;
-                                Resolve(Record);
-                                return;
-                            case undefined:
-                                break;
-                            default:
-                                TryFinishSection();
-                                Section = Update;
-                                TryParseElement();
-                                NewSection(Section);
-                                // Irrecoverable error completes the section
-                                if (Section.Type === ChatResponseType.ServerError && Section.Field == "Irrecoverable") {
-                                    Record.ResponseTimestamp = Date.now();
-                                    Thread.Records[Record.ID] = Record;
-                                    Resolve(Record);
-                                }
-                                return;
-                        }
-                        // Update the section
-                        if (Update.Content !== undefined)
-                            Section.Content += Update.Content;
-                        if (Update.Field !== undefined)
-                            Section.Field = Update.Field;
-                        if (Update.Options !== undefined)
-                            Record.Response.Options.push(...Update.Options);
-                        TryParseElement();
-                        UpdateSection(Section);
-                    };
-                    // Send the request
-                    Client.Listen((Data) => {
-                        var Raw;
-                        // Pause the update
-                        try {
-                            Raw = JSON.parse(Data.data);
-                        }
-                        catch (Exception) {
-                            console.log("Error: " + Data.data);
-                            return;
-                        }
-                        // Handle the update
-                        if (Array.isArray(Raw)) {
-                            Raw.forEach(Current => {
-                                Update = Current;
-                                TryParseUpdate();
-                            });
-                        }
-                        else {
-                            Update = Raw;
-                            TryParseUpdate();
-                        }
-                    }, (Error) => {
-                        console.log("Server Error: " + Error);
-                        Reject(Error);
-                    });
-                });
-            });
-        }
-        /** TryParse: Try to parse a JSON5 string. */
-        static TryParse(Source) {
-            try {
-                return JSON5.parse(Source);
-            }
-            catch (Exception) {
-                console.log(Source);
-                console.log(Exception);
-                return {};
-            }
-        }
-    }
-    /** Domain: The domain of the chat backend. */
-    ChatNetwork.Domain = "";
-
-    /** ChatRole: The role of the speaker. */
-    var ChatRole;
-    (function (ChatRole) {
-        /** System: The system. */
-        ChatRole["System"] = "system";
-        /** User: The user. */
-        ChatRole["User"] = "user";
-        /** Assistant: The assistant. */
-        ChatRole["Assistant"] = "assistant";
-    })(ChatRole || (ChatRole = {}));
-
-    /** ContextMessage: How to inherit an output message for the context. */
-    var ContextMessage;
-    (function (ContextMessage) {
-        /** Nothing: Nothing should be retained. */
-        ContextMessage[ContextMessage["Nothing"] = 0] = "Nothing";
-        /** TextOnly: Only text messages should be retained, in a text format. */
-        ContextMessage[ContextMessage["MessagesAsText"] = 1] = "MessagesAsText";
-        /** MessagesAsJSON: Only text messages should be retained, in a JSON format. */
-        ContextMessage[ContextMessage["MessagesAsJSON"] = 2] = "MessagesAsJSON";
-        /** FirstJSON: Only the first JSON message should be retained. */
-        ContextMessage[ContextMessage["FirstJSON"] = 3] = "FirstJSON";
-        /** AllAsJSON: Except for the code, all should be retained in a JSON format. */
-        ContextMessage[ContextMessage["AllAsJSON"] = 4] = "AllAsJSON";
-    })(ContextMessage || (ContextMessage = {}));
-    /** ContextInheritance: How to inherit the parent context. */
-    var ContextInheritance;
-    (function (ContextInheritance) {
-        /** Drop: Drop the context. */
-        ContextInheritance[ContextInheritance["Drop"] = 0] = "Drop";
-        /** InheritOne: Only inherit the current message segment. */
-        ContextInheritance[ContextInheritance["InheritOne"] = 1] = "InheritOne";
-        /** InheritParent: Only inherit the current message segment and its parent context. */
-        ContextInheritance[ContextInheritance["InheritParent"] = 2] = "InheritParent";
-        /** InheritRecursive: Inherit the current message segment and its parent context, recursively based on the parent's strategy. */
-        ContextInheritance[ContextInheritance["InheritRecursive"] = 3] = "InheritRecursive";
-        /** InheritEntire: Inherit the entire context. */
-        ContextInheritance[ContextInheritance["InheritEntire"] = 4] = "InheritEntire";
-    })(ContextInheritance || (ContextInheritance = {}));
 
     /** ChatManager: The interface for connecting to a chat backend. */
     class ChatManager {
@@ -35544,6 +35548,8 @@
         static HighlightCode(Content) {
             this.SharedEditor.SetCode(Content);
             this.SharedEditor.Semantics.PrettifyAll();
+            // TODO: Remove it when it is done
+            this.SharedEditor.SetCode(this.SharedEditor.GetCode().trim());
             var Element = this.SharedEditor.Semantics.Highlight();
             return [Element, Content];
         }
@@ -35955,6 +35961,19 @@
             Inheritance: ContextInheritance.Drop
         };
     }
+    /** AskCode: Ask a question about the code. */
+    function AskCode(Label, Style, Transparent) {
+        return {
+            Label: Label !== null && Label !== void 0 ? Label : "Can I ask a question?",
+            Style: Style !== null && Style !== void 0 ? Style : "followup",
+            Operation: "CodeAsk",
+            AskInput: true,
+            TextInContext: ContextMessage.MessagesAsText,
+            CodeInContext: true,
+            Transparent: Transparent !== null && Transparent !== void 0 ? Transparent : false,
+            Inheritance: ContextInheritance.InheritOne
+        };
+    }
     /** FixCode: Fix the current code snippet. */
     function FixCode(Label) {
         return {
@@ -36020,13 +36039,7 @@
     /** CopyCode: Copy a code snippet to the clipboard. */
     function CopyCode(Code) {
         Code = Code.trim();
-        if (Code.indexOf("\n") === -1) {
-            OutputDisplay.Instance.Tab.SetCode("observer", Code);
-            OutputDisplay.Instance.Tab.Galapagos.Focus();
-            Toast("success", Localized.Get("Press enter to execute again"));
-        }
-        else
-            Toast("success", Localized.Get("Copied to clipboard"));
+        Toast("success", Localized.Get("Copied to clipboard"));
         try {
             navigator.clipboard.writeText(Code);
         }
@@ -36081,6 +36094,7 @@
             // Show the output tab as well
             this.Tab.Outputs.Show();
             this.Tab.Outputs.Container.addClass("code-enabled");
+            this.Editor.SyncContext(this.Tab.Galapagos);
             // Show myself
             $(this.Container).show();
             this.Visible = true;
@@ -36092,6 +36106,7 @@
                 return;
             $(this.Container).hide();
             this.Tab.Outputs.Container.removeClass("code-enabled");
+            this.Tab.Editor.EditorTabs[0].Galapagos.SyncContext(this.Tab.Galapagos);
             this.Visible = false;
             this.Editor.SetVisible(false);
         }
@@ -36203,7 +36218,7 @@
             });
         }
         /** Play: Try to play the code. */
-        Play() {
+        Play(Callback) {
             if (this.Tab.Disabled)
                 return;
             // Hide the previous successful and uneventful execution
@@ -36212,16 +36227,26 @@
                 var LastRecord = LastSubthread.Children[LastSubthread.Children.length - 1];
                 var LastData = LastRecord.GetData();
                 if (LastData.Operation === "Execute" && LastRecord.Children.length >= 2) {
-                    var FirstType = LastRecord.Children[1].GetData().Type;
+                    var FirstType = LastRecord.Children[LastRecord.Children.length].GetData().Type;
                     if (FirstType === ChatResponseType.Finish || FirstType === ChatResponseType.Text)
                         LastRecord.Container.hide();
                 }
+                else if (LastData.Operation === "TryExecute")
+                    LastRecord.Container.hide();
             }
             // Create a new record
             var Record = this.Tab.Outputs.RenderRequest(Localized.Get("Trying to run the code"), this.Record);
+            Record.GetData().Operation = "TryExecute";
             Record.GetData().Transparent = true;
             // Try to play the code
             this.TryTo(() => {
+                // Custom callback
+                if (Callback !== undefined) {
+                    Callback();
+                    Record.Container.hide();
+                    return;
+                }
+                // Get the code
                 var Mode = this.Editor.Semantics.GetRecognizedMode();
                 var Code = this.Editor.GetCode().trim();
                 if (Code === "")
@@ -36496,7 +36521,11 @@
         RenderProcedure(Renderer, Metadata, Procedure) {
             var Renderer = $("<li></li>").appendTo(this.ContentContainer);
             $("<a></a>").appendTo(Renderer).text(`${Localized.Get(Procedure.IsCommand ? "Run command" : "Run reporter")} ${Procedure.Name}`)
-                .on("click", () => { var _a; return (_a = Metadata.Callback) === null || _a === void 0 ? void 0 : _a.call(Metadata, Procedure); });
+                .on("click", () => {
+                var _a, _b;
+                (_a = Metadata.Callback) === null || _a === void 0 ? void 0 : _a.call(Metadata, Procedure);
+                (_b = this.Parent) === null || _b === void 0 ? void 0 : _b.Container.hide();
+            });
             if (Procedure.Arguments.length > 0)
                 $("<p></p>").appendTo(Renderer).text(`${Localized.Get("Arguments", Procedure.Arguments.length)}: ${Procedure.Arguments.join(", ")}`);
         }
@@ -36581,12 +36610,14 @@
             var _a, _b, _c;
             var Section = this.GetData();
             var Content = (_a = Section.Content) !== null && _a !== void 0 ? _a : "";
-            // Post-process the text
-            Content = Content.replace(/\'([^`^\n]+?)\'/g, (Match) => {
-                if (Match.length == 3 || Match.match(/\'\S /g))
-                    return Match;
-                return `\`${Match.substring(1, Match.length - 1)}\``;
-            }).replace(/\n\n([^`]*?)\n\n/gs, "\n```\n$1\n```\n");
+            // Only post-process when it is finalized & sent by AI
+            if (this.Finalized && this.GetRecord().Operation) {
+                Content = Content.replace(/\'([^`^\n]+?)\'/g, (Match) => {
+                    if (Match.length == 3 || Match.match(/\'\S /g))
+                        return Match;
+                    return `\`${Match.substring(1, Match.length - 1)}\``;
+                }).replace(/\n\n([^`]*?)\n\n/gs, "\n```\n$1\n```\n");
+            }
             // Render the text
             this.ContentContainer.html(MarkdownToHTML(Content));
             PostprocessHTML(OutputDisplay.Instance.Tab.Editor, this.ContentContainer);
@@ -37065,6 +37096,10 @@
             else {
                 this.PrintOutput(Status, Message);
                 this.RestartBatch();
+                if (ChatManager.Available) {
+                    this.RenderOptions([AskCode()]);
+                    this.RenderOptions([ChangeTopic()]);
+                }
                 this.RenderResponses([], true);
             }
             this.Tab.SetDisabled(false);
@@ -37337,6 +37372,11 @@
                     this.Reset();
                     return;
                 }
+                // Execute
+                var Execute = (Objective, Content, Temporary) => {
+                    this.SetDisabled(true);
+                    this.ExecuteInput(Objective, Content, Temporary);
+                };
                 // Check if it is a command
                 if (!Chatable || (Objective != "chat" && Content != "help" && !Content.startsWith("help ") && !/^[\d\.]+$/.test(Content))) {
                     // Parse the code
@@ -37344,19 +37384,18 @@
                     let Diagnostics = yield this.Galapagos.ForceLintAsync();
                     let Mode = this.Galapagos.Semantics.GetRecognizedMode();
                     // Check if the context is temporary
-                    // TODO: Compile first if haven't done it yet.
                     var Temporary = this.Codes.Visible;
                     // If there is no linting issues, assume it is code snippet
-                    if (Diagnostics.length == 0) {
+                    if (Diagnostics.length == 0 || !Chatable) {
                         if (Mode == "Reporter" || Mode == "Unknown")
                             Content = `show ${Content}`;
-                        this.SetDisabled(true);
-                        this.ExecuteInput(Objective, Content, Temporary);
-                        return;
-                    }
-                    else if (!Chatable) {
-                        this.SetDisabled(true);
-                        this.ExecuteInput(Objective, Content, Temporary);
+                        // Try to compile first, if it is in a temporary context
+                        if (Temporary) {
+                            this.Codes.Play(() => Execute(Objective, Content, Temporary));
+                        }
+                        else {
+                            Execute(Objective, Content, false);
+                        }
                         return;
                     }
                 }
@@ -37455,7 +37494,18 @@
             Record.Operation = "Execute";
             this.Outputs.ScrollToBottom();
             // Check if we really could execute
-            this.Editor.CheckExecution();
+            this.CheckExecution();
+        }
+        /** CheckExecution: Check whether the execution is allowed. Otherwise, display a message. */
+        CheckExecution() {
+            if (!TurtleEditor.PostMessage) {
+                this.Outputs.RenderResponses([{
+                        Type: ChatResponseType.Text,
+                        Content: Localized.Get("Please download Turtle Universe")
+                    }], true);
+                this.Outputs.RenderOptions([ChangeTopic()]);
+                this.SetDisabled(false);
+            }
         }
         /** ExecuteProcedure: Execute the procedure. */
         ExecuteProcedure(Procedure, IsTemporary) {
@@ -37810,16 +37860,6 @@
                 Procedures: Procedures,
                 Breeds: Breeds
             };
-        }
-        /** CheckExecution: Check whether the execution is allowed. Otherwise, display a message. */
-        CheckExecution() {
-            if (!TurtleEditor.PostMessage) {
-                this.CommandTab.Outputs.RenderResponses([{
-                        Type: ChatResponseType.Text,
-                        Content: Localized.Get("Please download Turtle Universe")
-                    }], true);
-                this.CommandTab.SetDisabled(false);
-            }
         }
         // #endregion
         // #region "Editor Statuses"

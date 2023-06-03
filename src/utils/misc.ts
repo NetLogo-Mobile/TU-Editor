@@ -16,9 +16,8 @@ export function NumberToHex(Value: number) {
 export function CopyCode(Code: string) {
     Code = Code.trim();
     Toast("success", Localized.Get("Copied to clipboard"));
+    TurtleEditor.Call({ Type: "ClipboardWrite", Content: Code });
     try {
         navigator.clipboard.writeText(Code);
-    } catch {
-        TurtleEditor.Call({ Type: "ClipboardWrite", Content: Code });
-    }
+    } catch { }
 }

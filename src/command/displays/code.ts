@@ -21,8 +21,8 @@ export class CodeDisplay extends Display {
 	public Editor: GalapagosEditor;
 	/** Instance: The singleton instance. */
 	public static Instance: CodeDisplay;
-	/** ReturnButton: The return button of the display. */
-	private ReturnButton: JQuery<HTMLElement>;
+	/** FinishButton: The return button of the display. */
+	private FinishButton: JQuery<HTMLElement>;
 	/** PlayButton: The play button of the display. */
 	private PlayButton: JQuery<HTMLElement>;
 	/** AskButton: The ask button of the display. */
@@ -59,7 +59,7 @@ export class CodeDisplay extends Display {
 		this.PreviousButton = $(`<div class="button prev">&lt;</div>`).on("click", () => this.ShowPrevious()).appendTo(History);
 		this.HistoryDisplay = $(`<div class="label">0 / 0</div>`).appendTo(History);
 		this.NextButton = $(`<div class="button next">&gt;</div>`).on("click", () => this.ShowNext()).appendTo(History);
-		this.ReturnButton = $(`<div class="button finish">${Localized.Get("Finish")}</div>`).on("click", () => this.Return()).appendTo(Toolbar);
+		this.FinishButton = $(`<div class="button finish">${Localized.Get("Finish")}</div>`).on("click", () => this.Return()).appendTo(Toolbar);
 		CodeDisplay.Instance = this;
 	}
     /** Show: Show the section. */

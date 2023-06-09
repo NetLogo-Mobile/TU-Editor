@@ -43,6 +43,7 @@ export class EditorTab extends Tab {
 			OnUpdate: (Changed: boolean, Update: any) => {
 				if (Changed && !this.IgnoreUpdate)
 					TurtleEditor.Call({ Type: "CodeChanged" });
+				if (Changed) this.Galapagos.SetCompilerErrors([]);
 			},
 			OnDictionaryClick: (Text: string) => this.Editor.CommandTab.ExplainFull(Text)
 		});
@@ -70,7 +71,6 @@ export class EditorTab extends Tab {
 		if (Content != this.Galapagos.GetCode()) {
 			this.IgnoreUpdate = true;
 			this.Galapagos.SetCode(Content);
-			this.Galapagos.SetCompilerErrors([]);
 			this.Galapagos.UpdateContext();
 			if (!this.Visible) this.CodeRefreshed = true;
 			this.Galapagos.Selection.SetCursorPosition(0);

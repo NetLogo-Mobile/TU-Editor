@@ -173,6 +173,8 @@ export class CommandTab extends Tab {
 			TurtleEditor.SetChatBackend(Content.substring(7).trim());
 			this.Reset();
 			return;
+		} else if (!Chatable && Content.toLowerCase() == "chatlogo") {
+			TurtleEditor.SetChatBackend("https://chatlogo-us.turtlesim.com/");
 		}
 		// Execute
 		var Execute = (Objective: string, Content: string, Temporary: boolean) => {

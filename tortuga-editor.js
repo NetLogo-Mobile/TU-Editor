@@ -37570,6 +37570,8 @@
                 }
                 else if (!Chatable && Content.toLowerCase() == "chatlogo") {
                     TurtleEditor.SetChatBackend("https://chatlogo-us.turtlesim.com/");
+                    this.Reset();
+                    return;
                 }
                 // Execute
                 var Execute = (Objective, Content, Temporary) => {

@@ -36,7 +36,12 @@ export class CodeDisplay extends Display {
 		if (!NetLogoUtils.SharedEditor) {
 			NetLogoUtils.SharedEditor = new GalapagosEditor(
 				$(`<div class="hidden-editor"></div>`).appendTo(this.Container).get(0)!, {
-				ParseMode: ParseMode.Generative
+				ParseMode: ParseMode.Generative,
+				OnDictionaryClick: (Text: string) => this.Tab.ExplainPrimitive(Text),
+				OnExplain: (Diagnostic, Context) => this.Tab.ExplainDiagnostic({
+					Message: NetLogoUtils.PostprocessLintMessage(Diagnostic.message),
+					Code: this.Editor.GetCodeSlice(Diagnostic.from, Diagnostic.to)
+				}, Context, false)
 			});
 			NetLogoUtils.SharedEditor.SetVisible(false);
 			this.Tab.Editor.EditorTabs[0].Galapagos.AddChild(NetLogoUtils.SharedEditor);

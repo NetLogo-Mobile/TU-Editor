@@ -2,6 +2,7 @@ import { TurtleEditor } from "../main";
 import { Tab } from "../tab";
 import { ShowConfirm, Toast } from "../utils/dialog";
 import { GalapagosEditor, Localized } from "../../../CodeMirror-NetLogo/src/editor";
+import { NetLogoUtils } from "../utils/netlogo";
 
 /** EditorTab: A tab for the code editor. */
 export class EditorTab extends Tab {
@@ -45,7 +46,11 @@ export class EditorTab extends Tab {
 					TurtleEditor.Call({ Type: "CodeChanged" });
 				if (Changed) this.Galapagos.SetCompilerErrors([]);
 			},
-			OnDictionaryClick: (Text: string) => this.Editor.CommandTab.ExplainFull(Text)
+			OnDictionaryClick: (Text: string) => this.Editor.CommandTab.ExplainPrimitive(Text),
+			OnExplain: (Diagnostic, Context) => this.Editor.CommandTab.ExplainDiagnostic({
+				Message: NetLogoUtils.PostprocessLintMessage(Diagnostic.message),
+				Code: this.Galapagos.GetCodeSlice(Diagnostic.from, Diagnostic.to)
+			}, Context, true)
 		});
 	}
     // #endregion

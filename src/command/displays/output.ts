@@ -9,7 +9,7 @@ import { ChatResponseOption } from "../../chat/client/chat-option";
 import { Localized } from "../../../../CodeMirror-NetLogo/src/editor";
 import { ChatManager } from "../../chat/chat-manager";
 import { RuntimeError } from "../../../../CodeMirror-NetLogo/src/lang/linters/runtime-linter";
-import { ErrorsToDiagnostics } from "../../utils/netlogo";
+import { NetLogoUtils } from "../../utils/netlogo";
 import { DiagnosticType } from "../../chat/client/languages/netlogo-context";
 import { GenerateObjectID } from "../../utils/misc";
 import { CodeSectionRenderer } from "../sections/code-section-renderer";
@@ -184,7 +184,7 @@ export class OutputDisplay extends Display {
 	/** FinishExecution: Notify the completion of the command. */
 	public FinishExecution(Status: string, Code: string, Message: any | RuntimeError[]) {
 		if (Array.isArray(Message) && Message.length > 0) {
-			var Diagnostics = ErrorsToDiagnostics(Message as RuntimeError[]);
+			var Diagnostics = NetLogoUtils.ErrorsToDiagnostics(Message as RuntimeError[]);
 			this.RenderResponses([{
 				Type: Status == "CompileError" ? ChatResponseType.CompileError : ChatResponseType.RuntimeError,
 				Parsed: Diagnostics.length

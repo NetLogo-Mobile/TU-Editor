@@ -11,8 +11,9 @@ import { Diagnostics, DiagnosticType, Procedure } from "../chat/client/languages
 import { CodeArguments } from "./renderers/arguments-renderer";
 import { ChatResponseType } from "../chat/client/chat-response";
 import { RuntimeError } from "../../../CodeMirror-NetLogo/src/lang/linters/runtime-linter";
-import { ErrorsToDiagnostics } from "../utils/netlogo";
 import { ChangeTopic } from "../chat/client/options/option-templates";
+import { NetLogoUtils } from "../utils/netlogo";
+import { Diagnostic } from "../chat/client/languages/netlogo-context";
 
 declare const { bodyScrollLock, EditorDictionary }: any;
 
@@ -96,7 +97,7 @@ export class CommandTab extends Tab {
 			ParseMode: ParseMode.Oneline,
 			Placeholder: this.Placeholder.get(0),
 			OnKeyUp: (Event: any) => this.InputKeyHandler(Event),
-			OnDictionaryClick: (Text: any) => this.ExplainFull(Text)
+			OnDictionaryClick: (Text: any) => this.ExplainPrimitive(Text)
 		});
 		// Send button
 		this.SendButton = $(`<div class="command-send"><div class="dot-stretching"></div></div>`).on("click", () => {
@@ -257,6 +258,26 @@ export class CommandTab extends Tab {
 	}
 	// #endregion
 
+	// #region "Documentation"
+	/** ExplainPrimitive: Explain the selected text in the command center in full. */
+	public ExplainPrimitive(Command: string) {
+		if (!EditorDictionary.Check(Command)) return false;
+		this.ExecuteCommand("observer", `help ${Command} -full`, false);
+	}
+	/** ExplainDiagnostic: Explain the diagnostic. */
+	public ExplainDiagnostic(Diagnostic: Diagnostic, Context: string, NewThread: boolean) {
+		if (!this.Visible) this.Show();
+		this.ChatManager.SendRequest({
+			Input: JSON.stringify(Diagnostic),
+			FriendlyInput: Localized.Get("Can you explain the error message?"),
+			Operation: "CodeExplain", 
+			SubOperation: "CompileError",
+			ThreadID: NewThread ? undefined : this.Outputs.Subthread?.GetData()?.RootID,
+			Context: { CodeSnippet: Context, PreviousMessages: [] }
+		});
+	}
+	// #endregion
+
 	// #region "Command Execution"
 	/** ExecuteInput: Execute a human-sent command. */
 	private ExecuteInput(Objective: string, Content: string, Temporary: boolean) {
@@ -343,11 +364,6 @@ export class CommandTab extends Tab {
 	private FormatArgument(Value: string): string {
 		return !Value.startsWith("[") && !Value.startsWith("\"") && Value.indexOf(" ") != -1 && !Value.endsWith("]") ? `"${Value}"` : Value;
 	}
-	/** ExplainFull: ExplainFull: Explain the selected text in the command center in full. */
-	public ExplainFull(Command: string) {
-		if (!EditorDictionary.Check(Command)) return false;
-		this.ExecuteCommand("observer", `help ${Command} -full`, false);
-	}
 	/** RecompileCallback: The callback after the code to play is compiled. */
 	private RecompileCallback?: (() => void);
 	/** TemporaryCode: The temporary code snippet that is in-use. */
@@ -390,7 +406,7 @@ export class CommandTab extends Tab {
 			// Build the diagnostics
 			var Diagnostics: Diagnostics = {
 				Type: DiagnosticType.Compile,
-				Diagnostics: ErrorsToDiagnostics(Errors),
+				Diagnostics: NetLogoUtils.ErrorsToDiagnostics(Errors),
 				Code: this.TemporaryCode
 			};
 			// Show the diagnostics

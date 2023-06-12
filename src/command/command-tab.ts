@@ -109,6 +109,9 @@ export class CommandTab extends Tab {
 		this.FullText = new FullTextDisplay(this);
 		// Set up chat manager
 		this.ChatManager = new ChatManager(this);
+		// Compatibility
+		(this as any).FinishExecution = 
+			(Status: string, Message: any | RuntimeError[]) => this.Outputs.FinishExecution(Status, "", Message);
 	}
 	// #endregion
 

@@ -37597,6 +37597,9 @@
             this.FullText = new FullTextDisplay(this);
             // Set up chat manager
             this.ChatManager = new ChatManager(this);
+            // Compatibility
+            this.FinishExecution =
+                (Status, Message) => this.Outputs.FinishExecution(Status, "", Message);
         }
         /** InputKeyHandler: Handle the key input. */
         InputKeyHandler(Event) {

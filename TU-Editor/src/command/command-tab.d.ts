@@ -10,6 +10,7 @@ import { CodeDisplay } from "./displays/code";
 import { GalapagosEditor } from "../../../CodeMirror-NetLogo/src/editor";
 import { Procedure } from "../chat/client/languages/netlogo-context";
 import { RuntimeError } from "../../../CodeMirror-NetLogo/src/lang/linters/runtime-linter";
+import { Diagnostic } from "../chat/client/languages/netlogo-context";
 /** CommandTab: A tab for the command center. */
 export declare class CommandTab extends Tab {
     Disabled: boolean;
@@ -69,6 +70,10 @@ export declare class CommandTab extends Tab {
     SetDisabled(Disabled: boolean): void;
     /** RefreshPlaceholder: Refresh the placeholder. */
     RefreshPlaceholder(): void;
+    /** ExplainPrimitive: Explain the selected text in the command center in full. */
+    ExplainPrimitive(Command: string): false | undefined;
+    /** ExplainDiagnostic: Explain the diagnostic. */
+    ExplainDiagnostic(Diagnostic: Diagnostic, Context: string, NewThread: boolean): void;
     /** ExecuteInput: Execute a human-sent command. */
     private ExecuteInput;
     /** ExecuteCommand: Execute a command. */
@@ -81,8 +86,6 @@ export declare class CommandTab extends Tab {
     ExecuteProcedureWithArguments(Name: string, IsTemporary: boolean, Arguments: Record<string, string>): void;
     /** FormatArgument: Format the argument. */
     private FormatArgument;
-    /** ExplainFull: ExplainFull: Explain the selected text in the command center in full. */
-    ExplainFull(Command: string): false | undefined;
     /** RecompileCallback: The callback after the code to play is compiled. */
     private RecompileCallback?;
     /** TemporaryCode: The temporary code snippet that is in-use. */

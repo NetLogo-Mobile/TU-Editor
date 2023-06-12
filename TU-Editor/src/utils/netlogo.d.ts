@@ -20,8 +20,8 @@ export declare class NetLogoUtils {
     static FixGeneratedCode(Content: string, Parent?: CodeSnapshot): string;
     /** PostprocessLintMessage: Postprocess a lint message. */
     static PostprocessLintMessage(Message: string): string;
+    /** ErrorToDiagnostic: Convert a runtime error to a diagnostic. */
+    static ErrorToDiagnostic(Error: RuntimeError): Diagnostic;
+    /** ErrorsToDiagnostics: Convert runtime errors to diagnostics. */
+    static ErrorsToDiagnostics(Errors: RuntimeError[]): Diagnostic[];
 }
-/** ErrorToDiagnostic: Convert a runtime error to a diagnostic. */
-export declare function ErrorToDiagnostic(Error: RuntimeError): Diagnostic;
-/** ErrorsToDiagnostics: Convert runtime errors to diagnostics. */
-export declare function ErrorsToDiagnostics(Errors: RuntimeError[]): Diagnostic[];

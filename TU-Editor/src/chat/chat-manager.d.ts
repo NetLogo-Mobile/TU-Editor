@@ -17,7 +17,7 @@ export declare class ChatManager {
     /** IsRequesting: Whether we are currently requesting anything. */
     static IsRequesting: boolean;
     /** SendRequest: Send a request to the chat backend and handle its outputs. */
-    private SendRequest;
+    SendRequest(Request: ClientChatRequest): void;
     /** FinishRequest: Finish the current request. */
     private FinishRequest;
     /** GetPendingParent: Get the pending parent record. */

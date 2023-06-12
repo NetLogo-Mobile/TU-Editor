@@ -5423,7 +5423,7 @@
                 if (pos > 0 ? i == 0 : i == rects.length - 1 || rect.top < rect.bottom)
                     break;
             }
-            return this.length ? rect : flattenRect(rect, !fromBack);
+            return flattenRect(rect, !fromBack);
         }
         get isEditable() { return false; }
         get isWidget() { return true; }
@@ -17490,14 +17490,14 @@
             // state updates with parse work beyond the viewport.
             let upto = this.context.treeLen == tr.startState.doc.length ? undefined
                 : Math.max(tr.changes.mapPos(this.context.treeLen), newCx.viewport.to);
-            if (!newCx.work(20 /* Work.Apply */, upto))
+            if (!newCx.work(20 /* Apply */, upto))
                 newCx.takeTree();
             return new LanguageState(newCx);
         }
         static init(state) {
-            let vpTo = Math.min(3000 /* Work.InitViewport */, state.doc.length);
+            let vpTo = Math.min(3000 /* InitViewport */, state.doc.length);
             let parseState = ParseContext.create(state.facet(language).parser, state, { from: 0, to: vpTo });
-            if (!parseState.work(20 /* Work.Apply */, vpTo))
+            if (!parseState.work(20 /* Apply */, vpTo))
                 parseState.takeTree();
             return new LanguageState(parseState);
         }
@@ -17514,14 +17514,14 @@
         }
     });
     let requestIdle = (callback) => {
-        let timeout = setTimeout(() => callback(), 500 /* Work.MaxPause */);
+        let timeout = setTimeout(() => callback(), 500 /* MaxPause */);
         return () => clearTimeout(timeout);
     };
     if (typeof requestIdleCallback != "undefined")
         requestIdle = (callback) => {
             let idle = -1, timeout = setTimeout(() => {
-                idle = requestIdleCallback(callback, { timeout: 500 /* Work.MaxPause */ - 100 /* Work.MinPause */ });
-            }, 100 /* Work.MinPause */);
+                idle = requestIdleCallback(callback, { timeout: 500 /* MaxPause */ - 100 /* MinPause */ });
+            }, 100 /* MinPause */);
             return () => idle < 0 ? clearTimeout(timeout) : cancelIdleCallback(idle);
         };
     const isInputPending = typeof navigator != "undefined" && ((_a = navigator.scheduling) === null || _a === void 0 ? void 0 : _a.isInputPending)
@@ -17544,7 +17544,7 @@
                 this.scheduleWork();
             if (update.docChanged) {
                 if (this.view.hasFocus)
-                    this.chunkBudget += 50 /* Work.ChangeBonus */;
+                    this.chunkBudget += 50 /* ChangeBonus */;
                 this.scheduleWork();
             }
             this.checkAsyncSchedule(cx);
@@ -17560,19 +17560,19 @@
             this.working = null;
             let now = Date.now();
             if (this.chunkEnd < now && (this.chunkEnd < 0 || this.view.hasFocus)) { // Start a new chunk
-                this.chunkEnd = now + 30000 /* Work.ChunkTime */;
-                this.chunkBudget = 3000 /* Work.ChunkBudget */;
+                this.chunkEnd = now + 30000 /* ChunkTime */;
+                this.chunkBudget = 3000 /* ChunkBudget */;
             }
             if (this.chunkBudget <= 0)
                 return; // No more budget
             let { state, viewport: { to: vpTo } } = this.view, field = state.field(Language.state);
-            if (field.tree == field.context.tree && field.context.isDone(vpTo + 100000 /* Work.MaxParseAhead */))
+            if (field.tree == field.context.tree && field.context.isDone(vpTo + 100000 /* MaxParseAhead */))
                 return;
-            let endTime = Date.now() + Math.min(this.chunkBudget, 100 /* Work.Slice */, deadline && !isInputPending ? Math.max(25 /* Work.MinSlice */, deadline.timeRemaining() - 5) : 1e9);
+            let endTime = Date.now() + Math.min(this.chunkBudget, 100 /* Slice */, deadline && !isInputPending ? Math.max(25 /* MinSlice */, deadline.timeRemaining() - 5) : 1e9);
             let viewportFirst = field.context.treeLen < vpTo && state.doc.length > vpTo + 1000;
             let done = field.context.work(() => {
                 return isInputPending && isInputPending() || Date.now() > endTime;
-            }, vpTo + (viewportFirst ? 0 : 100000 /* Work.MaxParseAhead */));
+            }, vpTo + (viewportFirst ? 0 : 100000 /* MaxParseAhead */));
             this.chunkBudget -= Date.now() - now;
             if (done || this.chunkBudget <= 0) {
                 field.context.takeTree();
@@ -17917,13 +17917,20 @@
         on if it is covered by another such node.
         */
         get baseIndent() {
-            let line = this.state.doc.lineAt(this.node.from);
+            return this.baseIndentFor(this.node);
+        }
+        /**
+        Get the indentation for the reference line of the given node
+        (see [`baseIndent`](https://codemirror.net/6/docs/ref/#language.TreeIndentContext.baseIndent)).
+        */
+        baseIndentFor(node) {
+            let line = this.state.doc.lineAt(node.from);
             // Skip line starts that are covered by a sibling (or cousin, etc)
             for (;;) {
-                let atBreak = this.node.resolve(line.from);
+                let atBreak = node.resolve(line.from);
                 while (atBreak.parent && atBreak.parent.from == atBreak.from)
                     atBreak = atBreak.parent;
-                if (isParent(atBreak, this.node))
+                if (isParent(atBreak, node))
                     break;
                 line = this.state.doc.lineAt(atBreak.from);
             }
@@ -21617,7 +21624,7 @@
         // is. See `Penalty` above.
         match(word) {
             if (this.pattern.length == 0)
-                return [-100 /* Penalty.NotFull */];
+                return [-100 /* NotFull */];
             if (word.length < this.pattern.length)
                 return null;
             let { chars, folded, any, precise, byWord } = this;
@@ -21625,17 +21632,17 @@
             // at the start
             if (chars.length == 1) {
                 let first = codePointAt(word, 0), firstSize = codePointSize(first);
-                let score = firstSize == word.length ? 0 : -100 /* Penalty.NotFull */;
+                let score = firstSize == word.length ? 0 : -100 /* NotFull */;
                 if (first == chars[0]) ;
                 else if (first == folded[0])
-                    score += -200 /* Penalty.CaseFold */;
+                    score += -200 /* CaseFold */;
                 else
                     return null;
                 return [score, 0, firstSize];
             }
             let direct = word.indexOf(this.pattern);
             if (direct == 0)
-                return [word.length == this.pattern.length ? 0 : -100 /* Penalty.NotFull */, 0, this.pattern.length];
+                return [word.length == this.pattern.length ? 0 : -100 /* NotFull */, 0, this.pattern.length];
             let len = chars.length, anyTo = 0;
             if (direct < 0) {
                 for (let i = 0, e = Math.min(word.length, 200); i < e && anyTo < len;) {
@@ -21659,7 +21666,7 @@
             let adjacentTo = 0, adjacentStart = -1, adjacentEnd = -1;
             let hasLower = /[a-z]/.test(word), wordAdjacent = true;
             // Go over the option's text, scanning for the various kinds of matches
-            for (let i = 0, e = Math.min(word.length, 200), prevType = 0 /* Tp.NonWord */; i < e && byWordTo < len;) {
+            for (let i = 0, e = Math.min(word.length, 200), prevType = 0 /* NonWord */; i < e && byWordTo < len;) {
                 let next = codePointAt(word, i);
                 if (direct < 0) {
                     if (preciseTo < len && next == chars[preciseTo])
@@ -21677,9 +21684,9 @@
                     }
                 }
                 let ch, type = next < 0xff
-                    ? (next >= 48 && next <= 57 || next >= 97 && next <= 122 ? 2 /* Tp.Lower */ : next >= 65 && next <= 90 ? 1 /* Tp.Upper */ : 0 /* Tp.NonWord */)
-                    : ((ch = fromCodePoint(next)) != ch.toLowerCase() ? 1 /* Tp.Upper */ : ch != ch.toUpperCase() ? 2 /* Tp.Lower */ : 0 /* Tp.NonWord */);
-                if (!i || type == 1 /* Tp.Upper */ && hasLower || prevType == 0 /* Tp.NonWord */ && type != 0 /* Tp.NonWord */) {
+                    ? (next >= 48 && next <= 57 || next >= 97 && next <= 122 ? 2 /* Lower */ : next >= 65 && next <= 90 ? 1 /* Upper */ : 0 /* NonWord */)
+                    : ((ch = fromCodePoint(next)) != ch.toLowerCase() ? 1 /* Upper */ : ch != ch.toUpperCase() ? 2 /* Lower */ : 0 /* NonWord */);
+                if (!i || type == 1 /* Upper */ && hasLower || prevType == 0 /* NonWord */ && type != 0 /* NonWord */) {
                     if (chars[byWordTo] == next || (folded[byWordTo] == next && (byWordFolded = true)))
                         byWord[byWordTo++] = i;
                     else if (byWord.length)
@@ -21689,17 +21696,17 @@
                 i += codePointSize(next);
             }
             if (byWordTo == len && byWord[0] == 0 && wordAdjacent)
-                return this.result(-100 /* Penalty.ByWord */ + (byWordFolded ? -200 /* Penalty.CaseFold */ : 0), byWord, word);
+                return this.result(-100 /* ByWord */ + (byWordFolded ? -200 /* CaseFold */ : 0), byWord, word);
             if (adjacentTo == len && adjacentStart == 0)
-                return [-200 /* Penalty.CaseFold */ - word.length + (adjacentEnd == word.length ? 0 : -100 /* Penalty.NotFull */), 0, adjacentEnd];
+                return [-200 /* CaseFold */ - word.length + (adjacentEnd == word.length ? 0 : -100 /* NotFull */), 0, adjacentEnd];
             if (direct > -1)
-                return [-700 /* Penalty.NotStart */ - word.length, direct, direct + this.pattern.length];
+                return [-700 /* NotStart */ - word.length, direct, direct + this.pattern.length];
             if (adjacentTo == len)
-                return [-200 /* Penalty.CaseFold */ + -700 /* Penalty.NotStart */ - word.length, adjacentStart, adjacentEnd];
+                return [-200 /* CaseFold */ + -700 /* NotStart */ - word.length, adjacentStart, adjacentEnd];
             if (byWordTo == len)
-                return this.result(-100 /* Penalty.ByWord */ + (byWordFolded ? -200 /* Penalty.CaseFold */ : 0) + -700 /* Penalty.NotStart */ +
-                    (wordAdjacent ? 0 : -1100 /* Penalty.Gap */), byWord, word);
-            return chars.length == 2 ? null : this.result((any[0] ? -700 /* Penalty.NotStart */ : 0) + -200 /* Penalty.CaseFold */ + -1100 /* Penalty.Gap */, any, word);
+                return this.result(-100 /* ByWord */ + (byWordFolded ? -200 /* CaseFold */ : 0) + -700 /* NotStart */ +
+                    (wordAdjacent ? 0 : -1100 /* Gap */), byWord, word);
+            return chars.length == 2 ? null : this.result((any[0] ? -700 /* NotStart */ : 0) + -200 /* CaseFold */ + -1100 /* Gap */, any, word);
         }
         result(score, positions, word) {
             let result = [score - word.length], i = 1;
@@ -21757,11 +21764,11 @@
             left = true;
         if (infoWidth <= (left ? spaceLeft : spaceRight)) {
             offset = Math.max(space.top, Math.min(option.top, space.bottom - infoHeight)) - list.top;
-            maxWidth = Math.min(400 /* Info.Width */, left ? spaceLeft : spaceRight);
+            maxWidth = Math.min(400 /* Width */, left ? spaceLeft : spaceRight);
         }
         else {
             narrow = true;
-            maxWidth = Math.min(400 /* Info.Width */, (rtl ? list.right : space.right - list.left) - 30 /* Info.Margin */);
+            maxWidth = Math.min(400 /* Width */, (rtl ? list.right : space.right - list.left) - 30 /* Margin */);
             let spaceBelow = space.bottom - list.bottom;
             if (spaceBelow >= infoHeight || spaceBelow > list.top) { // Below the completion
                 offset = option.bottom - list.top;
@@ -21775,232 +21782,6 @@
             style: `${side}: ${offset}px; max-width: ${maxWidth}px`,
             class: "cm-completionInfo-" + (narrow ? (rtl ? "left-narrow" : "right-narrow") : left ? "left" : "right")
         };
-    }
-
-    /**
-    Returns a command that moves the completion selection forward or
-    backward by the given amount.
-    */
-    function moveCompletionSelection(forward, by = "option") {
-        return (view) => {
-            let cState = view.state.field(completionState, false);
-            if (!cState || !cState.open || cState.open.disabled ||
-                Date.now() - cState.open.timestamp < view.state.facet(completionConfig).interactionDelay)
-                return false;
-            let step = 1, tooltip;
-            if (by == "page" && (tooltip = getTooltip$1(view, cState.open.tooltip)))
-                step = Math.max(2, Math.floor(tooltip.dom.offsetHeight /
-                    tooltip.dom.querySelector("li").offsetHeight) - 1);
-            let { length } = cState.open.options;
-            let selected = cState.open.selected > -1 ? cState.open.selected + step * (forward ? 1 : -1) : forward ? 0 : length - 1;
-            if (selected < 0)
-                selected = by == "page" ? 0 : length - 1;
-            else if (selected >= length)
-                selected = by == "page" ? length - 1 : 0;
-            view.dispatch({ effects: setSelectedEffect.of(selected) });
-            return true;
-        };
-    }
-    /**
-    Accept the current completion.
-    */
-    const acceptCompletion = (view) => {
-        let cState = view.state.field(completionState, false);
-        if (view.state.readOnly || !cState || !cState.open || cState.open.selected < 0 ||
-            Date.now() - cState.open.timestamp < view.state.facet(completionConfig).interactionDelay)
-            return false;
-        if (!cState.open.disabled)
-            return applyCompletion(view, cState.open.options[cState.open.selected]);
-        return true;
-    };
-    /**
-    Explicitly start autocompletion.
-    */
-    const startCompletion = (view) => {
-        let cState = view.state.field(completionState, false);
-        if (!cState)
-            return false;
-        view.dispatch({ effects: startCompletionEffect.of(true) });
-        return true;
-    };
-    /**
-    Close the currently active completion.
-    */
-    const closeCompletion = (view) => {
-        let cState = view.state.field(completionState, false);
-        if (!cState || !cState.active.some(a => a.state != 0 /* State.Inactive */))
-            return false;
-        view.dispatch({ effects: closeCompletionEffect.of(null) });
-        return true;
-    };
-    class RunningQuery {
-        constructor(active, context) {
-            this.active = active;
-            this.context = context;
-            this.time = Date.now();
-            this.updates = [];
-            // Note that 'undefined' means 'not done yet', whereas 'null' means
-            // 'query returned null'.
-            this.done = undefined;
-        }
-    }
-    const DebounceTime = 50, MaxUpdateCount = 50, MinAbortTime = 1000;
-    const completionPlugin = /*@__PURE__*/ViewPlugin.fromClass(class {
-        constructor(view) {
-            this.view = view;
-            this.debounceUpdate = -1;
-            this.running = [];
-            this.debounceAccept = -1;
-            this.composing = 0 /* CompositionState.None */;
-            for (let active of view.state.field(completionState).active)
-                if (active.state == 1 /* State.Pending */)
-                    this.startQuery(active);
-        }
-        update(update) {
-            let cState = update.state.field(completionState);
-            if (!update.selectionSet && !update.docChanged && update.startState.field(completionState) == cState)
-                return;
-            let doesReset = update.transactions.some(tr => {
-                return (tr.selection || tr.docChanged) && !getUserEvent(tr);
-            });
-            for (let i = 0; i < this.running.length; i++) {
-                let query = this.running[i];
-                if (doesReset ||
-                    query.updates.length + update.transactions.length > MaxUpdateCount && Date.now() - query.time > MinAbortTime) {
-                    for (let handler of query.context.abortListeners) {
-                        try {
-                            handler();
-                        }
-                        catch (e) {
-                            logException(this.view.state, e);
-                        }
-                    }
-                    query.context.abortListeners = null;
-                    this.running.splice(i--, 1);
-                }
-                else {
-                    query.updates.push(...update.transactions);
-                }
-            }
-            if (this.debounceUpdate > -1)
-                clearTimeout(this.debounceUpdate);
-            this.debounceUpdate = cState.active.some(a => a.state == 1 /* State.Pending */ && !this.running.some(q => q.active.source == a.source))
-                ? setTimeout(() => this.startUpdate(), DebounceTime) : -1;
-            if (this.composing != 0 /* CompositionState.None */)
-                for (let tr of update.transactions) {
-                    if (getUserEvent(tr) == "input")
-                        this.composing = 2 /* CompositionState.Changed */;
-                    else if (this.composing == 2 /* CompositionState.Changed */ && tr.selection)
-                        this.composing = 3 /* CompositionState.ChangedAndMoved */;
-                }
-        }
-        startUpdate() {
-            this.debounceUpdate = -1;
-            let { state } = this.view, cState = state.field(completionState);
-            for (let active of cState.active) {
-                if (active.state == 1 /* State.Pending */ && !this.running.some(r => r.active.source == active.source))
-                    this.startQuery(active);
-            }
-        }
-        startQuery(active) {
-            let { state } = this.view, pos = cur(state);
-            let context = new CompletionContext(state, pos, active.explicitPos == pos);
-            let pending = new RunningQuery(active, context);
-            this.running.push(pending);
-            Promise.resolve(active.source(context)).then(result => {
-                if (!pending.context.aborted) {
-                    pending.done = result || null;
-                    this.scheduleAccept();
-                }
-            }, err => {
-                this.view.dispatch({ effects: closeCompletionEffect.of(null) });
-                logException(this.view.state, err);
-            });
-        }
-        scheduleAccept() {
-            if (this.running.every(q => q.done !== undefined))
-                this.accept();
-            else if (this.debounceAccept < 0)
-                this.debounceAccept = setTimeout(() => this.accept(), DebounceTime);
-        }
-        // For each finished query in this.running, try to create a result
-        // or, if appropriate, restart the query.
-        accept() {
-            var _a;
-            if (this.debounceAccept > -1)
-                clearTimeout(this.debounceAccept);
-            this.debounceAccept = -1;
-            let updated = [];
-            let conf = this.view.state.facet(completionConfig);
-            for (let i = 0; i < this.running.length; i++) {
-                let query = this.running[i];
-                if (query.done === undefined)
-                    continue;
-                this.running.splice(i--, 1);
-                if (query.done) {
-                    let active = new ActiveResult(query.active.source, query.active.explicitPos, query.done, query.done.from, (_a = query.done.to) !== null && _a !== void 0 ? _a : cur(query.updates.length ? query.updates[0].startState : this.view.state));
-                    // Replay the transactions that happened since the start of
-                    // the request and see if that preserves the result
-                    for (let tr of query.updates)
-                        active = active.update(tr, conf);
-                    if (active.hasResult()) {
-                        updated.push(active);
-                        continue;
-                    }
-                }
-                let current = this.view.state.field(completionState).active.find(a => a.source == query.active.source);
-                if (current && current.state == 1 /* State.Pending */) {
-                    if (query.done == null) {
-                        // Explicitly failed. Should clear the pending status if it
-                        // hasn't been re-set in the meantime.
-                        let active = new ActiveSource(query.active.source, 0 /* State.Inactive */);
-                        for (let tr of query.updates)
-                            active = active.update(tr, conf);
-                        if (active.state != 1 /* State.Pending */)
-                            updated.push(active);
-                    }
-                    else {
-                        // Cleared by subsequent transactions. Restart.
-                        this.startQuery(current);
-                    }
-                }
-            }
-            if (updated.length)
-                this.view.dispatch({ effects: setActiveEffect.of(updated) });
-        }
-    }, {
-        eventHandlers: {
-            blur(event) {
-                let state = this.view.state.field(completionState, false);
-                if (state && state.tooltip && this.view.state.facet(completionConfig).closeOnBlur) {
-                    let dialog = state.open && getTooltip$1(this.view, state.open.tooltip);
-                    if (!dialog || !dialog.dom.contains(event.relatedTarget))
-                        this.view.dispatch({ effects: closeCompletionEffect.of(null) });
-                }
-            },
-            compositionstart() {
-                this.composing = 1 /* CompositionState.Started */;
-            },
-            compositionend() {
-                if (this.composing == 3 /* CompositionState.ChangedAndMoved */) {
-                    // Safari fires compositionend events synchronously, possibly
-                    // from inside an update, so dispatch asynchronously to avoid reentrancy
-                    setTimeout(() => this.view.dispatch({ effects: startCompletionEffect.of(false) }), 20);
-                }
-                this.composing = 0 /* CompositionState.None */;
-            }
-        }
-    });
-    function applyCompletion(view, option) {
-        const apply = option.completion.apply || option.completion.label;
-        let result = view.state.field(completionState).active.find(a => a.source == option.source);
-        if (!(result instanceof ActiveResult))
-            return false;
-        if (typeof apply == "string")
-            view.dispatch(Object.assign(Object.assign({}, insertCompletionText(view.state, apply, result.from, result.to)), { annotations: pickedCompletion.of(option.completion) }));
-        else
-            apply(view, option.completion, result.from, result.to);
-        return true;
     }
 
     function optionContent(config) {
@@ -22062,10 +21843,12 @@
         return { from: total - (off + 1) * max, to: total - off * max };
     }
     class CompletionTooltip {
-        constructor(view, stateField) {
+        constructor(view, stateField, applyCompletion) {
             this.view = view;
             this.stateField = stateField;
+            this.applyCompletion = applyCompletion;
             this.info = null;
+            this.infoDestroy = null;
             this.placeInfoReq = {
                 read: () => this.measureInfo(),
                 write: (pos) => this.placeInfo(pos),
@@ -22086,7 +21869,7 @@
             this.dom.addEventListener("mousedown", (e) => {
                 for (let dom = e.target, match; dom && dom != this.dom; dom = dom.parentNode) {
                     if (dom.nodeName == "LI" && (match = /-(\d+)$/.exec(dom.id)) && +match[1] < options.length) {
-                        applyCompletion(view, options[+match[1]]);
+                        this.applyCompletion(view, options[+match[1]]);
                         e.preventDefault();
                         return;
                     }
@@ -22145,33 +21928,39 @@
                 });
             }
             if (this.updateSelectedOption(open.selected)) {
-                if (this.info) {
-                    this.info.remove();
-                    this.info = null;
-                }
+                this.destroyInfo();
                 let { completion } = open.options[open.selected];
                 let { info } = completion;
                 if (!info)
                     return;
-                let infoResult = typeof info === 'string' ? document.createTextNode(info) : info(completion);
+                let infoResult = typeof info === "string" ? document.createTextNode(info) : info(completion);
                 if (!infoResult)
                     return;
-                if ('then' in infoResult) {
-                    infoResult.then(node => {
-                        if (node && this.view.state.field(this.stateField, false) == cState)
-                            this.addInfoPane(node);
+                if ("then" in infoResult) {
+                    infoResult.then(obj => {
+                        if (obj && this.view.state.field(this.stateField, false) == cState)
+                            this.addInfoPane(obj, completion);
                     }).catch(e => logException(this.view.state, e, "completion info"));
                 }
                 else {
-                    this.addInfoPane(infoResult);
+                    this.addInfoPane(infoResult, completion);
                 }
             }
         }
-        addInfoPane(content) {
-            let dom = this.info = document.createElement("div");
-            dom.className = "cm-tooltip cm-completionInfo";
-            dom.appendChild(content);
-            this.dom.appendChild(dom);
+        addInfoPane(content, completion) {
+            this.destroyInfo();
+            let wrap = this.info = document.createElement("div");
+            wrap.className = "cm-tooltip cm-completionInfo";
+            if (content.nodeType != null) {
+                wrap.appendChild(content);
+                this.infoDestroy = null;
+            }
+            else {
+                let { dom, destroy } = content;
+                wrap.appendChild(dom);
+                this.infoDestroy = destroy || null;
+            }
+            this.dom.appendChild(wrap);
             this.view.requestMeasure(this.placeInfoReq);
         }
         updateSelectedOption(selected) {
@@ -22264,11 +22053,22 @@
                 ul.classList.add("cm-completionListIncompleteBottom");
             return ul;
         }
+        destroyInfo() {
+            if (this.info) {
+                if (this.infoDestroy)
+                    this.infoDestroy();
+                this.info.remove();
+                this.info = null;
+            }
+        }
+        destroy() {
+            this.destroyInfo();
+        }
     }
     // We allocate a new function instance every time the completion
     // changes to force redrawing/repositioning of the tooltip
-    function completionTooltip(stateField) {
-        return (view) => new CompletionTooltip(view, stateField);
+    function completionTooltip(stateField, applyCompletion) {
+        return (view) => new CompletionTooltip(view, stateField, applyCompletion);
     }
     function scrollIntoView(container, element) {
         let parent = container.getBoundingClientRect();
@@ -22361,7 +22161,7 @@
         static build(active, state, id, prev, conf) {
             let options = sortOptions(active, state);
             if (!options.length) {
-                return prev && active.some(a => a.state == 1 /* State.Pending */) ?
+                return prev && active.some(a => a.state == 1 /* Pending */) ?
                     new CompletionDialog(prev.options, prev.attrs, prev.tooltip, prev.timestamp, prev.selected, true) : null;
             }
             let selected = state.facet(completionConfig).selectOnOpen ? 0 : -1;
@@ -22375,7 +22175,7 @@
             }
             return new CompletionDialog(options, makeAttrs(id, selected), {
                 pos: active.reduce((a, b) => b.hasResult() ? Math.min(a, b.from) : a, 1e8),
-                create: completionTooltip(completionState),
+                create: completionTooltip(completionState, applyCompletion),
                 above: conf.aboveCursor,
             }, prev ? prev.timestamp : Date.now(), selected, false);
         }
@@ -22398,7 +22198,7 @@
                 state.languageDataAt("autocomplete", cur(state)).map(asSource);
             let active = sources.map(source => {
                 let value = this.active.find(s => s.source == source) ||
-                    new ActiveSource(source, this.active.some(a => a.state != 0 /* State.Inactive */) ? 1 /* State.Pending */ : 0 /* State.Inactive */);
+                    new ActiveSource(source, this.active.some(a => a.state != 0 /* Inactive */) ? 1 /* Pending */ : 0 /* Inactive */);
                 return value.update(tr, conf);
             });
             if (active.length == this.active.length && active.every((a, i) => a == this.active[i]))
@@ -22409,10 +22209,10 @@
             if (tr.selection || active.some(a => a.hasResult() && tr.changes.touchesRange(a.from, a.to)) ||
                 !sameResults(active, this.active))
                 open = CompletionDialog.build(active, state, this.id, open, conf);
-            else if (open && open.disabled && !active.some(a => a.state == 1 /* State.Pending */))
+            else if (open && open.disabled && !active.some(a => a.state == 1 /* Pending */))
                 open = null;
-            if (!open && active.every(a => a.state != 1 /* State.Pending */) && active.some(a => a.hasResult()))
-                active = active.map(a => a.hasResult() ? new ActiveSource(a.source, 0 /* State.Inactive */) : a);
+            if (!open && active.every(a => a.state != 1 /* Pending */) && active.some(a => a.hasResult()))
+                active = active.map(a => a.hasResult() ? new ActiveSource(a.source, 0 /* Inactive */) : a);
             for (let effect of tr.effects)
                 if (effect.is(setSelectedEffect))
                     open = open && open.setSelected(effect.value, this.id);
@@ -22466,13 +22266,13 @@
                 value = value.handleUserEvent(tr, event, conf);
             else if (tr.docChanged)
                 value = value.handleChange(tr);
-            else if (tr.selection && value.state != 0 /* State.Inactive */)
-                value = new ActiveSource(value.source, 0 /* State.Inactive */);
+            else if (tr.selection && value.state != 0 /* Inactive */)
+                value = new ActiveSource(value.source, 0 /* Inactive */);
             for (let effect of tr.effects) {
                 if (effect.is(startCompletionEffect))
-                    value = new ActiveSource(value.source, 1 /* State.Pending */, effect.value ? cur(tr.state) : -1);
+                    value = new ActiveSource(value.source, 1 /* Pending */, effect.value ? cur(tr.state) : -1);
                 else if (effect.is(closeCompletionEffect))
-                    value = new ActiveSource(value.source, 0 /* State.Inactive */);
+                    value = new ActiveSource(value.source, 0 /* Inactive */);
                 else if (effect.is(setActiveEffect))
                     for (let active of effect.value)
                         if (active.source == value.source)
@@ -22481,10 +22281,10 @@
             return value;
         }
         handleUserEvent(tr, type, conf) {
-            return type == "delete" || !conf.activateOnTyping ? this.map(tr.changes) : new ActiveSource(this.source, 1 /* State.Pending */);
+            return type == "delete" || !conf.activateOnTyping ? this.map(tr.changes) : new ActiveSource(this.source, 1 /* Pending */);
         }
         handleChange(tr) {
-            return tr.changes.touchesRange(cur(tr.startState)) ? new ActiveSource(this.source, 0 /* State.Inactive */) : this.map(tr.changes);
+            return tr.changes.touchesRange(cur(tr.startState)) ? new ActiveSource(this.source, 0 /* Inactive */) : this.map(tr.changes);
         }
         map(changes) {
             return changes.empty || this.explicitPos < 0 ? this : new ActiveSource(this.source, this.state, changes.mapPos(this.explicitPos));
@@ -22492,7 +22292,7 @@
     }
     class ActiveResult extends ActiveSource {
         constructor(source, explicitPos, result, from, to) {
-            super(source, 2 /* State.Result */, explicitPos);
+            super(source, 2 /* Result */, explicitPos);
             this.result = result;
             this.from = from;
             this.to = to;
@@ -22505,17 +22305,17 @@
             if ((this.explicitPos < 0 ? pos <= from : pos < this.from) ||
                 pos > to ||
                 type == "delete" && cur(tr.startState) == this.from)
-                return new ActiveSource(this.source, type == "input" && conf.activateOnTyping ? 1 /* State.Pending */ : 0 /* State.Inactive */);
+                return new ActiveSource(this.source, type == "input" && conf.activateOnTyping ? 1 /* Pending */ : 0 /* Inactive */);
             let explicitPos = this.explicitPos < 0 ? -1 : tr.changes.mapPos(this.explicitPos), updated;
             if (checkValid(this.result.validFor, tr.state, from, to))
                 return new ActiveResult(this.source, explicitPos, this.result, from, to);
             if (this.result.update &&
                 (updated = this.result.update(this.result, from, to, new CompletionContext(tr.state, pos, explicitPos >= 0))))
                 return new ActiveResult(this.source, explicitPos, updated, updated.from, (_a = updated.to) !== null && _a !== void 0 ? _a : cur(tr.state));
-            return new ActiveSource(this.source, 1 /* State.Pending */, explicitPos);
+            return new ActiveSource(this.source, 1 /* Pending */, explicitPos);
         }
         handleChange(tr) {
-            return tr.changes.touchesRange(this.from, this.to) ? new ActiveSource(this.source, 0 /* State.Inactive */) : this.map(tr.changes);
+            return tr.changes.touchesRange(this.from, this.to) ? new ActiveSource(this.source, 0 /* Inactive */) : this.map(tr.changes);
         }
         map(mapping) {
             return mapping.empty ? this :
@@ -22539,6 +22339,232 @@
             showTooltip.from(f, val => val.tooltip),
             EditorView.contentAttributes.from(f, state => state.attrs)
         ]
+    });
+    function applyCompletion(view, option) {
+        const apply = option.completion.apply || option.completion.label;
+        let result = view.state.field(completionState).active.find(a => a.source == option.source);
+        if (!(result instanceof ActiveResult))
+            return false;
+        if (typeof apply == "string")
+            view.dispatch(Object.assign(Object.assign({}, insertCompletionText(view.state, apply, result.from, result.to)), { annotations: pickedCompletion.of(option.completion) }));
+        else
+            apply(view, option.completion, result.from, result.to);
+        return true;
+    }
+
+    /**
+    Returns a command that moves the completion selection forward or
+    backward by the given amount.
+    */
+    function moveCompletionSelection(forward, by = "option") {
+        return (view) => {
+            let cState = view.state.field(completionState, false);
+            if (!cState || !cState.open || cState.open.disabled ||
+                Date.now() - cState.open.timestamp < view.state.facet(completionConfig).interactionDelay)
+                return false;
+            let step = 1, tooltip;
+            if (by == "page" && (tooltip = getTooltip$1(view, cState.open.tooltip)))
+                step = Math.max(2, Math.floor(tooltip.dom.offsetHeight /
+                    tooltip.dom.querySelector("li").offsetHeight) - 1);
+            let { length } = cState.open.options;
+            let selected = cState.open.selected > -1 ? cState.open.selected + step * (forward ? 1 : -1) : forward ? 0 : length - 1;
+            if (selected < 0)
+                selected = by == "page" ? 0 : length - 1;
+            else if (selected >= length)
+                selected = by == "page" ? length - 1 : 0;
+            view.dispatch({ effects: setSelectedEffect.of(selected) });
+            return true;
+        };
+    }
+    /**
+    Accept the current completion.
+    */
+    const acceptCompletion = (view) => {
+        let cState = view.state.field(completionState, false);
+        if (view.state.readOnly || !cState || !cState.open || cState.open.selected < 0 ||
+            Date.now() - cState.open.timestamp < view.state.facet(completionConfig).interactionDelay)
+            return false;
+        if (!cState.open.disabled)
+            return applyCompletion(view, cState.open.options[cState.open.selected]);
+        return true;
+    };
+    /**
+    Explicitly start autocompletion.
+    */
+    const startCompletion = (view) => {
+        let cState = view.state.field(completionState, false);
+        if (!cState)
+            return false;
+        view.dispatch({ effects: startCompletionEffect.of(true) });
+        return true;
+    };
+    /**
+    Close the currently active completion.
+    */
+    const closeCompletion = (view) => {
+        let cState = view.state.field(completionState, false);
+        if (!cState || !cState.active.some(a => a.state != 0 /* Inactive */))
+            return false;
+        view.dispatch({ effects: closeCompletionEffect.of(null) });
+        return true;
+    };
+    class RunningQuery {
+        constructor(active, context) {
+            this.active = active;
+            this.context = context;
+            this.time = Date.now();
+            this.updates = [];
+            // Note that 'undefined' means 'not done yet', whereas 'null' means
+            // 'query returned null'.
+            this.done = undefined;
+        }
+    }
+    const DebounceTime = 50, MaxUpdateCount = 50, MinAbortTime = 1000;
+    const completionPlugin = /*@__PURE__*/ViewPlugin.fromClass(class {
+        constructor(view) {
+            this.view = view;
+            this.debounceUpdate = -1;
+            this.running = [];
+            this.debounceAccept = -1;
+            this.composing = 0 /* None */;
+            for (let active of view.state.field(completionState).active)
+                if (active.state == 1 /* Pending */)
+                    this.startQuery(active);
+        }
+        update(update) {
+            let cState = update.state.field(completionState);
+            if (!update.selectionSet && !update.docChanged && update.startState.field(completionState) == cState)
+                return;
+            let doesReset = update.transactions.some(tr => {
+                return (tr.selection || tr.docChanged) && !getUserEvent(tr);
+            });
+            for (let i = 0; i < this.running.length; i++) {
+                let query = this.running[i];
+                if (doesReset ||
+                    query.updates.length + update.transactions.length > MaxUpdateCount && Date.now() - query.time > MinAbortTime) {
+                    for (let handler of query.context.abortListeners) {
+                        try {
+                            handler();
+                        }
+                        catch (e) {
+                            logException(this.view.state, e);
+                        }
+                    }
+                    query.context.abortListeners = null;
+                    this.running.splice(i--, 1);
+                }
+                else {
+                    query.updates.push(...update.transactions);
+                }
+            }
+            if (this.debounceUpdate > -1)
+                clearTimeout(this.debounceUpdate);
+            this.debounceUpdate = cState.active.some(a => a.state == 1 /* Pending */ && !this.running.some(q => q.active.source == a.source))
+                ? setTimeout(() => this.startUpdate(), DebounceTime) : -1;
+            if (this.composing != 0 /* None */)
+                for (let tr of update.transactions) {
+                    if (getUserEvent(tr) == "input")
+                        this.composing = 2 /* Changed */;
+                    else if (this.composing == 2 /* Changed */ && tr.selection)
+                        this.composing = 3 /* ChangedAndMoved */;
+                }
+        }
+        startUpdate() {
+            this.debounceUpdate = -1;
+            let { state } = this.view, cState = state.field(completionState);
+            for (let active of cState.active) {
+                if (active.state == 1 /* Pending */ && !this.running.some(r => r.active.source == active.source))
+                    this.startQuery(active);
+            }
+        }
+        startQuery(active) {
+            let { state } = this.view, pos = cur(state);
+            let context = new CompletionContext(state, pos, active.explicitPos == pos);
+            let pending = new RunningQuery(active, context);
+            this.running.push(pending);
+            Promise.resolve(active.source(context)).then(result => {
+                if (!pending.context.aborted) {
+                    pending.done = result || null;
+                    this.scheduleAccept();
+                }
+            }, err => {
+                this.view.dispatch({ effects: closeCompletionEffect.of(null) });
+                logException(this.view.state, err);
+            });
+        }
+        scheduleAccept() {
+            if (this.running.every(q => q.done !== undefined))
+                this.accept();
+            else if (this.debounceAccept < 0)
+                this.debounceAccept = setTimeout(() => this.accept(), DebounceTime);
+        }
+        // For each finished query in this.running, try to create a result
+        // or, if appropriate, restart the query.
+        accept() {
+            var _a;
+            if (this.debounceAccept > -1)
+                clearTimeout(this.debounceAccept);
+            this.debounceAccept = -1;
+            let updated = [];
+            let conf = this.view.state.facet(completionConfig);
+            for (let i = 0; i < this.running.length; i++) {
+                let query = this.running[i];
+                if (query.done === undefined)
+                    continue;
+                this.running.splice(i--, 1);
+                if (query.done) {
+                    let active = new ActiveResult(query.active.source, query.active.explicitPos, query.done, query.done.from, (_a = query.done.to) !== null && _a !== void 0 ? _a : cur(query.updates.length ? query.updates[0].startState : this.view.state));
+                    // Replay the transactions that happened since the start of
+                    // the request and see if that preserves the result
+                    for (let tr of query.updates)
+                        active = active.update(tr, conf);
+                    if (active.hasResult()) {
+                        updated.push(active);
+                        continue;
+                    }
+                }
+                let current = this.view.state.field(completionState).active.find(a => a.source == query.active.source);
+                if (current && current.state == 1 /* Pending */) {
+                    if (query.done == null) {
+                        // Explicitly failed. Should clear the pending status if it
+                        // hasn't been re-set in the meantime.
+                        let active = new ActiveSource(query.active.source, 0 /* Inactive */);
+                        for (let tr of query.updates)
+                            active = active.update(tr, conf);
+                        if (active.state != 1 /* Pending */)
+                            updated.push(active);
+                    }
+                    else {
+                        // Cleared by subsequent transactions. Restart.
+                        this.startQuery(current);
+                    }
+                }
+            }
+            if (updated.length)
+                this.view.dispatch({ effects: setActiveEffect.of(updated) });
+        }
+    }, {
+        eventHandlers: {
+            blur(event) {
+                let state = this.view.state.field(completionState, false);
+                if (state && state.tooltip && this.view.state.facet(completionConfig).closeOnBlur) {
+                    let dialog = state.open && getTooltip$1(this.view, state.open.tooltip);
+                    if (!dialog || !dialog.dom.contains(event.relatedTarget))
+                        this.view.dispatch({ effects: closeCompletionEffect.of(null) });
+                }
+            },
+            compositionstart() {
+                this.composing = 1 /* Started */;
+            },
+            compositionend() {
+                if (this.composing == 3 /* ChangedAndMoved */) {
+                    // Safari fires compositionend events synchronously, possibly
+                    // from inside an update, so dispatch asynchronously to avoid reentrancy
+                    setTimeout(() => this.view.dispatch({ effects: startCompletionEffect.of(false) }), 20);
+                }
+                this.composing = 0 /* None */;
+            }
+        }
     });
 
     const baseTheme$1 = /*@__PURE__*/EditorView.baseTheme({
@@ -22596,13 +22622,13 @@
             position: "absolute",
             padding: "3px 9px",
             width: "max-content",
-            maxWidth: `${400 /* Info.Width */}px`,
+            maxWidth: `${400 /* Width */}px`,
             boxSizing: "border-box"
         },
         ".cm-completionInfo.cm-completionInfo-left": { right: "100%" },
         ".cm-completionInfo.cm-completionInfo-right": { left: "100%" },
-        ".cm-completionInfo.cm-completionInfo-left-narrow": { right: `${30 /* Info.Margin */}px` },
-        ".cm-completionInfo.cm-completionInfo-right-narrow": { left: `${30 /* Info.Margin */}px` },
+        ".cm-completionInfo.cm-completionInfo-left-narrow": { right: `${30 /* Margin */}px` },
+        ".cm-completionInfo.cm-completionInfo-right-narrow": { left: `${30 /* Margin */}px` },
         "&light .cm-snippetField": { backgroundColor: "#00000022" },
         "&dark .cm-snippetField": { backgroundColor: "#ffffff22" },
         ".cm-snippetFieldPosition": {
@@ -27558,6 +27584,7 @@
         'Infinite loop _': (Name) => `This "${Name}" loop will run forever and likely block the model. Do you want to re-write into a "go" loop?`,
         'Argument is reserved _': (Name) => `The argument "${Name}" is a reserved NetLogo keyword. Do you want to replace it?`,
         'Argument is invalid _': (Name) => `The argument "${Name}" is invalid. Do you want to replace it?`,
+        'Inconsistent code block type _': (Prior, New) => `The code block type "${New}" does not match the preceding code block type "${Prior}".`,
         // Agent types and basic names
         Observer: () => 'Observer',
         Turtle: () => 'Turtle',
@@ -27699,6 +27726,7 @@
         'Infinite loop _': (Name) => `这个 "${Name}" 循环将永远运行下去，可能会阻塞模型。你想将它改成 "go" 循环吗？`,
         'Argument is reserved _': (Name) => `参数名称 "${Name}" 和 NetLogo 的关键字重复了。你想换一个名字吗？`,
         'Argument is invalid _': (Name) => `参数名称 "${Name}" 不可用。你想换一个名字吗？`,
+        'Inconsistent code block type _': (Prior, New) => `The code block type "${New}" does not match the preceding code block type "${Prior}".`,
         // Agent types and basic names
         Observer: () => '观察者',
         Turtle: () => '海龟',
@@ -28360,10 +28388,7 @@
     catch (error) { }
 
     /** Log: Log to console if debug is enabled. */
-    function Log(...args) {
-        if (window.GalapagosEditor.DebugEnabled)
-            console.log(...args);
-    }
+    const Log = !globalThis.GalapagosSilent ? console.log : () => { };
 
     /** GetCursorUntilMode: Get the cursor until the "mode" node. */
     function GetCursorUntilMode(State) {
@@ -28381,6 +28406,39 @@
             return null;
         return Cursor;
     }
+
+    /* getNodeContext: Gets the context code snippet of the node. */
+    const getNodeContext = function (State, Node) {
+        let curr_node = Node;
+        while (curr_node) {
+            // We consider a procedure or a global statement as a proper context scope.
+            if (curr_node.name == 'Procedure' ||
+                curr_node.name == 'Extensions' ||
+                curr_node.name == 'Globals' ||
+                curr_node.name == 'Breed' ||
+                curr_node.name == 'BreedsOwn')
+                return State.sliceDoc(curr_node.from, curr_node.to);
+            curr_node = curr_node.parent;
+        }
+        return State.sliceDoc(Node.from, Node.to);
+    };
+    /* getCodeName: Gets the lower-case, trimmed text (name) from a node. */
+    const getCodeName = function (State, Node) {
+        return State.sliceDoc(Node.from, Node.to).trim().toLowerCase();
+    };
+    /* getParentProcedure: Gets the name of the procedure the identifier is in. */
+    const getParentProcedure = function (State, Node) {
+        let curr_node = Node;
+        while (curr_node.parent) {
+            curr_node = curr_node.parent;
+            if (curr_node.name == 'Procedure') {
+                var children = curr_node.getChildren('ProcedureName');
+                if (children.length > 0)
+                    return getCodeName(State, children[0]);
+            }
+        }
+        return undefined;
+    };
 
     let primitives$5 = PrimitiveManager;
     /** StateNetLogo: The second-pass editor state for the NetLogo Language. */
@@ -28466,7 +28524,7 @@
                     // get extensions
                     if (Cursor.node.name == 'Extensions') {
                         Cursor.node.getChildren('Identifier').map((node) => {
-                            this.Extensions.push(this.getText(State, node));
+                            this.Extensions.push(getCodeName(State, node));
                         });
                     }
                     // get global variables
@@ -28478,7 +28536,7 @@
                         // get breed type
                         let breedType = BreedType$1.Turtle;
                         Cursor.node.getChildren('BreedStr').map((node) => {
-                            let name = this.getText(State, node);
+                            let name = getCodeName(State, node);
                             if (name.toLowerCase() == 'undirected-link-breed') {
                                 breedType = BreedType$1.UndirectedLink;
                             }
@@ -28490,8 +28548,8 @@
                         const Plural = Cursor.node.getChildren('BreedPlural');
                         const Singular = Cursor.node.getChildren('BreedSingular');
                         if (Plural.length == 1 && Singular.length == 1) {
-                            let singular = this.getText(State, Singular[0]);
-                            let plural = this.getText(State, Plural[0]);
+                            let singular = getCodeName(State, Singular[0]);
+                            let plural = getCodeName(State, Plural[0]);
                             let vars = (_a = tempBreedVars.get(plural)) !== null && _a !== void 0 ? _a : [];
                             let breed = new Breed(singular, plural, vars, breedType);
                             this.Breeds.set(singular, breed);
@@ -28501,7 +28559,7 @@
                     else if (Cursor.node.name == 'BreedsOwn') {
                         let breedName = '';
                         Cursor.node.getChildren('Own').map((node) => {
-                            breedName = this.getText(State, node);
+                            breedName = getCodeName(State, node);
                             breedName = breedName.substring(0, breedName.length - 4);
                         });
                         let breedVars = this.getVariables(Cursor.node, State);
@@ -28518,7 +28576,7 @@
                     }
                     // get procedures
                     else if (Cursor.node.name == 'Procedure') {
-                        let procedure = this.getProcedure(Cursor.node, State);
+                        let procedure = this.gatherProcedure(Cursor.node, State);
                         this.Procedures.set(procedure.Name, procedure);
                     }
                     if (!Cursor.nextSibling())
@@ -28528,33 +28586,23 @@
             else if (this.RecognizedMode == 'Command') ;
             return this;
         }
-        parseCommand(State, node) {
-            let procedure = new Procedure();
-            procedure.PositionStart = node.from;
-            procedure.PositionEnd = node.to;
-            procedure.IsCommand = true;
-            procedure.Name = '⚠EmbeddedMode⚠';
-            procedure.Arguments = [];
-            procedure.Variables = this.getLocalVarsCommand(node, State);
-            return procedure;
-        }
-        /** getProcedure: Gather all information about a procedure. */
-        getProcedure(node, State) {
+        /** gatherProcedure: Gather all information about a procedure. */
+        gatherProcedure(node, State) {
             let procedure = new Procedure();
             procedure.PositionStart = node.from;
             procedure.PositionEnd = node.to;
             procedure.IsCommand = true;
             if (node.getChild('To')) {
-                procedure.IsCommand = this.getText(State, node.getChildren('To')[0].node).toLowerCase() == 'to';
+                procedure.IsCommand = getCodeName(State, node.getChildren('To')[0].node).toLowerCase() == 'to';
             }
             node.getChildren('ProcedureName').map((node) => {
-                procedure.Name = this.getText(State, node);
+                procedure.Name = getCodeName(State, node);
             });
             procedure.Arguments = this.getArgs(node, State);
             procedure.Variables = this.getLocalVars(node, State, false);
-            procedure.AnonymousProcedures = this.searchAnonProcedure(node, State, procedure);
+            procedure.AnonymousProcedures = this.gatherAnonProcedures(node, State, procedure);
             procedure.Context = this.getContext(node, State);
-            procedure.CodeBlocks = this.getCodeBlocks(node, State, procedure.Context, procedure.Variables, procedure.Arguments);
+            procedure.CodeBlocks = this.gatherCodeBlocks(node, State, procedure.Context, procedure.Variables, procedure.Arguments);
             return procedure;
         }
         /** getContext: Identify context of a block by looking at primitives and variable names. */
@@ -28600,16 +28648,8 @@
                             }
                             else if (n) {
                                 for (let breed of this.Breeds.values()) {
-                                    if (breed.Variables.includes(name)) {
-                                        c = this.getBreedContext(breed);
-                                        // if (breed.IsLinkBreed) {
-                                        //   c = new AgentContexts('---L');
-                                        // } else if (breed.Singular == 'patch') {
-                                        //   c = new AgentContexts('-TP-');
-                                        // } else {
-                                        //   c = new AgentContexts('-T--');
-                                        // }
-                                    }
+                                    if (breed.Variables.includes(name))
+                                        c = this.getBreedContext(breed, true);
                                 }
                             }
                             newContext = combineContexts(c, priorContext);
@@ -28700,42 +28740,45 @@
             let prim_data = primitives$5.GetNamedPrimitive(prim);
             return prim_data === null || prim_data === void 0 ? void 0 : prim_data.AgentContext;
         }
-        /** getCodeBlocks: Gather all information about a given code block. */
-        getCodeBlocks(node, state, parentContext, vars, args) {
-            let blocks = [];
+        /** gatherCodeBlocks: Gather all information about code blocks inside a given node. */
+        gatherCodeBlocks(node, state, parentContext, vars, args) {
+            var blocks = [];
             node.cursor().iterate((noderef) => {
-                if (noderef.node.to > node.to) {
+                if (noderef.node.to > node.to)
                     return false;
-                }
-                if (noderef.name == 'Arg') {
+                if (noderef.name == 'Value')
                     noderef.node.getChildren('CodeBlock').map((child) => {
-                        if (!this.checkRanges(blocks, child)) {
-                            let block = new CodeBlock();
-                            let prim = this.getPrimitive(noderef.node, state);
-                            block.Primitive = prim.name;
-                            block.PositionStart = child.from;
-                            block.PositionEnd = child.to;
-                            block.InheritParentContext = prim.inheritParentContext;
-                            let originalContext = noContext(prim.context) ? parentContext : prim.context;
-                            block.Context = this.getContext(child, state, originalContext);
-                            // if (noContext(block.Context)) {
-                            //   console.log(
-                            //     parentContext,
-                            //     prim.context,
-                            //     noContext(prim.context) ? parentContext : prim.context,
-                            //     this.getContext(child, state)
-                            //   );
-                            // }
-                            block.Variables = vars.concat(this.getLocalVars(child.node, state, true));
-                            block.Arguments = args;
-                            block.CodeBlocks = this.getCodeBlocks(child.node, state, block.Context, block.Variables, block.Arguments);
-                            block.Breed = prim.breed;
-                            blocks.push(block);
-                        }
+                        this.gatherCodeBlock(child, state, blocks, parentContext, vars, args);
                     });
-                }
             });
             return blocks;
+        }
+        /** gatherCodeBlocks: Gather all information about a given code block. */
+        gatherCodeBlock(node, state, blocks, parentContext, vars, args) {
+            if (this.checkRanges(blocks, node))
+                return;
+            let block = new CodeBlock();
+            // Now it looks like Args/Value/CodeBlock
+            let prim = this.getPrimitive(node.parent.node.parent.node, state);
+            block.Primitive = prim.name;
+            block.PositionStart = node.from;
+            block.PositionEnd = node.to;
+            block.InheritParentContext = prim.inheritParentContext;
+            let originalContext = noContext(prim.context) ? parentContext : prim.context;
+            block.Context = this.getContext(node, state, originalContext);
+            // if (noContext(block.Context)) {
+            //   console.log(
+            //     parentContext,
+            //     prim.context,
+            //     noContext(prim.context) ? parentContext : prim.context,
+            //     this.getContext(child, state)
+            //   );
+            // }
+            block.Variables = vars.concat(this.getLocalVars(node.node, state, true));
+            block.Arguments = args;
+            block.Breed = prim.breed;
+            block.CodeBlocks = this.gatherCodeBlocks(node, state, block.Context, block.Variables, block.Arguments);
+            blocks.push(block);
         }
         /** getPrimitive: Gather information about the primitive whose argument is a code block. */
         getPrimitive(node, state) {
@@ -28780,21 +28823,11 @@
             if (prim.breed != '') {
                 prim.context = new AgentContexts('null');
                 if (prim.breed != '') {
-                    let breed = null;
                     for (let b of this.Breeds.values()) {
                         if (prim.breed.toLowerCase() == b.Singular || prim.breed.toLowerCase() == b.Plural) {
-                            breed = b;
+                            prim.context = this.getBreedContext(b);
+                            break;
                         }
-                    }
-                    if (breed) {
-                        prim.context = this.getBreedContext(breed);
-                        // if (breed.IsLinkBreed) {
-                        //   prim.context = new AgentContexts('---L');
-                        // } else if (breed.Singular == 'patch') {
-                        //   prim.context = new AgentContexts('-TP-');
-                        // } else {
-                        //   prim.context = new AgentContexts('-T--');
-                        // }
                     }
                 }
             }
@@ -28803,24 +28836,29 @@
                 prim.context = (_d = primitive === null || primitive === void 0 ? void 0 : primitive.BlockContext) !== null && _d !== void 0 ? _d : new AgentContexts('null');
                 prim.inheritParentContext = (_e = primitive === null || primitive === void 0 ? void 0 : primitive.InheritParentContext) !== null && _e !== void 0 ? _e : false;
             }
-            if (noContext(prim.context)) {
-                Log('No available context: ' + prim);
-            }
+            if (noContext(prim.context))
+                Log('No available context: ' + prim.name);
             return prim;
         }
-        getBreedContext(breed) {
+        /** getBreedContext: Get the context for a given breed. */
+        getBreedContext(breed, isVar = false) {
             if (breed.BreedType == BreedType$1.DirectedLink || breed.BreedType == BreedType$1.UndirectedLink) {
                 return new AgentContexts('---L');
             }
             else if (breed.Singular == 'patch') {
-                return new AgentContexts('-TP-');
+                if (isVar) {
+                    return new AgentContexts('-TP-');
+                }
+                else {
+                    return new AgentContexts('--P-');
+                }
             }
             else {
                 return new AgentContexts('-T--');
             }
         }
         /** searchAnonProcedure: Look for nested anonymous procedures within a node and procedure. */
-        searchAnonProcedure(node, State, procedure) {
+        gatherAnonProcedures(node, State, procedure) {
             let anonymousProcedures = [];
             node.cursor().iterate((noderef) => {
                 if (noderef.node.to > node.to) {
@@ -28829,23 +28867,21 @@
                 if (node != noderef.node &&
                     (noderef.name == 'AnonymousProcedure' || noderef.name == 'ShortAnonymousProcedure') &&
                     !this.checkRanges(anonymousProcedures, noderef.node)) {
-                    anonymousProcedures.push(this.getAnonProcedure(noderef, State, procedure));
+                    anonymousProcedures.push(this.gatherAnonProcedure(noderef, State, procedure));
                 }
             });
             return anonymousProcedures;
         }
         /** checkRanges: Identify whether a node is inside the set of procedures or code blocks. */
         checkRanges(procedures, node) {
-            let included = false;
             for (let p of procedures) {
-                if (p.PositionStart <= node.from && p.PositionEnd >= node.to) {
-                    included = true;
-                }
+                if (p.PositionStart <= node.from && p.PositionEnd >= node.to)
+                    return true;
             }
-            return included;
+            return false;
         }
-        /** getAnonProcedure: Gather information about the anonymous procedure. */
-        getAnonProcedure(noderef, State, procedure) {
+        /** getAnonProcedure: Gather information about an anonymous procedure. */
+        gatherAnonProcedure(noderef, State, procedure) {
             let anonProc = new Procedure();
             anonProc.PositionStart = noderef.from;
             anonProc.PositionEnd = noderef.to;
@@ -28857,22 +28893,18 @@
             let Node = noderef.node;
             Node.getChildren('AnonArguments').map((node) => {
                 node.getChildren('Identifier').map((subnode) => {
-                    args.push(this.getText(State, subnode));
+                    args.push(getCodeName(State, subnode));
                 });
                 node.getChildren('Arguments').map((subnode) => {
                     subnode.getChildren('Identifier').map((subsubnode) => {
-                        args.push(this.getText(State, subsubnode));
+                        args.push(getCodeName(State, subsubnode));
                     });
                 });
             });
             anonProc.Arguments = args;
             anonProc.Variables = anonProc.Variables.concat(this.getLocalVars(Node, State, true));
-            anonProc.AnonymousProcedures = this.searchAnonProcedure(Node, State, anonProc);
+            anonProc.AnonymousProcedures = this.gatherAnonProcedures(Node, State, anonProc);
             return anonProc;
-        }
-        /** getText: Get text for a given node. */
-        getText(State, Node) {
-            return State.sliceDoc(Node.from, Node.to).toLowerCase();
         }
         /** getLocalVars: Collect local variables within a node. */
         getLocalVars(Node, State, isAnon) {
@@ -28882,17 +28914,18 @@
             });
             return localVars;
         }
+        /** getLocalVarsCommand: Collect local variables within a command statement. */
         getLocalVarsCommand(Node, State, isAnon) {
             let localVars = [];
             Node.getChildren('CommandStatement').map((node2) => {
                 node2.getChildren('VariableDeclaration').map((node3) => {
                     node3.getChildren('NewVariableDeclaration').map((node4) => {
                         node4.getChildren('Identifier').map((node5) => {
-                            let variable = new LocalVariable(this.getText(State, node5), 1, node5.from);
+                            let variable = new LocalVariable(getCodeName(State, node5), 1, node5.from);
                             localVars.push(variable);
                         });
                         node4.getChildren('UnsupportedPrim').map((node5) => {
-                            let variable = new LocalVariable(this.getText(State, node5), 1, node5.from);
+                            let variable = new LocalVariable(getCodeName(State, node5), 1, node5.from);
                             localVars.push(variable);
                         });
                     });
@@ -28922,9 +28955,9 @@
                     'Breed',
                     'Extensions',
                 ].includes(noderef.name)) {
-                    var Text = this.getText(State, noderef.node);
+                    var Text = getCodeName(State, noderef.node);
                     if (Text !== '' && !Text.includes('\n'))
-                        vars.push(this.getText(State, noderef.node));
+                        vars.push(getCodeName(State, noderef.node));
                 }
             });
             return [...new Set(vars)];
@@ -28934,7 +28967,7 @@
             const args = [];
             Node.getChildren('Arguments').map((node) => {
                 node.getChildren('Identifier').map((subnode) => {
-                    args.push(this.getText(State, subnode));
+                    args.push(getCodeName(State, subnode));
                 });
             });
             return args;
@@ -28983,7 +29016,7 @@
             let doc = State.doc.toString();
             // Breeds
             let globals = doc.replace(/(^|\n)([^;\n]+[ ]+)?to\s+[\s\S]*\s+end/gi, '');
-            let breeds = globals.matchAll(/breed\s*\[\s*([^\s]+)\s+([^\s]+)\s*\]/g);
+            let breeds = globals.matchAll(/(^|\n)([^;\n]+[ ]+)?(directed-link-|undirected-link-)?breed\s*\[\s*([^\s]+)\s+([^\s]+)\s*\]/g);
             let processedBreeds = this.processBreeds(breeds);
             this.SingularBreeds = processedBreeds[0];
             this.PluralBreeds = processedBreeds[1];
@@ -29031,8 +29064,8 @@
             let pluralmatches = ['patches', 'turtles', 'links'];
             let count = 3;
             for (var match of breeds) {
-                pluralmatches[count] = match[1];
-                singularmatches[count] = match[2];
+                pluralmatches[count] = match[4];
+                singularmatches[count] = match[5];
                 count++;
             }
             return [singularmatches, pluralmatches];
@@ -29097,14 +29130,16 @@
     /** getDiagnostic: Returns a diagnostic object from a node and message. */
     const getDiagnostic = function (view, node, message, severity = 'error', ...values) {
         var value = view.state.sliceDoc(node.from, node.to).trim();
-        // Cut short the value if it's too long
-        if (value.length >= 20)
-            value = value.substring(0, 17) + '...';
-        if (values.length == 0)
+        var length = value.length;
+        if (values.length == 0) {
+            // Cut short the value if it's too long
+            if (value.length >= 20)
+                value = value.substring(0, 17) + '...';
             values.push(value);
+        }
         return {
             from: node.from,
-            to: node.from + value.length,
+            to: node.from + length,
             severity: severity,
             message: Localized.Get(message, ...values),
         };
@@ -29424,143 +29459,6 @@
         return linkData;
     }
 
-    /** buildToolTips: Extension for displaying language-specific & linting tooltips. */
-    const buildToolTips = (Editor) => {
-        return hoverTooltip((view, pos, side) => {
-            return getTooltips(view, pos, side, Editor);
-        });
-    };
-    /** getTooltips: Build the tooltip for both linting and language tips.  */
-    function getTooltips(view, pos, side, editor) {
-        var diagnostics = getLintState(view.state).diagnostics;
-        let found = [], stackStart = 2e8, stackEnd = 0;
-        diagnostics.between(pos - (side < 0 ? 1 : 0), pos + (side > 0 ? 1 : 0), (from, to, { spec }) => {
-            if (pos >= from && pos <= to && (from == to || ((pos > from || side > 0) && (pos < to || side < 0)))) {
-                found.push(spec.diagnostic);
-                stackStart = Math.min(from, stackStart);
-                stackEnd = Math.max(to, stackEnd);
-            }
-        });
-        if (found.length == 0) {
-            var tooltip = getTooltip(view, pos, pos, editor);
-            if (!tooltip)
-                return null;
-            stackStart = tooltip.from;
-            stackEnd = tooltip.to;
-            found.push(tooltip);
-        }
-        return {
-            pos: stackStart,
-            end: stackEnd,
-            above: view.state.doc.lineAt(stackStart).to < stackEnd,
-            create() {
-                return { dom: diagnosticsTooltip(view, found) };
-            },
-        };
-    }
-    // The following code is copied from CodeMirror, as they do not allow us to go deeper into diagnostics generation.
-    function diagnosticsTooltip(view, diagnostics) {
-        return crelt('ul', { class: 'cm-tooltip-lint' }, diagnostics.map((d) => renderDiagnostic(view, d, false)));
-    }
-    function assignKeys(actions) {
-        let assigned = [];
-        if (actions)
-            actions: for (let { name } of actions) {
-                for (let i = 0; i < name.length; i++) {
-                    let ch = name[i];
-                    if (/[a-zA-Z]/.test(ch) && !assigned.some((c) => c.toLowerCase() == ch.toLowerCase())) {
-                        assigned.push(ch);
-                        continue actions;
-                    }
-                }
-                assigned.push('');
-            }
-        return assigned;
-    }
-    function renderDiagnostic(view, diagnostic, inPanel) {
-        var _a;
-        let keys = inPanel ? assignKeys(diagnostic.actions) : [];
-        return crelt('li', { class: 'cm-diagnostic cm-diagnostic-' + diagnostic.severity }, crelt('span', { class: 'cm-diagnosticText' }, diagnostic.renderMessage ? diagnostic.renderMessage() : diagnostic.message), (_a = diagnostic.actions) === null || _a === void 0 ? void 0 : _a.map((action, i) => {
-            let fired = false, click = (e) => {
-                e.preventDefault();
-                if (fired)
-                    return;
-                fired = true;
-                let found = findDiagnostic(getLintState(view.state).diagnostics, diagnostic);
-                if (found)
-                    action.apply(view, found.from, found.to);
-            };
-            let { name } = action, keyIndex = keys[i] ? name.indexOf(keys[i]) : -1;
-            let nameElt = keyIndex < 0
-                ? name
-                : [name.slice(0, keyIndex), crelt('u', name.slice(keyIndex, keyIndex + 1)), name.slice(keyIndex + 1)];
-            return crelt('button', {
-                type: 'button',
-                class: 'cm-diagnosticAction',
-                onclick: click,
-                onmousedown: click,
-                'aria-label': ` Action: ${name}${keyIndex < 0 ? '' : ` (access key "${keys[i]})"`}.`,
-            }, nameElt);
-        }), diagnostic.source && crelt('div', { class: 'cm-diagnosticSource' }, diagnostic.source));
-    }
-    function findDiagnostic(diagnostics, diagnostic = null, after = 0) {
-        let found = null;
-        diagnostics.between(after, 1e9, (from, to, { spec }) => {
-            if (diagnostic && spec.diagnostic != diagnostic)
-                return;
-            found = new SelectedDiagnostic(from, to, spec.diagnostic);
-            return false;
-        });
-        return found;
-    }
-    class SelectedDiagnostic {
-        constructor(from, to, diagnostic) {
-            this.from = from;
-            this.to = to;
-            this.diagnostic = diagnostic;
-        }
-    }
-
-    const lightTheme = EditorView.theme({
-        '&.cm-editor': {
-            height: '100%',
-            '&.cm-focused': {
-                outline: 'none',
-            },
-        },
-        '.cm-diagnostic': {
-            fontSize: '0.9em',
-            padding: '0.3em 0.5em',
-        },
-        '.cm-tooltip-extendable': {
-            cursor: 'pointer',
-        },
-        '.cm-tooltip-extendable:hover': {
-            textDecoration: 'underline',
-        },
-        '.cm-editor.cm-focused': {
-            outline: 'none',
-        },
-        '.cm-gutter-lint': {
-            width: '3px',
-        },
-        '.cm-gutter-lint .cm-gutterElement': {
-            padding: '0',
-        },
-        '.cm-lint-marker': {
-            width: '100%',
-            height: '100%',
-        },
-        '.cm-lint-marker-error': {
-            background: '#cc2200',
-            content: 'none',
-        },
-        '.cm-lint-marker-warning': {
-            background: '#FAD842',
-            content: 'none',
-        },
-    });
-
     const directives = [
         'breed',
         'to',
@@ -29677,6 +29575,351 @@
         '__hubnet-make-plot-narrowcast',
     ];
     const reserved = [...directives, ...turtleVars, ...patchVars, ...linkVars, ...constants, ...unsupported];
+
+    /** CodeEditing: Functions for editing code. */
+    class CodeEditing {
+        /** Constructor: Create a new code editing service. */
+        constructor(View) {
+            this.View = View;
+            this.Galapagos = View.state.field(preprocessStateExtension).Editor;
+        }
+        /** ChangeCode: Send a changeset into the editor. */
+        ChangeCode(Changes) {
+            this.View.dispatch({ changes: Changes });
+        }
+        /** GetSlice: Get a slice of the code. */
+        GetSlice(From, To) {
+            return this.View.state.sliceDoc(From, To);
+        }
+        /** FindFirstChild: Find the first child that matches a condition. */
+        FindFirstChild(Parent, Field, Condition) {
+            var _a;
+            for (let Child of Parent.getChildren(Field)) {
+                if ((_a = Condition === null || Condition === void 0 ? void 0 : Condition(Child)) !== null && _a !== void 0 ? _a : true)
+                    return Child;
+            }
+            return null;
+        }
+        /** AddTermToBracket: Add a term to a bracket. */
+        AddTermToBracket(Contents, Node) {
+            // De-duplicate the contents
+            var Identifiers = Node.node.getChildren('Identifier').map((Child) => this.GetSlice(Child.from, Child.to).trim());
+            Contents = Contents.filter((Content) => Identifiers.indexOf(Content) == -1);
+            if (Contents.length == 0)
+                return false;
+            // Find the spaces between the brackets
+            let Seperator = this.View.state.sliceDoc(Node.from, Node.to).includes('\n') ? '\n' : ' ';
+            var From = this.FindFirstChild(Node, 'CloseBracket').from;
+            // Insert the contents
+            for (let Content of Contents.reverse()) {
+                this.ChangeCode({
+                    from: From,
+                    to: From,
+                    insert: Content + Seperator,
+                });
+                this.ChangeCode(indentRange(this.View.state, From, From + 1 + Content.length));
+            }
+            return true;
+        }
+        // #endregion
+        // #region "Global Statements"
+        /** AppendGlobals: Append items of a global statement to the editor. */
+        AppendGlobals(Field, Items) {
+            Items = [...new Set(Items.filter((Item) => reserved.indexOf(Item) == -1))];
+            if (Items.length == 0)
+                return false;
+            // Find the cursor
+            let Cursor = GetCursorUntilMode(this.View.state);
+            // Find the first global statement
+            if (Cursor) {
+                var Statement = this.FindFirstChild(Cursor.node, Field);
+                if (Statement)
+                    return this.AddTermToBracket(Items, Statement);
+            }
+            // If not found, append a new global statement
+            this.ChangeCode({
+                from: 0,
+                to: 0,
+                insert: `${Field.toLowerCase()} [ ${Items.join(' ')} ]\n`,
+            });
+            return true;
+        }
+        /** AppendBreed: Append a breed to the editor. */
+        AppendBreed(Type, Plural, Singular) {
+            // Check if the breed already exists
+            if (Plural == 'patches' || Singular == 'patch')
+                return false;
+            if (Plural == Singular)
+                Singular = getSingularName(Plural);
+            for (let [Sin, Breed] of this.Galapagos.LintContext.Breeds) {
+                if (Breed.Plural == Plural || Breed.Singular == Singular || Breed.Singular == Plural || Breed.Plural == Singular)
+                    return false;
+            }
+            // TODO: Find the most appropriate place to insert the breed
+            // Add the breed
+            var Name = 'breed';
+            if (Type == BreedType$1.DirectedLink)
+                Name = 'directed-link-breed';
+            if (Type == BreedType$1.UndirectedLink)
+                Name = 'undirected-link-breed';
+            this.ChangeCode({
+                from: 0,
+                to: 0,
+                insert: `${Name} [ ${Plural} ${Singular} ]\n`,
+            });
+            return true;
+        }
+        /** AppendBreedVariables: Add variables to a breed. */
+        AppendBreedVariables(Plural, Variables) {
+            Variables = [...new Set(Variables.filter((Item) => reserved.indexOf(Item) == -1))];
+            if (Variables.length == 0)
+                return false;
+            let Cursor = GetCursorInsideMode(this.View.state);
+            // Find the first existing statement
+            if (Cursor) {
+                while (true) {
+                    if (Cursor.node.name == 'BreedsOwn') {
+                        var Own = this.FindFirstChild(Cursor.node, 'Own');
+                        var Name = this.GetSlice(Own.from, Own.to).trim().toLowerCase();
+                        if (Name === Plural.toLowerCase() + '-own') {
+                            this.AddTermToBracket(Variables, Cursor.node);
+                            return true;
+                        }
+                    }
+                    if (!Cursor.nextSibling() || Cursor.node.name === 'Procedure')
+                        break;
+                }
+            }
+            // TODO: Find the most appropriate place to insert the breed
+            // If not found, append a new statement
+            this.ChangeCode({
+                from: 0,
+                to: 0,
+                insert: `${Plural.toLowerCase()}-own [ ${Variables.join(' ')} ]\n`,
+            });
+            return true;
+        }
+        // #endregion
+        ReplaceProcedure(view, name, content) {
+            syntaxTree(view.state)
+                .cursor()
+                .iterate((node) => {
+                if (node.name == 'Procedure' && view.state.sliceDoc(node.from, node.to) == name) {
+                    node.from + content.length;
+                    view.dispatch({
+                        changes: {
+                            from: node.from,
+                            to: node.to,
+                            insert: content,
+                        },
+                    });
+                }
+            });
+        }
+    }
+
+    /** addBreedAction: Add an adding a breed action. */
+    const addBreedAction = function (diagnostic, type, plural, singular) {
+        var _a;
+        diagnostic.actions = [
+            ...((_a = diagnostic.actions) !== null && _a !== void 0 ? _a : []),
+            {
+                name: Localized.Get('Add'),
+                apply(view, from, to) {
+                    new CodeEditing(view).AppendBreed(type, plural, singular);
+                },
+            },
+        ];
+        return diagnostic;
+    };
+    /** addGlobalsAction: Add an adding global variables action. */
+    const addGlobalsAction = function (diagnostic, type, items) {
+        var _a;
+        diagnostic.actions = [
+            ...((_a = diagnostic.actions) !== null && _a !== void 0 ? _a : []),
+            {
+                name: Localized.Get('Add'),
+                apply(view, from, to) {
+                    new CodeEditing(view).AppendGlobals(type, items);
+                },
+            },
+        ];
+        return diagnostic;
+    };
+    /** removeAction: Add an removing the snippet action. */
+    const removeAction = function (diagnostic) {
+        var _a;
+        diagnostic.actions = [
+            ...((_a = diagnostic.actions) !== null && _a !== void 0 ? _a : []),
+            {
+                name: Localized.Get('Remove'),
+                apply(view, from, to) {
+                    view.dispatch({ changes: { from, to, insert: '' } });
+                },
+            },
+        ];
+        return diagnostic;
+    };
+    /** explainAction: Add an explain the linting message action. */
+    const explainAction = function (diagnostic, callback) {
+        var _a;
+        diagnostic.actions = [
+            ...((_a = diagnostic.actions) !== null && _a !== void 0 ? _a : []),
+            {
+                name: Localized.Get('Explain'),
+                apply(view, from, to) {
+                    var node = syntaxTree(view.state).resolve(from, -1);
+                    callback(diagnostic, getNodeContext(view.state, node));
+                },
+            },
+        ];
+        return diagnostic;
+    };
+
+    /** buildToolTips: Extension for displaying language-specific & linting tooltips. */
+    const buildToolTips = (Editor) => {
+        return hoverTooltip((view, pos, side) => {
+            return getTooltips(view, pos, side, Editor);
+        });
+    };
+    /** getTooltips: Build the tooltip for both linting and language tips.  */
+    function getTooltips(view, pos, side, editor) {
+        var diagnostics = getLintState(view.state).diagnostics;
+        let found = [], stackStart = 2e8, stackEnd = 0;
+        // Find all diagnostics that touch this point
+        diagnostics.between(pos - (side < 0 ? 1 : 0), pos + (side > 0 ? 1 : 0), (from, to, { spec }) => {
+            var _a;
+            if (pos >= from && pos <= to && (from == to || ((pos > from || side > 0) && (pos < to || side < 0)))) {
+                var diagnostic = spec.diagnostic;
+                diagnostic.actions = (_a = diagnostic.actions) !== null && _a !== void 0 ? _a : [];
+                if (diagnostic.actions.length === 0 && editor.Options.OnExplain)
+                    explainAction(diagnostic, editor.Options.OnExplain);
+                found.push(diagnostic);
+                stackStart = Math.min(from, stackStart);
+                stackEnd = Math.max(to, stackEnd);
+            }
+        });
+        // If there are none, try to find a proper tooltip
+        if (found.length == 0) {
+            var tooltip = getTooltip(view, pos, pos, editor);
+            if (!tooltip)
+                return null;
+            stackStart = tooltip.from;
+            stackEnd = tooltip.to;
+            found.push(tooltip);
+        }
+        // Build up the tooltip DOM element
+        return {
+            pos: stackStart,
+            end: stackEnd,
+            above: view.state.doc.lineAt(stackStart).to < stackEnd,
+            create() {
+                return { dom: diagnosticsTooltip(view, found) };
+            },
+        };
+    }
+    // The following code is copied from CodeMirror, as they do not allow us to go deeper into diagnostics generation.
+    function diagnosticsTooltip(view, diagnostics) {
+        return crelt('ul', { class: 'cm-tooltip-lint' }, diagnostics.map((d) => renderDiagnostic(view, d, false)));
+    }
+    function assignKeys(actions) {
+        let assigned = [];
+        if (actions)
+            actions: for (let { name } of actions) {
+                for (let i = 0; i < name.length; i++) {
+                    let ch = name[i];
+                    if (/[a-zA-Z]/.test(ch) && !assigned.some((c) => c.toLowerCase() == ch.toLowerCase())) {
+                        assigned.push(ch);
+                        continue actions;
+                    }
+                }
+                assigned.push('');
+            }
+        return assigned;
+    }
+    function renderDiagnostic(view, diagnostic, inPanel) {
+        var _a;
+        let keys = inPanel ? assignKeys(diagnostic.actions) : [];
+        return crelt('li', { class: 'cm-diagnostic cm-diagnostic-' + diagnostic.severity }, crelt('span', { class: 'cm-diagnosticText' }, diagnostic.renderMessage ? diagnostic.renderMessage() : diagnostic.message), (_a = diagnostic.actions) === null || _a === void 0 ? void 0 : _a.map((action, i) => {
+            let fired = false, click = (e) => {
+                e.preventDefault();
+                if (fired)
+                    return;
+                fired = true;
+                let found = findDiagnostic(getLintState(view.state).diagnostics, diagnostic);
+                if (found)
+                    action.apply(view, found.from, found.to);
+            };
+            let { name } = action, keyIndex = keys[i] ? name.indexOf(keys[i]) : -1;
+            let nameElt = keyIndex < 0
+                ? name
+                : [name.slice(0, keyIndex), crelt('u', name.slice(keyIndex, keyIndex + 1)), name.slice(keyIndex + 1)];
+            return crelt('button', {
+                type: 'button',
+                class: 'cm-diagnosticAction',
+                onclick: click,
+                onmousedown: click,
+                'aria-label': ` Action: ${name}${keyIndex < 0 ? '' : ` (access key "${keys[i]})"`}.`,
+            }, nameElt);
+        }), diagnostic.source && crelt('div', { class: 'cm-diagnosticSource' }, diagnostic.source));
+    }
+    function findDiagnostic(diagnostics, diagnostic = null, after = 0) {
+        let found = null;
+        diagnostics.between(after, 1e9, (from, to, { spec }) => {
+            if (diagnostic && spec.diagnostic != diagnostic)
+                return;
+            found = new SelectedDiagnostic(from, to, spec.diagnostic);
+            return false;
+        });
+        return found;
+    }
+    class SelectedDiagnostic {
+        constructor(from, to, diagnostic) {
+            this.from = from;
+            this.to = to;
+            this.diagnostic = diagnostic;
+        }
+    }
+
+    const lightTheme = EditorView.theme({
+        '&.cm-editor': {
+            height: '100%',
+            '&.cm-focused': {
+                outline: 'none',
+            },
+        },
+        '.cm-diagnostic': {
+            fontSize: '0.9em',
+            padding: '0.3em 0.5em',
+        },
+        '.cm-tooltip-extendable': {
+            cursor: 'pointer',
+        },
+        '.cm-tooltip-extendable:hover': {
+            textDecoration: 'underline',
+        },
+        '.cm-editor.cm-focused': {
+            outline: 'none',
+        },
+        '.cm-gutter-lint': {
+            width: '3px',
+        },
+        '.cm-gutter-lint .cm-gutterElement': {
+            padding: '0',
+        },
+        '.cm-lint-marker': {
+            width: '100%',
+            height: '100%',
+        },
+        '.cm-lint-marker-error': {
+            background: '#cc2200',
+            content: 'none',
+        },
+        '.cm-lint-marker-warning': {
+            background: '#FAD842',
+            content: 'none',
+        },
+    });
 
     // This file was generated by lezer-generator. You probably shouldn't edit it.
     const ReporterLeft1Args = 1,
@@ -30236,9 +30479,12 @@
     };
     const specializeCommand = function (token) {
         token = token.toLowerCase();
-        if (token == 'ifelse' || token == 'if-else') {
+        if (token == 'ifelse' || token == 'if-else')
             return Command3ArgsVar2;
-        }
+        if (token == 'create-turtles')
+            return SpecialCommandCreateTurtle;
+        if (token == 'create-links')
+            return SpecialCommandCreateLink;
         let commands = primitives$3.GetPrimitive('', token);
         if (commands) {
             let repeats = false;
@@ -30347,21 +30593,22 @@
     // This file was generated by lezer-generator. You probably shouldn't edit it.
     const parser$3 = LRParser.deserialize({
       version: 14,
-      states: "$#YO$[QROOO&dQPO'#E[O&iQPO'#E^O&nQPO'#E_O&sQPO'#EbOOQQ'#F`'#F`O+{QRO'#EfOOQQ'#Em'#EmO.xQRO'#EmO/cQRO'#EvO1[QROOOOQQ'#Ev'#EvO1jQRO'#EvO4fQRO'#EvO4fQRO'#EvO4fQRO'#EvO4fQRO'#EvO4fQRO'#EvO:jQRO'#EvO:tQRO'#EvO4fQRO'#EvO4fQRO'#EvO4fQRO'#EvO4fQRO'#EvO4fQRO'#EvO=pQRO'#EvO@PQRO'#EvO=pQRO'#EvOB{QRO'#EuOOQQ'#Ek'#EkOOQQ'#Ee'#EeOC^QRO'#EeOCoQRO'#E|OCwQRO'#E}OOQQ'#E{'#E{OOQQ'#Ed'#EdOD]QRO'#EdO4fQRO'#EdO4fQRO'#EdO4fQRO'#EdO4fQRO'#EdO4fQRO'#EdO:tQRO'#EdOL[QRO'#EdO:tQRO'#EdO4fQRO'#EdO4fQRO'#EdO4fQRO'#EdO4fQRO'#EdO4fQRO'#EdO4fQRO'#EdOLcQRO'#EcO!!sQRO'#FPOOQQ'#FT'#FTO!#dQRO'#EYO!%]QRO'#FSQOQPOOO!'`QRO,5:vO!'hQRO,5:xO!'pQRO,5:yO!'{QRO,5:|OOQQ'#Ej'#EjO!(fQRO'#EmOOQQ'#Eg'#EgO/cQRO'#EgOOQQ'#FV'#FVO!(mQRO,5;QO!/fQRO'#EfO!:dQRO,5;QO!:wQRO'#EmO!;hQRO'#EmO!<dQRO'#EoOOQQ'#FW'#FWO!<zQRO'#FWO!=sQRO,5;YO!=zQRO'#ErOOQO'#Er'#ErOOQQ'#Eu'#EuO!>VQPO,5;]O!>[QRO,5;fO!>mQRO,5;eO!?OQRO'#EvO!A}QRO,5;bO1jQRO,5;bO!B`QRO,5;VO!BqQPO,5;vO1jQRO,5;bO4fQRO,5;bO1jQRO,5;bO!BvQRO'#EmO!MuQRO,5;bO!NZQRO,5;bO!NkQRO,5;bO!NkQRO,5;bO!NkQRO,5;bO!NkQRO,5;bO#%{QRO'#FZO#&fQRO,5;bO#&|QRO,5;bO!NkQRO,5;bO!NkQRO,5;bO!NkQRO,5;bO!NkQRO,5;bO#,TQRO'#ExOOQQ'#Ew'#EwO#.wQRO,5;bO:tQRO,5;bO#/OQRO,5;hO#/OQRO,5;iO#4^QRO,5;OO#4nQRO,5;OO!NkQRO,5;OO!NkQRO,5;OO!NkQRO,5;OO!NkQRO,5;OO#5OQRO,5;OO#8SQRO,5;OO#&|QRO,5;OO!NkQRO,5;OO!NkQRO,5;OO!NkQRO,5;OO!NkQRO,5;OO#?_QRO,5;OOOQQ'#FQ'#FQO#?iQRO,5;kOOQQ'#Ec'#EcOOQQ-E9R-E9ROOQQ'#F['#F[O#AhQRO'#F[OOQQ-E9Y-E9YOOQQ'#FU'#FUO#CeQRO1G0bOOQQ1G0b1G0bO#CmQRO1G0dOOQQ1G0d1G0dOOQQ'#E`'#E`O#CuQRO1G0eO#C}QRO1G0hOOQQ1G0h1G0hO!'pQRO,5;UO#DVQPO,5;RO#D[QPO'#EjO#AhQRO'#EgOOQQ-E9T-E9TOOQQ1G0l1G0lO#E_QRO,5;QO#EfQRO,5;_OOQQ'#Eo'#EoOOQQ-E9U-E9UO#EtQRO'#EnOOQQ1G0t1G0tOOQQ'#FX'#FXOOQQ-E9V-E9VO#E{QRO1G0wOOQQ1G1Q1G1QOOQQ1G1P1G1PO#F]QRO1G0|O#MpQRO1G0|OOQQ1G0q1G0qOOQQ1G1b1G1bOOQQ1G0|1G0|O!NZQRO1G0|O#NRQRO1G0|OOQQ,5;b,5;bO!NZQRO1G0|O!NkQRO1G0|O!NkQRO1G0|O!NkQRO1G0|OOQQ-E9X-E9XO#NgQRO1G0|O#&|QRO1G0|O!NkQRO1G0|O!NkQRO1G0|O!NkQRO1G0|O#N}QRO,5;dO$!yQRO'#EmOOQQ,5;d,5;dO$&SQRO,5;dO$&ZQRO,5;dO$)tQRO'#FYO$){QRO,5;bO$,sQRO,5;bO$/|QRO1G1SO$0^QRO1G1SO$3^QRO1G1TO$3nQRO1G1TO$6bQRO1G0jO#4nQRO1G0jO!NkQRO1G0jO!NkQRO1G0jO!NkQRO1G0jO$6rQRO1G0jO#&|QRO1G0jO!NkQRO1G0jO!NkQRO1G0jO!NkQRO1G0jO$>mQRO'#EfO$ExQRO'#EmO$MTQRO'#EkOOQQ'#FO'#FOOOQQ1G0j1G0jO$M[QRO1G1VO% WQRO'#EsOOQQ1G1V1G1VO$M[QRO1G1VOOQQ-E9S-E9SOOQQ7+%|7+%|OOQQ7+&O7+&OOOQO'#Ea'#EaO% cQPO7+&POOQQ7+&S7+&SO#CuQRO1G0pOOQQ1G0m1G0mOOQQ1G0y1G0yOOQQ,5;Y,5;YO% hQRO7+&cO%#dQRO7+&cOOQQ7+&c7+&cO%#kQRO7+&cOOQQ7+&h7+&hO%#|QRO7+&hO!NZQRO7+&hO!NkQRO7+&hO!NkQRO7+&hO%$bQRO7+&hO#&|QRO7+&hO!NkQRO7+&hO!NkQRO7+&hOOQQ1G1O1G1OOOQQ-E9W-E9WO%'[QRO7+&UO#4nQRO7+&UO!NkQRO7+&UO!NkQRO7+&UO%'lQRO7+&UO#&|QRO7+&UO!NkQRO7+&UO!NkQRO7+&UO%*dQRO,5;QO%8XQRO,5;QO%8`QRO,5;dO%8qQRO,5;eOOQQ7+&q7+&qO%8xQRO,5;_OOQQ,5;_,5;_O%9TQRO7+&qOOQQ<<Ik<<IkO%;PQPO7+&[OOQQ<<I}<<I}O%;UQRO<<JSO!NZQRO<<JSO!NkQRO<<JSO%;jQRO<<JSO#&|QRO<<JSO!NkQRO<<JSO%>dQRO<<IpO#4nQRO<<IpO!NkQRO<<IpO%>tQRO<<IpO#&|QRO<<IpO!NkQRO<<IpO%HpQRO1G0lO%IiQRO1G1OOOQQ<<J]<<J]OOQQ<<Iv<<IvOOQQ<<JS<<JSO%NkQROAN?nO!NZQROAN?nO& PQROAN?nO#&|QROAN?nO&#yQROAN?[O#4nQROAN?[O&$ZQROAN?[O#&|QROAN?[OOQQAN?nAN?nO&'RQROG25YO&'gQROG25YO&*aQROG24vO&*qQROG24vOOQQG25YG25YO&-iQRO'#EmO4fQRO'#EvO&3VQRO'#EvO&7eQRO'#EvO&9gQRO'#EvO&;iQRO'#EvO4fQRO'#EvO4fQRO'#EvO:tQRO'#EvO&=wQRO'#EdO&@sQRO'#EdO&CoQRO'#EdO&FkQRO'#EdO1jQRO'#EdO&LlQRO'#EdO&NqQRO'#EdO&NxQRO'#EdO' PQRO,5;QO'#pQRO,5;QO'$jQRO'#EmO'%^QRO'#EmO'%zQRO'#EmO4fQRO,5;bO&@sQRO,5;bO&CoQRO,5;bO&FkQRO,5;bO@PQRO,5;bO&=wQRO,5;bOD]QRO,5;bO4fQRO,5;bO&@sQRO,5;bO&CoQRO,5;bO&FkQRO,5;bO&=wQRO,5;bOD]QRO,5;bO@PQRO,5;bO')_QRO'#EmO'/kQRO,5;bO'2hQRO,5;bO'4{QRO,5;bO'7lQRO,5;bO':`QRO,5;bO':mQRO,5;bO'=WQRO,5;bO!NkQRO,5;bO'=eQRO,5;bO'=uQRO,5;bO'>VQRO,5;bO'>gQRO,5;bO#4nQRO,5;bO'>wQRO,5;bO'?XQRO,5;bO'@[QRO,5;bO'C]QRO,5;bO'FaQRO,5;bO!NkQRO,5;bO'IeQRO,5;bO4fQRO,5;bO'IlQRO,5;hO'LhQRO,5;hO( dQRO,5;hO($`QRO,5;hO!?RQRO,5;hO'IlQRO,5;iO'LhQRO,5;iO( dQRO,5;iO($`QRO,5;iO!?RQRO,5;iO()nQRO,5;OO(,bQRO,5;OO(.uQRO,5;OO(1fQRO,5;OO(1vQRO,5;OO'>gQRO,5;OO'=eQRO,5;OO'=uQRO,5;OO'>VQRO,5;OO!NZQRO,5;OO(2XQRO,5;OO(5YQRO,5;OO(8ZQRO,5;OO(;_QRO,5;OO(>fQRO,5;OO(>yQRO,5;OO(AqQRO,5;OO(AxQRO,5;OO(DsQRO1G0|O(K`QRO1G0|O!NkQRO1G0|O'=eQRO1G0|O'=uQRO1G0|O'>VQRO1G0|O'>gQRO1G0|O#4nQRO1G0|O'>wQRO1G0|O)!sQRO1G0|O)%pQRO1G0|O)(TQRO1G0|O)*tQRO1G0|O)+RQRO1G0|O)+`QRO1G0|O)-yQRO1G0|O!NkQRO1G0|O'=eQRO1G0|O'=uQRO1G0|O'>VQRO1G0|O'>gQRO1G0|O#4nQRO1G0|O'>wQRO1G0|O).WQRO1G0|O)/ZQRO1G0|O)2RQRO1G0|O)5VQRO1G0|O!NkQRO1G0|O)9[QRO,5;bO)@pQRO,5;bO)@}QRO,5;bO)A[QRO,5;bO)HTQRO1G0jO)JwQRO1G0jO)MXQRO1G0jO)MlQRO1G0jO)N]QRO1G0jO'>gQRO1G0jO'=eQRO1G0jO'=uQRO1G0jO'>VQRO1G0jO!NZQRO1G0jO)NnQRO1G0jO*#fQRO1G0jO*#mQRO1G0jO*-uQRO'#EmO*2|QRO'#EmO$>tQRO'#EmO*:RQRO'#EkO*?YQRO'#EkO$FPQRO'#EkO*DdQRO7+&hO*GaQRO7+&hO*ItQRO7+&hO*LeQRO7+&hO+ XQRO7+&hO+ fQRO7+&hO+$PQRO7+&hO!NkQRO7+&hO'=eQRO7+&hO'=uQRO7+&hO'>VQRO7+&hO'>gQRO7+&hO#4nQRO7+&hO'>wQRO7+&hO+$^QRO7+&hO+%aQRO7+&hO+(bQRO7+&hO++fQRO7+&hO!NkQRO7+&hO+0|QRO7+&UO+3pQRO7+&UO+6QQRO7+&UO+6eQRO7+&UO+7UQRO7+&UO'>gQRO7+&UO'=eQRO7+&UO'=uQRO7+&UO'>VQRO7+&UO!NZQRO7+&UO+7gQRO7+&UO+:_QRO7+&UO+:fQRO7+&UO+=pQRO,5;QO+GdQRO,5;QO%,`QRO,5;QO,%yQRO<<JSO,(vQRO<<JSO,+ZQRO<<JSO,-zQRO<<JSO,0nQRO<<JSO,0{QRO<<JSO,3fQRO<<JSO!NkQRO<<JSO'=eQRO<<JSO'=uQRO<<JSO'>VQRO<<JSO'>gQRO<<JSO#4nQRO<<JSO'>wQRO<<JSO,3sQRO<<JSO,4vQRO<<JSO,7wQRO<<JSO,:{QRO<<JSO!NkQRO<<JSO,@cQRO<<IpO,CVQRO<<IpO,EgQRO<<IpO,EzQRO<<IpO,FkQRO<<IpO'>gQRO<<IpO'=eQRO<<IpO'=uQRO<<IpO'>VQRO<<IpO!NZQRO<<IpO,F|QRO<<IpO,ItQRO<<IpO,I{QRO<<IpO,MVQRO1G0lO-*jQRO1G0lO%AlQRO1G0lO-/tQROAN?nO-2qQROAN?nO-5UQROAN?nO-7uQROAN?nO-:iQROAN?nO-:vQROAN?nO-=aQROAN?nO!NkQROAN?nO'=eQROAN?nO'=uQROAN?nO'>VQROAN?nO'>gQROAN?nO#4nQROAN?nO'>wQROAN?nO-=nQROAN?nO->qQROAN?nO-ArQROAN?nO-DvQROAN?nO!NkQROAN?nO-J^QROAN?[O-MQQROAN?[O. bQROAN?[O. uQROAN?[O.!fQROAN?[O'>gQROAN?[O'=eQROAN?[O'=uQROAN?[O'>VQROAN?[O!NZQROAN?[O.!wQROAN?[O.%oQROAN?[O.%vQROAN?[O..TQROG25YO.1QQROG25YO.3eQROG25YO.6UQROG25YO.8xQROG25YO.9VQROG25YO.;pQROG25YO.;}QROG25YO.=QQROG25YO.@RQROG25YO.CVQROG25YO.HmQROG24vO.KaQROG24vO.MqQROG24vO.NUQROG24vO.NuQROG24vO/ WQROG24vO/$OQROG24vO/$VQROG24vO/'aQRO'#EfO/'hQRO'#EfO/'oQRO'#EvO/'}QRO'#EvO/(]QRO'#EvO/(kQRO'#EvO/(yQRO'#EvO/)XQRO'#EvO/)gQRO'#EvO&=wQRO'#EvO&FkQRO'#EvOD]QRO'#EvO@PQRO'#EvO&CoQRO'#EvO&@sQRO'#EvO4fQRO'#EvO4fQRO'#EvO4fQRO'#EvO4fQRO'#EvO4fQRO'#EvO4fQRO'#EvO4fQRO'#EvO/,cQRO'#EvO4fQRO'#EvO4fQRO'#EvO:tQRO'#EvO4fQRO'#EvO=pQRO'#EvO=pQRO'#EvO=pQRO'#EvO=pQRO'#EvO=pQRO'#EvO=pQRO'#EvO=pQRO'#EvO@PQRO'#EvO=pQRO'#EvO/,vQRO'#E|O/-OQRO'#E|O/-WQRO'#E|O/-`QRO'#E|O/-hQRO'#E|OCwQRO'#E}OCwQRO'#E}OCwQRO'#E}OCwQRO'#E}OCwQRO'#E}O4fQRO'#EdO4fQRO'#EdO4fQRO'#EdO4fQRO'#EdO4fQRO'#EdO4fQRO'#EdO4fQRO'#EdO:tQRO'#EdO:tQRO'#EdO:tQRO'#EdO4fQRO'#EdO:tQRO'#EdO:tQRO'#EdO/-pQRO,5;bO/.RQRO,5;bO/)gQRO,5;bO4fQRO,5;bO4fQRO,5;bO4fQRO,5;bO4fQRO,5;bO4fQRO,5;bO4fQRO,5;bO4fQRO,5;bO/)gQRO,5;bO/.dQRO,5;bO/.uQRO,5;bO!NkQRO,5;bO!NkQRO,5;bO!NkQRO,5;bO!NkQRO,5;bO!NkQRO,5;bO!NkQRO,5;bO!NkQRO,5;bO//VQRO,5;bO!NkQRO,5;bO!NkQRO,5;bO#&|QRO,5;bO#&|QRO,5;bO!NkQRO,5;bO!NkQRO,5;bO//jQRO,5;bO//qQRO,5;bO//xQRO,5;bO/0PQRO,5;bO4fQRO,5;bO4fQRO,5;bO:tQRO,5;bO:tQRO,5;bO4fQRO,5;bO!NkQRO,5;OO!NkQRO,5;OO!NkQRO,5;OO!NkQRO,5;OO!NkQRO,5;OO!NkQRO,5;OO#&|QRO,5;OO#&|QRO,5;OO/0WQRO,5;OO/0bQRO,5;OO/0lQRO,5;OO/.uQRO1G0|O/0vQRO1G0|O/.uQRO1G0|O!NkQRO1G0|O!NkQRO1G0|O!NkQRO1G0|O!NkQRO1G0|O!NkQRO1G0|O!NkQRO1G0|O!NkQRO1G0|O/1XQRO1G0|O!NkQRO1G0|O!NkQRO1G0|O#&|QRO1G0|O#&|QRO1G0|O!NkQRO1G0|O!NkQRO1G0|O!NkQRO1G0jO!NkQRO1G0jO!NkQRO1G0jO!NkQRO1G0jO!NkQRO1G0jO!NkQRO1G0jO#&|QRO1G0jO#&|QRO1G0jO/1lQRO'#EfO/1sQRO'#EfO/1zQRO'#EfO/2RQRO7+&hO/.uQRO7+&hO!NkQRO7+&hO!NkQRO7+&hO!NkQRO7+&hO!NkQRO7+&hO!NkQRO7+&hO!NkQRO7+&hO!NkQRO7+&hO/2dQRO7+&hO!NkQRO7+&hO!NkQRO7+&hO#&|QRO7+&hO#&|QRO7+&hO!NkQRO7+&hO!NkQRO7+&hO!NkQRO7+&UO!NkQRO7+&UO!NkQRO7+&UO!NkQRO7+&UO!NkQRO7+&UO!NkQRO7+&UO#&|QRO7+&UO#&|QRO7+&UO/2wQRO,5;QO/4sQRO,5;QO/6oQRO,5;QO/8kQRO<<JSO/.uQRO<<JSO!NkQRO<<JSO!NkQRO<<JSO!NkQRO<<JSO!NkQRO<<JSO!NkQRO<<JSO!NkQRO<<JSO!NkQRO<<JSO/8|QRO<<JSO!NkQRO<<JSO!NkQRO<<JSO#&|QRO<<JSO#&|QRO<<JSO!NkQRO<<JSO!NkQRO<<JSO!NkQRO<<IpO!NkQRO<<IpO!NkQRO<<IpO!NkQRO<<IpO!NkQRO<<IpO!NkQRO<<IpO#&|QRO<<IpO#&|QRO<<IpO/9aQROAN?nO/.uQROAN?nO/9rQROAN?nO!NkQROAN?nO!NkQROAN?nO#&|QROAN?nO#&|QROAN?nO!NkQROAN?nO!NkQROAN?[O#&|QROAN?[O#&|QROAN?[O/:VQROG25YO/:hQROG25YO:tQRO'#EvO:tQRO'#EvO:tQRO,5;bO:tQRO,5;bO/:{QRO,5;bO#&|QRO,5;bO#&|QRO,5;bO:tQRO,5;bO#&|QRO1G0|O/;cQRO1G0|O#&|QRO1G0|O#&|QRO1G0|O/;yQRO7+&hO#&|QRO7+&hO#&|QRO7+&hO/<aQRO<<JSO#&|QRO<<JSO#&|QRO<<JSO/<wQROAN?nO#&|QROAN?nO#&|QROAN?nO/=_QROG25YO/=uQRO'#EvO4fQRO'#EvO4fQRO'#EvO4fQRO'#EvO4fQRO'#EvO4fQRO'#EvO4fQRO'#EvO4fQRO'#EvO4fQRO'#EvO4fQRO'#EvO4fQRO'#EvO4fQRO'#EvO4fQRO'#EvO4fQRO'#EvO4fQRO'#EvO=pQRO'#EvO@PQRO'#EvO@PQRO'#EvO@PQRO'#EvO@PQRO'#EvO=pQRO'#EvO=pQRO'#EvO=pQRO'#EvO=pQRO'#EvO=pQRO'#EvO4fQRO'#EdO4fQRO'#EdO4fQRO'#EdO4fQRO'#EdO4fQRO'#EdO4fQRO'#EdO4fQRO'#EdO4fQRO'#EdO4fQRO'#EdO4fQRO'#EdO4fQRO'#EdO/cQRO'#EgO!?OQRO'#EvO!?OQRO'#EvO4fQRO,5;bO!NkQRO,5;bO!NkQRO,5;bO!NkQRO,5;bO!NkQRO,5;bO!NkQRO,5;bO!NkQRO,5;bO!NkQRO,5;bO!NkQRO,5;bO/>TQRO'#FZO!NkQRO,5;bO!NkQRO,5;bO!NkQRO,5;bO!NkQRO,5;bO!NkQRO,5;bO!NkQRO,5;bO!NkQRO,5;OO!NkQRO,5;OO!NkQRO,5;OO!NkQRO,5;OO!NkQRO,5;OO!NkQRO,5;OO!NkQRO,5;OO!NkQRO,5;OO!NkQRO1G0|O!NkQRO1G0|O!NkQRO1G0|O!NkQRO1G0|O!NkQRO1G0|O!NkQRO1G0|O!NkQRO1G0|O!NkQRO1G0|O!NkQRO1G0|O!NkQRO1G0|O!NkQRO1G0|O!NkQRO1G0|O!NkQRO1G0|O!NkQRO1G0|O!NkQRO1G0jO!NkQRO1G0jO!NkQRO1G0jO!NkQRO1G0jO!NkQRO1G0jO!NkQRO1G0jO!NkQRO1G0jO!NkQRO1G0jO!NkQRO7+&hO!NkQRO7+&hO!NkQRO7+&hO!NkQRO7+&hO!NkQRO7+&hO!NkQRO7+&hO!NkQRO7+&hO!NkQRO7+&hO!NkQRO7+&hO!NkQRO7+&hO!NkQRO7+&hO!NkQRO7+&hO!NkQRO7+&hO!NkQRO7+&hO!NkQRO7+&UO!NkQRO7+&UO!NkQRO7+&UO!NkQRO7+&UO!NkQRO7+&UO!NkQRO7+&UO!NkQRO7+&UO!NkQRO7+&UO!NkQRO<<JSO!NkQRO<<JSO!NkQRO<<JSO!NkQRO<<JSO!NkQRO<<JSO!NkQRO<<JSO!NkQRO<<IpO!NkQRO<<IpO!NkQRO<<IpO4fQRO'#EvO4fQRO'#EvO=pQRO'#EvO=pQRO'#EvO4fQRO,5;bO!NkQRO,5;bO!NkQRO,5;bO!NkQRO1G0|O!NkQRO1G0|O!NkQRO7+&hO!NkQRO7+&hO!NkQRO<<JSO!NkQRO<<JSO4fQRO'#EvO4fQRO'#EvO4fQRO'#EvO4fQRO'#EvO4fQRO'#EvO4fQRO'#EvO4fQRO'#EvO4fQRO'#EvO4fQRO'#EvO4fQRO'#EvO4fQRO'#EvO4fQRO'#EvO4fQRO'#EvO4fQRO'#EvO4fQRO'#EdO4fQRO'#EdO4fQRO'#EdO4fQRO'#EdO4fQRO'#EdO4fQRO'#EdO4fQRO'#EdO4fQRO'#EdO!NkQRO,5;bO!NkQRO,5;bO!NkQRO,5;bO!NkQRO,5;bO!NkQRO,5;bO!NkQRO,5;bO!NkQRO,5;bO!NkQRO,5;bO!NkQRO,5;bO!NkQRO,5;bO!NkQRO,5;bO!NkQRO,5;bO!NkQRO,5;bO!NkQRO,5;bO!NkQRO,5;OO!NkQRO,5;OO!NkQRO,5;OO!NkQRO,5;OO!NkQRO,5;OO!NkQRO,5;OO!NkQRO,5;OO!NkQRO,5;OO!NkQRO1G0|O!NkQRO1G0|O!NkQRO1G0|O!NkQRO1G0|O!NkQRO1G0|O!NkQRO1G0|O!NkQRO1G0|O!NkQRO1G0|O!NkQRO1G0|O!NkQRO1G0|O!NkQRO1G0|O!NkQRO1G0|O!NkQRO1G0|O!NkQRO1G0|O!NkQRO1G0jO!NkQRO1G0jO!NkQRO1G0jO!NkQRO1G0jO!NkQRO1G0jO!NkQRO1G0jO!NkQRO1G0jO!NkQRO1G0jO!NkQRO7+&hO!NkQRO7+&hO!NkQRO7+&hO!NkQRO7+&hO!NkQRO7+&hO!NkQRO7+&hO!NkQRO7+&UO!NkQRO7+&UO!NkQRO7+&UO4fQRO'#EvO4fQRO'#EvO!NkQRO,5;bO!NkQRO,5;bO!NkQRO1G0|O!NkQRO1G0|O!NkQRO7+&hO!NkQRO7+&hO4fQRO'#EvO4fQRO'#EvO4fQRO'#EvO4fQRO'#EvO4fQRO'#EvO4fQRO'#EvO4fQRO'#EvO4fQRO'#EvO4fQRO'#EvO4fQRO'#EvO4fQRO'#EvO4fQRO'#EvO4fQRO'#EvO4fQRO'#EvO4fQRO'#EdO4fQRO'#EdO4fQRO'#EdO4fQRO'#EdO4fQRO'#EdO4fQRO'#EdO4fQRO'#EdO4fQRO'#EdO!NkQRO,5;bO!NkQRO,5;bO!NkQRO,5;bO!NkQRO,5;bO!NkQRO,5;bO!NkQRO,5;bO!NkQRO,5;bO!NkQRO,5;bO!NkQRO,5;bO!NkQRO,5;bO!NkQRO,5;bO!NkQRO,5;bO!NkQRO,5;bO!NkQRO,5;bO!NkQRO,5;OO!NkQRO,5;OO!NkQRO,5;OO!NkQRO,5;OO!NkQRO,5;OO!NkQRO,5;OO!NkQRO,5;OO!NkQRO,5;OO!NkQRO1G0|O!NkQRO1G0|O!NkQRO1G0|O!NkQRO1G0|O!NkQRO1G0|O!NkQRO1G0|O!NkQRO1G0jO!NkQRO1G0jO!NkQRO1G0jO4fQRO'#EvO4fQRO'#EvO!NkQRO,5;bO!NkQRO,5;bO!NkQRO1G0|O!NkQRO1G0|O4fQRO'#EvO4fQRO'#EvO4fQRO'#EvO4fQRO'#EvO4fQRO'#EvO4fQRO'#EvO4fQRO'#EvO4fQRO'#EvO4fQRO'#EvO4fQRO'#EvO4fQRO'#EvO4fQRO'#EvO4fQRO'#EvO4fQRO'#EvO4fQRO'#EdO4fQRO'#EdO4fQRO'#EdO4fQRO'#EdO4fQRO'#EdO4fQRO'#EdO4fQRO'#EdO4fQRO'#EdO!NkQRO,5;bO!NkQRO,5;bO!NkQRO,5;bO!NkQRO,5;bO!NkQRO,5;bO!NkQRO,5;bO!NkQRO,5;OO!NkQRO,5;OO!NkQRO,5;OO4fQRO'#EvO4fQRO'#EvO!NkQRO,5;bO!NkQRO,5;bO4fQRO'#EvO4fQRO'#EvO4fQRO'#EvO4fQRO'#EvO4fQRO'#EvO4fQRO'#EvO4fQRO'#EdO4fQRO'#EdO4fQRO'#EdO4fQRO'#EvO4fQRO'#Ev",
-      stateData: "/>n~O$ROS!zOS~O_VOdVOeVOfVOgmOhsOkVOnjOokOpiOqWOrZOs[Ot]Ou^Ov_Ow`OxaOybOzcO{dO|eO}fO!OgO!PhO!QdO!RcO!SZO!T[O!U]O!V^O!W_O!X`O!YaO!Z[O![ZO!][O!^]O!_ZO!`[O!aZO!bsO!qsO#PUO#`mO#dmO~OSQOTPOUROWSOXqOYpOZ!UOm!SO!ctO!duO!evO!fwO!gxO!hyO!i{O!j|O!k}O!l!OO!m!PO!n!QO!o!RO!p!OO!rtO!suO!tvO!uwO!vxO!wyO!xzO!yzO#[XO$P!|P~PYO#P!ZO~O#P![O~O#P!]O~O#P!^O~OSQOTPOUROWSOX-kOY-fO_!gOdVOeVOfVOg!iOhsOk!`Om2XOnjOo1zOp1uOq!hOrZOs,xOt1gOu4]Ov6SOw7aOx8UOy-WOz-XO{1oO|4eO}6[O!O7iO!P8VO!Q1oO!R-XO!SZO!T,xO!U1gO!V4]O!W6SO!X7aO!Y8UO!Z,xO![ZO!],xO!^1gO!_ZO!`,xO!aZO!bsO!c']O!d-pO!e2PO!f4kO!g6bO!h7oO!i'bO!j-zO!k2UO!l4pO!m6gO!n7tO!o8[O!p4pO!qsO!r']O!s-pO!t2PO!u4kO!v6bO!w7oO!x-uO!y-uO#P!eO#[!bO#`!iO#d!iO#h#fP~O!}!fO~P&xOP#aXP#jXQ#aXQ#jXR#aXR#jXS#WXT#WXU#WXW#WXX#WXY#WXh#WXl#aXl#jXm#WXq#WX!b#WX!c#WX!d#WX!e#WX!f#WX!g#WX!h#WX!i#WX!j#WX!k#WX!l#WX!m#WX!n#WX!o#WX!p#WX!q#WX!r#WX!s#WX!t#WX!u#WX!v#WX!w#WX!x#WX!y#WX#[#WX~OZ#WX$P#WX$P#aX$P#jX#]#WX#]#aX#]#jX~P,SOR!uOX-oOY-jOm2YO!c'aO!d-tO!e2TO!f4oO!g6fO!h7sO!i'cO!j-{O!k2VO!l4qO!m6hO!n7uO!o8]O!p4qO!r'aO!s-tO!t2TO!u4oO!v6fO!w7sO!x-yO!y-yO#[!sO~PYOP!xOQ!yOR!xOl!zO~O_VOdVOeVOfVOgmOkVOnjOokOpiOq!{OrZOs[Ot]Ou^Ov_Ow`OxaOybOzcO{dO|eO}fO!OgO!PhO!QdO!RcO!SZO!T[O!U]O!V^O!W_O!X`O!YaO!Z[O![ZO!][O!^]O!_ZO!`[O!aZO#P,pO#[2]O#`mO#dmO~O_VOdVOeVOfVOgmOkVOn-dOo-eOp-]Oq!{OrZOs'TOt-POu1hOv4^Ow6TOx7bOyZOz'YO{-[O|1tO}4jO!O6aO!P7nO!Q-[O!R'YO!SZO!T'TO!U-PO!V1hO!W4^O!X6TO!Y7bO!Z'TO![ZO!]'TO!^-PO!_ZO!`'TO!aZO#PUO#[2]O#`mO#dmO~O_VOdVOeVOfVOgmOkVOn-dOo4ROp4QOrZOs1OOt4OOu5zOv7ZOw8QOx8_OyZOz1PO{4PO|5{O}7[O!O8RO!P8`O!Q4PO!R1PO!SZO!T1OO!U4OO!V5zO!W7ZO!X8QO!Y8_O!Z1OO![ZO!]1OO!^4OO!_ZO!`1OO!aZO#P,pO#[2]O#`mO#dmOP#jXQ#jXR#jXl#jX$P#jX~Oq!{O#]#jX~P7bO_VOdVOeVOfVOgmOkVOn-dOo4ROp4QOq!{OrZOs1OOt4OOu5zOv7ZOw8QOx8_OyZOz1PO{4PO|5{O}7[O!O8RO!P8`O!Q4PO!R1PO!SZO!T1OO!U4OO!V5zO!W7ZO!X8QO!Y8_O!Z1OO![ZO!]1OO!^4OO!_ZO!`1OO!aZO#P,pO#[2]O#`mO#dmO~OP#[OQ#[OR#[O_#[Or#[Os#[Ot#[Ou#[Ov#[Ow#[Ox#[Oy#[Oz#[O{#[O|#[O}#[O!O#[O!P#[O!Q#[O!R#[O!S#[O!T#[O!U#[O!V#[O!W#[O!X#[O!Y#[O!Z#[O![#[O!]#[O!^#[O!_#[O!`#[O!a#[O#P#ZO~O_VOdVOeVOfVOgmOkVOn1yOo2OOp-cOq!{OrZOs,|Ot-VOu1nOv4dOw6ZOx7hOy'UOz-YO{1sO|4iO}6`O!O7mO!P8ZO!Q1sO!R-YO!SZO!T,|O!U-VO!V1nO!W4dO!X6ZO!Y7hO!Z,|O![ZO!],|O!^-VO!_ZO!`,|O!aZO#PUO#[!sO#`mO#dmO~OP#iXQ#iXR#iXl#iX$P#uX~OP#XXQ#XXR#XXl#XX$P#uX~O_#_Oq#_O~O_VOdVOeVOfVOkVOqVO~O_VOdVOeVOfVOgmOkVOn1xOo1}Op-bOq!{OrZOs,{Ot-UOu1mOv4cOw6YOx7gOy'WOz'[O{1rO|4hO}6_O!O7lO!P8YO!Q1rO!R'[O!SZO!T,{O!U-UO!V1mO!W4cO!X6YO!Y7gO!Z,{O![ZO!],{O!^-UO!_ZO!`,{O!aZO#P,pO#[2]O#`mO#dmO~O_VOdVOeVOfVOgmOkVOn-dOo4ROp4QOrZOs1OOt4OOu5zOv7ZOw8QOx8_OyZOz1PO{4PO|5{O}7[O!O8RO!P8`O!Q4PO!R1PO!SZO!T1OO!U4OO!V5zO!W7ZO!X8QO!Y8_O!Z1OO![ZO!]1OO!^4OO!_ZO!`1OO!aZO#P,pO#`mO#dmOS#WXT#WXU#WXW#WXX#WXY#WXZ#WXh#WXm#WXq#WX!b#WX!c#WX!d#WX!e#WX!f#WX!g#WX!h#WX!i#WX!j#WX!k#WX!l#WX!m#WX!n#WX!o#WX!p#WX!q#WX!r#WX!s#WX!t#WX!u#WX!v#WX!w#WX!x#WX!y#WX$P#WX~O#[#WX~PGXOS#VXT#VXU#VXW#VXX#VXX$OXY#VXY$OXZ#VXh#VXh$OXm#VXm$OXq#VXq$OX!b#VX!b$OX!c#VX!c$OX!d#VX!d$OX!e#VX!e$OX!f#VX!f$OX!g#VX!g$OX!h#VX!h$OX!i#VX!i$OX!j#VX!j$OX!k#VX!k$OX!l#VX!l$OX!m#VX!m$OX!n#VX!n$OX!o#VX!o$OX!p#VX!p$OX!q#VX!q$OX!r#VX!r$OX!s#VX!s$OX!t#VX!t$OX!u#VX!u$OX!v#VX!v$OX!w#VX!w$OX!x#VX!x$OX!y#VX!y$OX#[$OX$P#VX$P$OX~O_#oO~OSQOTPOUROWSOhsOqsO!bsO!qsO~OX-nOY-iOZ!UOm2ZO!c'`O!d-sO!e2SO!f4nO!g6eO!h7rO!i'dO!j-|O!k2WO!l4rO!m6iO!n7vO!o8^O!p4rO!r'`O!s-sO!t2SO!u4nO!v6eO!w7rO!x-xO!y-xO$P!|X~P!!xOX-mOY-hOhsOm!SOqsO!bsO!c'_O!d-rO!e2RO!f4mO!g6dO!h7qO!i{O!j|O!k}O!l!OO!m!PO!n!QO!o!RO!p!OO!qsO!r'_O!s-rO!t2RO!u4mO!v6dO!w7qO!x-wO!y-wO#[#tO$P#vX~O_#vO!}#xO~O_#vO!}#zO~O_#{Or#{O!T#{O~O_#vO!}$OO~OP#aXQ#aXR#aXl#aX!}#aX~O#P$PO~P!(TOX-kOY-fOk$ROm2XO!c']O!d-pO!e2PO!f4kO!g6bO!h7oO!i'bO!j-zO!k2UO!l4pO!m6gO!n7tO!o8[O!p4pO!r']O!s-pO!t2PO!u4kO!v6bO!w7oO!x-uO!y-uO!}$UO#[$SO~P!!xOSQOTPOUROWSOX-kOY-fOdVOeVOfVOg!iOhsOk!`Om2XOnjOo1zOp1uOrZOs,xOt1gOu4]Ov6SOw7aOx8UOy-WOz-XO{1oO|4eO}6[O!O7iO!P8VO!Q1oO!R-XO!SZO!T,xO!U1gO!V4]O!W6SO!X7aO!Y8UO!Z,xO![ZO!],xO!^1gO!_ZO!`,xO!aZO!bsO!c']O!d-pO!e2PO!f4kO!g6bO!h7oO!i'bO!j-zO!k2UO!l4pO!m6gO!n7tO!o8[O!p4pO!qsO!r']O!s-pO!t2PO!u4kO!v6bO!w7oO!x-uO!y-uO#P!eO#[!bO#`!iO#d!iO#h#fP~O_'gOq'hO!}$VO~P!*iOP#YaP#baQ#YaQ#baR#YaR#bal#Yal#ba$P#ba#]#ba_#Ya_#bad#Yad#bae#Yae#baf#Yaf#bag#Yag#bak#Yak#ban#Yan#bao#Yao#bap#Yap#baq#Yaq#bar#Yar#bas#Yas#bat#Yat#bau#Yau#bav#Yav#baw#Yaw#bax#Yax#bay#Yay#baz#Yaz#ba{#Ya{#ba|#Ya|#ba}#Ya}#ba!O#Ya!O#ba!P#Ya!P#ba!Q#Ya!Q#ba!R#Ya!R#ba!S#Ya!S#ba!T#Ya!T#ba!U#Ya!U#ba!V#Ya!V#ba!W#Ya!W#ba!X#Ya!X#ba!Y#Ya!Y#ba!Z#Ya!Z#ba![#Ya![#ba!]#Ya!]#ba!^#Ya!^#ba!_#Ya!_#ba!`#Ya!`#ba!a#Ya!a#ba#P#Ya#P#ba#[#Ya#[#ba#`#Ya#`#ba#d#Ya#d#ba!b#Ya!b#ba!c#Ya!c#ba!d#Ya!d#ba!e#Ya!e#ba!f#Ya!f#ba!g#Ya!g#ba!h#Ya!h#ba!i#Ya!i#ba!j#Ya!j#ba!k#Ya!k#ba!l#Ya!l#ba!m#Ya!m#ba!n#Ya!n#ba!o#Ya!o#ba!p#Ya!p#ba!q#Ya!q#ba!r#Ya!r#ba!s#Ya!s#ba!t#Ya!t#ba!u#Ya!u#ba!v#Ya!v#ba!w#Ya!w#ba!x#Ya!x#ba!y#Ya!y#ba!}#baS#YaS#baT#YaT#baU#YaU#baW#YaW#baX#YaX#baY#YaY#bah#Yah#bam#Yam#ba~Oj#Yaj#ba!}#Ya[#Ya[#ba~P!/sO_#zX_#{Xg#zXq#{X!}#zX#P#zX#`#zX#d#zX#h#{X~P!(TO_#{Xk#WXq#{X!}#WX!}#aX!}#jX#h#{X~P,SOP#_XQ#_XR#_Xl#_X!}#_X~O_#cXg#cX!}#cX#P#cX#`#cX#d#cX~P!<RO_#zXg#zX!}#zX#P#zX#`#zX#d#zX~P!<RO_!jOg$XO#P$ZO#`$XO#d$XO~O!}$[O~P!=bO_$]Oq$]O#h#fX~O#h$_O~O!}$`OP#_XQ#_XR#_Xl#_X~O!}$aOP#XXQ#XXR#XXl#XX~OR!uO_VOdVOeVOfVOgmOkVOnjOokOpiOq!{OrZOs[Ot]Ou^Ov_Ow`OxaOybOzcO{dO|eO}fO!OgO!PhO!QdO!RcO!SZO!T[O!U]O!V^O!W_O!X`O!YaO!Z[O![ZO!][O!^]O!_ZO!`[O!aZO#PUO#[!sO#`mO#dmO~O#]$bOP#iXQ#iXR#iXl#iX~O#]$dOP#XXQ#XXR#XXl#XX~O#]$eO~OP#jXQ#jXR#jXl#jX$P#aX$P#jX_#aX_#jXd#aXd#jXe#aXe#jXf#aXf#jXg#aXg#jXk#aXk#jXn#aXn#jXo#aXo#jXp#aXp#jXq#aXq#jXr#aXr#jXs#aXs#jXt#aXt#jXu#aXu#jXv#aXv#jXw#aXw#jXx#aXx#jXy#aXy#jXz#aXz#jX{#aX{#jX|#aX|#jX}#aX}#jX!O#aX!O#jX!P#aX!P#jX!Q#aX!Q#jX!R#aX!R#jX!S#aX!S#jX!T#aX!T#jX!U#aX!U#jX!V#aX!V#jX!W#aX!W#jX!X#aX!X#jX!Y#aX!Y#jX!Z#aX!Z#jX![#aX![#jX!]#aX!]#jX!^#aX!^#jX!_#aX!_#jX!`#aX!`#jX!a#aX!a#jX#P#aX#P#jX#[#aX#[#jX#`#aX#`#jX#d#aX#d#jXS#aXS#jXT#aXT#jXU#aXU#jXW#aXW#jXX#aXX#jXY#aXY#jXZ#aXZ#jXh#aXh#jXm#aXm#jX!b#aX!b#jX!c#aX!c#jX!d#aX!d#jX!e#aX!e#jX!f#aX!f#jX!g#aX!g#jX!h#aX!h#jX!i#aX!i#jX!j#aX!j#jX!k#aX!k#jX!l#aX!l#jX!m#aX!m#jX!n#aX!n#jX!o#aX!o#jX!p#aX!p#jX!q#aX!q#jX!r#aX!r#jX!s#aX!s#jX!t#aX!t#jX!u#aX!u#jX!v#aX!v#jX!w#aX!w#jX!x#aX!x#jX!y#aX!y#jXj#aXj#jX!}#jX#]#aX#]#jX[#aX[#jX~P!(TOP!xOQ!yOR!xOl#ja$P#ja#]#ja~OP'jOQ.QOR'jOl'qO~P1jOP'jOQ.QOR'jOl'qO~P4fO_#}Xd#}Xe#}Xf#}Xg#}Xk#}Xn#}Xo#}Xp#}Xq#}Xr#}Xs#}Xt#}Xu#}Xv#}Xw#}Xx#}Xy#}Xz#}X{#}X|#}X}#}X!O#}X!P#}X!Q#}X!R#}X!S#}X!T#}X!U#}X!V#}X!W#}X!X#}X!Y#}X!Z#}X![#}X!]#}X!^#}X!_#}X!`#}X!a#}X#P#}X#[#}X#`#}X#d#}XS#}XT#}XU#}XW#}XX#}XY#}Xh#}Xm#}X!b#}X!c#}X!d#}X!e#}X!f#}X!g#}X!h#}X!i#}X!j#}X!k#}X!l#}X!m#}X!n#}X!o#}X!p#}X!q#}X!r#}X!s#}X!t#}X!u#}X!v#}X!w#}X!x#}X!y#}X~OP1QOQ4SOR1QOl1RO$P#}XZ#}X#]#}X~P!N{OP#jaQ#jaR#jal#ja$P#ja#]#ja~P:tOP'jOQ.QOR'jOl'qO~P:tOSQOTPOUROWSOX-kOY-fOdVOeVOfVOgmOhsOk!`Om2XOn-dOo-eOp-]OrZOs'TOt-POu1hOv4^Ow6TOx7bOyZOz'YO{-[O|1tO}4jO!O6aO!P7nO!Q-[O!R'YO!SZO!T'TO!U-PO!V1hO!W4^O!X6TO!Y7bO!Z'TO![ZO!]'TO!^-PO!_ZO!`'TO!aZO!bsO!c']O!d-pO!e2PO!f4kO!g6bO!h7oO!i'bO!j-zO!k2UO!l4pO!m6gO!n7tO!o8[O!p4pO!qsO!r']O!s-pO!t2PO!u4kO!v6bO!w7oO!x-uO!y-uO#[2[O#`mO#dmO~O_$uOq'iO!}$vO#P!eO#h#fP~P#'^OP$zOR$zO_#[Ol'wOr#[Os#[Ot#[Ou#[Ov#[Ow#[Ox#[Oy#[Oz#[O{#[O|#[O}#[O!O#[O!P#[O!Q#[O!R#[O!S#[O!T#[O!U#[O!V#[O!W#[O!X#[O!Y#[O!Z#[O![#[O!]#[O!^#[O!_#[O!`#[O!a#[O#P#ZO~OQ${O~P#,hO_VOdVOeVOfVOgmOkVOn1xOo1}Op-bOq!{OrZOs,{Ot-UOu1mOv4cOw6YOx7gOy'WOz'[O{1rO|4hO}6_O!O7lO!P8YO!Q1rO!R'[O!SZO!T,{O!U-UO!V1mO!W4cO!X6YO!Y7gO!Z,{O![ZO!],{O!^-UO!_ZO!`,{O!aZO#P,qO#[!sO#`mO#dmO~OS#WaT#WaU#WaW#WaX#WaY#WaZ#Wah#Wam#Waq#Wa!b#Wa!c#Wa!d#Wa!e#Wa!f#Wa!g#Wa!h#Wa!i#Wa!j#Wa!k#Wa!l#Wa!m#Wa!n#Wa!o#Wa!p#Wa!q#Wa!r#Wa!s#Wa!t#Wa!u#Wa!v#Wa!w#Wa!x#Wa!y#Wa#[#Wa$P#Wa~OP'pOQ.WOR'pOl'vO~P#1zOP'jOQ.QOR'jOl'qO~PD]OP1QOQ4SOR1QO_VOdVOeVOfVOgmOkVOl1ROn1xOo1}Op-bOrZOs,{Ot-UOu1mOv4cOw6YOx7gOy'WOz'[O{1rO|4hO}6_O!O7lO!P8YO!Q1rO!R'[O!SZO!T,{O!U-UO!V1mO!W4cO!X6YO!Y7gO!Z,{O![ZO!],{O!^-UO!_ZO!`,{O!aZO#P,pO#`mO#dmO~P#1zO_VOdVOeVOfVOgmOkVOn-dOo4ROp4QOrZOs1OOt4OOu5zOv7ZOw8QOx8_OyZOz1PO{4PO|5{O}7[O!O8RO!P8`O!Q4PO!R1PO!SZO!T1OO!U4OO!V5zO!W7ZO!X8QO!Y8_O!Z1OO![ZO!]1OO!^4OO!_ZO!`1OO!aZO#P,pO#`mO#dmO~P#1zOdVOeVOfVOgmOj%_OkVOn-dOo-eOp-]Oq!{OrZOs'TOt-POu1hOv4^Ow6TOx7bOyZOz'YO{-[O|1tO}4jO!O6aO!P7nO!Q-[O!R'YO!SZO!T'TO!U-PO!V1hO!W4^O!X6TO!Y7bO!Z'TO![ZO!]'TO!^-PO!_ZO!`'TO!aZO!b%_O!c%_O!d%_O!e%_O!f%_O!g%_O!h%_O!i%_O!j%_O!k%_O!l%_O!m%_O!n%_O!o%_O!p%_O!q%_O!r%_O!s%_O!t%_O!u%_O!v%_O!w%_O!x%_O!y%_O#[2]O#`mO#dmO~O_%]O#P%[O~P#:zOX-lOY-gO[%cOk$ROm2XO!c'^O!d-qO!e2QO!f4lO!g6cO!h7pO!i'bO!j-zO!k2UO!l4pO!m6gO!n7tO!o8[O!p4pO!r'^O!s-qO!t2QO!u4lO!v6cO!w7pO!x-vO!y-vO#P%bO#[$SO~P!!xOX-oOY-jOhsOm2YOqsO!bsO!c'aO!d-tO!e2TO!f4oO!g6fO!h7sO!i'cO!j-{O!k2VO!l4qO!m6hO!n7uO!o8]O!p4qO!qsO!r'aO!s-tO!t2TO!u4oO!v6fO!w7sO!x-yO!y-yO~O_#vO!}%fO~O_#vO!}%gO~O_%hO!T%hO~O_#vO!}%jO~O#]%lO~O#P$PO~OP#YaP#baQ#YaQ#baR#YaR#ba_#bag#bal#Yal#ba!}#ba#P#ba#`#ba#d#ba~O#h#ga~P#DaO_$]Oq$]O!}%mO#h#fX~O!}%nO~P!=bO_VOq'SO!}%qO#P,pO~P#'^OP#iiP#jiQ#iiQ#jiR#iiR#jil#iil#ji$P#ji!}#ii!}#ji#]#ji_#ii_#jir#iir#jis#iis#jit#iit#jiu#iiu#jiv#iiv#jiw#iiw#jix#iix#jiy#iiy#jiz#iiz#ji{#ii{#ji|#ii|#ji}#ii}#ji!O#ii!O#ji!P#ii!P#ji!Q#ii!Q#ji!R#ii!R#ji!S#ii!S#ji!T#ii!T#ji!U#ii!U#ji!V#ii!V#ji!W#ii!W#ji!X#ii!X#ji!Y#ii!Y#ji!Z#ii!Z#ji![#ii![#ji!]#ii!]#ji!^#ii!^#ji!_#ii!_#ji!`#ii!`#ji!a#ii!a#ji#P#ii#P#jiS#jiT#jiU#jiW#jiX#jiY#jiZ#jih#jim#jiq#ji!b#ji!c#ji!d#ji!e#ji!f#ji!g#ji!h#ji!i#ji!j#ji!k#ji!l#ji!m#ji!n#ji!o#ji!p#ji!q#ji!r#ji!s#ji!t#ji!u#ji!v#ji!w#ji!x#ji!y#ji#[#ji[#jik#ji~OP!xOQ!yOR!xOl!zO#]%sO~OP!xOQ!yOR!xOl#ji$P#ji#]#ji~OP#jiQ#jiR#jil#ji$P#ji#]#ji~P:tOX-kOY-fOk$ROm2XO!c']O!d-pO!e2PO!f4kO!g6bO!h7oO!i'bO!j-zO!k2UO!l4pO!m6gO!n7tO!o8[O!p4pO!r']O!s-pO!t2PO!u4kO!v6bO!w7oO!x-uO!y-uO!}%|O#[$SO~P!!xO_#{Xq#{X#h#{X~P!(TO_VOdVOeVOfVOgmOkVOn-dOo-eOp-]Oq'xOrZOs'TOt-POu1hOv4^Ow6TOx7bOyZOz'YO{-[O|1tO}4jO!O6aO!P7nO!Q-[O!R'YO!SZO!T'TO!U-PO!V1hO!W4^O!X6TO!Y7bO!Z'TO![ZO!]'TO!^-PO!_ZO!`'TO!aZO#PUO#[2]O#`mO#dmO~O!}%|O~P$#WO!}%|OP#XXQ#XXR#XXl#XX~OP#XXQ#XXR#XX_#|Xd#|Xe#|Xf#|Xg#|Xk#|Xl#XXn#|Xo#|Xp#|Xq#|Xr#|Xs#|Xt#|Xu#|Xv#|Xw#|Xx#|Xy#|Xz#|X{#|X|#|X}#|X!O#|X!P#|X!Q#|X!R#|X!S#|X!T#|X!U#|X!V#|X!W#|X!X#|X!Y#|X!Z#|X![#|X!]#|X!^#|X!_#|X!`#|X!a#|X#P#|X#[#|X#`#|X#d#|X~O!}#|X~P$&lOP#kXQ#kXR#kXl#kX$P#kX!}#kX#]#kXS#kXT#kXU#kXW#kXX#kXY#kXZ#kXh#kXm#kX!b#kX!c#kX!d#kX!e#kX!f#kX!g#kX!h#kX!i#kX!j#kX!k#kX!l#kX!m#kX!n#kX!o#kX!p#kX!q#kX!r#kX!s#kX!t#kX!u#kX!v#kX!w#kX!x#kX!y#kXj#kX[#kX~P@POP#kXQ#kXR#kXl#kX$P#kX!}#kX#]#kX~P4fOS#piT#piU#piW#piX#piY#piZ#pih#pim#piq#pi!b#pi!c#pi!d#pi!e#pi!f#pi!g#pi!h#pi!i#pi!j#pi!k#pi!l#pi!m#pi!n#pi!o#pi!p#pi!q#pi!r#pi!s#pi!t#pi!u#pi!v#pi!w#pi!x#pi!y#pi#[#pi$P#pik#pi!}#pi#]#pi[#pi~OP#iXQ#iXR#iXl#iX~P$-^OP#XXQ#XXR#XXl#XX~P$-^OS#qiT#qiU#qiW#qiX#qiY#qiZ#qih#qim#qiq#qi!b#qi!c#qi!d#qi!e#qi!f#qi!g#qi!h#qi!i#qi!j#qi!k#qi!l#qi!m#qi!n#qi!o#qi!p#qi!q#qi!r#qi!s#qi!t#qi!u#qi!v#qi!w#qi!x#qi!y#qi#[#qi$P#qik#qi!}#qi#]#qi[#qi~OP#iXQ#iXR#iXl#iX~P$0nOP#XXQ#XXR#XXl#XX~P$0nOS#WiT#WiU#WiW#WiX#WiY#WiZ#Wih#Wim#Wiq#Wi!b#Wi!c#Wi!d#Wi!e#Wi!f#Wi!g#Wi!h#Wi!i#Wi!j#Wi!k#Wi!l#Wi!m#Wi!n#Wi!o#Wi!p#Wi!q#Wi!r#Wi!s#Wi!t#Wi!u#Wi!v#Wi!w#Wi!x#Wi!y#Wi#[#Wi$P#Wi~OP'pOQ.WOR'pOl'vO~P$4OO_VOdVOeVOfVOgmOkVOn-dOo4ROp4QOrZOs1OOt4OOu5zOv7ZOw8QOx8_OyZOz1PO{4PO|5{O}7[O!O8RO!P8`O!Q4PO!R1PO!SZO!T1OO!U4OO!V5zO!W7ZO!X8QO!Y8_O!Z1OO![ZO!]1OO!^4OO!_ZO!`1OO!aZO#P,pO#`mO#dmO~P$4OOSQOTPOUROWSOX-kOY-fO_!gOdVOeVOfVOg!iOhsOk!`Om2XOn-dOo-eOp-]Oq'iOrZOs'TOt-POu1hOv4^Ow6TOx7bOyZOz'YO{-[O|1tO}4jO!O6aO!P7nO!Q-[O!R'YO!SZO!T'TO!U-PO!V1hO!W4^O!X6TO!Y7bO!Z'TO![ZO!]'TO!^-PO!_ZO!`'TO!aZO!bsO!c']O!d-pO!e2PO!f4kO!g6bO!h7oO!i'bO!j-zO!k2UO!l4pO!m6gO!n7tO!o8[O!p4pO!qsO!r']O!s-pO!t2PO!u4kO!v6bO!w7oO!x-uO!y-uO#P!eO#[2[O#`!iO#d!iO#h#fP~O!}&XO~P$9jOP#aXQ#aXR#aXS#rXT#rXU#rXW#rXX#rXY#rXZ#rX_#aXd#aXe#aXf#aXg#aXh#rXj#aXk#aXl#aXm#rXn#aXo#aXp#aXq#aXq#rXr#aXs#aXt#aXu#aXv#aXw#aXx#aXy#aXz#aX{#aX|#aX}#aX!O#aX!P#aX!Q#aX!R#aX!S#aX!T#aX!U#aX!V#aX!W#aX!X#aX!Y#aX!Z#aX![#aX!]#aX!^#aX!_#aX!`#aX!a#aX!b#aX!b#rX!c#aX!c#rX!d#aX!d#rX!e#aX!e#rX!f#aX!f#rX!g#aX!g#rX!h#aX!h#rX!i#aX!i#rX!j#aX!j#rX!k#aX!k#rX!l#aX!l#rX!m#aX!m#rX!n#aX!n#rX!o#aX!o#rX!p#aX!p#rX!q#aX!q#rX!r#aX!r#rX!s#aX!s#rX!t#aX!t#rX!u#aX!u#rX!v#aX!v#rX!w#aX!w#rX!x#aX!x#rX!y#aX!y#rX#P#aX#[#aX#`#aX#d#aX$P#rX~O#[#rX~P$>tOP#_XQ#_XR#_XS#rXT#rXU#rXW#rXX#rXY#rXZ#rX_#_Xd#_Xe#_Xf#_Xg#_Xh#rXj#_Xk#_Xl#_Xm#rXn#_Xo#_Xp#_Xq#_Xq#rXr#_Xs#_Xt#_Xu#_Xv#_Xw#_Xx#_Xy#_Xz#_X{#_X|#_X}#_X!O#_X!P#_X!Q#_X!R#_X!S#_X!T#_X!U#_X!V#_X!W#_X!X#_X!Y#_X!Z#_X![#_X!]#_X!^#_X!_#_X!`#_X!a#_X!b#_X!b#rX!c#_X!c#rX!d#_X!d#rX!e#_X!e#rX!f#_X!f#rX!g#_X!g#rX!h#_X!h#rX!i#_X!i#rX!j#_X!j#rX!k#_X!k#rX!l#_X!l#rX!m#_X!m#rX!n#_X!n#rX!o#_X!o#rX!p#_X!p#rX!q#_X!q#rX!r#_X!r#rX!s#_X!s#rX!t#_X!t#rX!u#_X!u#rX!v#_X!v#rX!w#_X!w#rX!x#_X!x#rX!y#_X!y#rX#P#_X#[#_X#`#_X#d#_X$P#rX~O#[#rX~P$FPOX-lOY-gO[&[Ok$ROm2XO!c'^O!d-qO!e2QO!f4lO!g6cO!h7pO!i'bO!j-zO!k2UO!l4pO!m6gO!n7tO!o8[O!p4pO!r'^O!s-qO!t2QO!u4lO!v6cO!w7pO!x-vO!y-vO#[$SO~P!!xO_$]Oq$]O!}&^O~O!}&`O~OX-kOY-fOk$ROm2XO!c']O!d-pO!e2PO!f4kO!g6bO!h7oO!i'bO!j-zO!k2UO!l4pO!m6gO!n7tO!o8[O!p4pO!r']O!s-pO!t2PO!u4kO!v6bO!w7oO!x-uO!y-uO!}&bO#[$SO~P!!xO!}&bO~P$#WO!}&bOP#XXQ#XXR#XXl#XX~OP!xOQ!yOR!xOl#jq$P#jq#]#jq~OP#jqQ#jqR#jql#jq$P#jq#]#jq~P:tOS#WqT#WqU#WqW#WqX#WqY#WqZ#Wqh#Wqm#Wqq#Wq!b#Wq!c#Wq!d#Wq!e#Wq!f#Wq!g#Wq!h#Wq!i#Wq!j#Wq!k#Wq!l#Wq!m#Wq!n#Wq!o#Wq!p#Wq!q#Wq!r#Wq!s#Wq!t#Wq!u#Wq!v#Wq!w#Wq!x#Wq!y#Wq#[#Wq$P#Wq~OP'pOQ.WOR'pOl'vO~P%$xO_VOdVOeVOfVOgmOkVOn-dOo4ROp4QOrZOs1OOt4OOu5zOv7ZOw8QOx8_OyZOz1PO{4PO|5{O}7[O!O8RO!P8`O!Q4PO!R1PO!SZO!T1OO!U4OO!V5zO!W7ZO!X8QO!Y8_O!Z1OO![ZO!]1OO!^4OO!_ZO!`1OO!aZO#P,pO#`mO#dmO~P%$xOX-kOY-fOk$ROm2XO!c']O!d-pO!e2PO!f4kO!g6bO!h7oO!i'bO!j-zO!k2UO!l4pO!m6gO!n7tO!o8[O!p4pO!r']O!s-pO!t2PO!u4kO!v6bO!w7oO!x-uO!y-uO!}&oO#[$SO~P!!xOP#YaP#baQ#YaQ#baR#YaR#baS#laT#laU#laW#laX#laY#laZ#la_#Ya_#bad#Yad#bae#Yae#baf#Yaf#bag#Yag#bah#laj#Yaj#bak#Yak#bal#Yal#bam#lan#Yan#bao#Yao#bap#Yap#baq#Yaq#baq#lar#Yar#bas#Yas#bat#Yat#bau#Yau#bav#Yav#baw#Yaw#bax#Yax#bay#Yay#baz#Yaz#ba{#Ya{#ba|#Ya|#ba}#Ya}#ba!O#Ya!O#ba!P#Ya!P#ba!Q#Ya!Q#ba!R#Ya!R#ba!S#Ya!S#ba!T#Ya!T#ba!U#Ya!U#ba!V#Ya!V#ba!W#Ya!W#ba!X#Ya!X#ba!Y#Ya!Y#ba!Z#Ya!Z#ba![#Ya![#ba!]#Ya!]#ba!^#Ya!^#ba!_#Ya!_#ba!`#Ya!`#ba!a#Ya!a#ba!b#Ya!b#ba!b#la!c#Ya!c#ba!c#la!d#Ya!d#ba!d#la!e#Ya!e#ba!e#la!f#Ya!f#ba!f#la!g#Ya!g#ba!g#la!h#Ya!h#ba!h#la!i#Ya!i#ba!i#la!j#Ya!j#ba!j#la!k#Ya!k#ba!k#la!l#Ya!l#ba!l#la!m#Ya!m#ba!m#la!n#Ya!n#ba!n#la!o#Ya!o#ba!o#la!p#Ya!p#ba!p#la!q#Ya!q#ba!q#la!r#Ya!r#ba!r#la!s#Ya!s#ba!s#la!t#Ya!t#ba!t#la!u#Ya!u#ba!u#la!v#Ya!v#ba!v#la!w#Ya!w#ba!w#la!x#Ya!x#ba!x#la!y#Ya!y#ba!y#la#P#Ya#P#ba#[#Ya#[#ba#`#Ya#`#ba#d#Ya#d#ba$P#la~O#[#la~P%,`O!}&pOP#XXQ#XXR#XXl#XX~O!}$aO~P$&lO_$]Oq$]O!}%mO~OX-lOY-gO[&qOk$ROm2XO!c'^O!d-qO!e2QO!f4lO!g6cO!h7pO!i'bO!j-zO!k2UO!l4pO!m6gO!n7tO!o8[O!p4pO!r'^O!s-qO!t2QO!u4lO!v6cO!w7pO!x-vO!y-vO#[$SO~P!!xO!}&rO~OP!xOQ!yOR!xOl#jy$P#jy#]#jy~OP#jyQ#jyR#jyl#jy$P#jy#]#jy~P:tOS#WyT#WyU#WyW#WyX#WyY#WyZ#Wyh#Wym#Wyq#Wy!b#Wy!c#Wy!d#Wy!e#Wy!f#Wy!g#Wy!h#Wy!i#Wy!j#Wy!k#Wy!l#Wy!m#Wy!n#Wy!o#Wy!p#Wy!q#Wy!r#Wy!s#Wy!t#Wy!u#Wy!v#Wy!w#Wy!x#Wy!y#Wy#[#Wy$P#Wy~OP'pOQ.WOR'pOl'vO~P%<QO_VOdVOeVOfVOgmOkVOn-dOo4ROp4QOrZOs1OOt4OOu5zOv7ZOw8QOx8_OyZOz1PO{4PO|5{O}7[O!O8RO!P8`O!Q4PO!R1PO!SZO!T1OO!U4OO!V5zO!W7ZO!X8QO!Y8_O!Z1OO![ZO!]1OO!^4OO!_ZO!`1OO!aZO#P,pO#`mO#dmO~P%<QOP#YiQ#YiR#YiS#liT#liU#liW#liX#liY#liZ#li_#Yid#Yie#Yif#Yig#Yih#lij#Yik#Yil#Yim#lin#Yio#Yip#Yiq#Yiq#lir#Yis#Yit#Yiu#Yiv#Yiw#Yix#Yiy#Yiz#Yi{#Yi|#Yi}#Yi!O#Yi!P#Yi!Q#Yi!R#Yi!S#Yi!T#Yi!U#Yi!V#Yi!W#Yi!X#Yi!Y#Yi!Z#Yi![#Yi!]#Yi!^#Yi!_#Yi!`#Yi!a#Yi!b#Yi!b#li!c#Yi!c#li!d#Yi!d#li!e#Yi!e#li!f#Yi!f#li!g#Yi!g#li!h#Yi!h#li!i#Yi!i#li!j#Yi!j#li!k#Yi!k#li!l#Yi!l#li!m#Yi!m#li!n#Yi!n#li!o#Yi!o#li!p#Yi!p#li!q#Yi!q#li!r#Yi!r#li!s#Yi!s#li!t#Yi!t#li!u#Yi!u#li!v#Yi!v#li!w#Yi!w#li!x#Yi!x#li!y#Yi!y#li#P#Yi#[#Yi#`#Yi#d#Yi$P#li~O#[#li~P%AlOS#liT#liU#liW#liX#liY#lih#lim#li!}#li[#li~OP#miQ#miR#miZ#li_#mid#mie#mif#mig#mij#mik#mil#min#mio#mip#miq#mir#mis#mit#miu#miv#miw#mix#miy#miz#mi{#mi|#mi}#mi!O#mi!P#mi!Q#mi!R#mi!S#mi!T#mi!U#mi!V#mi!W#mi!X#mi!Y#mi!Z#mi![#mi!]#mi!^#mi!_#mi!`#mi!a#mi!b#mi!c#mi!d#mi!e#mi!f#mi!g#mi!h#mi!i#mi!j#mi!k#mi!l#mi!m#mi!n#mi!o#mi!p#mi!q#mi!r#mi!s#mi!t#mi!u#mi!v#mi!w#mi!x#mi!y#mi#P#mi#[#mi#`#mi#d#mi$P#li#]#li~P%HwOP!xOQ!yOR!xOl#j!R$P#j!R#]#j!R~OP#j!RQ#j!RR#j!Rl#j!R$P#j!R#]#j!R~P:tOS#W!RT#W!RU#W!RW#W!RX#W!RY#W!RZ#W!Rh#W!Rm#W!Rq#W!R!b#W!R!c#W!R!d#W!R!e#W!R!f#W!R!g#W!R!h#W!R!i#W!R!j#W!R!k#W!R!l#W!R!m#W!R!n#W!R!o#W!R!p#W!R!q#W!R!r#W!R!s#W!R!t#W!R!u#W!R!v#W!R!w#W!R!x#W!R!y#W!R#[#W!R$P#W!R~OP'pOQ.WOR'pOl'vO~P& gO_VOdVOeVOfVOgmOkVOn-dOo4ROp4QOrZOs1OOt4OOu5zOv7ZOw8QOx8_OyZOz1PO{4PO|5{O}7[O!O8RO!P8`O!Q4PO!R1PO!SZO!T1OO!U4OO!V5zO!W7ZO!X8QO!Y8_O!Z1OO![ZO!]1OO!^4OO!_ZO!`1OO!aZO#P,pO#`mO#dmO~P& gOP!xOQ!yOR!xOl#j!Z$P#j!Z#]#j!Z~OP#j!ZQ#j!ZR#j!Zl#j!Z$P#j!Z#]#j!Z~P:tOS#W!ZT#W!ZU#W!ZW#W!ZX#W!ZY#W!ZZ#W!Zh#W!Zm#W!Zq#W!Z!b#W!Z!c#W!Z!d#W!Z!e#W!Z!f#W!Z!g#W!Z!h#W!Z!i#W!Z!j#W!Z!k#W!Z!l#W!Z!m#W!Z!n#W!Z!o#W!Z!p#W!Z!q#W!Z!r#W!Z!s#W!Z!t#W!Z!u#W!Z!v#W!Z!w#W!Z!x#W!Z!y#W!Z#[#W!Z$P#W!Z~OP'pOQ.WOR'pOl'vO~P&'}O_VOdVOeVOfVOgmOkVOn-dOo4ROp4QOrZOs1OOt4OOu5zOv7ZOw8QOx8_OyZOz1PO{4PO|5{O}7[O!O8RO!P8`O!Q4PO!R1PO!SZO!T1OO!U4OO!V5zO!W7ZO!X8QO!Y8_O!Z1OO![ZO!]1OO!^4OO!_ZO!`1OO!aZO#P,pO#`mO#dmO~P&'}O_#jXd#jXe#jXf#jXg#jXk#WXk#jXn#jXo#jXp#jXq#jXr#jXs#jXt#jXu#jXv#jXw#jXx#jXy#jXz#jX{#jX|#jX}#jX!O#jX!P#jX!Q#jX!R#jX!S#jX!T#jX!U#jX!V#jX!W#jX!X#jX!Y#jX!Z#jX![#jX!]#jX!^#jX!_#jX!`#jX!a#jX!}#WX!}#aX!}#jX#P#jX#[#jX#`#jX#d#jX~P,SOP#jXQ#jXR#jX_#jXl#jXr#jXs#jXt#jXu#jXv#jXw#jXx#jXy#jXz#jX{#jX|#jX}#jX!O#jX!P#jX!Q#jX!R#jX!S#jX!T#jX!U#jX!V#jX!W#jX!X#jX!Y#jX!Z#jX![#jX!]#jX!^#jX!_#jX!`#jX!a#jX#P#jX~OdVOeVOfVOgmOkVOn-dOo-eOp-]Oq!{O#[2]O#`mO#dmO~P&0sO_VOdVOeVOfVOgmOn-dOrZOyZO!SZO![ZO!_ZO!aZO#`mO#dmOP#jXQ#jXR#jXS#jXT#jXU#jXW#jXX#jXY#jXh#jXl#jXm#jXq#jX!b#jX!c#jX!d#jX!e#jX!f#jX!g#jX!h#jX!i#jX!j#jX!k#jX!l#jX!m#jX!n#jX!o#jX!p#jX!q#jX!r#jX!s#jX!t#jX!u#jX!v#jX!w#jX!x#jX!y#jX#[#jX~Oo-eOp-]Os'TOt-POu1hOv4^Ow6TOx7bOz'YO{-[O|1tO}4jO!O6aO!P7nO!Q-[O!R'YO!T'TO!U-PO!V1hO!W4^O!X6TO!Y7bO!Z'TO!]'TO!^-PO!`'TO#PUOk#jX!}#jX[#jX~P&4POkVOo4ROp4QOs1OOt4OOu5zOv7ZOw8QOx8_Oz1PO{4PO|5{O}7[O!O8RO!P8`O!Q4PO!R1PO!T1OO!U4OO!V5zO!W7ZO!X8QO!Y8_O!Z1OO!]1OO!^4OO!`1OO#P,pOZ#jX$P#jX~P&4POS#jXT#jXU#jXW#jXX#jXY#jXZ#jXh#jXm#jXq#jX!b#jX!c#jX!d#jX!e#jX!f#jX!g#jX!h#jX!i#jX!j#jX!k#jX!l#jX!m#jX!n#jX!o#jX!p#jX!q#jX!r#jX!s#jX!t#jX!u#jX!v#jX!w#jX!x#jX!y#jX~P7bO_VOdVOeVOfVOgmOkVOn1vOo1{Op-aOq!{OrZOs,yOt-TOu1lOv4bOw6XOx7fOy'VOz'ZO{1pO|4fO}6]O!O7jO!P8WO!Q1pO!R'ZO!SZO!T,yO!U-TO!V1lO!W4bO!X6XO!Y7fO!Z,yO![ZO!],yO!^-TO!_ZO!`,yO!aZO#PUO#[2]O#`mO#dmO~O_VOdVOeVOfVOgmOkVOn1vOo1{Op-^Oq!{OrZOs-OOt-QOu1iOv4_Ow6UOx7cOy'VOz'ZO{1pO|4fO}6]O!O7jO!P8WO!Q1pO!R'ZO!SZO!T-OO!U-QO!V1iO!W4_O!X6UO!Y7cO!Z-OO![ZO!]-OO!^-QO!_ZO!`-OO!aZO#PUO#[2]O#`mO#dmO~O_VOdVOeVOfVOgmOkVOn1xOo1}Op-_Oq!{OrZOs,}Ot-ROu1jOv4`Ow6VOx7dOy'WOz'[O{1rO|4hO}6_O!O7lO!P8YO!Q1rO!R'[O!SZO!T,}O!U-RO!V1jO!W4`O!X6VO!Y7dO!Z,}O![ZO!],}O!^-RO!_ZO!`,}O!aZO#P,pO#[2]O#`mO#dmO~O_VOdVOeVOfVOgmOkVOn1wOo1|Op-`Oq!{OrZOs,zOt-SOu1kOv4aOw6WOx7eOy'XOz-ZO{1qO|4gO}6^O!O7kO!P8XO!Q1qO!R-ZO!SZO!T,zO!U-SO!V1kO!W4aO!X6WO!Y7eO!Z,zO![ZO!],zO!^-SO!_ZO!`,zO!aZO#P,pO#[2]O#`mO#dmO~O_VOdVOeVOfVOgmOn-dOrZOyZO!SZO![ZO!_ZO!aZO#`mO#dmOS#WXT#WXU#WXW#WXX#WXY#WXh#WXm#WXq#WX!b#WX!c#WX!d#WX!e#WX!f#WX!g#WX!h#WX!i#WX!j#WX!k#WX!l#WX!m#WX!n#WX!o#WX!p#WX!q#WX!r#WX!s#WX!t#WX!u#WX!v#WX!w#WX!x#WX!y#WX~Oo-eOp-]Os'TOt-POu1hOv4^Ow6TOx7bOz'YO{-[O|1tO}4jO!O6aO!P7nO!Q-[O!R'YO!T'TO!U-PO!V1hO!W4^O!X6TO!Y7bO!Z'TO!]'TO!^-PO!`'TO#PUOk#WX!}#WX#[#WX[#WX~P&IgO#]#WX~P:tO#[2]O~PGXO$P#YaZ#YaZ#ba#]#Ya~P!/sOP#YaP#baQ#YaQ#baR#YaR#bal#Yal#baq#ba!b#ba!c#ba!d#ba!e#ba!f#ba!g#ba!h#ba!i#ba!j#ba!k#ba!l#ba!m#ba!n#ba!o#ba!p#ba!q#ba!r#ba!s#ba!t#ba!u#ba!v#ba!w#ba!x#ba!y#ba#[#bak#ba~OS#baT#baU#baW#baX#baY#baZ#bah#bam#ba$P#ba!}#ba[#ba~P' aO_#zX_#{Xg#zXq#{X!}#zX!}#{X#P#zX#`#zX#d#zX#h#{X~P!(TO_#{Xk#WXq#{X!}#WX!}#aX!}#jX!}#{X#h#{X~P,SO_#jX_#{Xd#jXe#jXf#jXg#jXk#WXk#jXn#jXo#jXp#jXq#jXq#{Xr#jXs#jXt#jXu#jXv#jXw#jXx#jXy#jXz#jX{#jX|#jX}#jX!O#jX!P#jX!Q#jX!R#jX!S#jX!T#jX!U#jX!V#jX!W#jX!X#jX!Y#jX!Z#jX![#jX!]#jX!^#jX!_#jX!`#jX!a#jX!}#WX!}#aX!}#jX#P#jX#[#jX#`#jX#d#jX#h#{X~P,SOP#aXQ#aXR#aXd#jXe#jXf#jXg#jXk#jXl#aXn#jXo#jXp#jXq#jX!}#jX#[#jX#`#jX#d#jX~P&0sO_#jad#jae#jaf#jag#jak#jal#jan#jao#jap#jaq#jar#jas#jat#jau#jav#jaw#jax#jay#jaz#ja{#ja|#ja}#ja!O#ja!P#ja!Q#ja!R#ja!S#ja!T#ja!U#ja!V#ja!W#ja!X#ja!Y#ja!Z#ja![#ja!]#ja!^#ja!_#ja!`#ja!a#ja#P#ja#[#ja#`#ja#d#ja!b#ja!c#ja!d#ja!e#ja!f#ja!g#ja!h#ja!i#ja!j#ja!k#ja!l#ja!m#ja!n#ja!o#ja!p#ja!q#ja!r#ja!s#ja!t#ja!u#ja!v#ja!w#ja!x#ja!y#jaS#jaT#jaU#jaW#jaX#jaY#jah#jam#ja~OP'jOQ.QOR'jOj#ja!}#ja[#ja~P'*hOS#jaT#jaU#jaW#jaX#jaY#ja[#jah#jak#jal#jam#jaq#ja!b#ja!c#ja!d#ja!e#ja!f#ja!g#ja!h#ja!i#ja!j#ja!k#ja!l#ja!m#ja!n#ja!o#ja!p#ja!q#ja!r#ja!s#ja!t#ja!u#ja!v#ja!w#ja!x#ja!y#ja#[#ja~OP'kOQ.ROR'kO~P'0ROX#jaY#jah#jal#jam#jaq#ja!b#ja!c#ja!d#ja!e#ja!f#ja!g#ja!h#ja!i#ja!j#ja!k#ja!l#ja!m#ja!n#ja!o#ja!p#ja!q#ja!r#ja!s#ja!t#ja!u#ja!v#ja!w#ja!x#ja!y#ja#[#ja$P#ja~OP'lOQ.SOR'lO~P'2uOS#jaT#jaU#jaW#jaX#jaY#jaZ#jah#jal#jam#jaq#ja!b#ja!c#ja!d#ja!e#ja!f#ja!g#ja!h#ja!i#ja!j#ja!k#ja!l#ja!m#ja!n#ja!o#ja!p#ja!q#ja!r#ja!s#ja!t#ja!u#ja!v#ja!w#ja!x#ja!y#ja$P#ja~OP'mOQ.TOR'mO~P'5YOS#jaT#jaU#jaW#jaX#jaY#jah#jak#jal#jam#jaq#ja!b#ja!c#ja!d#ja!e#ja!f#ja!g#ja!h#ja!i#ja!j#ja!k#ja!l#ja!m#ja!n#ja!o#ja!p#ja!q#ja!r#ja!s#ja!t#ja!u#ja!v#ja!w#ja!x#ja!y#ja!}#ja#[#ja~OP'oOQ.VOR'oO~P'7yOP'pOQ.WOR'pO#[#ja~P'5YO_#jal#jar#jas#jat#jau#jav#jaw#jax#jay#jaz#ja{#ja|#ja}#ja!O#ja!P#ja!Q#ja!R#ja!S#ja!T#ja!U#ja!V#ja!W#ja!X#ja!Y#ja!Z#ja![#ja!]#ja!^#ja!_#ja!`#ja!a#ja#P#ja~OP'nOQ.UOR'nO~P':}OP'jOQ.QOR'jOl'qO~P&@sOP'jOQ.QOR'jOl'qO~P&CoOP'jOQ.QOR'jOl'qO~P&FkOP'jOQ.QOR'jOl'qO~P&=wOP'jOQ.QOR'jOl'qO~P@POdVOeVOfVOgmOkVOn-dOo-eOp-]Oq!{O#[2]O#`mO#dmOP#jaQ#jaR#ja~P':}O_VOdVOeVOfVOgmOn-dOo-eOp-]OrZOs'TOt-POu1hOv4^Ow6TOx7bOyZOz'YO{-[O|1tO}4jO!O6aO!P7nO!Q-[O!R'YO!SZO!T'TO!U-PO!V1hO!W4^O!X6TO!Y7bO!Z'TO![ZO!]'TO!^-PO!_ZO!`'TO!aZO#PUO#`mO#dmOP#jaQ#jaR#ja!}#ja~P'0RO_VOdVOeVOfVOgmOkVOn-dOo4ROp4QOrZOs1OOt4OOu5zOv7ZOw8QOx8_OyZOz1PO{4PO|5{O}7[O!O8RO!P8`O!Q4PO!R1PO!SZO!T1OO!U4OO!V5zO!W7ZO!X8QO!Y8_O!Z1OO![ZO!]1OO!^4OO!_ZO!`1OO!aZO#P,pO#`mO#dmOP#jaQ#jaR#ja#[#ja~P'5YO_VOdVOeVOfVOgmOkVOn-dOo4ROp4QOrZOs1OOt4OOu5zOv7ZOw8QOx8_OyZOz1PO{4PO|5{O}7[O!O8RO!P8`O!Q4PO!R1PO!SZO!T1OO!U4OO!V5zO!W7ZO!X8QO!Y8_O!Z1OO![ZO!]1OO!^4OO!_ZO!`1OO!aZO#P,pO#[2]O#`mO#dmOP#jaQ#jaR#ja~P'5YOQ#[O~P#,hO_VOdVOeVOfVOgmOkVOn1vOo1{Op-aOq!{OrZOs,yOt-TOu1lOv4bOw6XOx7fOy'VOz'ZO{1pO|4fO}6]O!O7jO!P8WO!Q1pO!R'ZO!SZO!T,yO!U-TO!V1lO!W4bO!X6XO!Y7fO!Z,yO![ZO!],yO!^-TO!_ZO!`,yO!aZO#P,qO#[2^O#`mO#dmO~O_VOdVOeVOfVOgmOkVOn1vOo1{Op-^Oq!{OrZOs-OOt-QOu1iOv4_Ow6UOx7cOy'VOz'ZO{1pO|4fO}6]O!O7jO!P8WO!Q1pO!R'ZO!SZO!T-OO!U-QO!V1iO!W4_O!X6UO!Y7cO!Z-OO![ZO!]-OO!^-QO!_ZO!`-OO!aZO#P,qO#[!sO#`mO#dmO~O_VOdVOeVOfVOgmOkVOn1xOo1}Op-_Oq!{OrZOs,}Ot-ROu1jOv4`Ow6VOx7dOy'WOz'[O{1rO|4hO}6_O!O7lO!P8YO!Q1rO!R'[O!SZO!T,}O!U-RO!V1jO!W4`O!X6VO!Y7dO!Z,}O![ZO!],}O!^-RO!_ZO!`,}O!aZO#P,qO#[!sO#`mO#dmO~O_VOdVOeVOfVOgmOkVOn1wOo1|Op-`Oq!{OrZOs,zOt-SOu1kOv4aOw6WOx7eOy'XOz-ZO{1qO|4gO}6^O!O7kO!P8XO!Q1qO!R-ZO!SZO!T,zO!U-SO!V1kO!W4aO!X6WO!Y7eO!Z,zO![ZO!],zO!^-SO!_ZO!`,zO!aZO#P,qO#[!sO#`mO#dmO~OS#WaT#WaU#WaW#WaX#WaY#Wah#Wak#Wam#Waq#Wa!b#Wa!c#Wa!d#Wa!e#Wa!f#Wa!g#Wa!h#Wa!i#Wa!j#Wa!k#Wa!l#Wa!m#Wa!n#Wa!o#Wa!p#Wa!q#Wa!r#Wa!s#Wa!t#Wa!u#Wa!v#Wa!w#Wa!x#Wa!y#Wa!}#Wa#[#Wa~OP'oOQ.VOR'oOl'uO~P('[OS#WaT#WaU#WaW#WaX#WaY#Wa[#Wah#Wak#Wam#Waq#Wa!b#Wa!c#Wa!d#Wa!e#Wa!f#Wa!g#Wa!h#Wa!i#Wa!j#Wa!k#Wa!l#Wa!m#Wa!n#Wa!o#Wa!p#Wa!q#Wa!r#Wa!s#Wa!t#Wa!u#Wa!v#Wa!w#Wa!x#Wa!y#Wa#[#Wa~OP'kOQ.ROR'kOl'rO~P(*OOX#WaY#Wah#Wam#Waq#Wa!b#Wa!c#Wa!d#Wa!e#Wa!f#Wa!g#Wa!h#Wa!i#Wa!j#Wa!k#Wa!l#Wa!m#Wa!n#Wa!o#Wa!p#Wa!q#Wa!r#Wa!s#Wa!t#Wa!u#Wa!v#Wa!w#Wa!x#Wa!y#Wa#[#Wa$P#Wa~OP'lOQ.SOR'lOl'sO~P(,rOS#WaT#WaU#WaW#WaX#WaY#WaZ#Wah#Wam#Waq#Wa!b#Wa!c#Wa!d#Wa!e#Wa!f#Wa!g#Wa!h#Wa!i#Wa!j#Wa!k#Wa!l#Wa!m#Wa!n#Wa!o#Wa!p#Wa!q#Wa!r#Wa!s#Wa!t#Wa!u#Wa!v#Wa!w#Wa!x#Wa!y#Wa$P#Wa~OP'mOQ.TOR'mOl'tO~P(/VOP!xOQ!yOR!xOl!zO#]#Wa~OP'jOQ.QOR'jO_VOdVOeVOfVOgmOl'qOn1vOo1{Op-aOrZOs,yOt-TOu1lOv4bOw6XOx7fOy'VOz'ZO{1pO|4fO}6]O!O7jO!P8WO!Q1pO!R'ZO!SZO!T,yO!U-TO!V1lO!W4bO!X6XO!Y7fO!Z,yO![ZO!],yO!^-TO!_ZO!`,yO!aZO#PUO#`mO#dmO~P('[OP'jOQ.QOR'jO_VOdVOeVOfVOgmOl'qOn1vOo1{Op-^OrZOs-OOt-QOu1iOv4_Ow6UOx7cOy'VOz'ZO{1pO|4fO}6]O!O7jO!P8WO!Q1pO!R'ZO!SZO!T-OO!U-QO!V1iO!W4_O!X6UO!Y7cO!Z-OO![ZO!]-OO!^-QO!_ZO!`-OO!aZO#PUO#`mO#dmO~P(*OOP1QOQ4SOR1QO_VOdVOeVOfVOgmOkVOl1ROn1xOo1}Op-_OrZOs,}Ot-ROu1jOv4`Ow6VOx7dOy'WOz'[O{1rO|4hO}6_O!O7lO!P8YO!Q1rO!R'[O!SZO!T,}O!U-RO!V1jO!W4`O!X6VO!Y7dO!Z,}O![ZO!],}O!^-RO!_ZO!`,}O!aZO#P,pO#`mO#dmO~P(,rOP1QOQ4SOR1QO_VOdVOeVOfVOgmOkVOl1ROn1wOo1|Op-`OrZOs,zOt-SOu1kOv4aOw6WOx7eOy'XOz-ZO{1qO|4gO}6^O!O7kO!P8XO!Q1qO!R-ZO!SZO!T,zO!U-SO!V1kO!W4aO!X6WO!Y7eO!Z,zO![ZO!],zO!^-SO!_ZO!`,zO!aZO#P,pO#[2]O#`mO#dmO~P(/VOP1QOQ4SOR1QOl1RO#]#Wa~P1jO_VOdVOeVOfVOgmOn-dOo-eOp-]OrZOs'TOt-POu1hOv4^Ow6TOx7bOyZOz'YO{-[O|1tO}4jO!O6aO!P7nO!Q-[O!R'YO!SZO!T'TO!U-PO!V1hO!W4^O!X6TO!Y7bO!Z'TO![ZO!]'TO!^-PO!_ZO!`'TO!aZO#PUO#`mO#dmO[#Wa~P('[O#]#Wa~P:tO_VOdVOeVOfVOgmOkVOn-dOo4ROp4QOrZOs1OOt4OOu5zOv7ZOw8QOx8_OyZOz1PO{4PO|5{O}7[O!O8RO!P8`O!Q4PO!R1PO!SZO!T1OO!U4OO!V5zO!W7ZO!X8QO!Y8_O!Z1OO![ZO!]1OO!^4OO!_ZO!`1OO!aZO#P,pO#[2]O#`mO#dmO~P(/VO$P#iid#iid#jie#iie#jif#iif#jig#iig#jik#iin#iin#jio#iio#jip#iip#jiq#ii#[#ii#`#ii#`#ji#d#ii#d#jiS#iiT#iiU#iiW#iiX#iiY#iiZ#iih#iim#ii!b#ii!c#ii!d#ii!e#ii!f#ii!g#ii!h#ii!i#ii!j#ii!k#ii!l#ii!m#ii!n#ii!o#ii!p#ii!q#ii!r#ii!s#ii!t#ii!u#ii!v#ii!w#ii!x#ii!y#iij#iij#ji#]#ii[#ii~P#F]OP#jiQ#jiR#jiS#jiT#jiU#jiW#jiX#jiY#jih#jik#jil#jim#jiq#ji!b#ji!c#ji!d#ji!e#ji!f#ji!g#ji!h#ji!i#ji!j#ji!k#ji!l#ji!m#ji!n#ji!o#ji!p#ji!q#ji!r#ji!s#ji!t#ji!u#ji!v#ji!w#ji!x#ji!y#ji!}#ji#[#ji~OP#iiQ#iiR#iil#ii~P(HpO_#jid#jie#jif#jig#jik#jil#jin#jio#jip#jiq#jir#jis#jit#jiu#jiv#jiw#jix#jiy#jiz#ji{#ji|#ji}#ji!O#ji!P#ji!Q#ji!R#ji!S#ji!T#ji!U#ji!V#ji!W#ji!X#ji!Y#ji!Z#ji![#ji!]#ji!^#ji!_#ji!`#ji!a#ji#P#ji#[#ji#`#ji#d#ji!b#ji!c#ji!d#ji!e#ji!f#ji!g#ji!h#ji!i#ji!j#ji!k#ji!l#ji!m#ji!n#ji!o#ji!p#ji!q#ji!r#ji!s#ji!t#ji!u#ji!v#ji!w#ji!x#ji!y#jiS#jiT#jiU#jiW#jiX#jiY#jih#jim#ji~OP'jOQ.QOR'jOj#ji!}#ji[#ji~P(KpOS#jiT#jiU#jiW#jiX#jiY#ji[#jih#jik#jil#jim#jiq#ji!b#ji!c#ji!d#ji!e#ji!f#ji!g#ji!h#ji!i#ji!j#ji!k#ji!l#ji!m#ji!n#ji!o#ji!p#ji!q#ji!r#ji!s#ji!t#ji!u#ji!v#ji!w#ji!x#ji!y#ji#[#ji~OP'kOQ.ROR'kO~P)#ZOX#jiY#jih#jil#jim#jiq#ji!b#ji!c#ji!d#ji!e#ji!f#ji!g#ji!h#ji!i#ji!j#ji!k#ji!l#ji!m#ji!n#ji!o#ji!p#ji!q#ji!r#ji!s#ji!t#ji!u#ji!v#ji!w#ji!x#ji!y#ji#[#ji$P#ji~OP'lOQ.SOR'lO~P)%}OS#jiT#jiU#jiW#jiX#jiY#jiZ#jih#jil#jim#jiq#ji!b#ji!c#ji!d#ji!e#ji!f#ji!g#ji!h#ji!i#ji!j#ji!k#ji!l#ji!m#ji!n#ji!o#ji!p#ji!q#ji!r#ji!s#ji!t#ji!u#ji!v#ji!w#ji!x#ji!y#ji$P#ji~OP'mOQ.TOR'mO~P)(bOP'oOQ.VOR'oO~P(HyOP'pOQ.WOR'pO#[#ji~P)(bO_#jil#jir#jis#jit#jiu#jiv#jiw#jix#jiy#jiz#ji{#ji|#ji}#ji!O#ji!P#ji!Q#ji!R#ji!S#ji!T#ji!U#ji!V#ji!W#ji!X#ji!Y#ji!Z#ji![#ji!]#ji!^#ji!_#ji!`#ji!a#ji#P#ji~OP'nOQ.UOR'nO~P)+pOdVOeVOfVOgmOkVOn-dOo-eOp-]Oq!{O#[2]O#`mO#dmOP#jiQ#jiR#ji~P)+pO_VOdVOeVOfVOgmOn-dOo-eOp-]OrZOs'TOt-POu1hOv4^Ow6TOx7bOyZOz'YO{-[O|1tO}4jO!O6aO!P7nO!Q-[O!R'YO!SZO!T'TO!U-PO!V1hO!W4^O!X6TO!Y7bO!Z'TO![ZO!]'TO!^-PO!_ZO!`'TO!aZO#PUO#`mO#dmO[#ji~P(HpO_VOdVOeVOfVOgmOkVOn-dOo4ROp4QOrZOs1OOt4OOu5zOv7ZOw8QOx8_OyZOz1PO{4PO|5{O}7[O!O8RO!P8`O!Q4PO!R1PO!SZO!T1OO!U4OO!V5zO!W7ZO!X8QO!Y8_O!Z1OO![ZO!]1OO!^4OO!_ZO!`1OO!aZO#P,pO#`mO#dmOP#jiQ#jiR#ji#[#ji~P)(bO_VOdVOeVOfVOgmOkVOn-dOo4ROp4QOrZOs1OOt4OOu5zOv7ZOw8QOx8_OyZOz1PO{4PO|5{O}7[O!O8RO!P8`O!Q4PO!R1PO!SZO!T1OO!U4OO!V5zO!W7ZO!X8QO!Y8_O!Z1OO![ZO!]1OO!^4OO!_ZO!`1OO!aZO#P,pO#[2]O#`mO#dmOP#jiQ#jiR#ji~P)(bOdVOeVOfVOgmOkVOn-dOo-eOp-]O#[2]O#`mO#dmOP#kXQ#kXR#kXl#kX~Oq!{O_#kXr#kXs#kXt#kXu#kXv#kXw#kXx#kXy#kXz#kX{#kX|#kX}#kX!O#kX!P#kX!Q#kX!R#kX!S#kX!T#kX!U#kX!V#kX!W#kX!X#kX!Y#kX!Z#kX![#kX!]#kX!^#kX!_#kX!`#kX!a#kX#P#kX~P)8ZO_VOdVOeVOfVOgmOn-dOo-eOp-]OrZOs'TOt-POu1hOv4^Ow6TOx7bOyZOz'YO{-[O|1tO}4jO!O6aO!P7nO!Q-[O!R'YO!SZO!T'TO!U-PO!V1hO!W4^O!X6TO!Y7bO!Z'TO![ZO!]'TO!^-PO!_ZO!`'TO!aZO#PUO#`mO#dmOP#kXQ#kXR#kXS#kXT#kXU#kXW#kXX#kXY#kXh#kXl#kXm#kXq#kX!b#kX!c#kX!d#kX!e#kX!f#kX!g#kX!h#kX!i#kX!j#kX!k#kX!l#kX!m#kX!n#kX!o#kX!p#kX!q#kX!r#kX!s#kX!t#kX!u#kX!v#kX!w#kX!x#kX!y#kX#[#kX~Ok#kX!}#kX[#kX~P);gOkVOZ#kX$P#kX~P);gO_VOrZOs'TOt-POu1hOv4^Ow6TOx7bOyZOz'YO{-[O|1tO}4jO!O6aO!P7nO!Q-[O!R'YO!SZO!T'TO!U-PO!V1hO!W4^O!X6TO!Y7bO!Z'TO![ZO!]'TO!^-PO!_ZO!`'TO!aZO#PUOS#kXT#kXU#kXW#kXX#kXY#kXZ#kXh#kXm#kXq#kX!b#kX!c#kX!d#kX!e#kX!f#kX!g#kX!h#kX!i#kX!j#kX!k#kX!l#kX!m#kX!n#kX!o#kX!p#kX!q#kX!r#kX!s#kX!t#kX!u#kX!v#kX!w#kX!x#kX!y#kX$P#kX~P)8ZOS#WiT#WiU#WiW#WiX#WiY#Wih#Wik#Wim#Wiq#Wi!b#Wi!c#Wi!d#Wi!e#Wi!f#Wi!g#Wi!h#Wi!i#Wi!j#Wi!k#Wi!l#Wi!m#Wi!n#Wi!o#Wi!p#Wi!q#Wi!r#Wi!s#Wi!t#Wi!u#Wi!v#Wi!w#Wi!x#Wi!y#Wi!}#Wi#[#Wi~OP'oOQ.VOR'oOl'uO~P)EqOS#WiT#WiU#WiW#WiX#WiY#Wi[#Wih#Wik#Wim#Wiq#Wi!b#Wi!c#Wi!d#Wi!e#Wi!f#Wi!g#Wi!h#Wi!i#Wi!j#Wi!k#Wi!l#Wi!m#Wi!n#Wi!o#Wi!p#Wi!q#Wi!r#Wi!s#Wi!t#Wi!u#Wi!v#Wi!w#Wi!x#Wi!y#Wi#[#Wi~OP'kOQ.ROR'kOl'rO~P)HeOX#WiY#Wih#Wim#Wiq#Wi!b#Wi!c#Wi!d#Wi!e#Wi!f#Wi!g#Wi!h#Wi!i#Wi!j#Wi!k#Wi!l#Wi!m#Wi!n#Wi!o#Wi!p#Wi!q#Wi!r#Wi!s#Wi!t#Wi!u#Wi!v#Wi!w#Wi!x#Wi!y#Wi$P#Wi~OP'lOQ.SOR'lOl'sO#[#Wi~P)KXOP'mOQ.TOR'mOl'tOS#WiT#WiU#WiW#WiZ#Wi~P)KXOP!xOQ!yOR!xOl!zO#]#Wi~O_VOdVOeVOfVOgmOn-dOo-eOp-]OrZOs'TOt-POu1hOv4^Ow6TOx7bOyZOz'YO{-[O|1tO}4jO!O6aO!P7nO!Q-[O!R'YO!SZO!T'TO!U-PO!V1hO!W4^O!X6TO!Y7bO!Z'TO![ZO!]'TO!^-PO!_ZO!`'TO!aZO#PUO#`mO#dmO[#Wi~P)EqO#]#Wi~P:tO_VOdVOeVOfVOgmOkVOn-dOo4ROp4QOrZOs1OOt4OOu5zOv7ZOw8QOx8_OyZOz1PO{4PO|5{O}7[O!O8RO!P8`O!Q4PO!R1PO!SZO!T1OO!U4OO!V5zO!W7ZO!X8QO!Y8_O!Z1OO![ZO!]1OO!^4OO!_ZO!`1OO!aZO#P,pO#[2]O#`mO#dmOS#WiT#WiU#WiW#WiZ#Wi~P)KXOP#aXQ#aXR#aXS#rXT#rXU#rXW#rXX#rXY#rX_#aXd#aXe#aXf#aXg#aXh#rXj#aXk#aXl#aXm#rXn#aXo#aXp#aXq#aXq#rXr#aXs#aXt#aXu#aXv#aXw#aXx#aXy#aXz#aX{#aX|#aX}#aX!O#aX!P#aX!Q#aX!R#aX!S#aX!T#aX!U#aX!V#aX!W#aX!X#aX!Y#aX!Z#aX![#aX!]#aX!^#aX!_#aX!`#aX!a#aX!b#aX!b#rX!c#aX!c#rX!d#aX!d#rX!e#aX!e#rX!f#aX!f#rX!g#aX!g#rX!h#aX!h#rX!i#aX!i#rX!j#aX!j#rX!k#aX!k#rX!l#aX!l#rX!m#aX!m#rX!n#aX!n#rX!o#aX!o#rX!p#aX!p#rX!q#aX!q#rX!r#aX!r#rX!s#aX!s#rX!t#aX!t#rX!u#aX!u#rX!v#aX!v#rX!w#aX!w#rX!x#aX!x#rX!y#aX!y#rX#P#aX#[#aX#`#aX#d#aX~Ok#rX!}#rX#[#rX[#rX~P*&wOP#aXQ#aXR#aX_#aXd#aXe#aXf#aXg#aXj#aXk#aXl#aXn#aXo#aXp#aXq#aXr#aXs#aXt#aXu#aXv#aXw#aXx#aXy#aXz#aX{#aX|#aX}#aX!O#aX!P#aX!Q#aX!R#aX!S#aX!T#aX!U#aX!V#aX!W#aX!X#aX!Y#aX!Z#aX![#aX!]#aX!^#aX!_#aX!`#aX!a#aX!b#aX!c#aX!d#aX!e#aX!f#aX!g#aX!h#aX!i#aX!j#aX!k#aX!l#aX!m#aX!n#aX!o#aX!p#aX!q#aX!r#aX!s#aX!t#aX!u#aX!v#aX!w#aX!x#aX!y#aX#P#aX#[#aX#`#aX#d#aX~O#]#rX~P*.VOP#_XQ#_XR#_XS#rXT#rXU#rXW#rXX#rXY#rX_#_Xd#_Xe#_Xf#_Xg#_Xh#rXj#_Xk#_Xl#_Xm#rXn#_Xo#_Xp#_Xq#_Xq#rXr#_Xs#_Xt#_Xu#_Xv#_Xw#_Xx#_Xy#_Xz#_X{#_X|#_X}#_X!O#_X!P#_X!Q#_X!R#_X!S#_X!T#_X!U#_X!V#_X!W#_X!X#_X!Y#_X!Z#_X![#_X!]#_X!^#_X!_#_X!`#_X!a#_X!b#_X!b#rX!c#_X!c#rX!d#_X!d#rX!e#_X!e#rX!f#_X!f#rX!g#_X!g#rX!h#_X!h#rX!i#_X!i#rX!j#_X!j#rX!k#_X!k#rX!l#_X!l#rX!m#_X!m#rX!n#_X!n#rX!o#_X!o#rX!p#_X!p#rX!q#_X!q#rX!r#_X!r#rX!s#_X!s#rX!t#_X!t#rX!u#_X!u#rX!v#_X!v#rX!w#_X!w#rX!x#_X!x#rX!y#_X!y#rX#P#_X#[#_X#`#_X#d#_X~Ok#rX!}#rX#[#rX[#rX~P*3TOP#_XQ#_XR#_X_#_Xd#_Xe#_Xf#_Xg#_Xj#_Xk#_Xl#_Xn#_Xo#_Xp#_Xq#_Xr#_Xs#_Xt#_Xu#_Xv#_Xw#_Xx#_Xy#_Xz#_X{#_X|#_X}#_X!O#_X!P#_X!Q#_X!R#_X!S#_X!T#_X!U#_X!V#_X!W#_X!X#_X!Y#_X!Z#_X![#_X!]#_X!^#_X!_#_X!`#_X!a#_X!b#_X!c#_X!d#_X!e#_X!f#_X!g#_X!h#_X!i#_X!j#_X!k#_X!l#_X!m#_X!n#_X!o#_X!p#_X!q#_X!r#_X!s#_X!t#_X!u#_X!v#_X!w#_X!x#_X!y#_X#P#_X#[#_X#`#_X#d#_X~O#]#rX~P*:cO_#jqd#jqe#jqf#jqg#jqk#jql#jqn#jqo#jqp#jqq#jqr#jqs#jqt#jqu#jqv#jqw#jqx#jqy#jqz#jq{#jq|#jq}#jq!O#jq!P#jq!Q#jq!R#jq!S#jq!T#jq!U#jq!V#jq!W#jq!X#jq!Y#jq!Z#jq![#jq!]#jq!^#jq!_#jq!`#jq!a#jq#P#jq#[#jq#`#jq#d#jq!b#jq!c#jq!d#jq!e#jq!f#jq!g#jq!h#jq!i#jq!j#jq!k#jq!l#jq!m#jq!n#jq!o#jq!p#jq!q#jq!r#jq!s#jq!t#jq!u#jq!v#jq!w#jq!x#jq!y#jqS#jqT#jqU#jqW#jqX#jqY#jqh#jqm#jq~OP'jOQ.QOR'jOj#jq!}#jq[#jq~P*?aOS#jqT#jqU#jqW#jqX#jqY#jq[#jqh#jqk#jql#jqm#jqq#jq!b#jq!c#jq!d#jq!e#jq!f#jq!g#jq!h#jq!i#jq!j#jq!k#jq!l#jq!m#jq!n#jq!o#jq!p#jq!q#jq!r#jq!s#jq!t#jq!u#jq!v#jq!w#jq!x#jq!y#jq#[#jq~OP'kOQ.ROR'kO~P*DzOX#jqY#jqh#jql#jqm#jqq#jq!b#jq!c#jq!d#jq!e#jq!f#jq!g#jq!h#jq!i#jq!j#jq!k#jq!l#jq!m#jq!n#jq!o#jq!p#jq!q#jq!r#jq!s#jq!t#jq!u#jq!v#jq!w#jq!x#jq!y#jq#[#jq$P#jq~OP'lOQ.SOR'lO~P*GnOS#jqT#jqU#jqW#jqX#jqY#jqZ#jqh#jql#jqm#jqq#jq!b#jq!c#jq!d#jq!e#jq!f#jq!g#jq!h#jq!i#jq!j#jq!k#jq!l#jq!m#jq!n#jq!o#jq!p#jq!q#jq!r#jq!s#jq!t#jq!u#jq!v#jq!w#jq!x#jq!y#jq$P#jq~OP'mOQ.TOR'mO~P*JROS#jqT#jqU#jqW#jqX#jqY#jqh#jqk#jql#jqm#jqq#jq!b#jq!c#jq!d#jq!e#jq!f#jq!g#jq!h#jq!i#jq!j#jq!k#jq!l#jq!m#jq!n#jq!o#jq!p#jq!q#jq!r#jq!s#jq!t#jq!u#jq!v#jq!w#jq!x#jq!y#jq!}#jq#[#jq~OP'oOQ.VOR'oO~P*LrOP'pOQ.WOR'pO#[#jq~P*JRO_#jql#jqr#jqs#jqt#jqu#jqv#jqw#jqx#jqy#jqz#jq{#jq|#jq}#jq!O#jq!P#jq!Q#jq!R#jq!S#jq!T#jq!U#jq!V#jq!W#jq!X#jq!Y#jq!Z#jq![#jq!]#jq!^#jq!_#jq!`#jq!a#jq#P#jq~OP'nOQ.UOR'nO~P+ vOdVOeVOfVOgmOkVOn-dOo-eOp-]Oq!{O#[2]O#`mO#dmOP#jqQ#jqR#jq~P+ vO_VOdVOeVOfVOgmOn-dOo-eOp-]OrZOs'TOt-POu1hOv4^Ow6TOx7bOyZOz'YO{-[O|1tO}4jO!O6aO!P7nO!Q-[O!R'YO!SZO!T'TO!U-PO!V1hO!W4^O!X6TO!Y7bO!Z'TO![ZO!]'TO!^-PO!_ZO!`'TO!aZO#PUO#`mO#dmOP#jqQ#jqR#jq!}#jq~P*DzO_VOdVOeVOfVOgmOkVOn-dOo4ROp4QOrZOs1OOt4OOu5zOv7ZOw8QOx8_OyZOz1PO{4PO|5{O}7[O!O8RO!P8`O!Q4PO!R1PO!SZO!T1OO!U4OO!V5zO!W7ZO!X8QO!Y8_O!Z1OO![ZO!]1OO!^4OO!_ZO!`1OO!aZO#P,pO#`mO#dmOP#jqQ#jqR#jq#[#jq~P*JRO_VOdVOeVOfVOgmOkVOn-dOo4ROp4QOrZOs1OOt4OOu5zOv7ZOw8QOx8_OyZOz1PO{4PO|5{O}7[O!O8RO!P8`O!Q4PO!R1PO!SZO!T1OO!U4OO!V5zO!W7ZO!X8QO!Y8_O!Z1OO![ZO!]1OO!^4OO!_ZO!`1OO!aZO#P,pO#[2]O#`mO#dmOP#jqQ#jqR#jq~P*JROS#WqT#WqU#WqW#WqX#WqY#Wqh#Wqk#Wqm#Wqq#Wq!b#Wq!c#Wq!d#Wq!e#Wq!f#Wq!g#Wq!h#Wq!i#Wq!j#Wq!k#Wq!l#Wq!m#Wq!n#Wq!o#Wq!p#Wq!q#Wq!r#Wq!s#Wq!t#Wq!u#Wq!v#Wq!w#Wq!x#Wq!y#Wq!}#Wq#[#Wq~OP'oOQ.VOR'oOl'uO~P+.jOS#WqT#WqU#WqW#WqX#WqY#Wq[#Wqh#Wqk#Wqm#Wqq#Wq!b#Wq!c#Wq!d#Wq!e#Wq!f#Wq!g#Wq!h#Wq!i#Wq!j#Wq!k#Wq!l#Wq!m#Wq!n#Wq!o#Wq!p#Wq!q#Wq!r#Wq!s#Wq!t#Wq!u#Wq!v#Wq!w#Wq!x#Wq!y#Wq#[#Wq~OP'kOQ.ROR'kOl'rO~P+1^OX#WqY#Wqh#Wqm#Wqq#Wq!b#Wq!c#Wq!d#Wq!e#Wq!f#Wq!g#Wq!h#Wq!i#Wq!j#Wq!k#Wq!l#Wq!m#Wq!n#Wq!o#Wq!p#Wq!q#Wq!r#Wq!s#Wq!t#Wq!u#Wq!v#Wq!w#Wq!x#Wq!y#Wq$P#Wq~OP'lOQ.SOR'lOl'sO#[#Wq~P+4QOP'mOQ.TOR'mOl'tOS#WqT#WqU#WqW#WqZ#Wq~P+4QOP!xOQ!yOR!xOl!zO#]#Wq~O_VOdVOeVOfVOgmOn-dOo-eOp-]OrZOs'TOt-POu1hOv4^Ow6TOx7bOyZOz'YO{-[O|1tO}4jO!O6aO!P7nO!Q-[O!R'YO!SZO!T'TO!U-PO!V1hO!W4^O!X6TO!Y7bO!Z'TO![ZO!]'TO!^-PO!_ZO!`'TO!aZO#PUO#`mO#dmO[#Wq~P+.jO#]#Wq~P:tO_VOdVOeVOfVOgmOkVOn-dOo4ROp4QOrZOs1OOt4OOu5zOv7ZOw8QOx8_OyZOz1PO{4PO|5{O}7[O!O8RO!P8`O!Q4PO!R1PO!SZO!T1OO!U4OO!V5zO!W7ZO!X8QO!Y8_O!Z1OO![ZO!]1OO!^4OO!_ZO!`1OO!aZO#P,pO#[2]O#`mO#dmOS#WqT#WqU#WqW#WqZ#Wq~P+4QOS#laT#laU#laW#laX#laY#la_#Ya_#bad#Yad#bae#Yae#baf#Yaf#bag#Yag#bah#laj#Yaj#bak#Yak#lam#lan#Yan#bao#Yao#bap#Yap#baq#Yaq#lar#Yar#bas#Yas#bat#Yat#bau#Yau#bav#Yav#baw#Yaw#bax#Yax#bay#Yay#baz#Yaz#ba{#Ya{#ba|#Ya|#ba}#Ya}#ba!O#Ya!O#ba!P#Ya!P#ba!Q#Ya!Q#ba!R#Ya!R#ba!S#Ya!S#ba!T#Ya!T#ba!U#Ya!U#ba!V#Ya!V#ba!W#Ya!W#ba!X#Ya!X#ba!Y#Ya!Y#ba!Z#Ya!Z#ba![#Ya![#ba!]#Ya!]#ba!^#Ya!^#ba!_#Ya!_#ba!`#Ya!`#ba!a#Ya!a#ba!b#Ya!b#la!c#Ya!c#la!d#Ya!d#la!e#Ya!e#la!f#Ya!f#la!g#Ya!g#la!h#Ya!h#la!i#Ya!i#la!j#Ya!j#la!k#Ya!k#la!l#Ya!l#la!m#Ya!m#la!n#Ya!n#la!o#Ya!o#la!p#Ya!p#la!q#Ya!q#la!r#Ya!r#la!s#Ya!s#la!t#Ya!t#la!u#Ya!u#la!v#Ya!v#la!w#Ya!w#la!x#Ya!x#la!y#Ya!y#la!}#la#P#Ya#P#ba#[#Ya#[#la#`#Ya#`#ba#d#Ya#d#ba[#la~P' aO_#Ya_#bad#Yad#bae#Yae#baf#Yaf#bag#Yag#baj#Yaj#bak#Yan#Yan#bao#Yao#bap#Yap#baq#Yar#Yar#bas#Yas#bat#Yat#bau#Yau#bav#Yav#baw#Yaw#bax#Yax#bay#Yay#baz#Yaz#ba{#Ya{#ba|#Ya|#ba}#Ya}#ba!O#Ya!O#ba!P#Ya!P#ba!Q#Ya!Q#ba!R#Ya!R#ba!S#Ya!S#ba!T#Ya!T#ba!U#Ya!U#ba!V#Ya!V#ba!W#Ya!W#ba!X#Ya!X#ba!Y#Ya!Y#ba!Z#Ya!Z#ba![#Ya![#ba!]#Ya!]#ba!^#Ya!^#ba!_#Ya!_#ba!`#Ya!`#ba!a#Ya!a#ba!b#Ya!c#Ya!d#Ya!e#Ya!f#Ya!g#Ya!h#Ya!i#Ya!j#Ya!k#Ya!l#Ya!m#Ya!n#Ya!o#Ya!p#Ya!q#Ya!r#Ya!s#Ya!t#Ya!u#Ya!v#Ya!w#Ya!x#Ya!y#Ya#P#Ya#P#ba#[#Ya#]#la#`#Ya#`#ba#d#Ya#d#ba~P' aO_#jyd#jye#jyf#jyg#jyk#jyl#jyn#jyo#jyp#jyq#jyr#jys#jyt#jyu#jyv#jyw#jyx#jyy#jyz#jy{#jy|#jy}#jy!O#jy!P#jy!Q#jy!R#jy!S#jy!T#jy!U#jy!V#jy!W#jy!X#jy!Y#jy!Z#jy![#jy!]#jy!^#jy!_#jy!`#jy!a#jy#P#jy#[#jy#`#jy#d#jy!b#jy!c#jy!d#jy!e#jy!f#jy!g#jy!h#jy!i#jy!j#jy!k#jy!l#jy!m#jy!n#jy!o#jy!p#jy!q#jy!r#jy!s#jy!t#jy!u#jy!v#jy!w#jy!x#jy!y#jyS#jyT#jyU#jyW#jyX#jyY#jyh#jym#jy~OP'jOQ.QOR'jOj#jy!}#jy[#jy~P+NvOS#jyT#jyU#jyW#jyX#jyY#jy[#jyh#jyk#jyl#jym#jyq#jy!b#jy!c#jy!d#jy!e#jy!f#jy!g#jy!h#jy!i#jy!j#jy!k#jy!l#jy!m#jy!n#jy!o#jy!p#jy!q#jy!r#jy!s#jy!t#jy!u#jy!v#jy!w#jy!x#jy!y#jy#[#jy~OP'kOQ.ROR'kO~P,&aOX#jyY#jyh#jyl#jym#jyq#jy!b#jy!c#jy!d#jy!e#jy!f#jy!g#jy!h#jy!i#jy!j#jy!k#jy!l#jy!m#jy!n#jy!o#jy!p#jy!q#jy!r#jy!s#jy!t#jy!u#jy!v#jy!w#jy!x#jy!y#jy#[#jy$P#jy~OP'lOQ.SOR'lO~P,)TOS#jyT#jyU#jyW#jyX#jyY#jyZ#jyh#jyl#jym#jyq#jy!b#jy!c#jy!d#jy!e#jy!f#jy!g#jy!h#jy!i#jy!j#jy!k#jy!l#jy!m#jy!n#jy!o#jy!p#jy!q#jy!r#jy!s#jy!t#jy!u#jy!v#jy!w#jy!x#jy!y#jy$P#jy~OP'mOQ.TOR'mO~P,+hOS#jyT#jyU#jyW#jyX#jyY#jyh#jyk#jyl#jym#jyq#jy!b#jy!c#jy!d#jy!e#jy!f#jy!g#jy!h#jy!i#jy!j#jy!k#jy!l#jy!m#jy!n#jy!o#jy!p#jy!q#jy!r#jy!s#jy!t#jy!u#jy!v#jy!w#jy!x#jy!y#jy!}#jy#[#jy~OP'oOQ.VOR'oO~P,.XOP'pOQ.WOR'pO#[#jy~P,+hO_#jyl#jyr#jys#jyt#jyu#jyv#jyw#jyx#jyy#jyz#jy{#jy|#jy}#jy!O#jy!P#jy!Q#jy!R#jy!S#jy!T#jy!U#jy!V#jy!W#jy!X#jy!Y#jy!Z#jy![#jy!]#jy!^#jy!_#jy!`#jy!a#jy#P#jy~OP'nOQ.UOR'nO~P,1]OdVOeVOfVOgmOkVOn-dOo-eOp-]Oq!{O#[2]O#`mO#dmOP#jyQ#jyR#jy~P,1]O_VOdVOeVOfVOgmOn-dOo-eOp-]OrZOs'TOt-POu1hOv4^Ow6TOx7bOyZOz'YO{-[O|1tO}4jO!O6aO!P7nO!Q-[O!R'YO!SZO!T'TO!U-PO!V1hO!W4^O!X6TO!Y7bO!Z'TO![ZO!]'TO!^-PO!_ZO!`'TO!aZO#PUO#`mO#dmOP#jyQ#jyR#jy!}#jy~P,&aO_VOdVOeVOfVOgmOkVOn-dOo4ROp4QOrZOs1OOt4OOu5zOv7ZOw8QOx8_OyZOz1PO{4PO|5{O}7[O!O8RO!P8`O!Q4PO!R1PO!SZO!T1OO!U4OO!V5zO!W7ZO!X8QO!Y8_O!Z1OO![ZO!]1OO!^4OO!_ZO!`1OO!aZO#P,pO#`mO#dmOP#jyQ#jyR#jy#[#jy~P,+hO_VOdVOeVOfVOgmOkVOn-dOo4ROp4QOrZOs1OOt4OOu5zOv7ZOw8QOx8_OyZOz1PO{4PO|5{O}7[O!O8RO!P8`O!Q4PO!R1PO!SZO!T1OO!U4OO!V5zO!W7ZO!X8QO!Y8_O!Z1OO![ZO!]1OO!^4OO!_ZO!`1OO!aZO#P,pO#[2]O#`mO#dmOP#jyQ#jyR#jy~P,+hOS#WyT#WyU#WyW#WyX#WyY#Wyh#Wyk#Wym#Wyq#Wy!b#Wy!c#Wy!d#Wy!e#Wy!f#Wy!g#Wy!h#Wy!i#Wy!j#Wy!k#Wy!l#Wy!m#Wy!n#Wy!o#Wy!p#Wy!q#Wy!r#Wy!s#Wy!t#Wy!u#Wy!v#Wy!w#Wy!x#Wy!y#Wy!}#Wy#[#Wy~OP'oOQ.VOR'oOl'uO~P,>POS#WyT#WyU#WyW#WyX#WyY#Wy[#Wyh#Wyk#Wym#Wyq#Wy!b#Wy!c#Wy!d#Wy!e#Wy!f#Wy!g#Wy!h#Wy!i#Wy!j#Wy!k#Wy!l#Wy!m#Wy!n#Wy!o#Wy!p#Wy!q#Wy!r#Wy!s#Wy!t#Wy!u#Wy!v#Wy!w#Wy!x#Wy!y#Wy#[#Wy~OP'kOQ.ROR'kOl'rO~P,@sOX#WyY#Wyh#Wym#Wyq#Wy!b#Wy!c#Wy!d#Wy!e#Wy!f#Wy!g#Wy!h#Wy!i#Wy!j#Wy!k#Wy!l#Wy!m#Wy!n#Wy!o#Wy!p#Wy!q#Wy!r#Wy!s#Wy!t#Wy!u#Wy!v#Wy!w#Wy!x#Wy!y#Wy$P#Wy~OP'lOQ.SOR'lOl'sO#[#Wy~P,CgOP'mOQ.TOR'mOl'tOS#WyT#WyU#WyW#WyZ#Wy~P,CgOP!xOQ!yOR!xOl!zO#]#Wy~O_VOdVOeVOfVOgmOn-dOo-eOp-]OrZOs'TOt-POu1hOv4^Ow6TOx7bOyZOz'YO{-[O|1tO}4jO!O6aO!P7nO!Q-[O!R'YO!SZO!T'TO!U-PO!V1hO!W4^O!X6TO!Y7bO!Z'TO![ZO!]'TO!^-PO!_ZO!`'TO!aZO#PUO#`mO#dmO[#Wy~P,>PO#]#Wy~P:tO_VOdVOeVOfVOgmOkVOn-dOo4ROp4QOrZOs1OOt4OOu5zOv7ZOw8QOx8_OyZOz1PO{4PO|5{O}7[O!O8RO!P8`O!Q4PO!R1PO!SZO!T1OO!U4OO!V5zO!W7ZO!X8QO!Y8_O!Z1OO![ZO!]1OO!^4OO!_ZO!`1OO!aZO#P,pO#[2]O#`mO#dmOS#WyT#WyU#WyW#WyZ#Wy~P,CgOP#YiQ#YiR#Yi_#Yid#Yie#Yif#Yig#Yij#Yik#Yik#lil#Yin#Yio#Yip#Yiq#Yiq#lir#Yis#Yit#Yiu#Yiv#Yiw#Yix#Yiy#Yiz#Yi{#Yi|#Yi}#Yi!O#Yi!P#Yi!Q#Yi!R#Yi!S#Yi!T#Yi!U#Yi!V#Yi!W#Yi!X#Yi!Y#Yi!Z#Yi![#Yi!]#Yi!^#Yi!_#Yi!`#Yi!a#Yi!b#Yi!b#li!c#Yi!c#li!d#Yi!d#li!e#Yi!e#li!f#Yi!f#li!g#Yi!g#li!h#Yi!h#li!i#Yi!i#li!j#Yi!j#li!k#Yi!k#li!l#Yi!l#li!m#Yi!m#li!n#Yi!n#li!o#Yi!o#li!p#Yi!p#li!q#Yi!q#li!r#Yi!r#li!s#Yi!s#li!t#Yi!t#li!u#Yi!u#li!v#Yi!v#li!w#Yi!w#li!x#Yi!x#li!y#Yi!y#li#P#Yi#[#Yi#[#li#`#Yi#d#Yi~P%HwOP#YiQ#YiR#Yi_#Yid#Yie#Yif#Yig#Yij#Yik#Yil#Yin#Yio#Yip#Yiq#Yir#Yis#Yit#Yiu#Yiv#Yiw#Yix#Yiy#Yiz#Yi{#Yi|#Yi}#Yi!O#Yi!P#Yi!Q#Yi!R#Yi!S#Yi!T#Yi!U#Yi!V#Yi!W#Yi!X#Yi!Y#Yi!Z#Yi![#Yi!]#Yi!^#Yi!_#Yi!`#Yi!a#Yi!b#Yi!c#Yi!d#Yi!e#Yi!f#Yi!g#Yi!h#Yi!i#Yi!j#Yi!k#Yi!l#Yi!m#Yi!n#Yi!o#Yi!p#Yi!q#Yi!r#Yi!s#Yi!t#Yi!u#Yi!v#Yi!w#Yi!x#Yi!y#Yi#P#Yi#[#Yi#`#Yi#d#Yi~O#]#li~P-%sO_#j!Rd#j!Re#j!Rf#j!Rg#j!Rk#j!Rl#j!Rn#j!Ro#j!Rp#j!Rq#j!Rr#j!Rs#j!Rt#j!Ru#j!Rv#j!Rw#j!Rx#j!Ry#j!Rz#j!R{#j!R|#j!R}#j!R!O#j!R!P#j!R!Q#j!R!R#j!R!S#j!R!T#j!R!U#j!R!V#j!R!W#j!R!X#j!R!Y#j!R!Z#j!R![#j!R!]#j!R!^#j!R!_#j!R!`#j!R!a#j!R#P#j!R#[#j!R#`#j!R#d#j!R!b#j!R!c#j!R!d#j!R!e#j!R!f#j!R!g#j!R!h#j!R!i#j!R!j#j!R!k#j!R!l#j!R!m#j!R!n#j!R!o#j!R!p#j!R!q#j!R!r#j!R!s#j!R!t#j!R!u#j!R!v#j!R!w#j!R!x#j!R!y#j!RS#j!RT#j!RU#j!RW#j!RX#j!RY#j!Rh#j!Rm#j!R~OP'jOQ.QOR'jOj#j!R!}#j!R[#j!R~P-*qOS#j!RT#j!RU#j!RW#j!RX#j!RY#j!R[#j!Rh#j!Rk#j!Rl#j!Rm#j!Rq#j!R!b#j!R!c#j!R!d#j!R!e#j!R!f#j!R!g#j!R!h#j!R!i#j!R!j#j!R!k#j!R!l#j!R!m#j!R!n#j!R!o#j!R!p#j!R!q#j!R!r#j!R!s#j!R!t#j!R!u#j!R!v#j!R!w#j!R!x#j!R!y#j!R#[#j!R~OP'kOQ.ROR'kO~P-0[OX#j!RY#j!Rh#j!Rl#j!Rm#j!Rq#j!R!b#j!R!c#j!R!d#j!R!e#j!R!f#j!R!g#j!R!h#j!R!i#j!R!j#j!R!k#j!R!l#j!R!m#j!R!n#j!R!o#j!R!p#j!R!q#j!R!r#j!R!s#j!R!t#j!R!u#j!R!v#j!R!w#j!R!x#j!R!y#j!R#[#j!R$P#j!R~OP'lOQ.SOR'lO~P-3OOS#j!RT#j!RU#j!RW#j!RX#j!RY#j!RZ#j!Rh#j!Rl#j!Rm#j!Rq#j!R!b#j!R!c#j!R!d#j!R!e#j!R!f#j!R!g#j!R!h#j!R!i#j!R!j#j!R!k#j!R!l#j!R!m#j!R!n#j!R!o#j!R!p#j!R!q#j!R!r#j!R!s#j!R!t#j!R!u#j!R!v#j!R!w#j!R!x#j!R!y#j!R$P#j!R~OP'mOQ.TOR'mO~P-5cOS#j!RT#j!RU#j!RW#j!RX#j!RY#j!Rh#j!Rk#j!Rl#j!Rm#j!Rq#j!R!b#j!R!c#j!R!d#j!R!e#j!R!f#j!R!g#j!R!h#j!R!i#j!R!j#j!R!k#j!R!l#j!R!m#j!R!n#j!R!o#j!R!p#j!R!q#j!R!r#j!R!s#j!R!t#j!R!u#j!R!v#j!R!w#j!R!x#j!R!y#j!R!}#j!R#[#j!R~OP'oOQ.VOR'oO~P-8SOP'pOQ.WOR'pO#[#j!R~P-5cO_#j!Rl#j!Rr#j!Rs#j!Rt#j!Ru#j!Rv#j!Rw#j!Rx#j!Ry#j!Rz#j!R{#j!R|#j!R}#j!R!O#j!R!P#j!R!Q#j!R!R#j!R!S#j!R!T#j!R!U#j!R!V#j!R!W#j!R!X#j!R!Y#j!R!Z#j!R![#j!R!]#j!R!^#j!R!_#j!R!`#j!R!a#j!R#P#j!R~OP'nOQ.UOR'nO~P-;WOdVOeVOfVOgmOkVOn-dOo-eOp-]Oq!{O#[2]O#`mO#dmOP#j!RQ#j!RR#j!R~P-;WO_VOdVOeVOfVOgmOn-dOo-eOp-]OrZOs'TOt-POu1hOv4^Ow6TOx7bOyZOz'YO{-[O|1tO}4jO!O6aO!P7nO!Q-[O!R'YO!SZO!T'TO!U-PO!V1hO!W4^O!X6TO!Y7bO!Z'TO![ZO!]'TO!^-PO!_ZO!`'TO!aZO#PUO#`mO#dmOP#j!RQ#j!RR#j!R!}#j!R~P-0[O_VOdVOeVOfVOgmOkVOn-dOo4ROp4QOrZOs1OOt4OOu5zOv7ZOw8QOx8_OyZOz1PO{4PO|5{O}7[O!O8RO!P8`O!Q4PO!R1PO!SZO!T1OO!U4OO!V5zO!W7ZO!X8QO!Y8_O!Z1OO![ZO!]1OO!^4OO!_ZO!`1OO!aZO#P,pO#`mO#dmOP#j!RQ#j!RR#j!R#[#j!R~P-5cO_VOdVOeVOfVOgmOkVOn-dOo4ROp4QOrZOs1OOt4OOu5zOv7ZOw8QOx8_OyZOz1PO{4PO|5{O}7[O!O8RO!P8`O!Q4PO!R1PO!SZO!T1OO!U4OO!V5zO!W7ZO!X8QO!Y8_O!Z1OO![ZO!]1OO!^4OO!_ZO!`1OO!aZO#P,pO#[2]O#`mO#dmOP#j!RQ#j!RR#j!R~P-5cOS#W!RT#W!RU#W!RW#W!RX#W!RY#W!Rh#W!Rk#W!Rm#W!Rq#W!R!b#W!R!c#W!R!d#W!R!e#W!R!f#W!R!g#W!R!h#W!R!i#W!R!j#W!R!k#W!R!l#W!R!m#W!R!n#W!R!o#W!R!p#W!R!q#W!R!r#W!R!s#W!R!t#W!R!u#W!R!v#W!R!w#W!R!x#W!R!y#W!R!}#W!R#[#W!R~OP'oOQ.VOR'oOl'uO~P-GzOS#W!RT#W!RU#W!RW#W!RX#W!RY#W!R[#W!Rh#W!Rk#W!Rm#W!Rq#W!R!b#W!R!c#W!R!d#W!R!e#W!R!f#W!R!g#W!R!h#W!R!i#W!R!j#W!R!k#W!R!l#W!R!m#W!R!n#W!R!o#W!R!p#W!R!q#W!R!r#W!R!s#W!R!t#W!R!u#W!R!v#W!R!w#W!R!x#W!R!y#W!R#[#W!R~OP'kOQ.ROR'kOl'rO~P-JnOX#W!RY#W!Rh#W!Rm#W!Rq#W!R!b#W!R!c#W!R!d#W!R!e#W!R!f#W!R!g#W!R!h#W!R!i#W!R!j#W!R!k#W!R!l#W!R!m#W!R!n#W!R!o#W!R!p#W!R!q#W!R!r#W!R!s#W!R!t#W!R!u#W!R!v#W!R!w#W!R!x#W!R!y#W!R$P#W!R~OP'lOQ.SOR'lOl'sO#[#W!R~P-MbOP'mOQ.TOR'mOl'tOS#W!RT#W!RU#W!RW#W!RZ#W!R~P-MbOP!xOQ!yOR!xOl!zO#]#W!R~O_VOdVOeVOfVOgmOn-dOo-eOp-]OrZOs'TOt-POu1hOv4^Ow6TOx7bOyZOz'YO{-[O|1tO}4jO!O6aO!P7nO!Q-[O!R'YO!SZO!T'TO!U-PO!V1hO!W4^O!X6TO!Y7bO!Z'TO![ZO!]'TO!^-PO!_ZO!`'TO!aZO#PUO#`mO#dmO[#W!R~P-GzO#]#W!R~P:tO_VOdVOeVOfVOgmOkVOn-dOo4ROp4QOrZOs1OOt4OOu5zOv7ZOw8QOx8_OyZOz1PO{4PO|5{O}7[O!O8RO!P8`O!Q4PO!R1PO!SZO!T1OO!U4OO!V5zO!W7ZO!X8QO!Y8_O!Z1OO![ZO!]1OO!^4OO!_ZO!`1OO!aZO#P,pO#[2]O#`mO#dmOS#W!RT#W!RU#W!RW#W!RZ#W!R~P-MbO_#j!Zd#j!Ze#j!Zf#j!Zg#j!Zk#j!Zl#j!Zn#j!Zo#j!Zp#j!Zq#j!Zr#j!Zs#j!Zt#j!Zu#j!Zv#j!Zw#j!Zx#j!Zy#j!Zz#j!Z{#j!Z|#j!Z}#j!Z!O#j!Z!P#j!Z!Q#j!Z!R#j!Z!S#j!Z!T#j!Z!U#j!Z!V#j!Z!W#j!Z!X#j!Z!Y#j!Z!Z#j!Z![#j!Z!]#j!Z!^#j!Z!_#j!Z!`#j!Z!a#j!Z#P#j!Z#[#j!Z#`#j!Z#d#j!Z!b#j!Z!c#j!Z!d#j!Z!e#j!Z!f#j!Z!g#j!Z!h#j!Z!i#j!Z!j#j!Z!k#j!Z!l#j!Z!m#j!Z!n#j!Z!o#j!Z!p#j!Z!q#j!Z!r#j!Z!s#j!Z!t#j!Z!u#j!Z!v#j!Z!w#j!Z!x#j!Z!y#j!ZS#j!ZT#j!ZU#j!ZW#j!ZX#j!ZY#j!Zh#j!Zm#j!Z~OP'jOQ.QOR'jOj#j!Z!}#j!Z[#j!Z~P.)QOS#j!ZT#j!ZU#j!ZW#j!ZX#j!ZY#j!Z[#j!Zh#j!Zk#j!Zl#j!Zm#j!Zq#j!Z!b#j!Z!c#j!Z!d#j!Z!e#j!Z!f#j!Z!g#j!Z!h#j!Z!i#j!Z!j#j!Z!k#j!Z!l#j!Z!m#j!Z!n#j!Z!o#j!Z!p#j!Z!q#j!Z!r#j!Z!s#j!Z!t#j!Z!u#j!Z!v#j!Z!w#j!Z!x#j!Z!y#j!Z#[#j!Z~OP'kOQ.ROR'kO~P..kOX#j!ZY#j!Zh#j!Zl#j!Zm#j!Zq#j!Z!b#j!Z!c#j!Z!d#j!Z!e#j!Z!f#j!Z!g#j!Z!h#j!Z!i#j!Z!j#j!Z!k#j!Z!l#j!Z!m#j!Z!n#j!Z!o#j!Z!p#j!Z!q#j!Z!r#j!Z!s#j!Z!t#j!Z!u#j!Z!v#j!Z!w#j!Z!x#j!Z!y#j!Z#[#j!Z$P#j!Z~OP'lOQ.SOR'lO~P.1_OS#j!ZT#j!ZU#j!ZW#j!ZX#j!ZY#j!ZZ#j!Zh#j!Zl#j!Zm#j!Zq#j!Z!b#j!Z!c#j!Z!d#j!Z!e#j!Z!f#j!Z!g#j!Z!h#j!Z!i#j!Z!j#j!Z!k#j!Z!l#j!Z!m#j!Z!n#j!Z!o#j!Z!p#j!Z!q#j!Z!r#j!Z!s#j!Z!t#j!Z!u#j!Z!v#j!Z!w#j!Z!x#j!Z!y#j!Z$P#j!Z~OP'mOQ.TOR'mO~P.3rOS#j!ZT#j!ZU#j!ZW#j!ZX#j!ZY#j!Zh#j!Zk#j!Zl#j!Zm#j!Zq#j!Z!b#j!Z!c#j!Z!d#j!Z!e#j!Z!f#j!Z!g#j!Z!h#j!Z!i#j!Z!j#j!Z!k#j!Z!l#j!Z!m#j!Z!n#j!Z!o#j!Z!p#j!Z!q#j!Z!r#j!Z!s#j!Z!t#j!Z!u#j!Z!v#j!Z!w#j!Z!x#j!Z!y#j!Z!}#j!Z#[#j!Z~OP'oOQ.VOR'oO~P.6cOP'pOQ.WOR'pO#[#j!Z~P.3rO_#j!Zl#j!Zr#j!Zs#j!Zt#j!Zu#j!Zv#j!Zw#j!Zx#j!Zy#j!Zz#j!Z{#j!Z|#j!Z}#j!Z!O#j!Z!P#j!Z!Q#j!Z!R#j!Z!S#j!Z!T#j!Z!U#j!Z!V#j!Z!W#j!Z!X#j!Z!Y#j!Z!Z#j!Z![#j!Z!]#j!Z!^#j!Z!_#j!Z!`#j!Z!a#j!Z#P#j!Z~OP'nOQ.UOR'nO~P.9gOdVOeVOfVOgmOkVOn-dOo-eOp-]Oq!{O#[2]O#`mO#dmOP#j!ZQ#j!ZR#j!Z~P.9gO_VOdVOeVOfVOgmOn-dOo-eOp-]OrZOs'TOt-POu1hOv4^Ow6TOx7bOyZOz'YO{-[O|1tO}4jO!O6aO!P7nO!Q-[O!R'YO!SZO!T'TO!U-PO!V1hO!W4^O!X6TO!Y7bO!Z'TO![ZO!]'TO!^-PO!_ZO!`'TO!aZO#PUO#`mO#dmOP#j!ZQ#j!ZR#j!Z!}#j!Z~P..kO_VOdVOeVOfVOgmOkVOn-dOo4ROp4QOrZOs1OOt4OOu5zOv7ZOw8QOx8_OyZOz1PO{4PO|5{O}7[O!O8RO!P8`O!Q4PO!R1PO!SZO!T1OO!U4OO!V5zO!W7ZO!X8QO!Y8_O!Z1OO![ZO!]1OO!^4OO!_ZO!`1OO!aZO#P,pO#`mO#dmOP#j!ZQ#j!ZR#j!Z#[#j!Z~P.3rO_VOdVOeVOfVOgmOkVOn-dOo4ROp4QOrZOs1OOt4OOu5zOv7ZOw8QOx8_OyZOz1PO{4PO|5{O}7[O!O8RO!P8`O!Q4PO!R1PO!SZO!T1OO!U4OO!V5zO!W7ZO!X8QO!Y8_O!Z1OO![ZO!]1OO!^4OO!_ZO!`1OO!aZO#P,pO#[2]O#`mO#dmOP#j!ZQ#j!ZR#j!Z~P.3rOS#W!ZT#W!ZU#W!ZW#W!ZX#W!ZY#W!Zh#W!Zk#W!Zm#W!Zq#W!Z!b#W!Z!c#W!Z!d#W!Z!e#W!Z!f#W!Z!g#W!Z!h#W!Z!i#W!Z!j#W!Z!k#W!Z!l#W!Z!m#W!Z!n#W!Z!o#W!Z!p#W!Z!q#W!Z!r#W!Z!s#W!Z!t#W!Z!u#W!Z!v#W!Z!w#W!Z!x#W!Z!y#W!Z!}#W!Z#[#W!Z~OP'oOQ.VOR'oOl'uO~P.FZOS#W!ZT#W!ZU#W!ZW#W!ZX#W!ZY#W!Z[#W!Zh#W!Zk#W!Zm#W!Zq#W!Z!b#W!Z!c#W!Z!d#W!Z!e#W!Z!f#W!Z!g#W!Z!h#W!Z!i#W!Z!j#W!Z!k#W!Z!l#W!Z!m#W!Z!n#W!Z!o#W!Z!p#W!Z!q#W!Z!r#W!Z!s#W!Z!t#W!Z!u#W!Z!v#W!Z!w#W!Z!x#W!Z!y#W!Z#[#W!Z~OP'kOQ.ROR'kOl'rO~P.H}OX#W!ZY#W!Zh#W!Zm#W!Zq#W!Z!b#W!Z!c#W!Z!d#W!Z!e#W!Z!f#W!Z!g#W!Z!h#W!Z!i#W!Z!j#W!Z!k#W!Z!l#W!Z!m#W!Z!n#W!Z!o#W!Z!p#W!Z!q#W!Z!r#W!Z!s#W!Z!t#W!Z!u#W!Z!v#W!Z!w#W!Z!x#W!Z!y#W!Z$P#W!Z~OP'lOQ.SOR'lOl'sO#[#W!Z~P.KqOP'mOQ.TOR'mOl'tOS#W!ZT#W!ZU#W!ZW#W!ZZ#W!Z~P.KqOP!xOQ!yOR!xOl!zO#]#W!Z~O_VOdVOeVOfVOgmOn-dOo-eOp-]OrZOs'TOt-POu1hOv4^Ow6TOx7bOyZOz'YO{-[O|1tO}4jO!O6aO!P7nO!Q-[O!R'YO!SZO!T'TO!U-PO!V1hO!W4^O!X6TO!Y7bO!Z'TO![ZO!]'TO!^-PO!_ZO!`'TO!aZO#PUO#`mO#dmO[#W!Z~P.FZO#]#W!Z~P:tO_VOdVOeVOfVOgmOkVOn-dOo4ROp4QOrZOs1OOt4OOu5zOv7ZOw8QOx8_OyZOz1PO{4PO|5{O}7[O!O8RO!P8`O!Q4PO!R1PO!SZO!T1OO!U4OO!V5zO!W7ZO!X8QO!Y8_O!Z1OO![ZO!]1OO!^4OO!_ZO!`1OO!aZO#P,pO#[2]O#`mO#dmOS#W!ZT#W!ZU#W!ZW#W!ZZ#W!Z~P.KqO!}'eO~P&xO!}'fO~P&xOP'jOQ.QOR'jOl'qO~OP'kOQ.ROR'kOl'rO~OP'lOQ.SOR'lOl'sO~OP'mOQ.TOR'mOl'tO~OP'oOQ.VOR'oOl'uO~OP'pOQ.WOR'pOl'vO~O_VOdVOeVOfVOgmOkVOnjOo1zOp1uOq!{OrZOs,xOt1gOu4]Ov6SOw7aOx8UOy-WOz-XO{1oO|4eO}6[O!O7iO!P8VO!Q1oO!R-XO!SZO!T,xO!U1gO!V4]O!W6SO!X7aO!Y8UO!Z,xO![ZO!],xO!^1gO!_ZO!`,xO!aZO#PUO#[!sO#`mO#dmO~OP#jXQ#jXR#jXl#jX!}#jX~P4fO_(`Oq(`O~O_(aOq(aO~O_(bOq(bO~O_(cOq(cO~O_(dOq(dO~O#](|OP#iXQ#iXR#iXl#iX~O#](}OP#iXQ#iXR#iXl#iX~OP.POQ2_OR.POl#ja!}#ja~OP'jOQ.QOR'jOl'qO~P/)gOP#jaQ#jaR#jal#ja!}#ja~P4fOQ)kO~P#,hOQ)mO~P#,hOQ)lO~P#,hOQ)jO~P#,hO_){O#P/iO~P#:zO_)|O#P/jO~P#:zO_)}O#P/kO~P#:zOP.POQ2_OR.POl#ji!}#ji~OP#jiQ#jiR#jil#ji!}#ji~P4fO!}*sO~P$9jO!}*tO~P$9jO!}*uO~P$9jOP.POQ2_OR.POl#jq!}#jq~OP#jqQ#jqR#jql#jq!}#jq~P4fOX-kOY-fOk$ROm2XO!c']O!d-pO!e2PO!f4kO!g6bO!h7oO!i'bO!j-zO!k2UO!l4pO!m6gO!n7tO!o8[O!p4pO!r']O!s-pO!t2PO!u4kO!v6bO!w7oO!x-uO!y-uO!}+hO#[$SO~P!!xOX-kOY-fOk$ROm2XO!c']O!d-pO!e2PO!f4kO!g6bO!h7oO!i'bO!j-zO!k2UO!l4pO!m6gO!n7tO!o8[O!p4pO!r']O!s-pO!t2PO!u4kO!v6bO!w7oO!x-uO!y-uO!}+iO#[$SO~P!!xOX-kOY-fOk$ROm2XO!c']O!d-pO!e2PO!f4kO!g6bO!h7oO!i'bO!j-zO!k2UO!l4pO!m6gO!n7tO!o8[O!p4pO!r']O!s-pO!t2PO!u4kO!v6bO!w7oO!x-uO!y-uO!}+jO#[$SO~P!!xOP.POQ2_OR.POl#jy!}#jy~OP#jyQ#jyR#jyl#jy!}#jy~P4fOP.POQ2_OR.POl#j!R!}#j!R~OP#j!RQ#j!RR#j!Rl#j!R!}#j!R~P4fOP.POQ2_OR.POl#j!Z!}#j!Z~OP#j!ZQ#j!ZR#j!Zl#j!Z!}#j!Z~P4fOP1QOQ4SOR1QO$P#jaZ#ja#]#ja~P'*hOP1QOQ4SOR1QO$P#jiZ#ji#]#ji~P(KpOP1QOQ4SOR1QO$P#jqZ#jq#]#jq~P*?aOP1QOQ4SOR1QO$P#jyZ#jy#]#jy~P+NvOP1QOQ4SOR1QO$P#j!RZ#j!R#]#j!R~P-*qOP1QOQ4SOR1QO$P#j!ZZ#j!Z#]#j!Z~P.)QOP.POQ2_OR.POl.XO~OP'jOQ.QOR'jOl'qOj#}X!}#}X[#}X~P!N{O",
-      goto: "$Jp$TPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP$UP$XP$X$X$r$x$X%O%S%}No!1]PP!1t!2]P!Cc#&m#7aP#7m#H}#IYP#Ih$,d$=f$>vNoNo$?h$@X$@X$@x%O$AO$U$U$AR$AX$Ag$Bb$Bp$CV$Ce$I}PPP$JTR!YO!PTOU!W!d!e#Z#p$_$t%[%a%d%o&W&_,p,q/i/j/k0U0V0WQ#|!]R%k$PQ%i#|R&a%kT!VO!WQ!TOz!aU!d!e#Z#p$_$t%[%a%d%o&W&_,p,q/i/j/k0U0V0WS!wX#tQ#q!WQ#s!XV$Q!b$S2[bYOX!b!s(d(i2[2]2^Q!|[Q!}]Q#O^Q#P_Q#Q`Q#Ra$v#Sbc{|#T#U#^#h#i$o$p%V%W%x%y&S&T&f&g&l&m&v&w&z&{'O'Q'W'X'['c'd(Z([(z({)g)h)y)z*c*d*q*r+W+X+f+g+{+|,Z,[,f,g,n,o-Z-{-|.f.g.p.q.y.z/]/^/g/h/x/y0S0T0e0f0o0p0v0w0z0{1P1U1V1Z1^1a1dQ#UdQ#VeQ#WfQ#XgQ#YhQ#]jQ#atQ#buQ#cvQ#dwQ#exQ#fyQ#gzQ#i}Q#j!OQ#k!PQ#l!QQ#m!RQ$c!uf$f!x$z'j'k'l'm'n'o'p.P1QQ$g!yS$h!z!}Q$j#OQ$k#PQ$l#QQ$m#RQ$p#VQ$q#WQ$r#XQ$s#YS%Q#b#gQ%R#cQ%S#dQ%T#eQ%U#fQ%W#jQ%X#kQ%Y#lQ%Z#md%s$g)O)P)Q)R)S)T)U/O1WQ%t$jQ%u$kQ%v$lQ%w$mQ%y$qQ%z$rQ%{$sQ&O%RQ&P%SQ&Q%TQ&R%UQ&T%XQ&U%YQ&V%ZQ&c%uQ&d%vQ&e%wQ&g%zQ&h%{Q&i&PQ&j&QQ&k&RQ&m&UQ&n&VQ&t&dQ&u&eQ&w&hQ&x&jQ&y&kQ&{&nQ&}&uQ'P&yQ'y'TQ'z-OQ'{,}Q'|,zQ'},yQ(O,{Q(P,|Q(Q-PQ(R-QQ(S-RQ(T-SQ(U-TQ(V-UQ(W-VQ(]-[Q(^-dQ(j']Q(k'^Q(l'_Q(m'`Q(n'aQ(o-pQ(p-qQ(q-rQ(r-sQ(s-tQ(t-uQ(u-vQ(v-wQ(w-xQ(x-yQ)O.QQ)P.RQ)Q.SQ)R.TQ)S.VQ)T.W[)U${)j)k)l)m.US)V'q(QS)W'r(RS)X's(SS)Y't(TS)Z'u(US)['v(VS)]'w(WQ)^.[Q)_.]Q)`.^Q)a._Q)b.`Q)c.aQ)d.bQ)i.iS)n(o(tS)o(p(uS)p(q(vS)q(r(wS)r(s(xQ)s.sQ)t.tQ)u.uQ)v.vQ)w.wQ*R)^Q*S)_Q*T)`Q*U)aQ*V)bQ*W)cQ*X)dQ*Y/RQ*Z/SQ*[/TQ*]/UQ*^/VQ*_/WQ*`/XQ*e/`Q*f)sQ*g)tQ*h)uQ*i)vQ*j)wQ*k/aQ*l/bQ*m/cQ*n/dQ*o/eQ*v*YQ*w*ZQ*x*[Q*y*]Q*z*^Q*{*_Q*|*`Q*}/nQ+O/oQ+P/pQ+Q/qQ+R/rQ+S/sQ+T/tQ+Y/{Q+Z*kQ+[*lQ+]*mQ+^*nQ+_*oQ+`/|Q+a/}Q+b0OQ+c0PQ+d0QQ+k*}Q+l+OQ+m+PQ+n+QQ+o+RQ+p+SQ+q+TQ+r0ZQ+s0[Q+t0]Q+u0^Q+v0_Q+w0`Q+x0aQ+}0hQ,O+`Q,P+aQ,Q+bQ,R+cQ,S+dQ,T0iQ,U0jQ,V0kQ,W0lQ,X0mQ,]+rQ,^+sQ,_+tQ,`+uQ,a+vQ,b+wQ,c+xQ,h,TQ,i,UQ,j,VQ,k,WQ,l,X`,r#Z$_$w%[%p/i/j/kS,s(a(fS,t(b(gS,u(c(hS,v(`(eS,w#_#`Q.Y,xQ.Z1gQ.[1hQ.]1iQ.^1jQ._1kQ.`1lQ.a1mQ.b1nQ.d1oQ.e1pQ.f1qQ.g1rQ.h1sQ.i1tQ.j1vQ.k1wQ.l1xQ.m1yQ.s2PQ.t2QQ.u2RQ.v2SQ.w2TQ.x2UQ.y2VQ.z2WQ/O2_S/P.X.ZQ/Q2`Q/R2aQ/S2bQ/T2cQ/U2dQ/V2eQ/W2fQ/X2gQ/Z2iQ/[2jQ/]2kQ/^2lQ/_2mQ/`2nQ/a2oQ/b2pQ/c2qQ/d2rQ/e2sQ/f2tQ/g2uQ/h2vQ/l/QQ/m2wQ/n2xQ/o2yQ/p2zQ/q2{Q/r2|Q/s2}Q/t3OQ/v3PQ/w3QQ/x3RQ/y3SQ/z3TQ/{3UQ/|3VQ/}3WQ0O3XQ0P3YQ0Q3ZQ0R3[Q0S3]Q0T3^Q0X/mQ0Y3_Q0Z3`Q0[3aQ0]3bQ0^3cQ0_3dQ0`3eQ0a3fQ0c3gQ0d3hQ0e3iQ0f3jQ0g3kQ0h3lQ0i3mQ0j3nQ0k3oQ0l3pQ0m3qQ0n3rQ0o3sQ0p3tQ0q0YQ0r3uQ0t3vQ0u3wQ0v3xQ0w3yQ0x3zQ0y3{Q0z3|Q0{3}Q0|0rQ1S1OQ1T4OQ1U4PQ1W4SS1X1R1TQ1Y4TQ1Z4UQ1[1YQ1]4VQ1^4WQ1_1]Q1`4XQ1a4YQ1b1`Q1c4ZQ1d4[Q1e1cW1fU!e,p,qQ2`4]Q2a4^Q2b4_Q2c4`Q2d4aQ2e4bQ2f4cQ2g4d$Q2h!S#n'U'V'Y'Z'b(X(Y(](_(y)e)f)i)x*a*b*e*p+U+V+Y+e+y+z+},Y,d,e,m-W-X-Y-z.c.d.e.h.n.o.r.x.{.|.}/Y/Z/[/_/f/u/v/w/z0R0b0c0d0g0n0s0t0u0x0y0}2X2Y2ZQ2i4eQ2j4fQ2k4gQ2l4hQ2m4iQ2n4jQ2o4kQ2p4lQ2q4mQ2r4nQ2s4oQ2t4pQ2u4qQ2v4rQ2w4sQ2x4tQ2y4uQ2z4vQ2{4wQ2|4xQ2}4yQ3O4zQ3P4{Q3Q4|Q3R4}Q3S5OQ3T5PQ3U5QQ3V5RQ3W5SQ3X5TQ3Y5UQ3Z5VQ3[5WQ3]5XQ3^5YQ3_5ZQ3`5[Q3a5]Q3b5^Q3c5_Q3d5`Q3e5aQ3f5bQ3g5cQ3h5dQ3i5eQ3j5fQ3k5gQ3l5hQ3m5iQ3n5jQ3o5kQ3p5lQ3q5mQ3r5nQ3s5oQ3t5pQ3u5qQ3v5rQ3w5sQ3x5tQ3y5uQ3z5vQ3{5wQ3|5xQ3}5yQ4T5zQ4U5{Q4V5|Q4W5}Q4X6OQ4Y6PQ4Z6QQ4[6RQ4s6SQ4t6TQ4u6UQ4v6VQ4w6WQ4x6XQ4y6YQ4z6ZQ4{6[Q4|6]Q4}6^Q5O6_Q5P6`Q5Q6aQ5R6bQ5S6cQ5T6dQ5U6eQ5V6fQ5W6gQ5X6hQ5Y6iQ5Z6jQ5[6kQ5]6lQ5^6mQ5_6nQ5`6oQ5a6pQ5b6qQ5c6rQ5d6sQ5e6tQ5f6uQ5g6vQ5h6wQ5i6xQ5j6yQ5k6zQ5l6{Q5m6|Q5n6}Q5o7OQ5p7PQ5q7QQ5r7RQ5s7SQ5t7TQ5u7UQ5v7VQ5w7WQ5x7XQ5y7YQ5|7ZQ5}7[Q6O7]Q6P7^Q6Q7_Q6R7`Q6j7aQ6k7bQ6l7cQ6m7dQ6n7eQ6o7fQ6p7gQ6q7hQ6r7iQ6s7jQ6t7kQ6u7lQ6v7mQ6w7nQ6x7oQ6y7pQ6z7qQ6{7rQ6|7sQ6}7tQ7O7uQ7P7vQ7Q7wQ7R7xQ7S7yQ7T7zQ7U7{Q7V7|Q7W7}Q7X8OQ7Y8PQ7]8QQ7^8RQ7_8SQ7`8TQ7w8UQ7x8VQ7y8WQ7z8XQ7{8YQ7|8ZQ7}8[Q8O8]Q8P8^Q8S8_R8T8`BVnOUX[]^_`abcdefghjtuvwxyz{|}!O!P!Q!R!S!b!e!s!u!x!y!z!}#O#P#Q#R#T#U#V#W#X#Y#Z#^#_#`#b#c#d#e#f#g#h#i#j#k#l#m#n$_$g$j$k$l$m$o$p$q$r$s$w$z${%R%S%T%U%V%W%X%Y%Z%[%p%u%v%w%x%y%z%{&P&Q&R&S&T&U&V&d&e&f&g&h&j&k&l&m&n&u&v&w&y&z&{'O'Q'T'V'W'X'Y'Z'[']'^'_'`'a'b'c'd'j'k'l'm'n'o'p'q'r's't'u'v'w(Q(R(S(T(U(V(W(Y(Z([(](_(`(a(b(c(d(e(f(g(h(i(o(p(q(r(s(t(u(v(w(x(y(z({)O)P)Q)R)S)T)U)^)_)`)a)b)c)d)f)g)h)i)k)l)m)s)t)u)v)w)x)y)z*Y*Z*[*]*^*_*`*b*c*d*e*k*l*m*n*o*p*q*r*}+O+P+Q+R+S+T+V+W+X+Y+`+a+b+c+d+e+f+g+r+s+t+u+v+w+x+z+{+|+},T,U,V,W,X,Y,Z,[,e,f,g,m,n,o,p,q,x,y,z,{,|,}-O-P-Q-R-S-T-U-V-W-X-Y-Z-[-d-p-q-r-s-t-u-v-w-x-y-z-{-|.P.Q.R.S.T.U.V.W.X.Z.[.].^._.`.a.b.c.d.e.f.g.h.i.n.o.p.q.r.s.t.u.v.w.x.y.z.{.|.}/O/Q/R/S/T/U/V/W/X/Y/Z/[/]/^/_/`/a/b/c/d/e/f/g/h/i/j/k/m/n/o/p/q/r/s/t/u/v/w/x/y/z/{/|/}0O0P0Q0R0S0T0Y0Z0[0]0^0_0`0a0b0c0d0e0f0g0h0i0j0k0l0m0n0o0p0r0s0t0u0v0w0x0y0z0{0}1O1P1Q1R1T1U1V1W1Y1Z1]1^1`1a1c1d1g1h1i1j1k1l1m1n1o1p1q1r1s1t1v1w1x1y2P2Q2R2S2T2U2V2W2X2Y2Z2[2]2^2_2`2a2b2c2d2e2f2g2i2j2k2l2m2n2o2p2q2r2s2t2u2v2w2x2y2z2{2|2}3O3P3Q3R3S3T3U3V3W3X3Y3Z3[3]3^3_3`3a3b3c3d3e3f3g3h3i3j3k3l3m3n3o3p3q3r3s3t3u3v3w3x3y3z3{3|3}4O4P4S4T4U4V4W4X4Y4Z4[4]4^4_4`4a4b4c4d4e4f4g4h4i4j4k4l4m4n4o4p4q4r4s4t4u4v4w4x4y4z4{4|4}5O5P5Q5R5S5T5U5V5W5X5Y5Z5[5]5^5_5`5a5b5c5d5e5f5g5h5i5j5k5l5m5n5o5p5q5r5s5t5u5v5w5x5y5z5{5|5}6O6P6Q6R6S6T6U6V6W6X6Y6Z6[6]6^6_6`6a6b6c6d6e6f6g6h6i6j6k6l6m6n6o6p6q6r6s6t6u6v6w6x6y6z6{6|6}7O7P7Q7R7S7T7U7V7W7X7Y7Z7[7]7^7_7`7a7b7c7d7e7f7g7h7i7j7k7l7m7n7o7p7q7r7s7t7u7v7w7x7y7z7{7|7}8O8P8Q8R8S8T8U8V8W8X8Y8Z8[8]8^8_8`{!cU!d!e#Z#p$_$t%[%a%d%o&W&_,p,q/i/j/k0U0V0W{!aU!d!e#Z#p$_$t%[%a%d%o&W&_,p,q/i/j/k0U0V0WAYn[]^_`abcdefghjtuvwxyz{|}!O!P!Q!R!S!u!x!y!z!}#O#P#Q#R#T#U#V#W#X#Y#^#b#c#d#e#f#g#h#i#j#k#l#m#n$g$j$k$l$m$o$p$q$r$s$w$z${%R%S%T%U%V%W%X%Y%Z%p%u%v%w%x%y%z%{&P&Q&R&S&T&U&V&d&e&f&g&h&j&k&l&m&n&u&v&w&y&z&{'O'Q'T'U'V'W'X'Y'Z'[']'^'_'`'a'b'c'd'j'k'l'm'n'o'p'q'r's't'u'v'w(Q(R(S(T(U(V(W(X(Y(Z([(](_(o(p(q(r(s(t(u(v(w(x(y(z({)O)P)Q)R)S)T)U)^)_)`)a)b)c)d)e)f)g)h)i)j)k)l)m)s)t)u)v)w)x)y)z*Y*Z*[*]*^*_*`*a*b*c*d*e*k*l*m*n*o*p*q*r*}+O+P+Q+R+S+T+U+V+W+X+Y+`+a+b+c+d+e+f+g+r+s+t+u+v+w+x+y+z+{+|+},T,U,V,W,X,Y,Z,[,d,e,f,g,m,n,o,x,y,z,{,|,}-O-P-Q-R-S-T-U-V-W-X-Y-Z-[-d-p-q-r-s-t-u-v-w-x-y-z-{-|.P.Q.R.S.T.U.V.W.X.Z.[.].^._.`.a.b.c.d.e.f.g.h.i.n.o.p.q.r.s.t.u.v.w.x.y.z.{.|.}/O/Q/R/S/T/U/V/W/X/Y/Z/[/]/^/_/`/a/b/c/d/e/f/g/h/m/n/o/p/q/r/s/t/u/v/w/x/y/z/{/|/}0O0P0Q0R0S0T0Y0Z0[0]0^0_0`0a0b0c0d0e0f0g0h0i0j0k0l0m0n0o0p0r0s0t0u0v0w0x0y0z0{0}1O1P1Q1R1T1U1V1W1Y1Z1]1^1`1a1c1d1g1h1i1j1k1l1m1n1o1p1q1r1s1t1v1w1x1y2P2Q2R2S2T2U2V2W2X2Y2Z2_2`2a2b2c2d2e2f2g2i2j2k2l2m2n2o2p2q2r2s2t2u2v2w2x2y2z2{2|2}3O3P3Q3R3S3T3U3V3W3X3Y3Z3[3]3^3_3`3a3b3c3d3e3f3g3h3i3j3k3l3m3n3o3p3q3r3s3t3u3v3w3x3y3z3{3|3}4O4P4S4T4U4V4W4X4Y4Z4[4]4^4_4`4a4b4c4d4e4f4g4h4i4j4k4l4m4n4o4p4q4r4s4t4u4v4w4x4y4z4{4|4}5O5P5Q5R5S5T5U5V5W5X5Y5Z5[5]5^5_5`5a5b5c5d5e5f5g5h5i5j5k5l5m5n5o5p5q5r5s5t5u5v5w5x5y5z5{5|5}6O6P6Q6R6S6T6U6V6W6X6Y6Z6[6]6^6_6`6a6b6c6d6e6f6g6h6i6j6k6l6m6n6o6p6q6r6s6t6u6v6w6x6y6z6{6|6}7O7P7Q7R7S7T7U7V7W7X7Y7Z7[7]7^7_7`7a7b7c7d7e7f7g7h7i7j7k7l7m7n7o7p7q7r7s7t7u7v7w7x7y7z7{7|7}8O8P8Q8R8S8T8U8V8W8X8Y8Z8[8]8^8_8`QoOW!rU!e,p,q[!vX!b!s2[2]2^Q$x#Z[$}#_(`(a(b(c(d[%P#`(e(f(g(h(iQ%r$_X&Y%[/i/j/kBUmOX[]^_`abcdefghjtuvwxyz{|}!O!P!Q!R!S!b!s!u!x!y!z!}#O#P#Q#R#T#U#V#W#X#Y#Z#^#_#`#b#c#d#e#f#g#h#i#j#k#l#m#n$_$g$j$k$l$m$o$p$q$r$s$w$z${%R%S%T%U%V%W%X%Y%Z%p%u%v%w%x%y%z%{&P&Q&R&S&T&U&V&d&e&f&g&h&j&k&l&m&n&u&v&w&y&z&{'O'Q'T'U'V'W'X'Y'Z'[']'^'_'`'a'b'c'd'j'k'l'm'n'o'p'q'r's't'u'v'w(Q(R(S(T(U(V(W(X(Y(Z([(](_(`(a(b(c(d(e(f(g(h(i(o(p(q(r(s(t(u(v(w(x(y(z({)O)P)Q)R)S)T)U)^)_)`)a)b)c)d)e)f)g)h)i)j)k)l)m)s)t)u)v)w)x)y)z*Y*Z*[*]*^*_*`*a*b*c*d*e*k*l*m*n*o*p*q*r*}+O+P+Q+R+S+T+U+V+W+X+Y+`+a+b+c+d+e+f+g+r+s+t+u+v+w+x+y+z+{+|+},T,U,V,W,X,Y,Z,[,d,e,f,g,m,n,o,x,y,z,{,|,}-O-P-Q-R-S-T-U-V-W-X-Y-Z-[-d-p-q-r-s-t-u-v-w-x-y-z-{-|.P.Q.R.S.T.U.V.W.X.Z.[.].^._.`.a.b.c.d.e.f.g.h.i.n.o.p.q.r.s.t.u.v.w.x.y.z.{.|.}/O/Q/R/S/T/U/V/W/X/Y/Z/[/]/^/_/`/a/b/c/d/e/f/g/h/m/n/o/p/q/r/s/t/u/v/w/x/y/z/{/|/}0O0P0Q0R0S0T0Y0Z0[0]0^0_0`0a0b0c0d0e0f0g0h0i0j0k0l0m0n0o0p0r0s0t0u0v0w0x0y0z0{0}1O1P1Q1R1T1U1V1W1Y1Z1]1^1`1a1c1d1g1h1i1j1k1l1m1n1o1p1q1r1s1t1v1w1x1y2P2Q2R2S2T2U2V2W2X2Y2Z2[2]2^2_2`2a2b2c2d2e2f2g2i2j2k2l2m2n2o2p2q2r2s2t2u2v2w2x2y2z2{2|2}3O3P3Q3R3S3T3U3V3W3X3Y3Z3[3]3^3_3`3a3b3c3d3e3f3g3h3i3j3k3l3m3n3o3p3q3r3s3t3u3v3w3x3y3z3{3|3}4O4P4S4T4U4V4W4X4Y4Z4[4]4^4_4`4a4b4c4d4e4f4g4h4i4j4k4l4m4n4o4p4q4r4s4t4u4v4w4x4y4z4{4|4}5O5P5Q5R5S5T5U5V5W5X5Y5Z5[5]5^5_5`5a5b5c5d5e5f5g5h5i5j5k5l5m5n5o5p5q5r5s5t5u5v5w5x5y5z5{5|5}6O6P6Q6R6S6T6U6V6W6X6Y6Z6[6]6^6_6`6a6b6c6d6e6f6g6h6i6j6k6l6m6n6o6p6q6r6s6t6u6v6w6x6y6z6{6|6}7O7P7Q7R7S7T7U7V7W7X7Y7Z7[7]7^7_7`7a7b7c7d7e7f7g7h7i7j7k7l7m7n7o7p7q7r7s7t7u7v7w7x7y7z7{7|7}8O8P8Q8R8S8T8U8V8W8X8Y8Z8[8]8^8_8``!qU!e%[,p,q/i/j/kQ#`qQ(e-kQ(f-lQ(g-mQ(h-nR(i-oAtmOX[]^_`abcdefghjtuvwxyz{|}!O!P!Q!R!S!b!s!u!x!y!z!}#O#P#Q#R#T#U#V#W#X#Y#Z#^#_#`#b#c#d#e#f#g#h#i#j#k#l#m#n$_$g$j$k$l$m$o$p$q$r$s$w$z${%R%S%T%U%V%W%X%Y%Z%p%u%v%w%x%y%z%{&P&Q&R&S&T&U&V&d&e&f&g&h&j&k&l&m&n&u&v&w&y&z&{'O'Q'T'V'W'X'Y'Z'[']'^'_'`'a'b'c'd'j'k'l'm'n'o'p'q'r's't'u'v'w(Q(R(S(T(U(V(W(Y(Z([(](_(`(a(b(c(d(e(f(g(h(i(o(p(q(r(s(t(u(v(w(x(y(z({)O)P)Q)R)S)T)U)^)_)`)a)b)c)d)f)g)h)i)k)l)m)s)t)u)v)w)x)y)z*Y*Z*[*]*^*_*`*b*c*d*e*k*l*m*n*o*p*q*r*}+O+P+Q+R+S+T+V+W+X+Y+`+a+b+c+d+e+f+g+r+s+t+u+v+w+x+z+{+|+},T,U,V,W,X,Y,Z,[,e,f,g,m,n,o,x,y,z,{,|,}-O-P-Q-R-S-T-U-V-W-X-Y-Z-[-d-p-q-r-s-t-u-v-w-x-y-z-{-|.P.Q.R.S.T.U.V.W.X.Z.[.].^._.`.a.b.c.d.e.f.g.h.i.n.o.p.q.r.s.t.u.v.w.x.y.z.{.|.}/O/Q/R/S/T/U/V/W/X/Y/Z/[/]/^/_/`/a/b/c/d/e/f/g/h/m/n/o/p/q/r/s/t/u/v/w/x/y/z/{/|/}0O0P0Q0R0S0T0Y0Z0[0]0^0_0`0a0b0c0d0e0f0g0h0i0j0k0l0m0n0o0p0r0s0t0u0v0w0x0y0z0{0}1O1P1Q1R1T1U1V1W1Y1Z1]1^1`1a1c1d1g1h1i1j1k1l1m1n1o1p1q1r1s1t1v1w1x1y2P2Q2R2S2T2U2V2W2X2Y2Z2[2]2^2_2`2a2b2c2d2e2f2g2i2j2k2l2m2n2o2p2q2r2s2t2u2v2w2x2y2z2{2|2}3O3P3Q3R3S3T3U3V3W3X3Y3Z3[3]3^3_3`3a3b3c3d3e3f3g3h3i3j3k3l3m3n3o3p3q3r3s3t3u3v3w3x3y3z3{3|3}4O4P4S4T4U4V4W4X4Y4Z4[4]4^4_4`4a4b4c4d4e4f4g4h4i4j4k4l4m4n4o4p4q4r4s4t4u4v4w4x4y4z4{4|4}5O5P5Q5R5S5T5U5V5W5X5Y5Z5[5]5^5_5`5a5b5c5d5e5f5g5h5i5j5k5l5m5n5o5p5q5r5s5t5u5v5w5x5y5z5{5|5}6O6P6Q6R6S6T6U6V6W6X6Y6Z6[6]6^6_6`6a6b6c6d6e6f6g6h6i6j6k6l6m6n6o6p6q6r6s6t6u6v6w6x6y6z6{6|6}7O7P7Q7R7S7T7U7V7W7X7Y7Z7[7]7^7_7`7a7b7c7d7e7f7g7h7i7j7k7l7m7n7o7p7q7r7s7t7u7v7w7x7y7z7{7|7}8O8P8Q8R8S8T8U8V8W8X8Y8Z8[8]8^8_8`S!j!l$Za!kU!e%[,p,q/i/j/ke!jU!e!l$Z%[,p,q/i/j/kA|mOUX[]^_`abcdefghjtuvwxyz{|}!O!P!Q!R!S!b!e!s!u!x!y!z!}#O#P#Q#R#T#U#V#W#X#Y#Z#^#_#`#b#c#d#e#f#g#h#i#j#k#l#m$_$g$j$k$l$m$o$p$q$r$s$w$z${%R%S%T%U%V%W%X%Y%Z%[%p%u%v%w%x%y%z%{&P&Q&R&S&T&U&V&d&e&f&g&h&j&k&l&m&n&u&v&w&y&z&{'O'Q'T'V'W'X'Y'Z'[']'^'_'`'a'b'c'd'j'k'l'm'n'o'p'q'r's't'u'v'w(Q(R(S(T(U(V(W(Y(Z([(](_(`(a(b(c(d(e(f(g(h(i(o(p(q(r(s(t(u(v(w(x(y(z({)O)P)Q)R)S)T)U)^)_)`)a)b)c)d)f)g)h)i)k)l)m)s)t)u)v)w)x)y)z*Y*Z*[*]*^*_*`*b*c*d*e*k*l*m*n*o*p*q*r*}+O+P+Q+R+S+T+V+W+X+Y+`+a+b+c+d+e+f+g+r+s+t+u+v+w+x+z+{+|+},T,U,V,W,X,Y,Z,[,e,f,g,m,n,o,p,q,x,y,z,{,|,}-O-P-Q-R-S-T-U-V-W-X-Y-Z-[-d-p-q-r-s-t-u-v-w-x-y-z-{-|.P.Q.R.S.T.U.V.W.X.Z.[.].^._.`.a.b.c.d.e.f.g.h.i.n.o.p.q.r.s.t.u.v.w.x.y.z/O/Q/R/S/T/U/V/W/X/Y/Z/[/]/^/_/`/a/b/c/d/e/f/g/h/i/j/k/m/n/o/p/q/r/s/t/u/v/w/x/y/z/{/|/}0O0P0Q0R0S0T0Y0Z0[0]0^0_0`0a0b0c0d0e0f0g0h0i0j0k0l0m0n0o0p0r0s0t0u0v0w0x0y0z0{0}1O1P1Q1R1T1U1V1W1Y1Z1]1^1`1a1c1d1g1h1i1j1k1l1m1n1o1p1q1r1s1t1v1w1x1y2P2Q2R2S2T2U2V2W2X2Y2Z2[2]2^2_2`2a2b2c2d2e2f2g2i2j2k2l2m2n2o2p2q2r2s2t2u2v2w2x2y2z2{2|2}3O3P3Q3R3S3T3U3V3W3X3Y3Z3[3]3^3_3`3a3b3c3d3e3f3g3h3i3j3k3l3m3n3o3p3q3r3s3t3u3v3w3x3y3z3{3|3}4O4P4S4T4U4V4W4X4Y4Z4[4]4^4_4`4a4b4c4d4e4f4g4h4i4j4k4l4m4n4o4p4q4r4s4t4u4v4w4x4y4z4{4|4}5O5P5Q5R5S5T5U5V5W5X5Y5Z5[5]5^5_5`5a5b5c5d5e5f5g5h5i5j5k5l5m5n5o5p5q5r5s5t5u5v5w5x5y5z5{5|5}6O6P6Q6R6S6T6U6V6W6X6Y6Z6[6]6^6_6`6a6b6c6d6e6f6g6h6i6j6k6l6m6n6o6p6q6r6s6t6u6v6w6x6y6z6{6|6}7O7P7Q7R7S7T7U7V7W7X7Y7Z7[7]7^7_7`7a7b7c7d7e7f7g7h7i7j7k7l7m7n7o7p7q7r7s7t7u7v7w7x7y7z7{7|7}8O8P8Q8R8S8T8U8V8W8X8Y8Z8[8]8^8_8`!Q#[ik#](^-]-^-_-`-a-b-c-e.j.k.l.m1u1z1{1|1}2O4Q4RQ%^#nQ*O.{Q*P.|R*Q.}c!pU!e#Z%[,p,q/i/j/kb!nU!e#Z%[,p,q/i/j/kR%d#pA|nOX[]^_`abcdefghjtuvwxyz{|}!O!P!Q!R!S!b!s!u!x!y!z!}#O#P#Q#R#T#U#V#W#X#Y#^#_#`#b#c#d#e#f#g#h#i#j#k#l#m#n$g$j$k$l$m$o$p$q$r$s$z${%R%S%T%U%V%W%X%Y%Z%u%v%w%x%y%z%{&P&Q&R&S&T&U&V&d&e&f&g&h&j&k&l&m&n&u&v&w&y&z&{'O'Q'T'U'V'W'X'Y'Z'[']'^'_'`'a'b'c'd'j'k'l'm'n'o'p'q'r's't'u'v'w(Q(R(S(T(U(V(W(X(Y(Z([(](_(`(a(b(c(d(e(f(g(h(i(o(p(q(r(s(t(u(v(w(x(y(z({)O)P)Q)R)S)T)U)^)_)`)a)b)c)d)e)f)g)h)i)j)k)l)m)s)t)u)v)w)x)y)z*Y*Z*[*]*^*_*`*a*b*c*d*e*k*l*m*n*o*p*q*r*}+O+P+Q+R+S+T+U+V+W+X+Y+`+a+b+c+d+e+f+g+r+s+t+u+v+w+x+y+z+{+|+},T,U,V,W,X,Y,Z,[,d,e,f,g,m,n,o,x,y,z,{,|,}-O-P-Q-R-S-T-U-V-W-X-Y-Z-[-d-p-q-r-s-t-u-v-w-x-y-z-{-|.P.Q.R.S.T.U.V.W.X.Z.[.].^._.`.a.b.c.d.e.f.g.h.i.n.o.p.q.r.s.t.u.v.w.x.y.z.{.|.}/O/Q/R/S/T/U/V/W/X/Y/Z/[/]/^/_/`/a/b/c/d/e/f/g/h/m/n/o/p/q/r/s/t/u/v/w/x/y/z/{/|/}0O0P0Q0R0S0T0Y0Z0[0]0^0_0`0a0b0c0d0e0f0g0h0i0j0k0l0m0n0o0p0r0s0t0u0v0w0x0y0z0{0}1O1P1Q1R1T1U1V1W1Y1Z1]1^1`1a1c1d1g1h1i1j1k1l1m1n1o1p1q1r1s1t1v1w1x1y2P2Q2R2S2T2U2V2W2X2Y2Z2[2]2^2_2`2a2b2c2d2e2f2g2i2j2k2l2m2n2o2p2q2r2s2t2u2v2w2x2y2z2{2|2}3O3P3Q3R3S3T3U3V3W3X3Y3Z3[3]3^3_3`3a3b3c3d3e3f3g3h3i3j3k3l3m3n3o3p3q3r3s3t3u3v3w3x3y3z3{3|3}4O4P4S4T4U4V4W4X4Y4Z4[4]4^4_4`4a4b4c4d4e4f4g4h4i4j4k4l4m4n4o4p4q4r4s4t4u4v4w4x4y4z4{4|4}5O5P5Q5R5S5T5U5V5W5X5Y5Z5[5]5^5_5`5a5b5c5d5e5f5g5h5i5j5k5l5m5n5o5p5q5r5s5t5u5v5w5x5y5z5{5|5}6O6P6Q6R6S6T6U6V6W6X6Y6Z6[6]6^6_6`6a6b6c6d6e6f6g6h6i6j6k6l6m6n6o6p6q6r6s6t6u6v6w6x6y6z6{6|6}7O7P7Q7R7S7T7U7V7W7X7Y7Z7[7]7^7_7`7a7b7c7d7e7f7g7h7i7j7k7l7m7n7o7p7q7r7s7t7u7v7w7x7y7z7{7|7}8O8P8Q8R8S8T8U8V8W8X8Y8Z8[8]8^8_8`W!rU!e,p,qW$y#Z$_$w%pX&Z%[/i/j/kQlOAn!oU[]^_`abcdefghjtuvwxyz{|}!O!P!Q!R!S!e!u!x!y!z!}#O#P#Q#R#T#U#V#W#X#Y#Z#^#b#c#d#e#f#g#h#i#j#k#l#m#n$_$g$j$k$l$m$o$p$q$r$s$w$z${%R%S%T%U%V%W%X%Y%Z%[%p%u%v%w%x%y%z%{&P&Q&R&S&T&U&V&d&e&f&g&h&j&k&l&m&n&u&v&w&y&z&{'O'Q'T'U'V'W'X'Y'Z'[']'^'_'`'a'b'c'd'j'k'l'm'n'o'p'q'r's't'u'v'w(Q(R(S(T(U(V(W(X(Y(Z([(](_(o(p(q(r(s(t(u(v(w(x(y(z({)O)P)Q)R)S)T)U)^)_)`)a)b)c)d)e)f)g)h)i)j)k)l)m)s)t)u)v)w)x)y)z*Y*Z*[*]*^*_*`*a*b*c*d*e*k*l*m*n*o*p*q*r*}+O+P+Q+R+S+T+U+V+W+X+Y+`+a+b+c+d+e+f+g+r+s+t+u+v+w+x+y+z+{+|+},T,U,V,W,X,Y,Z,[,d,e,f,g,m,n,o,p,q,x,y,z,{,|,}-O-P-Q-R-S-T-U-V-W-X-Y-Z-[-d-p-q-r-s-t-u-v-w-x-y-z-{-|.P.Q.R.S.T.U.V.W.X.Z.[.].^._.`.a.b.c.d.e.f.g.h.i.n.o.p.q.r.s.t.u.v.w.x.y.z.{.|.}/O/Q/R/S/T/U/V/W/X/Y/Z/[/]/^/_/`/a/b/c/d/e/f/g/h/i/j/k/m/n/o/p/q/r/s/t/u/v/w/x/y/z/{/|/}0O0P0Q0R0S0T0Y0Z0[0]0^0_0`0a0b0c0d0e0f0g0h0i0j0k0l0m0n0o0p0r0s0t0u0v0w0x0y0z0{0}1O1P1Q1R1T1U1V1W1Y1Z1]1^1`1a1c1d1g1h1i1j1k1l1m1n1o1p1q1r1s1t1v1w1x1y2P2Q2R2S2T2U2V2W2X2Y2Z2_2`2a2b2c2d2e2f2g2i2j2k2l2m2n2o2p2q2r2s2t2u2v2w2x2y2z2{2|2}3O3P3Q3R3S3T3U3V3W3X3Y3Z3[3]3^3_3`3a3b3c3d3e3f3g3h3i3j3k3l3m3n3o3p3q3r3s3t3u3v3w3x3y3z3{3|3}4O4P4S4T4U4V4W4X4Y4Z4[4]4^4_4`4a4b4c4d4e4f4g4h4i4j4k4l4m4n4o4p4q4r4s4t4u4v4w4x4y4z4{4|4}5O5P5Q5R5S5T5U5V5W5X5Y5Z5[5]5^5_5`5a5b5c5d5e5f5g5h5i5j5k5l5m5n5o5p5q5r5s5t5u5v5w5x5y5z5{5|5}6O6P6Q6R6S6T6U6V6W6X6Y6Z6[6]6^6_6`6a6b6c6d6e6f6g6h6i6j6k6l6m6n6o6p6q6r6s6t6u6v6w6x6y6z6{6|6}7O7P7Q7R7S7T7U7V7W7X7Y7Z7[7]7^7_7`7a7b7c7d7e7f7g7h7i7j7k7l7m7n7o7p7q7r7s7t7u7v7w7x7y7z7{7|7}8O8P8Q8R8S8T8U8V8W8X8Y8Z8[8]8^8_8`U!tX!b!s[$|#_(`(a(b(c(d[%O#`(e(f(g(h(iS-}2[2]R.O2^Q!ziQ#^k[$f#](^.j.k.l.mQ'q-]Q'r-^Q's-_Q't-`Q'u-aQ'v-bQ'w-cQ(_-eQ.X1uQ.n1zQ.o1{Q.p1|Q.q1}Q.r2OQ1R4QR1V4R!Q#[ik#](^-]-^-_-`-a-b-c-e.j.k.l.m1u1z1{1|1}2O4Q4RX%_#n.{.|.}!]sOUX!W!X!b!d!e#Z#p#t$S$_$t%[%a%d%o&W&_,p,q/i/j/k0U0V0W2[!]rOUX!W!X!b!d!e#Z#p#t$S$_$t%[%a%d%o&W&_,p,q/i/j/k0U0V0W2[X%`#n.{.|.}R#p!UQ!WOR#r!WQ#w!ZQ#y![Q#}!^V%e#w#y#}W!dU!e,p,qb$T!d$t%a%o&W&_0U0V0WQ$t#ZQ%a#pQ%o$_Q&W%[Q&_%dQ0U/iQ0V/jR0W/kb!lU!e$Z%[,p,q/i/j/kR$Y!l`!mU#Z%[,p,q/i/j/kQ$W!eU$^!m$W&]R&]%bY$w#Z%[/i/j/kQ%p$_T%}$w%pS#TbcS#h{|Q#n!SW$f(](_1U1VS$i'Y1P#t$n#T#h#n$o%V%x&S&f&l&v&z'O'Q(X(Y(Z([(y(z({)e)f)g)h)x)y)z*a*b*c*d*p*q*r+U+V+W+X+e+f+g+y+z+{+|,Y,Z,[,d,e,f,g,m,n,o.c.{.|.}/Y/u0b0s0}S$o#U#^Q%V#iS%s)i1ZQ%x$pQ&S%WQ&f%yQ&l&TS&s*e1^Q&v&gQ&z&mS&|+Y1aQ'O&wQ'Q&{S'R+}1dS(X'U-YS(Y'V'ZS(Z'W'[S(['X-ZS(y'b-zS(z'c-{S({'d-|S)e.h.rS)f.e.oS)g.g.qS)h.f.pQ)x.xQ)y.yQ)z.zQ*a/_Q*b/[Q*c/^Q*d/]Q*p/fQ*q/gQ*r/hQ+U/zQ+V/wQ+W/yQ+X/xQ+e0RQ+f0SQ+g0TQ+y0gQ+z0dQ+{0fQ+|0eQ,Y0nQ,Z0oQ,[0pQ,d0xQ,e0uQ,f0wQ,g0vQ,m0yQ,n0zQ,o0{S.c-W-XQ.{2XQ.|2YQ.}2ZS/Y.d.nQ/u/ZQ0b/vQ0s0cR0}0tQ!XOR#u!XS!VO!W{!_U!d!e#Z#p$_$t%[%a%d%o&W&_,p,q/i/j/k0U0V0W",
-      nodeNames: "⚠ ReporterLeft1Args ReporterLeft2Args ReporterLeft1ArgsOpt GlobalStr ExtensionStr BreedStr PlusMinus Own Set Let To End And Or Identifier Directive Command Reporter Extension TurtleVar PatchVar LinkVar Constant Unsupported SpecialReporter SpecialCommand BreedToken AndOr APCommand APReporterFlip APReporterVar APReporter UnsupportedPrim Reporter0Args Reporter1Args Reporter2Args Reporter3Args Reporter4Args Reporter5Args Reporter6Args Reporter0ArgsVar Reporter1ArgsVar Reporter2ArgsVar Reporter3ArgsVar Reporter4ArgsVar Reporter5ArgsVar Reporter6ArgsVar Reporter2ArgsVar0 Reporter1ArgsVar0 SpecialReporter0Args SpecialReporter1Args SpecialReporter2Args SpecialReporter3Args SpecialReporter4Args SpecialReporter5Args SpecialReporter6Args SpecialReporter1ArgsBoth SpecialReporter0ArgsLink SpecialReporter1ArgsLink SpecialReporter2ArgsTurtle SpecialReporter0ArgsTurtle SpecialReporter1ArgsTurtle SpecialReporter0ArgsLinkP Command0Args Command1Args Command2Args Command3Args Command4Args Command5Args Command6Args Command0ArgsVar Command1ArgsVar Command2ArgsVar Command3ArgsVar Command4ArgsVar Command5ArgsVar Command6ArgsVar Command3ArgsVar2 SpecialCommand0Args SpecialCommand1Args SpecialCommand2Args SpecialCommand3Args SpecialCommand4Args SpecialCommand5Args SpecialCommand6Args SpecialCommandCreateTurtle SpecialCommandCreateLink LineComment Program Normal CloseBracket Extensions OpenBracket Globals Breed BreedPlural BreedSingular BreedsOwn Misplaced CommandStatement Arg CodeBlock ProcedureContent OpenParen CloseParen Error Value String VariableName List Literal Numeric AnonymousProcedure AnonArguments Arguments Arrow ReporterContent ReporterStatement Reporters ShortAnonymousProcedure ReporterBlock Property VariableDeclaration NewVariableDeclaration SetVariable Commands Procedure ProcedureName OnelineReporter Embedded",
-      maxTerm: 142,
+      states: "#?rO%|QROOO&dQPO'#E[O&iQPO'#E^O&nQPO'#E_O&sQPO'#EbOOQQ'#Fa'#FaOOQQ'#Ej'#EjO+uQRO'#EiOOQQ'#Ep'#EpO6^QRO'#EpO;iQRO'#EvO@`QROOOOQQ'#Ev'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvOCjQRO'#EvOEyQRO'#EvOCjQRO'#EvOMxQRO'#EuOOQQ'#Ef'#EfO!%SQRO'#EeOOQQ'#Ee'#EeO@nQRO'#FdO@nQRO'#FeO!%ZQRO'#E|O!%cQRO'#E}OOQQ'#E{'#E{OOQQ'#Ed'#EdO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO!*nQRO'#EcO!-PQRO'#FPOOQQ'#FT'#FTO!-pQRO'#EYO!/iQRO'#FSQOQPOOO!/pQRO,5:vO!/xQRO,5:xO!0QQRO,5:yO!0]QRO,5:|O!3jQRO'#FVO!3}QRO'#FVO!4|QRO,5;TO!5TQRO'#EiO!>|QRO,5;TOOQQ'#Eo'#EoO!ATQRO'#EpOOQQ'#En'#EnO;iQRO'#EnO!C}QRO'#FWOOQQ'#FW'#FWO!DbQRO,5;XO!FmQRO'#EpO!IzQRO'#ErOOQO'#Er'#ErO!JVQRO'#EvOOQQ'#Eu'#EuO!JmQPO,5;]O!JrQRO,5;fO!KTQRO,5;eO#!YQRO'#EdO#!mQRO'#EvO#%lQRO,5;bO#%}QRO,5;bO#(yQRO,5;QO#)[QPO,5;wO@nQRO,5;bO@nQRO,5;bO@nQRO,5;bO#)aQRO'#EpO#-]QRO,5;bO#0ZQRO,5;bO#0ZQRO,5;bO#0ZQRO,5;bO#0ZQRO,5;bO#0ZQRO,5;bO#0kQRO'#F[OOQQ,5;b,5;bO#0ZQRO,5;bO#0ZQRO,5;bO#0ZQRO,5;bO#0ZQRO,5;bO#0ZQRO,5;bO#;QQRO'#ExOOQQ'#Ew'#EwO#=tQRO,5;bO@nQRO,5;bO#={QRO,5<OO#CaQRO,5<PO#HuQRO,5;hO#HuQRO,5;iO#NaQRO,5;OO#0ZQRO,5;OO#0ZQRO,5;OO#0ZQRO,5;OO#0ZQRO,5;OO#0ZQRO,5;OOOQQ,5;O,5;OO#0ZQRO,5;OO#0ZQRO,5;OO#0ZQRO,5;OO#0ZQRO,5;OO#0ZQRO,5;OO$'lQRO,5;OOOQQ'#FQ'#FQO$'vQRO,5;kOOQQ'#Ec'#EcOOQQ-E9R-E9ROHuQRO'#EuONPQRO'#EeOOQQ'#F]'#F]OOQQ-E9Z-E9ZOOQQ'#FU'#FUO$)uQRO1G0bOOQQ1G0b1G0bO$)}QRO1G0dOOQQ1G0d1G0dOOQQ'#E`'#E`O$*VQRO1G0eO$*_QRO1G0hOOQQ1G0h1G0hOOQQ'#FV'#FVOOQQ-E9T-E9TO$*gQRO'#EiOOQQ1G0o1G0oO$/bQRO,5;TO$0qQRO,5;_O!0QQRO,5;ZO$1PQPO,5;YO$1UQRO'#EiO$3aQPO'#EoO$5`QRO'#EnOOQQ-E9U-E9UOOQQ1G0s1G0sOOQQ'#FX'#FXOOQQ-E9V-E9VO$5gQRO,5;bO$5}QRO1G0wOOQQ1G1Q1G1QOOQQ1G1P1G1PO$6_QRO,5;OO$8vQRO1G0|O$>rQRO1G0|OOQQ1G0l1G0lOOQQ1G1c1G1cOOQQ1G0|1G0|O#0ZQRO1G0|O$DjQRO1G0|O#0ZQRO1G0|O#0ZQRO1G0|O#0ZQRO1G0|O#0ZQRO1G0|OOQQ-E9Y-E9YO#0ZQRO1G0|O#0ZQRO1G0|O#0ZQRO1G0|O#0ZQRO1G0|O$DwQRO'#EpOOQQ'#FY'#FYO$EUQRO,5;dOOQQ,5;d,5;dO$I|QRO,5;dO$JTQRO,5;dO$MnQRO'#FZO$MuQRO,5;bO%%]QRO1G1hO%*sQRO1G1iO%2zQRO1G1SO%3[QRO1G1SO%8{QRO1G1TO%9]QRO1G1TO%<]QRO1G0jO#0ZQRO1G0jO#0ZQRO1G0jO#0ZQRO1G0jO#0ZQRO1G0jOOQQ1G0j1G0jO#0ZQRO1G0jO#0ZQRO1G0jO#0ZQRO1G0jO#0ZQRO1G0jO%DWQRO'#EiO%KrQRO'#EpO&'qQRO'#EfOOQQ'#FO'#FOO&*]QRO'#EsO&*hQRO1G1VOOQQ1G1V1G1VO&*hQRO1G1VOOQQ-E9S-E9SOOQQ7+%|7+%|OOQQ7+&O7+&OOOQO'#Ea'#EaO&,dQPO7+&POOQQ7+&S7+&SOOQQ,5;T,5;TOOQQ1G0y1G0yO$*VQRO1G0uOOQQ1G0t1G0tO!0eQRO'#FVO&,iQRO1G0|O&-PQRO,5;bO&-gQRO7+&cO&/cQRO7+&cOOQQ7+&c7+&cO&/jQRO7+&cO&/{QRO1G0jOOQQ7+&h7+&hO&5YQRO7+&hO#0ZQRO7+&hO#0ZQRO7+&hO#0ZQRO7+&hO#0ZQRO7+&hO#0ZQRO7+&hO#0ZQRO7+&hOOQQ-E9W-E9WOOQQ1G1O1G1OOOQQ-E9X-E9XO&:vQRO7+&UO#0ZQRO7+&UO#0ZQRO7+&UO#0ZQRO7+&UOOQQ7+&U7+&UO#0ZQRO7+&UO#0ZQRO7+&UO#0ZQRO7+&UO&=nQRO,5;TO&BvQRO'#FWO&E[QRO,5;dO&EmQRO,5;eO&EtQRO,5;_OOQQ,5;_,5;_OOQQ7+&q7+&qO&FPQRO7+&qOOQQ<<Ik<<IkO&G{QPO7+&aO&HQQRO7+&hOOQQ<<I}<<I}O&HhQRO7+&UO&MuQRO<<JSO#0ZQRO<<JSO#0ZQRO<<JSOOQQ<<JS<<JSO#0ZQRO<<JSO#0ZQRO<<JSO'%cQRO<<IpO#0ZQRO<<IpO#0ZQRO<<IpOOQQ<<Ip<<IpO#0ZQRO<<IpO#0ZQRO<<IpO'(ZQRO1G1OOOQQ<<J]<<J]OOQQ<<I{<<I{O'-yQRO<<JSO'.aQRO<<IpO'3nQROAN?nO#0ZQROAN?nOOQQAN?nAN?nO#0ZQROAN?nO'9[QROAN?[O#0ZQROAN?[OOQQAN?[AN?[O#0ZQROAN?[O'<SQROAN?nO'<jQROAN?[O'AwQROG25YOOQQG25YG25YO'GeQROG24vOOQQG24vG24vO'J]QROG25YO'JsQROG24vO'M[QRO'#EpO($yQRO'#EvO@nQRO'#EvO('uQRO'#EdO@nQRO'#EdO(*qQRO'#FVO(+bQRO'#EpO(.rQRO'#EpO(4yQRO'#EpO(=TQRO'#EvO(CTQRO'#EvO(CeQRO'#EvO(FXQRO'#EvO(IYQRO'#EdO(IaQRO'#EdO(IwQRO'#EdO($yQRO,5;bO(LoQRO,5;bO('uQRO,5;bOEyQRO,5;bO) kQRO,5;bO($yQRO,5;bO(LoQRO,5;bOEyQRO,5;bO('uQRO,5;bO) kQRO,5;bO)$gQRO'#EpO)%pQRO,5;bO)(kQRO,5;bO)+RQRO,5;bO)+`QRO,5;bO).PQRO,5;bO).^QRO,5;bO).nQRO,5;bO)/OQRO,5;bO)/`QRO,5;bO)/pQRO,5;bO#0ZQRO,5;bO)0QQRO,5;bO@nQRO,5;bO)0XQRO,5<OO)3YQRO,5<OO)5}QRO,5<OO)6bQRO,5<OO)9PQRO,5<PO)<QQRO,5<PO)>uQRO,5<PO)?YQRO,5<PO)AwQRO,5;hO)DsQRO,5;hO#!pQRO,5;hO)GoQRO,5;hO)AwQRO,5;iO)DsQRO,5;iO#!pQRO,5;iO)GoQRO,5;iO)JkQRO,5;OO)MeQRO,5;OO)MuQRO,5;OO*!gQRO,5;OO)/`QRO,5;OO).nQRO,5;OO*!wQRO,5;OO)/pQRO,5;OO#0ZQRO,5;OO*#XQRO,5;bO*$[QRO,5;bO*'YQRO,5;bO**^QRO,5;bO*,{QRO,5;OO*-SQRO,5;OO*/wQRO,5;OO*2oQRO1G0|O*;SQRO1G0|O).^QRO1G0|O).nQRO1G0|O)/OQRO1G0|O)/`QRO1G0|O)/pQRO1G0|O*;dQRO1G0|O*>_QRO1G0|O*@uQRO1G0|O*ASQRO1G0|O*CsQRO1G0|O).^QRO1G0|O).nQRO1G0|O)/OQRO1G0|O)/`QRO1G0|O)/pQRO1G0|O#0ZQRO1G0|O*DQQRO1G1hO*FnQRO1G1hO*G[QRO1G1hO*GmQRO1G1hO*HTQRO1G1iO*JqQRO1G1iO*K_QRO1G1iO*KpQRO1G1iO*LWQRO1G0jO+ QQRO1G0jO+ bQRO1G0jO+$SQRO1G0jO)/`QRO1G0jO).nQRO1G0jO*!wQRO1G0jO)/pQRO1G0jO#0ZQRO1G0jO+$dQRO'#EpO++iQRO'#EpO+0pQRO'#EpO+0wQRO'#EpO+1RQRO'#EfO+8WQRO'#EfO+=_QRO'#EfO+=fQRO'#EfO+=pQRO1G0|O+>sQRO1G0|O+AqQRO1G0|O+DuQRO1G0|O+H[QRO,5;bO+JgQRO,5;bO+MkQRO,5;bO,!oQRO,5;bO,%pQRO1G0jO,%wQRO1G0jO,(lQRO1G0jO,+dQRO7+&hO,._QRO7+&hO,0uQRO7+&hO,1SQRO7+&hO,3sQRO7+&hO).^QRO7+&hO).nQRO7+&hO)/OQRO7+&hO)/`QRO7+&hO)/pQRO7+&hO#0ZQRO7+&hO,4QQRO7+&UO,6zQRO7+&UO,7[QRO7+&UO,9|QRO7+&UO)/`QRO7+&UO).nQRO7+&UO*!wQRO7+&UO)/pQRO7+&UO#0ZQRO7+&UO,:^QRO,5;TO,=RQRO,5;TO,?jQRO,5;TO,?qQRO,5;TO,BSQRO7+&hO,CVQRO7+&hO,FTQRO7+&hO,IXQRO7+&hO,KvQRO7+&UO,K}QRO7+&UO,NrQRO7+&UO-#jQRO<<JSO-&eQRO<<JSO-({QRO<<JSO-)YQRO<<JSO-+yQRO<<JSO).^QRO<<JSO).nQRO<<JSO)/OQRO<<JSO)/`QRO<<JSO)/pQRO<<JSO#0ZQRO<<JSO-,WQRO<<IpO-/QQRO<<IpO-/bQRO<<IpO-2SQRO<<IpO)/`QRO<<IpO).nQRO<<IpO*!wQRO<<IpO)/pQRO<<IpO#0ZQRO<<IpO-2dQRO<<JSO-3gQRO<<JSO-6eQRO<<JSO-9iQRO<<JSO-<WQRO<<IpO-<_QRO<<IpO-?SQRO<<IpO-AzQROAN?nO-DuQROAN?nO-G]QROAN?nO-GjQROAN?nO-JZQROAN?nO).^QROAN?nO).nQROAN?nO)/OQROAN?nO)/`QROAN?nO)/pQROAN?nO#0ZQROAN?nO-JhQROAN?[O-MbQROAN?[O-MrQROAN?[O.!dQROAN?[O)/`QROAN?[O).nQROAN?[O*!wQROAN?[O)/pQROAN?[O#0ZQROAN?[O.!tQROAN?nO.#wQROAN?nO.&uQROAN?nO.)yQROAN?nO.,hQROAN?[O.,oQROAN?[O./dQROAN?[O.2[QROG25YO.5VQROG25YO.7mQROG25YO.7zQROG25YO.:kQROG25YO.:xQROG24vO.=rQROG24vO.>SQROG24vO.@tQROG24vO.AUQROG25YO.BXQROG25YO.EVQROG25YO.HZQROG25YO.JxQROG24vO.KPQROG24vO.MtQROG24vO/!lQRO'#EvO/!zQRO'#EvO/#YQRO'#EvO/#hQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvOCjQRO'#EvOCjQRO'#EvOCjQRO'#EvOCjQRO'#EvOCjQRO'#EvOEyQRO'#EvOCjQRO'#EvO@nQRO'#FdO@nQRO'#FdO@nQRO'#FdO@nQRO'#FdO@nQRO'#FeO@nQRO'#FeO@nQRO'#FeO@nQRO'#FeO/#vQRO'#E|O/$OQRO'#E|O/$WQRO'#E|O/$`QRO'#E|O!%cQRO'#E}O!%cQRO'#E}O!%cQRO'#E}O!%cQRO'#E}O@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO/$hQRO,5;bO/$yQRO,5;bO@nQRO,5;bO@nQRO,5;bO@nQRO,5;bO@nQRO,5;bO@nQRO,5;bO#0ZQRO,5;bO#0ZQRO,5;bO#0ZQRO,5;bO#0ZQRO,5;bO#0ZQRO,5;bO#0ZQRO,5;bO#0ZQRO,5;OO#0ZQRO,5;OO#0ZQRO,5;OO#0ZQRO,5;OO#0ZQRO,5;OO/%[QRO,5;OO/%fQRO,5;OO/%pQRO,5;OO/%zQRO,5;OO#0ZQRO1G0|O#0ZQRO1G0|O#0ZQRO1G0|O#0ZQRO1G0|O#0ZQRO1G0|O#0ZQRO1G0|O#0ZQRO1G0jO#0ZQRO1G0jO#0ZQRO1G0jO#0ZQRO1G0jO#0ZQRO1G0jO/&UQRO'#EiO/&]QRO'#EiO/&dQRO'#EiO/&kQRO'#EiO#0ZQRO7+&hO#0ZQRO7+&hO#0ZQRO7+&hO#0ZQRO7+&hO#0ZQRO7+&hO#0ZQRO7+&hO#0ZQRO7+&UO#0ZQRO7+&UO#0ZQRO7+&UO#0ZQRO7+&UO#0ZQRO7+&UO#0ZQRO<<JSO#0ZQRO<<JSO#0ZQRO<<JSO#0ZQRO<<JSO#0ZQRO<<JSO#0ZQRO<<JSO#0ZQRO<<IpO#0ZQRO<<IpO#0ZQRO<<IpO#0ZQRO<<IpO#0ZQRO<<IpO(LoQRO'#EvO) kQRO'#EvO('uQRO'#EvOEyQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO(LoQRO'#EdO) kQRO'#EdO#%}QRO'#EdO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO#0ZQRO,5;bO#0ZQRO,5;bO#0ZQRO,5;bO#0ZQRO,5;bO/&rQRO,5;bO/&yQRO,5;bO/'QQRO,5;bO/'XQRO,5;bO@nQRO,5;bO@nQRO,5;bO@nQRO,5;bO@nQRO,5;bO#0ZQRO,5;OO#0ZQRO,5;OO#0ZQRO,5;OO#0ZQRO1G0|O#0ZQRO1G0|O#0ZQRO1G0|O#0ZQRO1G0|O#0ZQRO1G0jO#0ZQRO1G0jO#0ZQRO1G0jO#0ZQRO7+&hO#0ZQRO7+&hO#0ZQRO7+&hO#0ZQRO7+&hO#0ZQRO7+&UO#0ZQRO7+&UO#0ZQRO7+&UO#0ZQRO<<JSO#0ZQRO<<JSO#0ZQRO<<JSO#0ZQRO<<JSO#0ZQRO<<IpO#0ZQRO<<IpO#0ZQRO<<IpO#0ZQROAN?nO#0ZQROAN?nO#0ZQROAN?nO#0ZQROAN?nO#0ZQROAN?[O#0ZQROAN?[O#0ZQROAN?[O@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO;iQRO'#EnO#!mQRO'#EvO#!mQRO'#EvO#0ZQRO,5;bO#0ZQRO,5;bO#0ZQRO,5;bO#0ZQRO,5;bO#0ZQRO,5;bO#0ZQRO,5;bO#0ZQRO,5;OO#0ZQRO,5;OO#0ZQRO,5;OO#0ZQRO,5;OO#0ZQRO,5;OO#0ZQRO1G0|O#0ZQRO1G0|O#0ZQRO1G0|O#0ZQRO1G0|O#0ZQRO1G0|O#0ZQRO1G0|O#0ZQRO1G0jO#0ZQRO1G0jO#0ZQRO1G0jO#0ZQRO1G0jO#0ZQRO1G0jO#0ZQRO7+&hO#0ZQRO7+&hO#0ZQRO7+&hO#0ZQRO7+&hO#0ZQRO7+&hO#0ZQRO7+&hO#0ZQRO7+&UO#0ZQRO7+&UO#0ZQRO7+&UO#0ZQRO7+&UO#0ZQRO7+&UO#%}QRO'#EvO#%}QRO,5;bO#%}QRO,5;bO/'`QRO,5;bO*!wQRO,5;bO/'qQRO,5;hO/'qQRO,5;iO*!wQRO1G0|O/*mQRO1G0|O*!wQRO1G0|O/+OQRO7+&hO*!wQRO7+&hO/+aQRO<<JSO*!wQRO<<JSO/+rQROAN?nO*!wQROAN?nO/,TQROG25YO/,fQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvOCjQRO'#EvOEyQRO'#EvOEyQRO'#EvOEyQRO'#EvOEyQRO'#EvOCjQRO'#EvOCjQRO'#EvOCjQRO'#EvOCjQRO'#EvO/,tQRO'#E|O!%cQRO'#E}O@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO@nQRO,5;bO#0ZQRO,5;bO#0ZQRO,5;bO#0ZQRO,5;bO#0ZQRO,5;bO#0ZQRO,5;bO#0ZQRO,5;OO#0ZQRO,5;OO#0ZQRO,5;OO#0ZQRO1G0|O#0ZQRO1G0|O#0ZQRO1G0|O#0ZQRO1G0|O#0ZQRO1G0|O#0ZQRO1G0jO#0ZQRO1G0jO#0ZQRO1G0jO#0ZQRO7+&hO#0ZQRO7+&hO#0ZQRO7+&hO#0ZQRO7+&hO#0ZQRO7+&hO#0ZQRO7+&UO#0ZQRO7+&UO#0ZQRO7+&UO#0ZQRO<<JSO#0ZQRO<<JSO#0ZQRO<<JSO#0ZQRO<<JSO#0ZQRO<<JSO#0ZQRO<<IpO#0ZQRO<<IpO#0ZQRO<<IpO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO#0ZQRO,5;bO#0ZQRO,5;bO#0ZQRO,5;bO#0ZQRO,5;bO#0ZQRO,5;bO#0ZQRO,5;bO#0ZQRO,5;OO#0ZQRO,5;OO#0ZQRO,5;OO#0ZQRO,5;OO#0ZQRO,5;OO#0ZQRO1G0|O#0ZQRO1G0|O#0ZQRO1G0|O#0ZQRO1G0|O#0ZQRO1G0|O#0ZQRO1G0|O#0ZQRO1G0jO#0ZQRO1G0jO#0ZQRO1G0jO#0ZQRO1G0jO#0ZQRO1G0jO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO#0ZQRO,5;bO#0ZQRO,5;bO#0ZQRO,5;bO#0ZQRO,5;bO#0ZQRO,5;bO#0ZQRO,5;OO#0ZQRO,5;OO#0ZQRO,5;OO#0ZQRO1G0|O#0ZQRO1G0|O#0ZQRO1G0|O#0ZQRO1G0|O#0ZQRO1G0|O#0ZQRO1G0jO#0ZQRO1G0jO#0ZQRO1G0jO#0ZQRO7+&hO#0ZQRO7+&hO#0ZQRO7+&hO#0ZQRO7+&hO#0ZQRO7+&hO#0ZQRO7+&UO#0ZQRO7+&UO#0ZQRO7+&UO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO#0ZQRO,5;bO#0ZQRO,5;bO#0ZQRO,5;bO#0ZQRO,5;bO#0ZQRO,5;bO#0ZQRO,5;bO#0ZQRO,5;OO#0ZQRO,5;OO#0ZQRO,5;OO#0ZQRO,5;OO#0ZQRO,5;OO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO#0ZQRO,5;bO#0ZQRO,5;bO#0ZQRO,5;bO#0ZQRO,5;bO#0ZQRO,5;bO#0ZQRO,5;OO#0ZQRO,5;OO#0ZQRO,5;OO#0ZQRO1G0|O#0ZQRO1G0|O#0ZQRO1G0|O#0ZQRO1G0|O#0ZQRO1G0|O#0ZQRO1G0jO#0ZQRO1G0jO#0ZQRO1G0jO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO#0ZQRO,5;bO#0ZQRO,5;bO#0ZQRO,5;bO#0ZQRO,5;bO#0ZQRO,5;bO#0ZQRO,5;OO#0ZQRO,5;OO#0ZQRO,5;OO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EdO@nQRO'#EdO@nQRO'#Ed",
+      stateData: "/,|~O$SOS!zOS~OXsOYrO_WOdWOeWOfWOgUOhuOkWOm!SOnjOokOpiOqXOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O!buO!cvO!dwO!exO!fyO!gzO!h{O!iuO!j|O!k}O!l!OO!m!PO!n!QO!o!RO!p!OO!quO!rvO!swO!txO!uyO!vzO!w{O!xpO!yqO#PVO#ZYO#_UO#`UO~OSQOTPOUROWSOZ!UO$Q!|P~PYO#P!ZO~O#P![O~O#P!]O~O#P!^O~OSQOTPOUROWSOX,{OY,wOdWOeWOfWOgUOhuOk!eOm/yOn,mOo,nOp,hOr[Os'bOt,bOu/nOv2]Ow3pOx4pOy!nOz'cO{,gO|/sO}2bO!O3uO!P4uO!Q,gO!R'cO!S[O!T'bO!U,bO!V/nO!W2]O!X3pO!Y4pO!Z'bO![[O!]'bO!^,bO!_[O!`'bO!a[O!buO!c'dO!d-PO!e/tO!f2cO!g3vO!h4vO!i!sO!j'eO!k-TO!l/xO!m2gO!n3zO!o4zO!p/xO!quO!r'dO!s-PO!t/tO!u2cO!v3vO!w4vO!x,oO!y,sO#P!bO#Z!gO#_UO#`UO#h#fP~O_!`Oq!kO!}!cO~P&xOP#dXP#jXQ#dXQ#jXR#dXR#jXX#dXX#jXY#dXY#jX_#dX_#jXd#dXd#jXe#dXe#jXf#dXf#jXg#dXg#jXh#dXh#jXk#dXk#jXl#dXl#jXm#dXm#jXn#dXn#jXo#dXo#jXp#dXp#jXq#dXq#jXr#dXr#jXs#dXs#jXt#dXt#jXu#dXu#jXv#dXv#jXw#dXw#jXx#dXx#jXy#dXy#jXz#dXz#jX{#dX{#jX|#dX|#jX}#dX}#jX!O#dX!O#jX!P#dX!P#jX!Q#dX!Q#jX!R#dX!R#jX!S#dX!S#jX!T#dX!T#jX!U#dX!U#jX!V#dX!V#jX!W#dX!W#jX!X#dX!X#jX!Y#dX!Y#jX!Z#dX!Z#jX![#dX![#jX!]#dX!]#jX!^#dX!^#jX!_#dX!_#jX!`#dX!`#jX!a#dX!a#jX!b#dX!b#jX!c#dX!c#jX!d#dX!d#jX!e#dX!e#jX!f#dX!f#jX!g#dX!g#jX!h#dX!h#jX!i#dX!i#jX!j#dX!j#jX!k#dX!k#jX!l#dX!l#jX!m#dX!m#jX!n#dX!n#jX!o#dX!o#jX!p#dX!p#jX!q#dX!q#jX!r#dX!r#jX!s#dX!s#jX!t#dX!t#jX!u#dX!u#jX!v#dX!v#jX!w#dX!w#jX!x#dX!x#jX!y#dX!y#jX#P#dX#P#jX#Z#dX#Z#jX#_#dX#_#jX#`#dX#`#jX$Q#dX$Q#jX#[#dX#[#jX~OS#WXT#WXU#WXW#WXX#WXY#WXZ#WX_#WXd#WXe#WXf#WXg#WXh#WXk#WXm#WXn#WXo#WXp#WXq#WXr#WXs#WXt#WXu#WXv#WXw#WXx#WXy#WXz#WX{#WX|#WX}#WX!O#WX!P#WX!Q#WX!R#WX!S#WX!T#WX!U#WX!V#WX!W#WX!X#WX!Y#WX!Z#WX![#WX!]#WX!^#WX!_#WX!`#WX!a#WX!b#WX!c#WX!d#WX!e#WX!f#WX!g#WX!h#WX!i#WX!j#WX!k#WX!l#WX!m#WX!n#WX!o#WX!p#WX!q#WX!r#WX!s#WX!t#WX!u#WX!v#WX!w#WX!x#WX!y#WX#P#WX#Z#WX#_#WX#`#WX$Q#WX#[#WX~P,SOR!vOX,}OY,yO_WOdWOeWOfWOgUOhuOkWOm/{On,mOo,nOp1[OqXOr[Os0sOt1VOu3OOv4WOw4{Ox5]Oy!nOz'cO{,gO|/sO}2bO!O3uO!P4uO!Q,gO!R'cO!S[O!T0sO!U1VO!V3OO!W4WO!X4{O!Y5]O!Z0sO![[O!]0sO!^1VO!_[O!`0sO!a[O!buO!c.mO!d-RO!e/vO!f2eO!g3xO!h4xO!i'nO!j.pO!k1iO!l3VO!m4_O!n5SO!o5dO!p3VO!quO!r.mO!s-RO!t/vO!u2eO!v3xO!w4xO!x,qO!y,uO#PVO#Z!tO#_UO#`UO~OP!yOQ!zOR!yOl!{O~O_WOdWOeWOfWOgUOkWOnjOokOpiOq!|Or[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O#PVO#Z0OO#_UO#`UO~OP#]OQ#]OR#]O_#]Or#]Os#]Ot#]Ou#]Ov#]Ow#]Ox#]Oy#]Oz#]O{#]O|#]O}#]O!O#]O!P#]O!Q#]O!R#]O!S#]O!T#]O!U#]O!V#]O!W#]O!X#]O!Y#]O!Z#]O![#]O!]#]O!^#]O!_#]O!`#]O!a#]O#P#[O~O_WOdWOeWOfWOgUOkWOn1`Oo1dOp,jOq!|Or[Os.fOt,dOu/pOv2_Ow3rOx4rOy'jOz.jO{1ZO|3SO}4[O!O5PO!P5aO!Q1ZO!R.jO!S[O!T.fO!U,dO!V/pO!W2_O!X3rO!Y4rO!Z.fO![[O!].fO!^,dO!_[O!`.fO!a[O#PVO#Z0OO#_UO#`UO~OP#iXQ#iXR#iXX$PXY$PX_$PXd$PXe$PXf$PXg$PXh$PXk$PXl#iXm$PXn$PXo$PXp$PXq$PXr$PXs$PXt$PXu$PXv$PXw$PXx$PXy$PXz$PX{$PX|$PX}$PX!O$PX!P$PX!Q$PX!R$PX!S$PX!T$PX!U$PX!V$PX!W$PX!X$PX!Y$PX!Z$PX![$PX!]$PX!^$PX!_$PX!`$PX!a$PX!b$PX!c$PX!d$PX!e$PX!f$PX!g$PX!h$PX!i$PX!j$PX!k$PX!l$PX!m$PX!n$PX!o$PX!p$PX!q$PX!r$PX!s$PX!t$PX!u$PX!v$PX!w$PX!x$PX!y$PX#P$PX#Z$PX#_$PX#`$PX$Q$PX~O$Q#uX~PHuOP#XXQ#XXR#XXX$PXY$PX_$PXd$PXe$PXf$PXg$PXh$PXk$PXl#XXm$PXn$PXo$PXp$PXq$PXr$PXs$PXt$PXu$PXv$PXw$PXx$PXy$PXz$PX{$PX|$PX}$PX!O$PX!P$PX!Q$PX!R$PX!S$PX!T$PX!U$PX!V$PX!W$PX!X$PX!Y$PX!Z$PX![$PX!]$PX!^$PX!_$PX!`$PX!a$PX!b$PX!c$PX!d$PX!e$PX!f$PX!g$PX!h$PX!i$PX!j$PX!k$PX!l$PX!m$PX!n$PX!o$PX!p$PX!q$PX!r$PX!s$PX!t$PX!u$PX!v$PX!w$PX!x$PX!y$PX#P$PX#Z$PX#_$PX#`$PX$Q$PX~O$Q#uX~PNPO_#bOq#bO~O_WOdWOeWOfWOkWOqWO~OX$PXY$PX_$PXd$PXe$PXf$PXg$PXh$PXk$PXm$PXn$PXo$PXp$PXq$PXr$PXs$PXt$PXu$PXv$PXw$PXx$PXy$PXz$PX{$PX|$PX}$PX!O$PX!P$PX!Q$PX!R$PX!S$PX!T$PX!U$PX!V$PX!W$PX!X$PX!Y$PX!Z$PX![$PX!]$PX!^$PX!_$PX!`$PX!a$PX!b$PX!c$PX!d$PX!e$PX!f$PX!g$PX!h$PX!i$PX!j$PX!k$PX!l$PX!m$PX!n$PX!o$PX!p$PX!q$PX!r$PX!s$PX!t$PX!u$PX!v$PX!w$PX!x$PX!y$PX#P$PX#Z$PX#_$PX#`$PX$Q$PX~OS#VXT#VXU#VXW#VXX#VXY#VXZ#VXh#VXm#VXq#VX!b#VX!c#VX!d#VX!e#VX!f#VX!g#VX!h#VX!i#VX!j#VX!k#VX!l#VX!m#VX!n#VX!o#VX!p#VX!q#VX!r#VX!s#VX!t#VX!u#VX!v#VX!w#VX!x#VX!y#VX$Q#VX~P!%wO_#qO~OSQOTPOUROWSOhuOquO!buO!quO~OX-OOY,zOZ!UOm/|O!c.lO!d-SO!e/wO!f2fO!g3yO!h4yO!i'pO!j.oO!k1hO!l3UO!m4^O!n5RO!o5cO!p3UO!r.lO!s-SO!t/wO!u2fO!v3yO!w4yO!x,rO!y,vO$Q!|X~P!-UO$Q#vX~PYO_#yO!}#{O~O_#yO!}#}O~O_$OOr$OO!T$OO~O_#yO!}$RO~OS#zXT#zXU#zXW#zXX#zXY#zX_#yX_#zXg#yXg#zXh#zXk#zXm#zXq#zX!b#zX!c#zX!d#zX!e#zX!f#zX!g#zX!h#zX!i#zX!j#zX!k#zX!l#zX!m#zX!n#zX!o#zX!p#zX!q#zX!r#zX!s#zX!t#zX!u#zX!v#zX!w#zX!x#zX!y#zX!}#yX!}#zX#P#yX#P#zX#Z#zX#_#yX#_#zX#`#yX#`#zX~OP#YXQ#YXR#YXl#YX!}#YX~P!0eOP#dXQ#dXR#dX_#{Xl#dXq#{X!}#dX#h#{X~P!0eO_$SOgUO#P$UO#_UO#`UO~O!}$VO~P!4kO_'fOq'gO!}$WO~P&xOP#]aP#aaQ#]aQ#aaR#]aR#aa_#]a_#aad#]ad#aae#]ae#aaf#]af#aag#]ag#aak#]ak#aal#]al#aan#]an#aao#]ao#aap#]ap#aaq#]aq#aar#]ar#aas#]as#aat#]at#aau#]au#aav#]av#aaw#]aw#aax#]ax#aay#]ay#aaz#]az#aa{#]a{#aa|#]a|#aa}#]a}#aa!O#]a!O#aa!P#]a!P#aa!Q#]a!Q#aa!R#]a!R#aa!S#]a!S#aa!T#]a!T#aa!U#]a!U#aa!V#]a!V#aa!W#]a!W#aa!X#]a!X#aa!Y#]a!Y#aa!Z#]a!Z#aa![#]a![#aa!]#]a!]#aa!^#]a!^#aa!_#]a!_#aa!`#]a!`#aa!a#]a!a#aa!b#]a!b#aa!c#]a!c#aa!d#]a!d#aa!e#]a!e#aa!f#]a!f#aa!g#]a!g#aa!h#]a!h#aa!i#]a!i#aa!j#]a!j#aa!k#]a!k#aa!l#]a!l#aa!m#]a!m#aa!n#]a!n#aa!o#]a!o#aa!p#]a!p#aa!q#]a!q#aa!r#]a!r#aa!s#]a!s#aa!t#]a!t#aa!u#]a!u#aa!v#]a!v#aa!w#]a!w#aa!x#]a!x#aa!y#]a!y#aa#P#]a#P#aa#Z#]a#Z#aa#_#]a#_#aa#`#]a#`#aaj#]aj#aa~OX#]aX#aaY#]aY#aah#]ah#aam#]am#aa$Q#]a$Q#aa#[#]a#[#aaS#]aS#aaT#]aT#aaU#]aU#aaW#]aW#aaZ#]aZ#aa!}#]a!}#aa[#]a[#aa~P!5bOP#dXQ#dXR#dXl#dX!}#dX~O#P$YO~P!@rOS#zXT#zXU#zXW#zXX#zXY#zX_#zXg#zXh#zXk#zXm#zXq#zX!b#zX!c#zX!d#zX!e#zX!f#zX!g#zX!h#zX!i#zX!j#zX!k#zX!l#zX!m#zX!n#zX!o#zX!p#zX!q#zX!r#zX!s#zX!t#zX!u#zX!v#zX!w#zX!x#zX!y#zX!}#zX#P#zX#Z#zX#_#zX#`#zX~OP#YXQ#YXR#YXl#YX!}#YX~P!A[OX,{OY,wO_!iOgUOk$]Om/yO!c'dO!d-PO!e/tO!f2cO!g3vO!h4vO!i!sO!j'eO!k-TO!l/xO!m2gO!n3zO!o4zO!p/xO!r'dO!s-PO!t/tO!u2cO!v3vO!w4vO!x,oO!y,sO!}$`O#P$[O#Z$^O#_UO#`UO~P!-UOP#jXQ#jXR#jXS#WXT#WXU#WXW#WXX#WXY#WX_#WX_#{Xg#WXh#WXk#WXl#jXm#WXq#WXq#{X!b#WX!c#WX!d#WX!e#WX!f#WX!g#WX!h#WX!i#WX!j#WX!k#WX!l#WX!m#WX!n#WX!o#WX!p#WX!q#WX!r#WX!s#WX!t#WX!u#WX!v#WX!w#WX!x#WX!y#WX!}#WX!}#jX#P#WX#Z#WX#_#WX#`#WX#h#{X~P!@rO_$aOq$aO#h#fX~OP#jXQ#jXR#jXl#jX!}#jX#[#jX~P@nO#h$dO~O!}$eOP#YXQ#YXR#YXl#YX~O!}$fOP#XXQ#XXR#XXl#XX~OdWOeWOfWOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[OS#WXT#WXU#WXW#WXX#WXY#WXh#WXk#WXm#WXq#WX!b#WX!c#WX!d#WX!e#WX!f#WX!g#WX!h#WX!i#WX!j#WX!k#WX!l#WX!m#WX!n#WX!o#WX!p#WX!q#WX!r#WX!s#WX!t#WX!u#WX!v#WX!w#WX!x#WX!y#WX!}#WX#Z#WX~O_#WXg#WX#P#WX#_#WX#`#WX~P!KfOR!vO_WOdWOeWOfWOgUOkWOn,mOo,nOp1[Oq!|Or[Os0sOt1VOu3OOv4WOw4{Ox5]Oy!nOz'cO{,gO|/sO}2bO!O3uO!P4uO!Q,gO!R'cO!S[O!T0sO!U1VO!V3OO!W4WO!X4{O!Y5]O!Z0sO![[O!]0sO!^1VO!_[O!`0sO!a[O#PVO#Z!tO#_UO#`UO~O#[$hOP#iXQ#iXR#iXl#iX~O_WOdWOeWOfWOgUOkWOn,mOo,nOp1[Oq!|Or[Os0sOt1VOu3OOv4WOw4{Ox5]Oy!nOz'cO{,gO|/sO}2bO!O3uO!P4uO!Q,gO!R'cO!S[O!T0sO!U1VO!V3OO!W4WO!X4{O!Y5]O!Z0sO![[O!]0sO!^1VO!_[O!`0sO!a[O#PVO#Z0OO#_UO#`UO~O#[$jOP#XXQ#XXR#XXl#XX~O#[$kO~OS#dXS#jXT#dXT#jXU#dXU#jXW#dXW#jXZ#dXZ#jXj#dXj#jX!}#dX!}#jX[#dX[#jX~P,SOX#jaY#ja_#jag#jah#jak#jal#jam#jaq#ja!b#ja!c#ja!d#ja!e#ja!f#ja!g#ja!h#ja!i#ja!j#ja!k#ja!l#ja!m#ja!n#ja!o#ja!p#ja!q#ja!r#ja!s#ja!t#ja!u#ja!v#ja!w#ja!x#ja!y#ja#P#ja#Z#ja#_#ja#`#jaS#jaT#jaU#jaW#ja!}#ja~OP!yOQ!zOR!yOd#jae#jaf#jan#jao#jap#jar#jas#jat#jau#jav#jaw#jax#jay#jaz#ja{#ja|#ja}#ja!O#ja!P#ja!Q#ja!R#ja!S#ja!T#ja!U#ja!V#ja!W#ja!X#ja!Y#ja!Z#ja![#ja!]#ja!^#ja!_#ja!`#ja!a#ja$Q#jaZ#jaj#ja#[#ja[#ja~P#*gOP!yOQ!zOR!yOl!{O~P@nOP!yOQ!zOR!yOl!{OX$OXY$OX_$OXd$OXe$OXf$OXg$OXh$OXk$OXm$OXn$OXo$OXp$OXq$OXr$OXs$OXt$OXu$OXv$OXw$OXx$OXy$OXz$OX{$OX|$OX}$OX!O$OX!P$OX!Q$OX!R$OX!S$OX!T$OX!U$OX!V$OX!W$OX!X$OX!Y$OX!Z$OX![$OX!]$OX!^$OX!_$OX!`$OX!a$OX!b$OX!c$OX!d$OX!e$OX!f$OX!g$OX!h$OX!i$OX!j$OX!k$OX!l$OX!m$OX!n$OX!o$OX!p$OX!q$OX!r$OX!s$OX!t$OX!u$OX!v$OX!w$OX!x$OX!y$OX#P$OX#Z$OX#_$OX#`$OX$Q$OXS$OXT$OXU$OXW$OXZ$OXj$OX!}$OX#[$OX[$OX~OSQOTPOUROWSOX1fOY1eOdWOeWOfWOgUOhuOk!eOm/zOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O!buO!c.kO!d-QO!e/uO!f2dO!g3wO!h4wO!i'oO!j.nO!k1gO!l3TO!m4]O!n5QO!o5bO!p3TO!quO!r.kO!s-QO!t/uO!u2dO!v3wO!w4wO!x,pO!y,tO#Z/}O#_UO#`UO~O_$xOq'iO!}${O#P!bO#h#fP~P#6ZOP%POR%PO_#]Ol'xOr#]Os#]Ot#]Ou#]Ov#]Ow#]Ox#]Oy#]Oz#]O{#]O|#]O}#]O!O#]O!P#]O!Q#]O!R#]O!S#]O!T#]O!U#]O!V#]O!W#]O!X#]O!Y#]O!Z#]O![#]O!]#]O!^#]O!_#]O!`#]O!a#]O#P#[O~OQ#]O~P#;eOP!yOQ!zOR!yOl!{OS$WaT$WaU$WaW$WaX$WaY$WaZ$Wa_$Wad$Wae$Waf$Wag$Wah$Wak$Wam$Wan$Wao$Wap$Waq$War$Was$Wat$Wau$Wav$Waw$Wax$Way$Waz$Wa{$Wa|$Wa}$Wa!O$Wa!P$Wa!Q$Wa!R$Wa!S$Wa!T$Wa!U$Wa!V$Wa!W$Wa!X$Wa!Y$Wa!Z$Wa![$Wa!]$Wa!^$Wa!_$Wa!`$Wa!a$Wa!b$Wa!c$Wa!d$Wa!e$Wa!f$Wa!g$Wa!h$Wa!i$Wa!j$Wa!k$Wa!l$Wa!m$Wa!n$Wa!o$Wa!p$Wa!q$Wa!r$Wa!s$Wa!t$Wa!u$Wa!v$Wa!w$Wa!x$Wa!y$Wa#P$Wa#Z$Wa#_$Wa#`$Wa$Q$Wa~P@nOP!yOQ!zOR!yOl!{OS$XaT$XaU$XaW$XaX$XaY$XaZ$Xa_$Xad$Xae$Xaf$Xag$Xah$Xak$Xam$Xan$Xao$Xap$Xaq$Xar$Xas$Xat$Xau$Xav$Xaw$Xax$Xay$Xaz$Xa{$Xa|$Xa}$Xa!O$Xa!P$Xa!Q$Xa!R$Xa!S$Xa!T$Xa!U$Xa!V$Xa!W$Xa!X$Xa!Y$Xa!Z$Xa![$Xa!]$Xa!^$Xa!_$Xa!`$Xa!a$Xa!b$Xa!c$Xa!d$Xa!e$Xa!f$Xa!g$Xa!h$Xa!i$Xa!j$Xa!k$Xa!l$Xa!m$Xa!n$Xa!o$Xa!p$Xa!q$Xa!r$Xa!s$Xa!t$Xa!u$Xa!v$Xa!w$Xa!x$Xa!y$Xa#P$Xa#Z$Xa#_$Xa#`$Xa$Q$Xa~P@nO_WOdWOeWOfWOgUOkWOnjOokOpiOq!|Or[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O#PVO#Z!tO#_UO#`UO~OS#WaT#WaU#WaW#WaX#WaY#Wa_#Wag#Wah#Wak#Wam#Waq#Wa!b#Wa!c#Wa!d#Wa!e#Wa!f#Wa!g#Wa!h#Wa!i#Wa!j#Wa!k#Wa!l#Wa!m#Wa!n#Wa!o#Wa!p#Wa!q#Wa!r#Wa!s#Wa!t#Wa!u#Wa!v#Wa!w#Wa!x#Wa!y#Wa#P#Wa#Z#Wa#_#Wa#`#Wa~OP!yOQ!zOR!yOl!{OZ#Wad#Wae#Waf#Wan#Wao#Wap#War#Was#Wat#Wau#Wav#Waw#Wax#Way#Waz#Wa{#Wa|#Wa}#Wa!O#Wa!P#Wa!Q#Wa!R#Wa!S#Wa!T#Wa!U#Wa!V#Wa!W#Wa!X#Wa!Y#Wa!Z#Wa![#Wa!]#Wa!^#Wa!_#Wa!`#Wa!a#Wa$Q#Wa~P#KqOdWOeWOfWOgUOj%eOkWOnjOokOpiOq!|Or[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O!b%eO!c%eO!d%eO!e%eO!f%eO!g%eO!h%eO!i%eO!j%eO!k%eO!l%eO!m%eO!n%eO!o%eO!p%eO!q%eO!r%eO!s%eO!t%eO!u%eO!v%eO!w%eO!x%eO!y%eO#Z0OO#_UO#`UO~O_%cO#P%bO~P$#XOX,|OY,xO[%hOk$]Om/zO!c.kO!d-QO!e/uO!f2dO!g3wO!h4wO!i'oO!j.nO!k1gO!l3TO!m4]O!n5QO!o5bO!p3TO!r.kO!s-QO!t/uO!u2dO!v3wO!w4wO!x,pO!y,tO#P%fO#Z$^O~P!-UO_#yO!}%kO~O_#yO!}%lO~O_%mO!T%mO~O_#yO!}%oO~O!}%pO~P!4kOP#]aP#aaQ#]aQ#aaR#]aR#aa_#]a_#aag#]ag#aak#]ak#aal#]al#aaq#]aq#aa!b#]a!b#aa!c#]a!c#aa!d#]a!d#aa!e#]a!e#aa!f#]a!f#aa!g#]a!g#aa!h#]a!h#aa!i#]a!i#aa!j#]a!j#aa!k#]a!k#aa!l#]a!l#aa!m#]a!m#aa!n#]a!n#aa!o#]a!o#aa!p#]a!p#aa!q#]a!q#aa!r#]a!r#aa!s#]a!s#aa!t#]a!t#aa!u#]a!u#aa!v#]a!v#aa!w#]a!w#aa!x#]a!x#aa!y#]a!y#aa#P#]a#P#aa#Z#]a#Z#aa#_#]a#_#aa#`#]a#`#aa~OS#]aS#aaT#]aT#aaU#]aU#aaW#]aW#aaX#]aX#aaY#]aY#aah#]ah#aam#]am#aa!}#]a!}#aa#h#ga~P$*nO_$aOq$aO!}%qO#h#fX~O#[%sO~OX,{OY,wO_%tOgUOk$]Om/yO!c'dO!d-PO!e/tO!f2cO!g3vO!h4vO!i!sO!j'eO!k-TO!l/xO!m2gO!n3zO!o4zO!p/xO!r'dO!s-PO!t/tO!u2cO!v3vO!w4vO!x,oO!y,sO!}!cO#P$[O#Z$^O#_UO#`UO~P!-UO#P$YO~OX,}OY,yOhuOm/{O!buO!c.mO!d-RO!e/vO!f2eO!g3xO!h4xO!i'nO!j.pO!k1iO!l3VO!m4_O!n5SO!o5dO!p3VO!quO!r.mO!s-RO!t/vO!u2eO!v3xO!w4xO!x,qO!y,uO~OquO~P$3fOP#jaQ#jaR#jal#ja!}#ja#[#ja~P@nO_WOq'aO!}%yO#PVO~P#6ZOdWOeWOfWOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O!}#Wa~P#KqOP#iiP#jiQ#iiQ#jiR#iiR#jiX#jiY#ji_#jid#jie#jif#jig#jih#jik#jil#iil#jim#jin#jio#jip#jiq#jir#jis#jit#jiu#jiv#jiw#jix#jiy#jiz#ji{#ji|#ji}#ji!O#ji!P#ji!Q#ji!R#ji!S#ji!T#ji!U#ji!V#ji!W#ji!X#ji!Y#ji!Z#ji![#ji!]#ji!^#ji!_#ji!`#ji!a#ji!b#ji!c#ji!d#ji!e#ji!f#ji!g#ji!h#ji!i#ji!j#ji!k#ji!l#ji!m#ji!n#ji!o#ji!p#ji!q#ji!r#ji!s#ji!t#ji!u#ji!v#ji!w#ji!x#ji!y#ji#P#ji#Z#ji#_#ji#`#ji$Q#ji!}#ii!}#ji#[#jiS#jiT#jiU#jiW#jiZ#ji[#ji~OP0tOQ1jOR0tOl0uO#[%|O~OX#jiY#ji_#jid#jie#jif#jig#jih#jik#jil#jim#jin#jio#jip#jiq#jir#jis#jit#jiu#jiv#jiw#jix#jiy#jiz#ji{#ji|#ji}#ji!O#ji!P#ji!Q#ji!R#ji!S#ji!T#ji!U#ji!V#ji!W#ji!X#ji!Y#ji!Z#ji![#ji!]#ji!^#ji!_#ji!`#ji!a#ji!b#ji!c#ji!d#ji!e#ji!f#ji!g#ji!h#ji!i#ji!j#ji!k#ji!l#ji!m#ji!n#ji!o#ji!p#ji!q#ji!r#ji!s#ji!t#ji!u#ji!v#ji!w#ji!x#ji!y#ji#P#ji#Z#ji#_#ji#`#ji$Q#jiS#jiT#jiU#jiW#jiZ#jij#ji!}#ji#[#ji[#ji~OP!yOQ!zOR!yO~P$?TO_#{Xq#{X#h#{X~P!@rOX1fOY1eOk$]Om/zO!c.kO!d-QO!e/uO!f2dO!g3wO!h4wO!i'oO!j.nO!k1gO!l3TO!m4]O!n5QO!o5bO!p3TO!r.kO!s-QO!t/uO!u2dO!v3wO!w4wO!x,pO!y,tO!}&VO#Z$^O~P!-UO_WOdWOeWOfWOgUOkWOnjOokOpiOq'{Or[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O#PVO#Z0OO#_UO#`UO~O!}&VO~P$GQO!}&VOP#XXQ#XXR#XXl#XX~OP#XXQ#XXR#XX_#}Xd#}Xe#}Xf#}Xg#}Xk#}Xl#XXn#}Xo#}Xp#}Xq#}Xr#}Xs#}Xt#}Xu#}Xv#}Xw#}Xx#}Xy#}Xz#}X{#}X|#}X}#}X!O#}X!P#}X!Q#}X!R#}X!S#}X!T#}X!U#}X!V#}X!W#}X!X#}X!Y#}X!Z#}X![#}X!]#}X!^#}X!_#}X!`#}X!a#}X#P#}X#Z#}X#_#}X#`#}X~O!}#}X~P$JfOP#kXQ#kXR#kXX#kXY#kXh#kXl#kXm#kX!b#kX!c#kX!d#kX!e#kX!f#kX!g#kX!h#kX!i#kX!j#kX!k#kX!l#kX!m#kX!n#kX!o#kX!p#kX!q#kX!r#kX!s#kX!t#kX!u#kX!v#kX!w#kX!x#kX!y#kX$Q#kX!}#kX#[#kXS#kXT#kXU#kXW#kXZ#kXj#kX[#kX~PEyOS$UiT$UiU$UiW$UiX$UiY$Ui_$Uig$Uih$Uik$Uim$Uiq$Ui!b$Ui!c$Ui!d$Ui!e$Ui!f$Ui!g$Ui!h$Ui!i$Ui!j$Ui!k$Ui!l$Ui!m$Ui!n$Ui!o$Ui!p$Ui!q$Ui!r$Ui!s$Ui!t$Ui!u$Ui!v$Ui!w$Ui!x$Ui!y$Ui#P$Ui#Z$Ui#_$Ui#`$Ui~OP!yOQ!zOR!yOl!{OZ$Uid$Uie$Uif$Uin$Uio$Uip$Uir$Uis$Uit$Uiu$Uiv$Uiw$Uix$Uiy$Uiz$Ui{$Ui|$Ui}$Ui!O$Ui!P$Ui!Q$Ui!R$Ui!S$Ui!T$Ui!U$Ui!V$Ui!W$Ui!X$Ui!Y$Ui!Z$Ui![$Ui!]$Ui!^$Ui!_$Ui!`$Ui!a$Ui$Q$Ui~P%!mOS$ViT$ViU$ViW$ViX$ViY$Vi_$Vig$Vih$Vik$Vim$Viq$Vi!b$Vi!c$Vi!d$Vi!e$Vi!f$Vi!g$Vi!h$Vi!i$Vi!j$Vi!k$Vi!l$Vi!m$Vi!n$Vi!o$Vi!p$Vi!q$Vi!r$Vi!s$Vi!t$Vi!u$Vi!v$Vi!w$Vi!x$Vi!y$Vi#P$Vi#Z$Vi#_$Vi#`$Vi~OP!yOQ!zOR!yOl!{OZ$Vid$Vie$Vif$Vin$Vio$Vip$Vir$Vis$Vit$Viu$Viv$Viw$Vix$Viy$Viz$Vi{$Vi|$Vi}$Vi!O$Vi!P$Vi!Q$Vi!R$Vi!S$Vi!T$Vi!U$Vi!V$Vi!W$Vi!X$Vi!Y$Vi!Z$Vi![$Vi!]$Vi!^$Vi!_$Vi!`$Vi!a$Vi$Q$Vi~P%(TOS#piT#piU#piW#piX#piY#piZ#pi_#pid#pie#pif#pig#pih#pik#pim#pin#pio#pip#piq#pir#pis#pit#piu#piv#piw#pix#piy#piz#pi{#pi|#pi}#pi!O#pi!P#pi!Q#pi!R#pi!S#pi!T#pi!U#pi!V#pi!W#pi!X#pi!Y#pi!Z#pi![#pi!]#pi!^#pi!_#pi!`#pi!a#pi!b#pi!c#pi!d#pi!e#pi!f#pi!g#pi!h#pi!i#pi!j#pi!k#pi!l#pi!m#pi!n#pi!o#pi!p#pi!q#pi!r#pi!s#pi!t#pi!u#pi!v#pi!w#pi!x#pi!y#pi#P#pi#Z#pi#_#pi#`#pi$Q#pi!}#pi#[#pi[#pi~OP#iXQ#iXR#iXl#iX~P%-kOP#XXQ#XXR#XXl#XX~P%-kOS#qiT#qiU#qiW#qiX#qiY#qiZ#qi_#qid#qie#qif#qig#qih#qik#qim#qin#qio#qip#qiq#qir#qis#qit#qiu#qiv#qiw#qix#qiy#qiz#qi{#qi|#qi}#qi!O#qi!P#qi!Q#qi!R#qi!S#qi!T#qi!U#qi!V#qi!W#qi!X#qi!Y#qi!Z#qi![#qi!]#qi!^#qi!_#qi!`#qi!a#qi!b#qi!c#qi!d#qi!e#qi!f#qi!g#qi!h#qi!i#qi!j#qi!k#qi!l#qi!m#qi!n#qi!o#qi!p#qi!q#qi!r#qi!s#qi!t#qi!u#qi!v#qi!w#qi!x#qi!y#qi#P#qi#Z#qi#_#qi#`#qi$Q#qi!}#qi#[#qi[#qi~OP#iXQ#iXR#iXl#iX~P%3lOP#XXQ#XXR#XXl#XX~P%3lOS#WiT#WiU#WiW#WiX#WiY#Wi_#Wig#Wih#Wik#Wim#Wiq#Wi!b#Wi!c#Wi!d#Wi!e#Wi!f#Wi!g#Wi!h#Wi!i#Wi!j#Wi!k#Wi!l#Wi!m#Wi!n#Wi!o#Wi!p#Wi!q#Wi!r#Wi!s#Wi!t#Wi!u#Wi!v#Wi!w#Wi!x#Wi!y#Wi#P#Wi#Z#Wi#_#Wi#`#Wi~OP!yOQ!zOR!yOl!{OZ#Wid#Wie#Wif#Win#Wio#Wip#Wir#Wis#Wit#Wiu#Wiv#Wiw#Wix#Wiy#Wiz#Wi{#Wi|#Wi}#Wi!O#Wi!P#Wi!Q#Wi!R#Wi!S#Wi!T#Wi!U#Wi!V#Wi!W#Wi!X#Wi!Y#Wi!Z#Wi![#Wi!]#Wi!^#Wi!_#Wi!`#Wi!a#Wi$Q#Wi~P%9mOSQOTPOUROWSOX,{OY,wO_!`OdWOeWOfWOgUOhuOk!eOm/yOnjOokOpiOq'hOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O!buO!c'dO!d-PO!e/tO!f2cO!g3vO!h4vO!i!sO!j'eO!k-TO!l/xO!m2gO!n3zO!o4zO!p/xO!quO!r'dO!s-PO!t/tO!u2cO!v3vO!w4vO!x,oO!y,sO#P!bO#Z/}O#_UO#`UO#h#fP~O!}&aO~P%?TOP#dXQ#dXR#dXS#rXT#rXU#rXW#rXX#rXY#rX_#dX_#rXd#dXe#dXf#dXg#dXg#rXh#rXj#dXk#dXk#rXl#dXm#rXn#dXo#dXp#dXq#dXq#rXr#dXs#dXt#dXu#dXv#dXw#dXx#dXy#dXz#dX{#dX|#dX}#dX!O#dX!P#dX!Q#dX!R#dX!S#dX!T#dX!U#dX!V#dX!W#dX!X#dX!Y#dX!Z#dX![#dX!]#dX!^#dX!_#dX!`#dX!a#dX!b#dX!b#rX!c#dX!c#rX!d#dX!d#rX!e#dX!e#rX!f#dX!f#rX!g#dX!g#rX!h#dX!h#rX!i#dX!i#rX!j#dX!j#rX!k#dX!k#rX!l#dX!l#rX!m#dX!m#rX!n#dX!n#rX!o#dX!o#rX!p#dX!p#rX!q#dX!q#rX!r#dX!r#rX!s#dX!s#rX!t#dX!t#rX!u#dX!u#rX!v#dX!v#rX!w#dX!w#rX!x#dX!x#rX!y#dX!y#rX#P#dX#P#rX#Z#dX#Z#rX#_#dX#_#rX#`#dX#`#rX~OZ#rXd#rXe#rXf#rXn#rXo#rXp#rXr#rXs#rXt#rXu#rXv#rXw#rXx#rXy#rXz#rX{#rX|#rX}#rX!O#rX!P#rX!Q#rX!R#rX!S#rX!T#rX!U#rX!V#rX!W#rX!X#rX!Y#rX!Z#rX![#rX!]#rX!^#rX!_#rX!`#rX!a#rX$Q#rX~P%D_OP#YXQ#YXR#YXS#rXT#rXU#rXW#rXX#rXY#rX_#YX_#rXd#YXe#YXf#YXg#YXg#rXh#rXj#YXk#YXk#rXl#YXm#rXn#YXo#YXp#YXq#YXq#rXr#YXs#YXt#YXu#YXv#YXw#YXx#YXy#YXz#YX{#YX|#YX}#YX!O#YX!P#YX!Q#YX!R#YX!S#YX!T#YX!U#YX!V#YX!W#YX!X#YX!Y#YX!Z#YX![#YX!]#YX!^#YX!_#YX!`#YX!a#YX!b#YX!b#rX!c#YX!c#rX!d#YX!d#rX!e#YX!e#rX!f#YX!f#rX!g#YX!g#rX!h#YX!h#rX!i#YX!i#rX!j#YX!j#rX!k#YX!k#rX!l#YX!l#rX!m#YX!m#rX!n#YX!n#rX!o#YX!o#rX!p#YX!p#rX!q#YX!q#rX!r#YX!r#rX!s#YX!s#rX!t#YX!t#rX!u#YX!u#rX!v#YX!v#rX!w#YX!w#rX!x#YX!x#rX!y#YX!y#rX#P#YX#P#rX#Z#YX#Z#rX#_#YX#_#rX#`#YX#`#rX~OZ#rXd#rXe#rXf#rXn#rXo#rXp#rXr#rXs#rXt#rXu#rXv#rXw#rXx#rXy#rXz#rX{#rX|#rX}#rX!O#rX!P#rX!Q#rX!R#rX!S#rX!T#rX!U#rX!V#rX!W#rX!X#rX!Y#rX!Z#rX![#rX!]#rX!^#rX!_#rX!`#rX!a#rX$Q#rX~P%N^O_$aOq$aO!}&fO~OX,|OY,xO[&gOk$]Om/zO!c.kO!d-QO!e/uO!f2dO!g3wO!h4wO!i'oO!j.nO!k1gO!l3TO!m4]O!n5QO!o5bO!p3TO!r.kO!s-QO!t/uO!u2dO!v3wO!w4wO!x,pO!y,tO#Z$^O~P!-UO!}&iO~OP#jiQ#jiR#jil#ji!}#ji#[#ji~P@nOP#kXQ#kXR#kXl#kX!}#kX#[#kX~P@nOX1fOY1eOk$]Om/zO!c.kO!d-QO!e/uO!f2dO!g3wO!h4wO!i'oO!j.nO!k1gO!l3TO!m4]O!n5QO!o5bO!p3TO!r.kO!s-QO!t/uO!u2dO!v3wO!w4wO!x,pO!y,tO!}&lO#Z$^O~P!-UO!}&lO~P$GQO!}&lOP#XXQ#XXR#XXl#XX~OdWOeWOfWOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O!}#Wi~P%9mOX#jqY#jq_#jqg#jqh#jqk#jql#jqm#jqq#jq!b#jq!c#jq!d#jq!e#jq!f#jq!g#jq!h#jq!i#jq!j#jq!k#jq!l#jq!m#jq!n#jq!o#jq!p#jq!q#jq!r#jq!s#jq!t#jq!u#jq!v#jq!w#jq!x#jq!y#jq#P#jq#Z#jq#_#jq#`#jqS#jqT#jqU#jqW#jq!}#jq~OP!yOQ!zOR!yOd#jqe#jqf#jqn#jqo#jqp#jqr#jqs#jqt#jqu#jqv#jqw#jqx#jqy#jqz#jq{#jq|#jq}#jq!O#jq!P#jq!Q#jq!R#jq!S#jq!T#jq!U#jq!V#jq!W#jq!X#jq!Y#jq!Z#jq![#jq!]#jq!^#jq!_#jq!`#jq!a#jq$Q#jqZ#jqj#jq#[#jq[#jq~P&2dOS#WqT#WqU#WqW#WqX#WqY#Wq_#Wqg#Wqh#Wqk#Wqm#Wqq#Wq!b#Wq!c#Wq!d#Wq!e#Wq!f#Wq!g#Wq!h#Wq!i#Wq!j#Wq!k#Wq!l#Wq!m#Wq!n#Wq!o#Wq!p#Wq!q#Wq!r#Wq!s#Wq!t#Wq!u#Wq!v#Wq!w#Wq!x#Wq!y#Wq#P#Wq#Z#Wq#_#Wq#`#Wq~OP!yOQ!zOR!yOl!{OZ#Wqd#Wqe#Wqf#Wqn#Wqo#Wqp#Wqr#Wqs#Wqt#Wqu#Wqv#Wqw#Wqx#Wqy#Wqz#Wq{#Wq|#Wq}#Wq!O#Wq!P#Wq!Q#Wq!R#Wq!S#Wq!T#Wq!U#Wq!V#Wq!W#Wq!X#Wq!Y#Wq!Z#Wq![#Wq!]#Wq!^#Wq!_#Wq!`#Wq!a#Wq$Q#Wq~P&8WOS#laT#laU#laW#laX#laY#laZ#la_#lad#lae#laf#lag#lah#lak#lam#lan#lao#lap#laq#lar#las#lat#lau#lav#law#lax#lay#laz#la{#la|#la}#la!O#la!P#la!Q#la!R#la!S#la!T#la!U#la!V#la!W#la!X#la!Y#la!Z#la![#la!]#la!^#la!_#la!`#la!a#la!b#la!c#la!d#la!e#la!f#la!g#la!h#la!i#la!j#la!k#la!l#la!m#la!n#la!o#la!p#la!q#la!r#la!s#la!t#la!u#la!v#la!w#la!x#la!y#la#P#la#Z#la#_#la#`#la$Q#la~P!5bOS#|XT#|XU#|XW#|XX#|XY#|Xh#|Xk#|Xm#|Xq#|X!b#|X!c#|X!d#|X!e#|X!f#|X!g#|X!h#|X!i#|X!j#|X!k#|X!l#|X!m#|X!n#|X!o#|X!p#|X!q#|X!r#|X!s#|X!t#|X!u#|X!v#|X!w#|X!x#|X!y#|X!}#|X#Z#|X~P!A[O!}&zOP#XXQ#XXR#XXl#XX~O!}$fO~P$JfO_$aOq$aO!}%qO~OX,|OY,xO[&{Ok$]Om/zO!c.kO!d-QO!e/uO!f2dO!g3wO!h4wO!i'oO!j.nO!k1gO!l3TO!m4]O!n5QO!o5bO!p3TO!r.kO!s-QO!t/uO!u2dO!v3wO!w4wO!x,pO!y,tO#Z$^O~P!-UO!}&|O~OP#jqQ#jqR#jql#jq!}#jq#[#jq~P@nOdWOeWOfWOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O!}#Wq~P&8WOX#jyY#jy_#jyg#jyh#jyk#jyl#jym#jyq#jy!b#jy!c#jy!d#jy!e#jy!f#jy!g#jy!h#jy!i#jy!j#jy!k#jy!l#jy!m#jy!n#jy!o#jy!p#jy!q#jy!r#jy!s#jy!t#jy!u#jy!v#jy!w#jy!x#jy!y#jy#P#jy#Z#jy#_#jy#`#jyS#jyT#jyU#jyW#jy!}#jy~OP!yOQ!zOR!yOd#jye#jyf#jyn#jyo#jyp#jyr#jys#jyt#jyu#jyv#jyw#jyx#jyy#jyz#jy{#jy|#jy}#jy!O#jy!P#jy!Q#jy!R#jy!S#jy!T#jy!U#jy!V#jy!W#jy!X#jy!Y#jy!Z#jy![#jy!]#jy!^#jy!_#jy!`#jy!a#jy$Q#jyZ#jyj#jy#[#jy[#jy~P&KPOS#WyT#WyU#WyW#WyX#WyY#Wy_#Wyg#Wyh#Wyk#Wym#Wyq#Wy!b#Wy!c#Wy!d#Wy!e#Wy!f#Wy!g#Wy!h#Wy!i#Wy!j#Wy!k#Wy!l#Wy!m#Wy!n#Wy!o#Wy!p#Wy!q#Wy!r#Wy!s#Wy!t#Wy!u#Wy!v#Wy!w#Wy!x#Wy!y#Wy#P#Wy#Z#Wy#_#Wy#`#Wy~OP!yOQ!zOR!yOl!{OZ#Wyd#Wye#Wyf#Wyn#Wyo#Wyp#Wyr#Wys#Wyt#Wyu#Wyv#Wyw#Wyx#Wyy#Wyz#Wy{#Wy|#Wy}#Wy!O#Wy!P#Wy!Q#Wy!R#Wy!S#Wy!T#Wy!U#Wy!V#Wy!W#Wy!X#Wy!Y#Wy!Z#Wy![#Wy!]#Wy!^#Wy!_#Wy!`#Wy!a#Wy$Q#Wy~P'!sOP#miQ#miR#miS#liT#liU#liW#liX#liY#liZ#li_#mid#mie#mif#mig#mih#lij#mik#mil#mim#lin#mio#mip#miq#mir#mis#mit#miu#miv#miw#mix#miy#miz#mi{#mi|#mi}#mi!O#mi!P#mi!Q#mi!R#mi!S#mi!T#mi!U#mi!V#mi!W#mi!X#mi!Y#mi!Z#mi![#mi!]#mi!^#mi!_#mi!`#mi!a#mi!b#mi!c#mi!d#mi!e#mi!f#mi!g#mi!h#mi!i#mi!j#mi!k#mi!l#mi!m#mi!n#mi!o#mi!p#mi!q#mi!r#mi!s#mi!t#mi!u#mi!v#mi!w#mi!x#mi!y#mi#P#mi#Z#mi#_#mi#`#mi$Q#li!}#li#[#li[#li~OP#jyQ#jyR#jyl#jy!}#jy#[#jy~P@nOdWOeWOfWOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O!}#Wy~P'!sOX#j!RY#j!R_#j!Rg#j!Rh#j!Rk#j!Rl#j!Rm#j!Rq#j!R!b#j!R!c#j!R!d#j!R!e#j!R!f#j!R!g#j!R!h#j!R!i#j!R!j#j!R!k#j!R!l#j!R!m#j!R!n#j!R!o#j!R!p#j!R!q#j!R!r#j!R!s#j!R!t#j!R!u#j!R!v#j!R!w#j!R!x#j!R!y#j!R#P#j!R#Z#j!R#_#j!R#`#j!RS#j!RT#j!RU#j!RW#j!R!}#j!R~OP!yOQ!zOR!yOd#j!Re#j!Rf#j!Rn#j!Ro#j!Rp#j!Rr#j!Rs#j!Rt#j!Ru#j!Rv#j!Rw#j!Rx#j!Ry#j!Rz#j!R{#j!R|#j!R}#j!R!O#j!R!P#j!R!Q#j!R!R#j!R!S#j!R!T#j!R!U#j!R!V#j!R!W#j!R!X#j!R!Y#j!R!Z#j!R![#j!R!]#j!R!^#j!R!_#j!R!`#j!R!a#j!R$Q#j!RZ#j!Rj#j!R#[#j!R[#j!R~P'0xOS#W!RT#W!RU#W!RW#W!RX#W!RY#W!R_#W!Rg#W!Rh#W!Rk#W!Rm#W!Rq#W!R!b#W!R!c#W!R!d#W!R!e#W!R!f#W!R!g#W!R!h#W!R!i#W!R!j#W!R!k#W!R!l#W!R!m#W!R!n#W!R!o#W!R!p#W!R!q#W!R!r#W!R!s#W!R!t#W!R!u#W!R!v#W!R!w#W!R!x#W!R!y#W!R#P#W!R#Z#W!R#_#W!R#`#W!R~OP!yOQ!zOR!yOl!{OZ#W!Rd#W!Re#W!Rf#W!Rn#W!Ro#W!Rp#W!Rr#W!Rs#W!Rt#W!Ru#W!Rv#W!Rw#W!Rx#W!Ry#W!Rz#W!R{#W!R|#W!R}#W!R!O#W!R!P#W!R!Q#W!R!R#W!R!S#W!R!T#W!R!U#W!R!V#W!R!W#W!R!X#W!R!Y#W!R!Z#W!R![#W!R!]#W!R!^#W!R!_#W!R!`#W!R!a#W!R$Q#W!R~P'6lOP#j!RQ#j!RR#j!Rl#j!R!}#j!R#[#j!R~P@nOdWOeWOfWOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O!}#W!R~P'6lOX#j!ZY#j!Z_#j!Zg#j!Zh#j!Zk#j!Zl#j!Zm#j!Zq#j!Z!b#j!Z!c#j!Z!d#j!Z!e#j!Z!f#j!Z!g#j!Z!h#j!Z!i#j!Z!j#j!Z!k#j!Z!l#j!Z!m#j!Z!n#j!Z!o#j!Z!p#j!Z!q#j!Z!r#j!Z!s#j!Z!t#j!Z!u#j!Z!v#j!Z!w#j!Z!x#j!Z!y#j!Z#P#j!Z#Z#j!Z#_#j!Z#`#j!ZS#j!ZT#j!ZU#j!ZW#j!Z!}#j!Z~OP!yOQ!zOR!yOd#j!Ze#j!Zf#j!Zn#j!Zo#j!Zp#j!Zr#j!Zs#j!Zt#j!Zu#j!Zv#j!Zw#j!Zx#j!Zy#j!Zz#j!Z{#j!Z|#j!Z}#j!Z!O#j!Z!P#j!Z!Q#j!Z!R#j!Z!S#j!Z!T#j!Z!U#j!Z!V#j!Z!W#j!Z!X#j!Z!Y#j!Z!Z#j!Z![#j!Z!]#j!Z!^#j!Z!_#j!Z!`#j!Z!a#j!Z$Q#j!ZZ#j!Zj#j!Z#[#j!Z[#j!Z~P'?ROS#W!ZT#W!ZU#W!ZW#W!ZX#W!ZY#W!Z_#W!Zg#W!Zh#W!Zk#W!Zm#W!Zq#W!Z!b#W!Z!c#W!Z!d#W!Z!e#W!Z!f#W!Z!g#W!Z!h#W!Z!i#W!Z!j#W!Z!k#W!Z!l#W!Z!m#W!Z!n#W!Z!o#W!Z!p#W!Z!q#W!Z!r#W!Z!s#W!Z!t#W!Z!u#W!Z!v#W!Z!w#W!Z!x#W!Z!y#W!Z#P#W!Z#Z#W!Z#_#W!Z#`#W!Z~OP!yOQ!zOR!yOl!{OZ#W!Zd#W!Ze#W!Zf#W!Zn#W!Zo#W!Zp#W!Zr#W!Zs#W!Zt#W!Zu#W!Zv#W!Zw#W!Zx#W!Zy#W!Zz#W!Z{#W!Z|#W!Z}#W!Z!O#W!Z!P#W!Z!Q#W!Z!R#W!Z!S#W!Z!T#W!Z!U#W!Z!V#W!Z!W#W!Z!X#W!Z!Y#W!Z!Z#W!Z![#W!Z!]#W!Z!^#W!Z!_#W!Z!`#W!Z!a#W!Z$Q#W!Z~P'DuOP#j!ZQ#j!ZR#j!Zl#j!Z!}#j!Z#[#j!Z~P@nOdWOeWOfWOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O!}#W!Z~P'DuOP#jXQ#jXR#jXS#WXT#WXU#WXW#WXX#WXY#WX_#jXd#jXe#jXf#jXg#jXh#WXk#WXk#jXl#jXm#WXn#jXo#jXp#jXq#WXq#jXr#jXs#jXt#jXu#jXv#jXw#jXx#jXy#jXz#jX{#jX|#jX}#jX!O#jX!P#jX!Q#jX!R#jX!S#jX!T#jX!U#jX!V#jX!W#jX!X#jX!Y#jX!Z#jX![#jX!]#jX!^#jX!_#jX!`#jX!a#jX!b#WX!c#WX!d#WX!e#WX!f#WX!g#WX!h#WX!i#WX!j#WX!k#WX!l#WX!m#WX!n#WX!o#WX!p#WX!q#WX!r#WX!s#WX!t#WX!u#WX!v#WX!w#WX!x#WX!y#WX!}#WX!}#jX#P#jX#Z#WX#Z#jX#_#jX#`#jX~P!@rO_WOdWOeWOfWOgUOkWOn,mOo,nOp,hOq!|Or[Os'bOt,bOu/nOv2]Ow3pOx4pOy!nOz'cO{,gO|/sO}2bO!O3uO!P4uO!Q,gO!R'cO!S[O!T'bO!U,bO!V/nO!W2]O!X3pO!Y4pO!Z'bO![[O!]'bO!^,bO!_[O!`'bO!a[O#PVO#Z!tO#_UO#`UO~O_WOdWOeWOfWOgUOkWOn1_Oo1cOp,kOq!|Or[Os.eOt,eOu/qOv2`Ow3sOx4sOy'mOz.iO{1YO|3RO}4ZO!O5OO!P5`O!Q1YO!R.iO!S[O!T.eO!U,eO!V/qO!W2`O!X3sO!Y4sO!Z.eO![[O!].eO!^,eO!_[O!`.eO!a[O#PVO#Z0OO#_UO#`UO~OP#dXQ#dXR#dX_#{Xl#dXq#{X!}#dX!}#{X#h#{X~P!0eOP#jXQ#jXR#jXS#WXT#WXU#WXW#WXX#WXY#WX_#WX_#{Xg#WXh#WXk#WXl#jXm#WXq#WXq#{X!b#WX!c#WX!d#WX!e#WX!f#WX!g#WX!h#WX!i#WX!j#WX!k#WX!l#WX!m#WX!n#WX!o#WX!p#WX!q#WX!r#WX!s#WX!t#WX!u#WX!v#WX!w#WX!x#WX!y#WX!}#WX!}#jX!}#{X#P#WX#Z#WX#_#WX#`#WX#h#{X~P!@rOP#jXQ#jXR#jXS#WXT#WXU#WXW#WXX#WXY#WX_#WX_#jX_#{Xd#jXe#jXf#jXg#WXg#jXh#WXk#WXk#jXl#jXm#WXn#jXo#jXp#jXq#WXq#jXq#{Xr#jXs#jXt#jXu#jXv#jXw#jXx#jXy#jXz#jX{#jX|#jX}#jX!O#jX!P#jX!Q#jX!R#jX!S#jX!T#jX!U#jX!V#jX!W#jX!X#jX!Y#jX!Z#jX![#jX!]#jX!^#jX!_#jX!`#jX!a#jX!b#WX!c#WX!d#WX!e#WX!f#WX!g#WX!h#WX!i#WX!j#WX!k#WX!l#WX!m#WX!n#WX!o#WX!p#WX!q#WX!r#WX!s#WX!t#WX!u#WX!v#WX!w#WX!x#WX!y#WX!}#WX!}#jX#P#WX#P#jX#Z#WX#Z#jX#_#WX#_#jX#`#WX#`#jX#h#{X~P!@rOP#jXQ#jXR#jXS#WXT#WXU#WXW#WXX#WXY#WX_#jX_#{Xd#jXe#jXf#jXg#jXh#WXk#WXk#jXl#jXm#WXn#jXo#jXp#jXq#WXq#jXq#{Xr#jXs#jXt#jXu#jXv#jXw#jXx#jXy#jXz#jX{#jX|#jX}#jX!O#jX!P#jX!Q#jX!R#jX!S#jX!T#jX!U#jX!V#jX!W#jX!X#jX!Y#jX!Z#jX![#jX!]#jX!^#jX!_#jX!`#jX!a#jX!b#WX!c#WX!d#WX!e#WX!f#WX!g#WX!h#WX!i#WX!j#WX!k#WX!l#WX!m#WX!n#WX!o#WX!p#WX!q#WX!r#WX!s#WX!t#WX!u#WX!v#WX!w#WX!x#WX!y#WX!}#WX!}#jX#P#jX#Z#WX#Z#jX#_#jX#`#jX#h#{X~P!@rOP#jXQ#jXR#jX_#jXl#jXr#jXs#jXt#jXu#jXv#jXw#jXx#jXy#jXz#jX{#jX|#jX}#jX!O#jX!P#jX!Q#jX!R#jX!S#jX!T#jX!U#jX!V#jX!W#jX!X#jX!Y#jX!Z#jX![#jX!]#jX!^#jX!_#jX!`#jX!a#jX#P#jX~OdWOeWOfWOgUOkWOnjOokOpiOq!|O#Z0OO#_UO#`UO~P(:qO_WOdWOeWOfWOgUOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O#PVO#_UO#`UOP#jXQ#jXR#jXS#jXT#jXU#jXW#jXX#jXY#jXh#jXl#jXm#jXq#jX!b#jX!c#jX!d#jX!e#jX!f#jX!g#jX!h#jX!i#jX!j#jX!k#jX!l#jX!m#jX!n#jX!o#jX!p#jX!q#jX!r#jX!s#jX!t#jX!u#jX!v#jX!w#jX!x#jX!y#jX~Ok#jX!}#jX#Z#jX[#jX~P(=}OkWO#Z0OOZ#jX$Q#jX~P(=}OdWOeWOfWOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O~OP#jXQ#jXR#jXS#jXT#jXU#jXW#jXX#jXY#jX_#jXg#jXh#jXk#jXl#jXm#jXq#jX!b#jX!c#jX!d#jX!e#jX!f#jX!g#jX!h#jX!i#jX!j#jX!k#jX!l#jX!m#jX!n#jX!o#jX!p#jX!q#jX!r#jX!s#jX!t#jX!u#jX!v#jX!w#jX!x#jX!y#jX!}#jX#P#jX#Z#jX#_#jX#`#jX~P(CuO#[#WX~P@nO_WOgUO#PVO#_UO#`UO[#WX~P!KfO_WOgUOkWO#PVO#Z0OO#_UO#`UOS#WXT#WXU#WXW#WXX#WXY#WXZ#WXh#WXm#WXq#WX!b#WX!c#WX!d#WX!e#WX!f#WX!g#WX!h#WX!i#WX!j#WX!k#WX!l#WX!m#WX!n#WX!o#WX!p#WX!q#WX!r#WX!s#WX!t#WX!u#WX!v#WX!w#WX!x#WX!y#WX$Q#WX~P(CuO_WOdWOeWOfWOgUOkWOn1]Oo1aOp,iOq!|Or[Os.cOt,cOu/oOv2^Ow3qOx4qOy'kOz.gO{1WO|3PO}4XO!O4|O!P5^O!Q1WO!R.gO!S[O!T.cO!U,cO!V/oO!W2^O!X3qO!Y4qO!Z.cO![[O!].cO!^,cO!_[O!`.cO!a[O#PVO#Z0OO#_UO#`UO~O_WOdWOeWOfWOgUOkWOn1^Oo1bOp,lOq!|Or[Os.dOt,fOu/rOv2aOw3tOx4tOy'lOz.hO{1XO|3QO}4YO!O4}O!P5_O!Q1XO!R.hO!S[O!T.dO!U,fO!V/rO!W2aO!X3tO!Y4tO!Z.dO![[O!].dO!^,fO!_[O!`.dO!a[O#PVO#Z0OO#_UO#`UO~OP#dXQ#dXR#dXd#jXe#jXf#jXg#jXk#jXl#dXn#jXo#jXp#jXq#jX!}#jX#Z#jX#_#jX#`#jX~P(:qOP'qOQ-WOR'qOl#ja!}#ja~OS#jaT#jaU#jaW#jaX#jaY#jah#jak#jal#jam#jaq#ja!b#ja!c#ja!d#ja!e#ja!f#ja!g#ja!h#ja!i#ja!j#ja!k#ja!l#ja!m#ja!n#ja!o#ja!p#ja!q#ja!r#ja!s#ja!t#ja!u#ja!v#ja!w#ja!x#ja!y#ja!}#ja#Z#ja[#ja~OP'rOQ-XOR'rO~P)&RO_#jal#jar#jas#jat#jau#jav#jaw#jax#jay#jaz#ja{#ja|#ja}#ja!O#ja!P#ja!Q#ja!R#ja!S#ja!T#ja!U#ja!V#ja!W#ja!X#ja!Y#ja!Z#ja![#ja!]#ja!^#ja!_#ja!`#ja!a#ja#P#ja~OP'tOQ-ZOR'tO~P)(xOP'sOQ-YOR'sO~P#*gOS#jaT#jaU#jaW#jaX#jaY#jaZ#jah#jal#jam#jaq#ja!b#ja!c#ja!d#ja!e#ja!f#ja!g#ja!h#ja!i#ja!j#ja!k#ja!l#ja!m#ja!n#ja!o#ja!p#ja!q#ja!r#ja!s#ja!t#ja!u#ja!v#ja!w#ja!x#ja!y#ja$Q#ja~OP'uOQ-[OR'uO~P)+mOP!yOQ!zOR!yOl!{O~P($yOP!yOQ!zOR!yOl!{O~P(LoOP!yOQ!zOR!yOl!{O~PEyOP!yOQ!zOR!yOl!{O~P('uOP!yOQ!zOR!yOl!{O~P) kOQ%vO~P#;eOP!yOQ!zOR!yOl!{OS$WaT$WaU$WaW$WaX$WaY$Wa_$Wag$Wah$Wak$Wam$Waq$Wa!b$Wa!c$Wa!d$Wa!e$Wa!f$Wa!g$Wa!h$Wa!i$Wa!j$Wa!k$Wa!l$Wa!m$Wa!n$Wa!o$Wa!p$Wa!q$Wa!r$Wa!s$Wa!t$Wa!u$Wa!v$Wa!w$Wa!x$Wa!y$Wa!}$Wa#P$Wa#Z$Wa#_$Wa#`$Wa~P('uOP!yOQ!zOR!yOl!{OS$WaT$WaU$WaW$WaX$WaY$Wah$Wak$Wam$Waq$Wa!b$Wa!c$Wa!d$Wa!e$Wa!f$Wa!g$Wa!h$Wa!i$Wa!j$Wa!k$Wa!l$Wa!m$Wa!n$Wa!o$Wa!p$Wa!q$Wa!r$Wa!s$Wa!t$Wa!u$Wa!v$Wa!w$Wa!x$Wa!y$Wa!}$Wa#Z$Wa[$Wa~P(LoOP!yOQ!zOR!yOl!{O#[$Wa~P#%}OP!yOQ!zOR!yOl!{OS$WaT$WaU$WaW$WaX$WaY$WaZ$Wah$Wam$Waq$Wa!b$Wa!c$Wa!d$Wa!e$Wa!f$Wa!g$Wa!h$Wa!i$Wa!j$Wa!k$Wa!l$Wa!m$Wa!n$Wa!o$Wa!p$Wa!q$Wa!r$Wa!s$Wa!t$Wa!u$Wa!v$Wa!w$Wa!x$Wa!y$Wa$Q$Wa~P) kOP!yOQ!zOR!yOl!{OS$XaT$XaU$XaW$XaX$XaY$Xa_$Xag$Xah$Xak$Xam$Xaq$Xa!b$Xa!c$Xa!d$Xa!e$Xa!f$Xa!g$Xa!h$Xa!i$Xa!j$Xa!k$Xa!l$Xa!m$Xa!n$Xa!o$Xa!p$Xa!q$Xa!r$Xa!s$Xa!t$Xa!u$Xa!v$Xa!w$Xa!x$Xa!y$Xa!}$Xa#P$Xa#Z$Xa#_$Xa#`$Xa~P('uOP!yOQ!zOR!yOl!{OS$XaT$XaU$XaW$XaX$XaY$Xah$Xak$Xam$Xaq$Xa!b$Xa!c$Xa!d$Xa!e$Xa!f$Xa!g$Xa!h$Xa!i$Xa!j$Xa!k$Xa!l$Xa!m$Xa!n$Xa!o$Xa!p$Xa!q$Xa!r$Xa!s$Xa!t$Xa!u$Xa!v$Xa!w$Xa!x$Xa!y$Xa!}$Xa#Z$Xa[$Xa~P(LoOP!yOQ!zOR!yOl!{O#[$Xa~P#%}OP!yOQ!zOR!yOl!{OS$XaT$XaU$XaW$XaX$XaY$XaZ$Xah$Xam$Xaq$Xa!b$Xa!c$Xa!d$Xa!e$Xa!f$Xa!g$Xa!h$Xa!i$Xa!j$Xa!k$Xa!l$Xa!m$Xa!n$Xa!o$Xa!p$Xa!q$Xa!r$Xa!s$Xa!t$Xa!u$Xa!v$Xa!w$Xa!x$Xa!y$Xa$Q$Xa~P) kO_WOdWOeWOfWOgUOkWOn1_Oo1cOp,kOq!|Or[Os.eOt,eOu/qOv2`Ow3sOx4sOy'mOz.iO{1YO|3RO}4ZO!O5OO!P5`O!Q1YO!R.iO!S[O!T.eO!U,eO!V/qO!W2`O!X3sO!Y4sO!Z.eO![[O!].eO!^,eO!_[O!`.eO!a[O#PVO#Z0PO#_UO#`UO~O_WOdWOeWOfWOgUOkWOn1]Oo1aOp,iOq!|Or[Os.cOt,cOu/oOv2^Ow3qOx4qOy'kOz.gO{1WO|3PO}4XO!O4|O!P5^O!Q1WO!R.gO!S[O!T.cO!U,cO!V/oO!W2^O!X3qO!Y4qO!Z.cO![[O!].cO!^,cO!_[O!`.cO!a[O#PVO#Z!tO#_UO#`UO~O_WOdWOeWOfWOgUOkWOn1^Oo1bOp,lOq!|Or[Os.dOt,fOu/rOv2aOw3tOx4tOy'lOz.hO{1XO|3QO}4YO!O4}O!P5_O!Q1XO!R.hO!S[O!T.dO!U,fO!V/rO!W2aO!X3tO!Y4tO!Z.dO![[O!].dO!^,fO!_[O!`.dO!a[O#PVO#Z!tO#_UO#`UO~OP'sOQ-YOR'sOl'yO!}#Wa~P#KqOS#WaT#WaU#WaW#WaX#WaY#Wah#Wak#Wam#Waq#Wa!b#Wa!c#Wa!d#Wa!e#Wa!f#Wa!g#Wa!h#Wa!i#Wa!j#Wa!k#Wa!l#Wa!m#Wa!n#Wa!o#Wa!p#Wa!q#Wa!r#Wa!s#Wa!t#Wa!u#Wa!v#Wa!w#Wa!x#Wa!y#Wa!}#Wa#Z#Wa[#Wa~OP'rOQ-XOR'rOl'wO~P)KOOP0tOQ1jOR0tOl0uO#[#Wa~OS#WaT#WaU#WaW#WaX#WaY#WaZ#Wah#Wam#Waq#Wa!b#Wa!c#Wa!d#Wa!e#Wa!f#Wa!g#Wa!h#Wa!i#Wa!j#Wa!k#Wa!l#Wa!m#Wa!n#Wa!o#Wa!p#Wa!q#Wa!r#Wa!s#Wa!t#Wa!u#Wa!v#Wa!w#Wa!x#Wa!y#Wa$Q#Wa~OP'uOQ-[OR'uOl'zO~P)NWOP!yOQ!zOR!yOl!{O~P#%}OdWOeWOfWOgUOkWOnjOokOpiOq!|O#Z0OO#_UO#`UOP#jaQ#jaR#ja~P)(xO_WOdWOeWOfWOgUOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O#PVO#_UO#`UOP#jaQ#jaR#ja~P)&RO_WOgUOkWO#PVO#Z0OO#_UO#`UOP#jaQ#jaR#jaS#jaT#jaU#jaW#jaX#jaY#jaZ#jah#jal#jam#jaq#ja!b#ja!c#ja!d#ja!e#ja!f#ja!g#ja!h#ja!i#ja!j#ja!k#ja!l#ja!m#ja!n#ja!o#ja!p#ja!q#ja!r#ja!s#ja!t#ja!u#ja!v#ja!w#ja!x#ja!y#ja$Q#ja~P(CuOdWOeWOfWOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[OP#jaQ#jaR#ja~P#*gO#[#Wa~P@nO_WOdWOeWOfWOgUOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O#PVO#_UO#`UO~P)KOO_WOgUOkWO#PVO#Z0OO#_UO#`UOS#WaT#WaU#WaW#WaX#WaY#WaZ#Wah#Wam#Waq#Wa!b#Wa!c#Wa!d#Wa!e#Wa!f#Wa!g#Wa!h#Wa!i#Wa!j#Wa!k#Wa!l#Wa!m#Wa!n#Wa!o#Wa!p#Wa!q#Wa!r#Wa!s#Wa!t#Wa!u#Wa!v#Wa!w#Wa!x#Wa!y#Wa$Q#Wa~P(CuOX#iiY#ii_#iid#iie#iif#iig#iih#iik#iim#iin#iio#iip#iiq#iir#iis#iit#iiu#iiv#iiw#iix#iiy#iiz#ii{#ii|#ii}#ii!O#ii!P#ii!Q#ii!R#ii!S#ii!T#ii!U#ii!V#ii!W#ii!X#ii!Y#ii!Z#ii![#ii!]#ii!^#ii!_#ii!`#ii!a#ii!b#ii!c#ii!d#ii!e#ii!f#ii!g#ii!h#ii!i#ii!j#ii!k#ii!l#ii!m#ii!n#ii!o#ii!p#ii!q#ii!r#ii!s#ii!t#ii!u#ii!v#ii!w#ii!x#ii!y#ii#P#ii#Z#ii#_#ii#`#ii$Q#iiS#iiT#iiU#iiW#iiZ#iij#iij#ji#[#ii[#ii~P$8vOP#jiQ#jiR#jiS#jiT#jiU#jiW#jiX#jiY#ji_#jig#jih#jik#jil#jim#jiq#ji!b#ji!c#ji!d#ji!e#ji!f#ji!g#ji!h#ji!i#ji!j#ji!k#ji!l#ji!m#ji!n#ji!o#ji!p#ji!q#ji!r#ji!s#ji!t#ji!u#ji!v#ji!w#ji!x#ji!y#ji!}#ji#P#ji#Z#ji#_#ji#`#ji~OP#iiQ#iiR#iil#ii~P*8TOP'qOQ-WOR'qOl#ji!}#ji~OS#jiT#jiU#jiW#jiX#jiY#jih#jik#jil#jim#jiq#ji!b#ji!c#ji!d#ji!e#ji!f#ji!g#ji!h#ji!i#ji!j#ji!k#ji!l#ji!m#ji!n#ji!o#ji!p#ji!q#ji!r#ji!s#ji!t#ji!u#ji!v#ji!w#ji!x#ji!y#ji!}#ji#Z#ji[#ji~OP'rOQ-XOR'rO~P*;uO_#jil#jir#jis#jit#jiu#jiv#jiw#jix#jiy#jiz#ji{#ji|#ji}#ji!O#ji!P#ji!Q#ji!R#ji!S#ji!T#ji!U#ji!V#ji!W#ji!X#ji!Y#ji!Z#ji![#ji!]#ji!^#ji!_#ji!`#ji!a#ji#P#ji~OP'tOQ-ZOR'tO~P*>lOP'sOQ-YOR'sO~P*8^OS#jiT#jiU#jiW#jiX#jiY#jiZ#jih#jil#jim#jiq#ji!b#ji!c#ji!d#ji!e#ji!f#ji!g#ji!h#ji!i#ji!j#ji!k#ji!l#ji!m#ji!n#ji!o#ji!p#ji!q#ji!r#ji!s#ji!t#ji!u#ji!v#ji!w#ji!x#ji!y#ji$Q#ji~OP'uOQ-[OR'uO~P*AaOP'sOQ-YOR'sOl'yO!}$Ui~P%!mOS$UiT$UiU$UiW$UiX$UiY$Uih$Uim$Uiq$Ui!b$Ui!c$Ui!d$Ui!e$Ui!f$Ui!g$Ui!h$Ui!i$Ui!j$Ui!k$Ui!l$Ui!m$Ui!n$Ui!o$Ui!p$Ui!q$Ui!r$Ui!s$Ui!t$Ui!u$Ui!v$Ui!w$Ui!x$Ui!y$Ui~OP'rOQ-XOR'rOl'wOk$Ui!}$Ui#Z$Ui[$Ui~P*DeOP0tOQ1jOR0tOl0uO#[$Ui~OP'uOQ-[OR'uOl'zOZ$Ui$Q$Ui~P*DeOP'sOQ-YOR'sOl'yO!}$Vi~P%(TOS$ViT$ViU$ViW$ViX$ViY$Vih$Vim$Viq$Vi!b$Vi!c$Vi!d$Vi!e$Vi!f$Vi!g$Vi!h$Vi!i$Vi!j$Vi!k$Vi!l$Vi!m$Vi!n$Vi!o$Vi!p$Vi!q$Vi!r$Vi!s$Vi!t$Vi!u$Vi!v$Vi!w$Vi!x$Vi!y$Vi~OP'rOQ-XOR'rOl'wOk$Vi!}$Vi#Z$Vi[$Vi~P*HhOP0tOQ1jOR0tOl0uO#[$Vi~OP'uOQ-[OR'uOl'zOZ$Vi$Q$Vi~P*HhOP'sOQ-YOR'sOl'yO!}#Wi~P%9mOS#WiT#WiU#WiW#WiX#WiY#Wih#Wik#Wim#Wiq#Wi!b#Wi!c#Wi!d#Wi!e#Wi!f#Wi!g#Wi!h#Wi!i#Wi!j#Wi!k#Wi!l#Wi!m#Wi!n#Wi!o#Wi!p#Wi!q#Wi!r#Wi!s#Wi!t#Wi!u#Wi!v#Wi!w#Wi!x#Wi!y#Wi!}#Wi#Z#Wi[#Wi~OP'rOQ-XOR'rOl'wO~P*LkOP0tOQ1jOR0tOl0uO#[#Wi~OS#WiT#WiU#WiW#WiX#WiY#WiZ#Wih#Wim#Wiq#Wi!b#Wi!c#Wi!d#Wi!e#Wi!f#Wi!g#Wi!h#Wi!i#Wi!j#Wi!k#Wi!l#Wi!m#Wi!n#Wi!o#Wi!p#Wi!q#Wi!r#Wi!s#Wi!t#Wi!u#Wi!v#Wi!w#Wi!x#Wi!y#Wi$Q#Wi~OP'uOQ-[OR'uOl'zO~P+ sO!}#rX~P%D_OP#dXQ#dXR#dXS#rXT#rXU#rXW#rXX#rXY#rX_#dXd#dXe#dXf#dXg#dXh#rXj#dXk#dXl#dXm#rXn#dXo#dXp#dXq#dXq#rXr#dXs#dXt#dXu#dXv#dXw#dXx#dXy#dXz#dX{#dX|#dX}#dX!O#dX!P#dX!Q#dX!R#dX!S#dX!T#dX!U#dX!V#dX!W#dX!X#dX!Y#dX!Z#dX![#dX!]#dX!^#dX!_#dX!`#dX!a#dX!b#dX!b#rX!c#dX!c#rX!d#dX!d#rX!e#dX!e#rX!f#dX!f#rX!g#dX!g#rX!h#dX!h#rX!i#dX!i#rX!j#dX!j#rX!k#dX!k#rX!l#dX!l#rX!m#dX!m#rX!n#dX!n#rX!o#dX!o#rX!p#dX!p#rX!q#dX!q#rX!r#dX!r#rX!s#dX!s#rX!t#dX!t#rX!u#dX!u#rX!v#dX!v#rX!w#dX!w#rX!x#dX!x#rX!y#dX!y#rX#P#dX#Z#dX#_#dX#`#dX~Ok#rX!}#rX#Z#rX[#rX~P+$kOP#dXQ#dXR#dX_#dXd#dXe#dXf#dXg#dXj#dXk#dXl#dXn#dXo#dXp#dXq#dXr#dXs#dXt#dXu#dXv#dXw#dXx#dXy#dXz#dX{#dX|#dX}#dX!O#dX!P#dX!Q#dX!R#dX!S#dX!T#dX!U#dX!V#dX!W#dX!X#dX!Y#dX!Z#dX![#dX!]#dX!^#dX!_#dX!`#dX!a#dX!b#dX!c#dX!d#dX!e#dX!f#dX!g#dX!h#dX!i#dX!j#dX!k#dX!l#dX!m#dX!n#dX!o#dX!p#dX!q#dX!r#dX!s#dX!t#dX!u#dX!v#dX!w#dX!x#dX!y#dX#P#dX#Z#dX#_#dX#`#dX~O#[#rX~P++yOZ#rX$Q#rX~P+$kO!}#rX~P%N^OP#YXQ#YXR#YXS#rXT#rXU#rXW#rXX#rXY#rX_#YXd#YXe#YXf#YXg#YXh#rXj#YXk#YXl#YXm#rXn#YXo#YXp#YXq#YXq#rXr#YXs#YXt#YXu#YXv#YXw#YXx#YXy#YXz#YX{#YX|#YX}#YX!O#YX!P#YX!Q#YX!R#YX!S#YX!T#YX!U#YX!V#YX!W#YX!X#YX!Y#YX!Z#YX![#YX!]#YX!^#YX!_#YX!`#YX!a#YX!b#YX!b#rX!c#YX!c#rX!d#YX!d#rX!e#YX!e#rX!f#YX!f#rX!g#YX!g#rX!h#YX!h#rX!i#YX!i#rX!j#YX!j#rX!k#YX!k#rX!l#YX!l#rX!m#YX!m#rX!n#YX!n#rX!o#YX!o#rX!p#YX!p#rX!q#YX!q#rX!r#YX!r#rX!s#YX!s#rX!t#YX!t#rX!u#YX!u#rX!v#YX!v#rX!w#YX!w#rX!x#YX!x#rX!y#YX!y#rX#P#YX#Z#YX#_#YX#`#YX~Ok#rX!}#rX#Z#rX[#rX~P+1YOP#YXQ#YXR#YX_#YXd#YXe#YXf#YXg#YXj#YXk#YXl#YXn#YXo#YXp#YXq#YXr#YXs#YXt#YXu#YXv#YXw#YXx#YXy#YXz#YX{#YX|#YX}#YX!O#YX!P#YX!Q#YX!R#YX!S#YX!T#YX!U#YX!V#YX!W#YX!X#YX!Y#YX!Z#YX![#YX!]#YX!^#YX!_#YX!`#YX!a#YX!b#YX!c#YX!d#YX!e#YX!f#YX!g#YX!h#YX!i#YX!j#YX!k#YX!l#YX!m#YX!n#YX!o#YX!p#YX!q#YX!r#YX!s#YX!t#YX!u#YX!v#YX!w#YX!x#YX!y#YX#P#YX#Z#YX#_#YX#`#YX~O#[#rX~P+8hOZ#rX$Q#rX~P+1YOdWOeWOfWOgUOkWOnjOokOpiOq!|O#Z0OO#_UO#`UOP#jiQ#jiR#ji~P*>lO_WOdWOeWOfWOgUOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O#PVO#_UO#`UOP#jiQ#jiR#ji~P*;uO_WOgUOkWO#PVO#Z0OO#_UO#`UOP#jiQ#jiR#jiS#jiT#jiU#jiW#jiX#jiY#jiZ#jih#jil#jim#jiq#ji!b#ji!c#ji!d#ji!e#ji!f#ji!g#ji!h#ji!i#ji!j#ji!k#ji!l#ji!m#ji!n#ji!o#ji!p#ji!q#ji!r#ji!s#ji!t#ji!u#ji!v#ji!w#ji!x#ji!y#ji$Q#ji~P(CuOdWOeWOfWOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O~P*8TOdWOeWOfWOgUOkWOnjOokOpiO#Z0OO#_UO#`UOP#kXQ#kXR#kXl#kX~Oq!|O_#kXr#kXs#kXt#kXu#kXv#kXw#kXx#kXy#kXz#kX{#kX|#kX}#kX!O#kX!P#kX!Q#kX!R#kX!S#kX!T#kX!U#kX!V#kX!W#kX!X#kX!Y#kX!Z#kX![#kX!]#kX!^#kX!_#kX!`#kX!a#kX#P#kX~P+GZO_WOgUO#PVO#_UO#`UOP#kXQ#kXR#kXS#kXT#kXU#kXW#kXX#kXY#kXh#kXk#kXl#kXm#kXq#kX!b#kX!c#kX!d#kX!e#kX!f#kX!g#kX!h#kX!i#kX!j#kX!k#kX!l#kX!m#kX!n#kX!o#kX!p#kX!q#kX!r#kX!s#kX!t#kX!u#kX!v#kX!w#kX!x#kX!y#kX!}#kX#Z#kX[#kX~P(CuO_WOgUOkWO#PVO#Z0OO#_UO#`UOP#kXQ#kXR#kXS#kXT#kXU#kXW#kXX#kXY#kXZ#kXh#kXl#kXm#kXq#kX!b#kX!c#kX!d#kX!e#kX!f#kX!g#kX!h#kX!i#kX!j#kX!k#kX!l#kX!m#kX!n#kX!o#kX!p#kX!q#kX!r#kX!s#kX!t#kX!u#kX!v#kX!w#kX!x#kX!y#kX$Q#kX~P(CuOP#kXQ#kXR#kXS#kXT#kXU#kXW#kXX#kXY#kX_#kXg#kXh#kXk#kXl#kXm#kXq#kX!b#kX!c#kX!d#kX!e#kX!f#kX!g#kX!h#kX!i#kX!j#kX!k#kX!l#kX!m#kX!n#kX!o#kX!p#kX!q#kX!r#kX!s#kX!t#kX!u#kX!v#kX!w#kX!x#kX!y#kX!}#kX#P#kX#Z#kX#_#kX#`#kX~P(CuO#[#Wi~P@nO_WOdWOeWOfWOgUOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O#PVO#_UO#`UO~P*LkO_WOgUOkWO#PVO#Z0OO#_UO#`UOS#WiT#WiU#WiW#WiX#WiY#WiZ#Wih#Wim#Wiq#Wi!b#Wi!c#Wi!d#Wi!e#Wi!f#Wi!g#Wi!h#Wi!i#Wi!j#Wi!k#Wi!l#Wi!m#Wi!n#Wi!o#Wi!p#Wi!q#Wi!r#Wi!s#Wi!t#Wi!u#Wi!v#Wi!w#Wi!x#Wi!y#Wi$Q#Wi~P(CuOP'qOQ-WOR'qOl#jq!}#jq~OS#jqT#jqU#jqW#jqX#jqY#jqh#jqk#jql#jqm#jqq#jq!b#jq!c#jq!d#jq!e#jq!f#jq!g#jq!h#jq!i#jq!j#jq!k#jq!l#jq!m#jq!n#jq!o#jq!p#jq!q#jq!r#jq!s#jq!t#jq!u#jq!v#jq!w#jq!x#jq!y#jq!}#jq#Z#jq[#jq~OP'rOQ-XOR'rO~P,+uO_#jql#jqr#jqs#jqt#jqu#jqv#jqw#jqx#jqy#jqz#jq{#jq|#jq}#jq!O#jq!P#jq!Q#jq!R#jq!S#jq!T#jq!U#jq!V#jq!W#jq!X#jq!Y#jq!Z#jq![#jq!]#jq!^#jq!_#jq!`#jq!a#jq#P#jq~OP'tOQ-ZOR'tO~P,.lOP'sOQ-YOR'sO~P&2dOS#jqT#jqU#jqW#jqX#jqY#jqZ#jqh#jql#jqm#jqq#jq!b#jq!c#jq!d#jq!e#jq!f#jq!g#jq!h#jq!i#jq!j#jq!k#jq!l#jq!m#jq!n#jq!o#jq!p#jq!q#jq!r#jq!s#jq!t#jq!u#jq!v#jq!w#jq!x#jq!y#jq$Q#jq~OP'uOQ-[OR'uO~P,1aOP'sOQ-YOR'sOl'yO!}#Wq~P&8WOS#WqT#WqU#WqW#WqX#WqY#Wqh#Wqk#Wqm#Wqq#Wq!b#Wq!c#Wq!d#Wq!e#Wq!f#Wq!g#Wq!h#Wq!i#Wq!j#Wq!k#Wq!l#Wq!m#Wq!n#Wq!o#Wq!p#Wq!q#Wq!r#Wq!s#Wq!t#Wq!u#Wq!v#Wq!w#Wq!x#Wq!y#Wq!}#Wq#Z#Wq[#Wq~OP'rOQ-XOR'rOl'wO~P,4eOP0tOQ1jOR0tOl0uO#[#Wq~OS#WqT#WqU#WqW#WqX#WqY#WqZ#Wqh#Wqm#Wqq#Wq!b#Wq!c#Wq!d#Wq!e#Wq!f#Wq!g#Wq!h#Wq!i#Wq!j#Wq!k#Wq!l#Wq!m#Wq!n#Wq!o#Wq!p#Wq!q#Wq!r#Wq!s#Wq!t#Wq!u#Wq!v#Wq!w#Wq!x#Wq!y#Wq$Q#Wq~OP'uOQ-[OR'uOl'zO~P,7mOS#laT#laU#laW#laX#laY#la_#lag#lah#lak#lam#laq#la!b#la!c#la!d#la!e#la!f#la!g#la!h#la!i#la!j#la!k#la!l#la!m#la!n#la!o#la!p#la!q#la!r#la!s#la!t#la!u#la!v#la!w#la!x#la!y#la!}#la#P#la#Z#la#_#la#`#la~P!5bOS#laT#laU#laW#laX#laY#lah#lak#lam#laq#la!b#la!c#la!d#la!e#la!f#la!g#la!h#la!i#la!j#la!k#la!l#la!m#la!n#la!o#la!p#la!q#la!r#la!s#la!t#la!u#la!v#la!w#la!x#la!y#la!}#la#Z#la[#la~P!5bO#[#la~P!5bOS#laT#laU#laW#laX#laY#laZ#lah#lam#laq#la!b#la!c#la!d#la!e#la!f#la!g#la!h#la!i#la!j#la!k#la!l#la!m#la!n#la!o#la!p#la!q#la!r#la!s#la!t#la!u#la!v#la!w#la!x#la!y#la$Q#la~P!5bOdWOeWOfWOgUOkWOnjOokOpiOq!|O#Z0OO#_UO#`UOP#jqQ#jqR#jq~P,.lO_WOdWOeWOfWOgUOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O#PVO#_UO#`UOP#jqQ#jqR#jq~P,+uO_WOgUOkWO#PVO#Z0OO#_UO#`UOP#jqQ#jqR#jqS#jqT#jqU#jqW#jqX#jqY#jqZ#jqh#jql#jqm#jqq#jq!b#jq!c#jq!d#jq!e#jq!f#jq!g#jq!h#jq!i#jq!j#jq!k#jq!l#jq!m#jq!n#jq!o#jq!p#jq!q#jq!r#jq!s#jq!t#jq!u#jq!v#jq!w#jq!x#jq!y#jq$Q#jq~P(CuOdWOeWOfWOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[OP#jqQ#jqR#jq~P&2dO#[#Wq~P@nO_WOdWOeWOfWOgUOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O#PVO#_UO#`UO~P,4eO_WOgUOkWO#PVO#Z0OO#_UO#`UOS#WqT#WqU#WqW#WqX#WqY#WqZ#Wqh#Wqm#Wqq#Wq!b#Wq!c#Wq!d#Wq!e#Wq!f#Wq!g#Wq!h#Wq!i#Wq!j#Wq!k#Wq!l#Wq!m#Wq!n#Wq!o#Wq!p#Wq!q#Wq!r#Wq!s#Wq!t#Wq!u#Wq!v#Wq!w#Wq!x#Wq!y#Wq$Q#Wq~P(CuOP'qOQ-WOR'qOl#jy!}#jy~OS#jyT#jyU#jyW#jyX#jyY#jyh#jyk#jyl#jym#jyq#jy!b#jy!c#jy!d#jy!e#jy!f#jy!g#jy!h#jy!i#jy!j#jy!k#jy!l#jy!m#jy!n#jy!o#jy!p#jy!q#jy!r#jy!s#jy!t#jy!u#jy!v#jy!w#jy!x#jy!y#jy!}#jy#Z#jy[#jy~OP'rOQ-XOR'rO~P-#{O_#jyl#jyr#jys#jyt#jyu#jyv#jyw#jyx#jyy#jyz#jy{#jy|#jy}#jy!O#jy!P#jy!Q#jy!R#jy!S#jy!T#jy!U#jy!V#jy!W#jy!X#jy!Y#jy!Z#jy![#jy!]#jy!^#jy!_#jy!`#jy!a#jy#P#jy~OP'tOQ-ZOR'tO~P-&rOP'sOQ-YOR'sO~P&KPOS#jyT#jyU#jyW#jyX#jyY#jyZ#jyh#jyl#jym#jyq#jy!b#jy!c#jy!d#jy!e#jy!f#jy!g#jy!h#jy!i#jy!j#jy!k#jy!l#jy!m#jy!n#jy!o#jy!p#jy!q#jy!r#jy!s#jy!t#jy!u#jy!v#jy!w#jy!x#jy!y#jy$Q#jy~OP'uOQ-[OR'uO~P-)gOP'sOQ-YOR'sOl'yO!}#Wy~P'!sOS#WyT#WyU#WyW#WyX#WyY#Wyh#Wyk#Wym#Wyq#Wy!b#Wy!c#Wy!d#Wy!e#Wy!f#Wy!g#Wy!h#Wy!i#Wy!j#Wy!k#Wy!l#Wy!m#Wy!n#Wy!o#Wy!p#Wy!q#Wy!r#Wy!s#Wy!t#Wy!u#Wy!v#Wy!w#Wy!x#Wy!y#Wy!}#Wy#Z#Wy[#Wy~OP'rOQ-XOR'rOl'wO~P-,kOP0tOQ1jOR0tOl0uO#[#Wy~OS#WyT#WyU#WyW#WyX#WyY#WyZ#Wyh#Wym#Wyq#Wy!b#Wy!c#Wy!d#Wy!e#Wy!f#Wy!g#Wy!h#Wy!i#Wy!j#Wy!k#Wy!l#Wy!m#Wy!n#Wy!o#Wy!p#Wy!q#Wy!r#Wy!s#Wy!t#Wy!u#Wy!v#Wy!w#Wy!x#Wy!y#Wy$Q#Wy~OP'uOQ-[OR'uOl'zO~P-/sOdWOeWOfWOgUOkWOnjOokOpiOq!|O#Z0OO#_UO#`UOP#jyQ#jyR#jy~P-&rO_WOdWOeWOfWOgUOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O#PVO#_UO#`UOP#jyQ#jyR#jy~P-#{O_WOgUOkWO#PVO#Z0OO#_UO#`UOP#jyQ#jyR#jyS#jyT#jyU#jyW#jyX#jyY#jyZ#jyh#jyl#jym#jyq#jy!b#jy!c#jy!d#jy!e#jy!f#jy!g#jy!h#jy!i#jy!j#jy!k#jy!l#jy!m#jy!n#jy!o#jy!p#jy!q#jy!r#jy!s#jy!t#jy!u#jy!v#jy!w#jy!x#jy!y#jy$Q#jy~P(CuOdWOeWOfWOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[OP#jyQ#jyR#jy~P&KPO#[#Wy~P@nO_WOdWOeWOfWOgUOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O#PVO#_UO#`UO~P-,kO_WOgUOkWO#PVO#Z0OO#_UO#`UOS#WyT#WyU#WyW#WyX#WyY#WyZ#Wyh#Wym#Wyq#Wy!b#Wy!c#Wy!d#Wy!e#Wy!f#Wy!g#Wy!h#Wy!i#Wy!j#Wy!k#Wy!l#Wy!m#Wy!n#Wy!o#Wy!p#Wy!q#Wy!r#Wy!s#Wy!t#Wy!u#Wy!v#Wy!w#Wy!x#Wy!y#Wy$Q#Wy~P(CuOP'qOQ-WOR'qOl#j!R!}#j!R~OS#j!RT#j!RU#j!RW#j!RX#j!RY#j!Rh#j!Rk#j!Rl#j!Rm#j!Rq#j!R!b#j!R!c#j!R!d#j!R!e#j!R!f#j!R!g#j!R!h#j!R!i#j!R!j#j!R!k#j!R!l#j!R!m#j!R!n#j!R!o#j!R!p#j!R!q#j!R!r#j!R!s#j!R!t#j!R!u#j!R!v#j!R!w#j!R!x#j!R!y#j!R!}#j!R#Z#j!R[#j!R~OP'rOQ-XOR'rO~P-B]O_#j!Rl#j!Rr#j!Rs#j!Rt#j!Ru#j!Rv#j!Rw#j!Rx#j!Ry#j!Rz#j!R{#j!R|#j!R}#j!R!O#j!R!P#j!R!Q#j!R!R#j!R!S#j!R!T#j!R!U#j!R!V#j!R!W#j!R!X#j!R!Y#j!R!Z#j!R![#j!R!]#j!R!^#j!R!_#j!R!`#j!R!a#j!R#P#j!R~OP'tOQ-ZOR'tO~P-ESOP'sOQ-YOR'sO~P'0xOS#j!RT#j!RU#j!RW#j!RX#j!RY#j!RZ#j!Rh#j!Rl#j!Rm#j!Rq#j!R!b#j!R!c#j!R!d#j!R!e#j!R!f#j!R!g#j!R!h#j!R!i#j!R!j#j!R!k#j!R!l#j!R!m#j!R!n#j!R!o#j!R!p#j!R!q#j!R!r#j!R!s#j!R!t#j!R!u#j!R!v#j!R!w#j!R!x#j!R!y#j!R$Q#j!R~OP'uOQ-[OR'uO~P-GwOP'sOQ-YOR'sOl'yO!}#W!R~P'6lOS#W!RT#W!RU#W!RW#W!RX#W!RY#W!Rh#W!Rk#W!Rm#W!Rq#W!R!b#W!R!c#W!R!d#W!R!e#W!R!f#W!R!g#W!R!h#W!R!i#W!R!j#W!R!k#W!R!l#W!R!m#W!R!n#W!R!o#W!R!p#W!R!q#W!R!r#W!R!s#W!R!t#W!R!u#W!R!v#W!R!w#W!R!x#W!R!y#W!R!}#W!R#Z#W!R[#W!R~OP'rOQ-XOR'rOl'wO~P-J{OP0tOQ1jOR0tOl0uO#[#W!R~OS#W!RT#W!RU#W!RW#W!RX#W!RY#W!RZ#W!Rh#W!Rm#W!Rq#W!R!b#W!R!c#W!R!d#W!R!e#W!R!f#W!R!g#W!R!h#W!R!i#W!R!j#W!R!k#W!R!l#W!R!m#W!R!n#W!R!o#W!R!p#W!R!q#W!R!r#W!R!s#W!R!t#W!R!u#W!R!v#W!R!w#W!R!x#W!R!y#W!R$Q#W!R~OP'uOQ-[OR'uOl'zO~P-NTOdWOeWOfWOgUOkWOnjOokOpiOq!|O#Z0OO#_UO#`UOP#j!RQ#j!RR#j!R~P-ESO_WOdWOeWOfWOgUOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O#PVO#_UO#`UOP#j!RQ#j!RR#j!R~P-B]O_WOgUOkWO#PVO#Z0OO#_UO#`UOP#j!RQ#j!RR#j!RS#j!RT#j!RU#j!RW#j!RX#j!RY#j!RZ#j!Rh#j!Rl#j!Rm#j!Rq#j!R!b#j!R!c#j!R!d#j!R!e#j!R!f#j!R!g#j!R!h#j!R!i#j!R!j#j!R!k#j!R!l#j!R!m#j!R!n#j!R!o#j!R!p#j!R!q#j!R!r#j!R!s#j!R!t#j!R!u#j!R!v#j!R!w#j!R!x#j!R!y#j!R$Q#j!R~P(CuOdWOeWOfWOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[OP#j!RQ#j!RR#j!R~P'0xO#[#W!R~P@nO_WOdWOeWOfWOgUOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O#PVO#_UO#`UO~P-J{O_WOgUOkWO#PVO#Z0OO#_UO#`UOS#W!RT#W!RU#W!RW#W!RX#W!RY#W!RZ#W!Rh#W!Rm#W!Rq#W!R!b#W!R!c#W!R!d#W!R!e#W!R!f#W!R!g#W!R!h#W!R!i#W!R!j#W!R!k#W!R!l#W!R!m#W!R!n#W!R!o#W!R!p#W!R!q#W!R!r#W!R!s#W!R!t#W!R!u#W!R!v#W!R!w#W!R!x#W!R!y#W!R$Q#W!R~P(CuOP'qOQ-WOR'qOl#j!Z!}#j!Z~OS#j!ZT#j!ZU#j!ZW#j!ZX#j!ZY#j!Zh#j!Zk#j!Zl#j!Zm#j!Zq#j!Z!b#j!Z!c#j!Z!d#j!Z!e#j!Z!f#j!Z!g#j!Z!h#j!Z!i#j!Z!j#j!Z!k#j!Z!l#j!Z!m#j!Z!n#j!Z!o#j!Z!p#j!Z!q#j!Z!r#j!Z!s#j!Z!t#j!Z!u#j!Z!v#j!Z!w#j!Z!x#j!Z!y#j!Z!}#j!Z#Z#j!Z[#j!Z~OP'rOQ-XOR'rO~P.2mO_#j!Zl#j!Zr#j!Zs#j!Zt#j!Zu#j!Zv#j!Zw#j!Zx#j!Zy#j!Zz#j!Z{#j!Z|#j!Z}#j!Z!O#j!Z!P#j!Z!Q#j!Z!R#j!Z!S#j!Z!T#j!Z!U#j!Z!V#j!Z!W#j!Z!X#j!Z!Y#j!Z!Z#j!Z![#j!Z!]#j!Z!^#j!Z!_#j!Z!`#j!Z!a#j!Z#P#j!Z~OP'tOQ-ZOR'tO~P.5dOP'sOQ-YOR'sO~P'?ROS#j!ZT#j!ZU#j!ZW#j!ZX#j!ZY#j!ZZ#j!Zh#j!Zl#j!Zm#j!Zq#j!Z!b#j!Z!c#j!Z!d#j!Z!e#j!Z!f#j!Z!g#j!Z!h#j!Z!i#j!Z!j#j!Z!k#j!Z!l#j!Z!m#j!Z!n#j!Z!o#j!Z!p#j!Z!q#j!Z!r#j!Z!s#j!Z!t#j!Z!u#j!Z!v#j!Z!w#j!Z!x#j!Z!y#j!Z$Q#j!Z~OP'uOQ-[OR'uO~P.8XOP'sOQ-YOR'sOl'yO!}#W!Z~P'DuOS#W!ZT#W!ZU#W!ZW#W!ZX#W!ZY#W!Zh#W!Zk#W!Zm#W!Zq#W!Z!b#W!Z!c#W!Z!d#W!Z!e#W!Z!f#W!Z!g#W!Z!h#W!Z!i#W!Z!j#W!Z!k#W!Z!l#W!Z!m#W!Z!n#W!Z!o#W!Z!p#W!Z!q#W!Z!r#W!Z!s#W!Z!t#W!Z!u#W!Z!v#W!Z!w#W!Z!x#W!Z!y#W!Z!}#W!Z#Z#W!Z[#W!Z~OP'rOQ-XOR'rOl'wO~P.;]OP0tOQ1jOR0tOl0uO#[#W!Z~OS#W!ZT#W!ZU#W!ZW#W!ZX#W!ZY#W!ZZ#W!Zh#W!Zm#W!Zq#W!Z!b#W!Z!c#W!Z!d#W!Z!e#W!Z!f#W!Z!g#W!Z!h#W!Z!i#W!Z!j#W!Z!k#W!Z!l#W!Z!m#W!Z!n#W!Z!o#W!Z!p#W!Z!q#W!Z!r#W!Z!s#W!Z!t#W!Z!u#W!Z!v#W!Z!w#W!Z!x#W!Z!y#W!Z$Q#W!Z~OP'uOQ-[OR'uOl'zO~P.>eOdWOeWOfWOgUOkWOnjOokOpiOq!|O#Z0OO#_UO#`UOP#j!ZQ#j!ZR#j!Z~P.5dO_WOdWOeWOfWOgUOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O#PVO#_UO#`UOP#j!ZQ#j!ZR#j!Z~P.2mO_WOgUOkWO#PVO#Z0OO#_UO#`UOP#j!ZQ#j!ZR#j!ZS#j!ZT#j!ZU#j!ZW#j!ZX#j!ZY#j!ZZ#j!Zh#j!Zl#j!Zm#j!Zq#j!Z!b#j!Z!c#j!Z!d#j!Z!e#j!Z!f#j!Z!g#j!Z!h#j!Z!i#j!Z!j#j!Z!k#j!Z!l#j!Z!m#j!Z!n#j!Z!o#j!Z!p#j!Z!q#j!Z!r#j!Z!s#j!Z!t#j!Z!u#j!Z!v#j!Z!w#j!Z!x#j!Z!y#j!Z$Q#j!Z~P(CuOdWOeWOfWOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[OP#j!ZQ#j!ZR#j!Z~P'?RO#[#W!Z~P@nO_WOdWOeWOfWOgUOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O#PVO#_UO#`UO~P.;]O_WOgUOkWO#PVO#Z0OO#_UO#`UOS#W!ZT#W!ZU#W!ZW#W!ZX#W!ZY#W!ZZ#W!Zh#W!Zm#W!Zq#W!Z!b#W!Z!c#W!Z!d#W!Z!e#W!Z!f#W!Z!g#W!Z!h#W!Z!i#W!Z!j#W!Z!k#W!Z!l#W!Z!m#W!Z!n#W!Z!o#W!Z!p#W!Z!q#W!Z!r#W!Z!s#W!Z!t#W!Z!u#W!Z!v#W!Z!w#W!Z!x#W!Z!y#W!Z$Q#W!Z~P(CuOP'qOQ-WOR'qOl'vO~OP'rOQ-XOR'rOl'wO~OP'uOQ-[OR'uOl'zO~OP'sOQ-YOR'sOl'yO~O_(cOq(cO~O_(dOq(dO~O_(eOq(eO~O_(fOq(fO~O#[({OP#iXQ#iXR#iXl#iX~O#[(|OP#iXQ#iXR#iXl#iX~O_)pO#P-wO~P$#XO_)qO#P-xO~P$#XO_)rO#P-yO~P$#XO_)sO#P-zO~P$#XO!}*iO~P%?TO!}*jO~P%?TO!}*kO~P%?TO!}*lO~P%?TOQ)}O~P#;eOQ*OO~P#;eOQ*PO~P#;eOQ)|O~P#;eOP0tOQ1jOR0tOl#ja#[#ja~O_WOdWOeWOfWOgUOkWOn1]Oo1aOp,iOq!|Or[Os.cOt,cOu/oOv2^Ow3qOx4qOy'kOz.gO{1WO|3PO}4XO!O4|O!P5^O!Q1WO!R.gO!S[O!T.cO!U,cO!V/oO!W2^O!X3qO!Y4qO!Z.cO![[O!].cO!^,cO!_[O!`.cO!a[O#PVO#Z0PO#_UO#`UO~OP0tOQ1jOR0tOl#ji#[#ji~OP0tOQ1jOR0tOl#jq#[#jq~OP0tOQ1jOR0tOl#jy#[#jy~OP0tOQ1jOR0tOl#j!R#[#j!R~OP0tOQ1jOR0tOl#j!Z#[#j!Z~OP0tOQ1jOR0tOl0uO~O_0xOq0xO~O",
+      goto: "$L^$YPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP$ZP$^P$^$^$s$y$^%P%T%yHTPP!(s!6tPP!D}#$x#%a#%t#4f#Bz#CUP#Cc$#u$2a$3b$4O$4O$As$B_$B_$By%P$CQ$Z$Z$CT$CZ$Ci$Cw$DU$Dj$ER$Eb$KoPPP$Ku$As$As$As$AsR!YOwTOV!W!b!j#[#r$[$d$z%b%g%i%w&h-w-x-y-zQ$P!]R%r$YQ%n$PR&j%rT!VO!WQ!TOr!fV!b!j#[#r$[$d$z%b%g%i%w&h-w-x-y-zQ!xYQ#s!WQ#w!XV$Z!g$^/}jZO!X#[#b#c$d$|%b%x-w-x-y-zQ!}]Q#O^Q#P_Q#Q`Q#RaQ#Sb'^#Tc|!S!n!s#V#_#k#p$c$g$t%^%u%{&R&^&k&m&r&x&}'O'S'W'X'Y'_'`'c'e'j'k'l'm'n'o'p(W(Y(s(t(u(v(w(x(y(z)^)o)x)y)z){*Q*R*S*_*h*m*n*o*p*q*r*s+O+X+Y+Z+[+]+^+_+`+k+t+u+v+w+x+y+z+{,V,W,X,Y,Z,[,]-h-i-j-k.g.h.i.j.n.o.p.q.r.s.t.y.z.{.|.}/O/P/Q/R/S/T/U/V/W/X/Y/Z/[/]/^/_/`/a/b/c/d/e/f/g/h/i/j/k/l/m/y/z/{/|Q#VdQ#WeQ#XfQ#YgQ#ZhQ#^jQ#`pQ#aqQ#dvQ#ewQ#fxQ#gyQ#hzQ#i{Q#k}Q#l!OQ#m!PQ#n!QQ#o!RQ$i!v`$l!y%P'q'r's't'u0tQ$m!zS$n!{#OQ$o#PQ$p#QQ$q#RQ$r#SQ$t#WQ$u#XQ$v#YQ$w#ZQ%Q#`Q%R#aQ%W#eQ%X#fQ%Y#gQ%Z#hQ%[#iQ%^#lQ%_#mQ%`#nQ%a#o^%|$m(})O)P)Q)R0zQ%}$oQ&O$pQ&P$qQ&Q$rQ&R$uQ&S$vQ&T$wQ&X%XQ&Y%YQ&Z%ZQ&[%[Q&^%_Q&_%`Q&`%aQ&n&OQ&o&PQ&p&QQ&r&SQ&s&TQ&t&YQ&u&ZQ&v&[Q&x&_Q&y&`Q'P&oQ'Q&pQ'S&sQ'T&uQ'U&vQ'W&yQ'Z'QQ']'UQ'|'bQ'}.cQ(O.fQ(P.eQ(Q.dQ(R,bQ(S,cQ(T,dQ(U,eQ(V,fQ(W,gQ(X,mQ(Z,oQ([,pQ(],qQ(^,rQ(_,sQ(`,tQ(a,uQ(b,vQ(k'dQ(l.kQ(m.mQ(n.lQ(o-PQ(p-QQ(q-RQ(r-SQ(s-TQ(}-WQ)O-X[)P%v)|)}*O*P-ZQ)Q-YQ)R-[S)S'v(RS)T'w(SS)U'x(TS)V'y(US)W'z(VQ)X-]Q)Y-^Q)Z-_Q)[-`Q)]-aQ)^-bQ)_(ZQ)`([Q)a(]Q)b(^Q)c(_Q)d(`Q)e(aQ)f(bQ)g(oQ)h(pQ)i(qQ)j(rQ)k-cQ)l-dQ)m-eQ)n-fQ)o-gQ*T)XQ*U)YQ*V)ZQ*W)[Q*X)]Q*Y-lQ*Z-mQ*[-nQ*]-oQ*^-pQ*_-qQ*`)kQ*a)lQ*b)mQ*c)nQ*d-rQ*e-sQ*f-tQ*g-uQ*h-vQ*t*YQ*u*ZQ*v*[Q*w*]Q*x*^Q*y-{Q*z-|Q*{-}Q*|.OQ*}.PQ+O.QQ+P*dQ+Q*eQ+R*fQ+S*gQ+T.RQ+U.SQ+V.TQ+W.UQ+X.VQ+a*yQ+b*zQ+c*{Q+d*|Q+e*}Q+f.WQ+g.XQ+h.YQ+i.ZQ+j.[Q+k.]Q+l+TQ+m+UQ+n+VQ+o+WQ+p.^Q+q._Q+r.`Q+s.aQ+t.bQ+|+fQ+}+gQ,O+hQ,P+iQ,Q+jQ,R+pQ,S+qQ,T+rQ,U+sS,^V!bW,_(d(h0x0yS,`(f(jS,a(c(gQ-]/nQ-^/oQ-_/pQ-`/qQ-a/rQ-b/sQ-c/tQ-d/uQ-e/vQ-f/wQ-g/xQ-l0QQ-m0RQ-n0SQ-o0TQ-p0UQ-q0VQ-r0WQ-s0XQ-t0YQ-u0ZQ-v0[Q-{0]Q-|0^Q-}0_Q.O0`Q.P0aQ.Q0bQ.R0cQ.S0dQ.T0eQ.U0fQ.V0gQ.W0hQ.X0iQ.Y0jQ.Z0kQ.[0lQ.]0mQ.^0nQ._0oQ.`0pQ.a0qQ.b0rQ.q1WQ.r1XQ.s1YQ.t1ZQ.u1]Q.v1^Q.w1_Q.x1`Q.}1gQ/O1hQ/P1iQ/Q1lQ/R1mQ/S1nQ/T1oQ/U1pQ/V1qQ/W1rQ/X1tQ/Y1uQ/Z1vQ/[1wQ/]1xQ/^1yQ/_1zQ/`1|Q/a1}Q/b2OQ/c2PQ/d2QQ/e2RQ/f2SQ/g2UQ/h2VQ/i2WQ/j2XQ/k2YQ/l2ZQ/m2[Q0Q2]Q0R2^Q0S2_Q0T2`Q0U2aQ0V2bQ0W2cQ0X2dQ0Y2eQ0Z2fQ0[2gQ0]2hQ0^2iQ0_2jQ0`2kQ0a2lQ0b2mQ0c2nQ0d2oQ0e2pQ0f2qQ0g2rQ0h2sQ0i2tQ0j2uQ0k2vQ0l2wQ0m2xQ0n2yQ0o2zQ0p2{Q0q2|Q0r2}Q0v0sQ0w1VQ0z1jS0{0u0wQ0|1kQ0}0|Q1O1sQ1P1OQ1Q1{Q1R1QQ1S2TQ1T1S`1UY!g!t(e(i/}0O0PQ1k3OQ1l3PQ1m3QQ1n3RQ1o3SQ1p3TQ1q3UQ1r3VQ1s3WQ1t3XQ1u3YQ1v3ZQ1w3[Q1x3]Q1y3^Q1z3_Q1{3`Q1|3aQ1}3bQ2O3cQ2P3dQ2Q3eQ2R3fQ2S3gQ2T3hQ2U3iQ2V3jQ2W3kQ2X3lQ2Y3mQ2Z3nQ2[3oQ2h3pQ2i3qQ2j3rQ2k3sQ2l3tQ2m3uQ2n3vQ2o3wQ2p3xQ2q3yQ2r3zQ2s3{Q2t3|Q2u3}Q2v4OQ2w4PQ2x4QQ2y4RQ2z4SQ2{4TQ2|4UQ2}4VQ3W4WQ3X4XQ3Y4YQ3Z4ZQ3[4[Q3]4]Q3^4^Q3_4_Q3`4`Q3a4aQ3b4bQ3c4cQ3d4dQ3e4eQ3f4fQ3g4gQ3h4hQ3i4iQ3j4jQ3k4kQ3l4lQ3m4mQ3n4nQ3o4oQ3{4pQ3|4qQ3}4rQ4O4sQ4P4tQ4Q4uQ4R4vQ4S4wQ4T4xQ4U4yQ4V4zQ4`4{Q4a4|Q4b4}Q4c5OQ4d5PQ4e5QQ4f5RQ4g5SQ4h5TQ4i5UQ4j5VQ4k5WQ4l5XQ4m5YQ4n5ZQ4o5[Q5T5]Q5U5^Q5V5_Q5W5`Q5X5aQ5Y5bQ5Z5cR5[5dQnO<Wo]^_`abcdefghjpqvwxyz{|}!O!P!Q!R!S!n!s!v!y!z!{#O#P#Q#R#S#V#W#X#Y#Z#_#`#a#e#f#g#h#i#k#l#m#n#o#p$c$g$m$o$p$q$r$t$u$v$w$|%P%X%Y%Z%[%^%_%`%a%u%v%x%{&O&P&Q&R&S&T&Y&Z&[&^&_&`&k&m&o&p&r&s&u&v&x&y&}'O'Q'S'U'W'X'Y'_'`'b'c'd'e'j'k'l'm'n'o'p'q'r's't'u'v'w'x'y'z(R(S(T(U(V(W(Y(Z([(](^(_(`(a(b(o(p(q(r(s(t(u(v(w(x(y(z(})O)P)Q)R)X)Y)Z)[)])^)k)l)m)n)o)x)y)z){)|)}*O*P*Q*R*S*Y*Z*[*]*^*_*d*e*f*g*h*m*n*o*p*q*r*s*y*z*{*|*}+O+T+U+V+W+X+Y+Z+[+]+^+_+`+f+g+h+i+j+k+p+q+r+s+t+u+v+w+x+y+z+{,V,W,X,Y,Z,[,],b,c,d,e,f,g,m,o,p,q,r,s,t,u,v-P-Q-R-S-T-W-X-Y-Z-[-]-^-_-`-a-b-c-d-e-f-g-h-i-j-k-l-m-n-o-p-q-r-s-t-u-v-{-|-}.O.P.Q.R.S.T.U.V.W.X.Y.Z.[.].^._.`.a.b.c.d.e.f.g.h.i.j.k.l.m.n.o.p.q.r.s.t.y.z.{.|.}/O/P/Q/R/S/T/U/V/W/X/Y/Z/[/]/^/_/`/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/{/|0Q0R0S0T0U0V0W0X0Y0Z0[0]0^0_0`0a0b0c0d0e0f0g0h0i0j0k0l0m0n0o0p0q0r0s0t0u0w0z0|1O1Q1S1V1W1X1Y1Z1]1^1_1`1g1h1i1j1k1l1m1n1o1p1q1r1s1t1u1v1w1x1y1z1{1|1}2O2P2Q2R2S2T2U2V2W2X2Y2Z2[2]2^2_2`2a2b2c2d2e2f2g2h2i2j2k2l2m2n2o2p2q2r2s2t2u2v2w2x2y2z2{2|2}3O3P3Q3R3S3T3U3V3W3X3Y3Z3[3]3^3_3`3a3b3c3d3e3f3g3h3i3j3k3l3m3n3o3p3q3r3s3t3u3v3w3x3y3z3{3|3}4O4P4Q4R4S4T4U4V4W4X4Y4Z4[4]4^4_4`4a4b4c4d4e4f4g4h4i4j4k4l4m4n4o4p4q4r4s4t4u4v4w4x4y4z4{4|4}5O5P5Q5R5S5T5U5V5W5X5Y5Z5[5]5^5_5`5a5b5c5dS!rV!b[!wY!g!t/}0O0PQ#v!XQ$}#[[%T#b(c(d(e(f0x[%V#c(g(h(i(j0yQ%z$dZ&c%b-w-x-y-z<UmOY]^_`abcdefghjpqvwxyz{|}!O!P!Q!R!S!X!g!n!t!v!y!z!{#O#P#Q#R#S#V#W#X#Y#Z#[#_#`#a#b#c#e#f#g#h#i#k#l#m#n#o#p$c$d$m$o$p$q$r$t$u$v$w$|%P%X%Y%Z%[%^%_%`%a%u%v%x&O&P&Q&R&S&T&Y&Z&[&^&_&`&k&o&p&r&s&u&v&x&y&}'Q'S'U'W'X'_'b'c'd'e'k'l'n'o'p'q'r's't'u'v'w'x'y'z(R(S(T(U(V(W(Y(Z([(](^(_(`(a(b(c(d(e(f(g(h(i(j(o(p(q(r(s(u(v(x(y(z(})O)P)Q)R)X)Y)Z)[)])^)k)l)m)n)o)y)z)}*O*Q*R*S*Y*Z*[*]*^*_*d*e*f*g*h*n*o*q*r*s*y*z*{*|*}+O+T+U+V+W+X+Z+[+^+_+`+f+g+h+i+j+k+p+q+r+s+t+v+w+y+z+{,W,X,Z,[,],b,c,d,e,f,g,m,o,p,q,r,s,t,u,v-P-Q-R-S-T-W-X-Y-Z-[-]-^-_-`-a-b-c-d-e-f-g-h-i-j-k-l-m-n-o-p-q-r-s-t-u-v-{-|-}.O.P.Q.R.S.T.U.V.W.X.Y.Z.[.].^._.`.a.b.c.d.e.f.g.h.i.j.k.l.m.n.o.p.q.r.s.t.y.z.{.|.}/O/P/Q/R/S/T/U/V/W/X/Y/Z/[/]/^/_/`/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/{/|/}0O0P0Q0R0S0T0U0V0W0X0Y0Z0[0]0^0_0`0a0b0c0d0e0f0g0h0i0j0k0l0m0n0o0p0q0r0s0t0u0w0x0y0z0|1O1Q1S1V1W1X1Y1Z1]1^1_1`1g1h1i1j1k1l1m1n1o1p1q1r1s1t1u1v1w1x1y1z1{1|1}2O2P2Q2R2S2T2U2V2W2X2Y2Z2[2]2^2_2`2a2b2c2d2e2f2g2h2i2j2k2l2m2n2o2p2q2r2s2t2u2v2w2x2y2z2{2|2}3O3P3Q3R3S3T3U3V3W3X3Y3Z3[3]3^3_3`3a3b3c3d3e3f3g3h3i3j3k3l3m3n3o3p3q3r3s3t3u3v3w3x3y3z3{3|3}4O4P4Q4R4S4T4U4V4W4X4Y4Z4[4]4^4_4`4a4b4c4d4e4f4g4h4i4j4k4l4m4n4o4p4q4r4s4t4u4v4w4x4y4z4{4|4}5O5P5Q5R5S5T5U5V5W5X5Y5Z5[5]5^5_5`5a5b5c5d^!_V!b%b-w-x-y-zQ!i!jS$S!a$UR%t$[<fmOY]^_`abcdefghjpqvwxyz{|}!O!P!Q!R!S!X!g!n!t!v!y!z!{#O#P#Q#R#S#V#W#X#Y#Z#[#_#`#a#b#c#e#f#g#h#i#k#l#m#n#o#p$c$d$m$o$p$q$r$t$u$v$w$|%P%X%Y%Z%[%^%_%`%a%u%v%x&O&P&Q&R&S&T&Y&Z&[&^&_&`&k&o&p&r&s&u&v&x&y&}'Q'S'U'W'X'_'b'c'd'e'j'k'l'n'o'p'q'r's't'u'v'w'x'y'z(R(S(T(U(V(W(Y(Z([(](^(_(`(a(b(c(d(e(f(g(h(i(j(o(p(q(r(s(t(u(v(x(y(z(})O)P)Q)R)X)Y)Z)[)])^)k)l)m)n)o)x)y)z)|)}*O*Q*R*S*Y*Z*[*]*^*_*d*e*f*g*h*m*n*o*q*r*s*y*z*{*|*}+O+T+U+V+W+X+Y+Z+[+^+_+`+f+g+h+i+j+k+p+q+r+s+t+u+v+w+y+z+{,V,W,X,Z,[,],b,c,d,e,f,g,m,o,p,q,r,s,t,u,v-P-Q-R-S-T-W-X-Y-Z-[-]-^-_-`-a-b-c-d-e-f-g-h-i-j-k-l-m-n-o-p-q-r-s-t-u-v-{-|-}.O.P.Q.R.S.T.U.V.W.X.Y.Z.[.].^._.`.a.b.c.d.e.f.g.h.i.j.k.l.m.n.o.p.q.r.s.t.y.z.{.|.}/O/P/Q/R/S/T/U/V/W/X/Y/Z/[/]/^/_/`/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/{/|/}0O0P0Q0R0S0T0U0V0W0X0Y0Z0[0]0^0_0`0a0b0c0d0e0f0g0h0i0j0k0l0m0n0o0p0q0r0s0t0u0w0x0y0z0|1O1Q1S1V1W1X1Y1Z1]1^1_1`1g1h1i1j1k1l1m1n1o1p1q1r1s1t1u1v1w1x1y1z1{1|1}2O2P2Q2R2S2T2U2V2W2X2Y2Z2[2]2^2_2`2a2b2c2d2e2f2g2h2i2j2k2l2m2n2o2p2q2r2s2t2u2v2w2x2y2z2{2|2}3O3P3Q3R3S3T3U3V3W3X3Y3Z3[3]3^3_3`3a3b3c3d3e3f3g3h3i3j3k3l3m3n3o3p3q3r3s3t3u3v3w3x3y3z3{3|3}4O4P4Q4R4S4T4U4V4W4X4Y4Z4[4]4^4_4`4a4b4c4d4e4f4g4h4i4j4k4l4m4n4o4p4q4r4s4t4u4v4w4x4y4z4{4|4}5O5P5Q5R5S5T5U5V5W5X5Y5Z5[5]5^5_5`5a5b5c5d^!_V!b%b-w-x-y-zQ!i!jS$S!a$UR%t$[<UmOY]^_`abcdefghjpqvwxyz{|}!O!P!Q!R!S!X!g!n!t!v!y!z!{#O#P#Q#R#S#V#W#X#Y#Z#[#_#`#a#b#c#e#f#g#h#i#k#l#m#n#o#p$c$d$m$o$p$q$r$t$u$v$w$|%P%X%Y%Z%[%^%_%`%a%u%v%x&O&P&Q&R&S&T&Y&Z&[&^&_&`&k&o&p&r&s&u&v&x&y&}'Q'S'U'W'X'_'b'c'd'e'k'l'n'o'p'q'r's't'u'v'w'x'y'z(R(S(T(U(V(W(Y(Z([(](^(_(`(a(b(c(d(e(f(g(h(i(j(o(p(q(r(s(u(v(x(y(z(})O)P)Q)R)X)Y)Z)[)])^)k)l)m)n)o)y)z)}*O*Q*R*S*Y*Z*[*]*^*_*d*e*f*g*h*n*o*q*r*s*y*z*{*|*}+O+T+U+V+W+X+Z+[+^+_+`+f+g+h+i+j+k+p+q+r+s+t+v+w+y+z+{,W,X,Z,[,],b,c,d,e,f,g,m,o,p,q,r,s,t,u,v-P-Q-R-S-T-W-X-Y-Z-[-]-^-_-`-a-b-c-d-e-f-g-h-i-j-k-l-m-n-o-p-q-r-s-t-u-v-{-|-}.O.P.Q.R.S.T.U.V.W.X.Y.Z.[.].^._.`.a.b.c.d.e.f.g.h.i.j.k.l.m.n.o.p.q.r.s.t.y.z.{.|.}/O/P/Q/R/S/T/U/V/W/X/Y/Z/[/]/^/_/`/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/{/|/}0O0P0Q0R0S0T0U0V0W0X0Y0Z0[0]0^0_0`0a0b0c0d0e0f0g0h0i0j0k0l0m0n0o0p0q0r0s0t0u0w0x0y0z0|1O1Q1S1V1W1X1Y1Z1]1^1_1`1g1h1i1j1k1l1m1n1o1p1q1r1s1t1u1v1w1x1y1z1{1|1}2O2P2Q2R2S2T2U2V2W2X2Y2Z2[2]2^2_2`2a2b2c2d2e2f2g2h2i2j2k2l2m2n2o2p2q2r2s2t2u2v2w2x2y2z2{2|2}3O3P3Q3R3S3T3U3V3W3X3Y3Z3[3]3^3_3`3a3b3c3d3e3f3g3h3i3j3k3l3m3n3o3p3q3r3s3t3u3v3w3x3y3z3{3|3}4O4P4Q4R4S4T4U4V4W4X4Y4Z4[4]4^4_4`4a4b4c4d4e4f4g4h4i4j4k4l4m4n4o4p4q4r4s4t4u4v4w4x4y4z4{4|4}5O5P5Q5R5S5T5U5V5W5X5Y5Z5[5]5^5_5`5a5b5c5d^!hV!b%b-w-x-y-zT!i!j$[W!iV!b!j$[`$y#[#r$d$z%g%i%w&hZ&b%b-w-x-y-zs!fV!b!j#[#r$[$d$z%b%g%i%w&h-w-x-y-z=UmOY]^_`abcdefghjpqvwxyz{|}!O!P!Q!R!S!X!g!n!s!t!v!y!z!{#O#P#Q#R#S#V#W#X#Y#Z#[#_#`#a#b#c#e#f#g#h#i#k#l#m#n#o#p$c$d$g$m$o$p$q$r$t$u$v$w$|%P%X%Y%Z%[%^%_%`%a%u%v%x%{&O&P&Q&R&S&T&Y&Z&[&^&_&`&k&m&o&p&r&s&u&v&x&y&}'O'Q'S'U'W'X'Y'_'`'b'c'd'e'j'k'l'm'n'o'p'q'r's't'u'v'w'x'y'z(R(S(T(U(V(W(Y(Z([(](^(_(`(a(b(c(d(e(f(g(h(i(j(o(p(q(r(s(t(u(v(w(x(y(z(})O)P)Q)R)X)Y)Z)[)])^)k)l)m)n)o)x)y)z){)|)}*O*P*Q*R*S*Y*Z*[*]*^*_*d*e*f*g*h*m*n*o*p*q*r*s*y*z*{*|*}+O+T+U+V+W+X+Y+Z+[+]+^+_+`+f+g+h+i+j+k+p+q+r+s+t+u+v+w+x+y+z+{,V,W,X,Y,Z,[,],b,c,d,e,f,g,m,o,p,q,r,s,t,u,v-P-Q-R-S-T-W-X-Y-Z-[-]-^-_-`-a-b-c-d-e-f-g-h-i-j-k-l-m-n-o-p-q-r-s-t-u-v-{-|-}.O.P.Q.R.S.T.U.V.W.X.Y.Z.[.].^._.`.a.b.c.d.e.f.g.h.i.j.k.l.m.n.o.p.q.r.s.t.y.z.{.|.}/O/P/Q/R/S/T/U/V/W/X/Y/Z/[/]/^/_/`/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/{/|/}0O0P0Q0R0S0T0U0V0W0X0Y0Z0[0]0^0_0`0a0b0c0d0e0f0g0h0i0j0k0l0m0n0o0p0q0r0s0t0u0w0x0y0z0|1O1Q1S1V1W1X1Y1Z1]1^1_1`1g1h1i1j1k1l1m1n1o1p1q1r1s1t1u1v1w1x1y1z1{1|1}2O2P2Q2R2S2T2U2V2W2X2Y2Z2[2]2^2_2`2a2b2c2d2e2f2g2h2i2j2k2l2m2n2o2p2q2r2s2t2u2v2w2x2y2z2{2|2}3O3P3Q3R3S3T3U3V3W3X3Y3Z3[3]3^3_3`3a3b3c3d3e3f3g3h3i3j3k3l3m3n3o3p3q3r3s3t3u3v3w3x3y3z3{3|3}4O4P4Q4R4S4T4U4V4W4X4Y4Z4[4]4^4_4`4a4b4c4d4e4f4g4h4i4j4k4l4m4n4o4p4q4r4s4t4u4v4w4x4y4z4{4|4}5O5P5Q5R5S5T5U5V5W5X5Y5Z5[5]5^5_5`5a5b5c5d^!qV!b%b-w-x-y-zQ#csQ(g,{Q(h,|Q(i,}Q(j-OR0y1f<YmOVY]^_`abcdefghjpqvwxyz{|}!O!P!Q!R!S!X!b!g!n!t!v!y!z!{#O#P#Q#R#S#V#W#X#Y#Z#[#_#`#a#b#c#e#f#g#h#i#k#l#m#n#o$c$d$m$o$p$q$r$t$u$v$w$|%P%X%Y%Z%[%^%_%`%a%b%u%v%x&O&P&Q&R&S&T&Y&Z&[&^&_&`&k&o&p&r&s&u&v&x&y&}'Q'S'U'W'X'_'b'c'd'e'k'l'n'o'p'q'r's't'u'v'w'x'y'z(R(S(T(U(V(W(Y(Z([(](^(_(`(a(b(c(d(e(f(g(h(i(j(o(p(q(r(s(u(v(x(y(z(})O)P)Q)R)X)Y)Z)[)])^)k)l)m)n)o)y)z)}*O*Q*R*S*Y*Z*[*]*^*_*d*e*f*g*h*n*o*q*r*s*y*z*{*|*}+O+T+U+V+W+X+Z+[+^+_+`+f+g+h+i+j+k+p+q+r+s+t+v+w+y+z+{,W,X,Z,[,],b,c,d,e,f,g,m,o,p,q,r,s,t,u,v-P-Q-R-S-T-W-X-Y-Z-[-]-^-_-`-a-b-c-d-e-f-g-l-m-n-o-p-q-r-s-t-u-v-w-x-y-z-{-|-}.O.P.Q.R.S.T.U.V.W.X.Y.Z.[.].^._.`.a.b.c.d.e.f.g.h.i.j.k.l.m.n.o.p.q.r.s.t.y.z.{.|.}/O/P/Q/R/S/T/U/V/W/X/Y/Z/[/]/^/_/`/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/{/|/}0O0P0Q0R0S0T0U0V0W0X0Y0Z0[0]0^0_0`0a0b0c0d0e0f0g0h0i0j0k0l0m0n0o0p0q0r0s0t0u0w0x0y0z0|1O1Q1S1V1W1X1Y1Z1]1^1_1`1g1h1i1j1k1l1m1n1o1p1q1r1s1t1u1v1w1x1y1z1{1|1}2O2P2Q2R2S2T2U2V2W2X2Y2Z2[2]2^2_2`2a2b2c2d2e2f2g2h2i2j2k2l2m2n2o2p2q2r2s2t2u2v2w2x2y2z2{2|2}3O3P3Q3R3S3T3U3V3W3X3Y3Z3[3]3^3_3`3a3b3c3d3e3f3g3h3i3j3k3l3m3n3o3p3q3r3s3t3u3v3w3x3y3z3{3|3}4O4P4Q4R4S4T4U4V4W4X4Y4Z4[4]4^4_4`4a4b4c4d4e4f4g4h4i4j4k4l4m4n4o4p4q4r4s4t4u4v4w4x4y4z4{4|4}5O5P5Q5R5S5T5U5V5W5X5Y5Z5[5]5^5_5`5a5b5c5dv#]ik#^(X,h,i,j,k,l,n.u.v.w.x1[1a1b1c1dQ%d#pQ)t-hQ)u-iQ)v-jR)w-ka!pV!b#[%b-w-x-y-z`!mV!b#[%b-w-x-y-zR%i#r<|oOY]^_`abcdefghjpqvwxyz{|}!O!P!Q!R!S!X!g!n!s!t!v!y!z!{#O#P#Q#R#S#V#W#X#Y#Z#_#`#a#b#c#e#f#g#h#i#k#l#m#n#o#p$c$g$m$o$p$q$r$t$u$v$w%P%X%Y%Z%[%^%_%`%a%u%v%{&O&P&Q&R&S&T&Y&Z&[&^&_&`&k&m&o&p&r&s&u&v&x&y&}'O'Q'S'U'W'X'Y'_'`'b'c'd'e'j'k'l'm'n'o'p'q'r's't'u'v'w'x'y'z(R(S(T(U(V(W(Y(Z([(](^(_(`(a(b(c(d(e(f(g(h(i(j(o(p(q(r(s(t(u(v(w(x(y(z(})O)P)Q)R)X)Y)Z)[)])^)k)l)m)n)o)x)y)z){)|)}*O*P*Q*R*S*Y*Z*[*]*^*_*d*e*f*g*h*m*n*o*p*q*r*s*y*z*{*|*}+O+T+U+V+W+X+Y+Z+[+]+^+_+`+f+g+h+i+j+k+p+q+r+s+t+u+v+w+x+y+z+{,V,W,X,Y,Z,[,],b,c,d,e,f,g,m,o,p,q,r,s,t,u,v-P-Q-R-S-T-W-X-Y-Z-[-]-^-_-`-a-b-c-d-e-f-g-h-i-j-k-l-m-n-o-p-q-r-s-t-u-v-{-|-}.O.P.Q.R.S.T.U.V.W.X.Y.Z.[.].^._.`.a.b.c.d.e.f.g.h.i.j.k.l.m.n.o.p.q.r.s.t.y.z.{.|.}/O/P/Q/R/S/T/U/V/W/X/Y/Z/[/]/^/_/`/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/{/|/}0O0P0Q0R0S0T0U0V0W0X0Y0Z0[0]0^0_0`0a0b0c0d0e0f0g0h0i0j0k0l0m0n0o0p0q0r0s0t0u0w0x0y0z0|1O1Q1S1V1W1X1Y1Z1]1^1_1`1g1h1i1j1k1l1m1n1o1p1q1r1s1t1u1v1w1x1y1z1{1|1}2O2P2Q2R2S2T2U2V2W2X2Y2Z2[2]2^2_2`2a2b2c2d2e2f2g2h2i2j2k2l2m2n2o2p2q2r2s2t2u2v2w2x2y2z2{2|2}3O3P3Q3R3S3T3U3V3W3X3Y3Z3[3]3^3_3`3a3b3c3d3e3f3g3h3i3j3k3l3m3n3o3p3q3r3s3t3u3v3w3x3y3z3{3|3}4O4P4Q4R4S4T4U4V4W4X4Y4Z4[4]4^4_4`4a4b4c4d4e4f4g4h4i4j4k4l4m4n4o4p4q4r4s4t4u4v4w4x4y4z4{4|4}5O5P5Q5R5S5T5U5V5W5X5Y5Z5[5]5^5_5`5a5b5c5dS!rV!bW%O#[$d$|%xZ&d%b-w-x-y-zQlO<j!oV]^_`abcdefghjpqvwxyz{|}!O!P!Q!R!S!b!n!s!v!y!z!{#O#P#Q#R#S#V#W#X#Y#Z#[#_#`#a#e#f#g#h#i#k#l#m#n#o#p$c$d$g$m$o$p$q$r$t$u$v$w$|%P%X%Y%Z%[%^%_%`%a%b%u%v%x%{&O&P&Q&R&S&T&Y&Z&[&^&_&`&k&m&o&p&r&s&u&v&x&y&}'O'Q'S'U'W'X'Y'_'`'b'c'd'e'j'k'l'm'n'o'p'q'r's't'u'v'w'x'y'z(R(S(T(U(V(W(Y(Z([(](^(_(`(a(b(o(p(q(r(s(t(u(v(w(x(y(z(})O)P)Q)R)X)Y)Z)[)])^)k)l)m)n)o)x)y)z){)|)}*O*P*Q*R*S*Y*Z*[*]*^*_*d*e*f*g*h*m*n*o*p*q*r*s*y*z*{*|*}+O+T+U+V+W+X+Y+Z+[+]+^+_+`+f+g+h+i+j+k+p+q+r+s+t+u+v+w+x+y+z+{,V,W,X,Y,Z,[,],b,c,d,e,f,g,m,o,p,q,r,s,t,u,v-P-Q-R-S-T-W-X-Y-Z-[-]-^-_-`-a-b-c-d-e-f-g-h-i-j-k-l-m-n-o-p-q-r-s-t-u-v-w-x-y-z-{-|-}.O.P.Q.R.S.T.U.V.W.X.Y.Z.[.].^._.`.a.b.c.d.e.f.g.h.i.j.k.l.m.n.o.p.q.r.s.t.y.z.{.|.}/O/P/Q/R/S/T/U/V/W/X/Y/Z/[/]/^/_/`/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/{/|0Q0R0S0T0U0V0W0X0Y0Z0[0]0^0_0`0a0b0c0d0e0f0g0h0i0j0k0l0m0n0o0p0q0r0s0t0u0w0z0|1O1Q1S1V1W1X1Y1Z1]1^1_1`1g1h1i1j1k1l1m1n1o1p1q1r1s1t1u1v1w1x1y1z1{1|1}2O2P2Q2R2S2T2U2V2W2X2Y2Z2[2]2^2_2`2a2b2c2d2e2f2g2h2i2j2k2l2m2n2o2p2q2r2s2t2u2v2w2x2y2z2{2|2}3O3P3Q3R3S3T3U3V3W3X3Y3Z3[3]3^3_3`3a3b3c3d3e3f3g3h3i3j3k3l3m3n3o3p3q3r3s3t3u3v3w3x3y3z3{3|3}4O4P4Q4R4S4T4U4V4W4X4Y4Z4[4]4^4_4`4a4b4c4d4e4f4g4h4i4j4k4l4m4n4o4p4q4r4s4t4u4v4w4x4y4z4{4|4}5O5P5Q5R5S5T5U5V5W5X5Y5Z5[5]5^5_5`5a5b5c5dU!uY!g!tQ#u!X[%S#b(c(d(e(f0x[%U#c(g(h(i(j0yS-U/}0OR-V0PQ!{iQ#_k[$l#^(X.u.v.w.xQ'v,hQ'w,iQ'x,jQ'y,kQ'z,lQ(Y,nQ.y1aQ.z1bQ.{1cQ.|1dR0u1[v#]ik#^(X,h,i,j,k,l,n.u.v.w.x1[1a1b1c1dZ%e#p-h-i-j-k<eoOVY]^_`abcdefghjpqvwxyz{|}!O!P!Q!R!S!X!b!g!n!t!v!y!z!{#O#P#Q#R#S#V#W#X#Y#Z#[#_#`#a#b#c#e#f#g#h#i#k#l#m#n#o#p$c$d$m$o$p$q$r$t$u$v$w$|%P%X%Y%Z%[%^%_%`%a%b%u%v%x&O&P&Q&R&S&T&Y&Z&[&^&_&`&k&o&p&r&s&u&v&x&y&}'Q'S'U'W'X'_'b'c'd'e'k'l'n'o'p'q'r's't'u'v'w'x'y'z(R(S(T(U(V(W(Y(Z([(](^(_(`(a(b(c(d(e(f(g(h(i(j(o(p(q(r(s(u(v(x(y(z(})O)P)Q)R)X)Y)Z)[)])^)k)l)m)n)o)y)z)}*O*Q*R*S*Y*Z*[*]*^*_*d*e*f*g*h*n*o*q*r*s*y*z*{*|*}+O+T+U+V+W+X+Z+[+^+_+`+f+g+h+i+j+k+p+q+r+s+t+v+w+y+z+{,W,X,Z,[,],b,c,d,e,f,g,m,o,p,q,r,s,t,u,v-P-Q-R-S-T-W-X-Y-Z-[-]-^-_-`-a-b-c-d-e-f-g-h-i-j-k-l-m-n-o-p-q-r-s-t-u-v-w-x-y-z-{-|-}.O.P.Q.R.S.T.U.V.W.X.Y.Z.[.].^._.`.a.b.c.d.e.f.g.h.i.j.k.l.m.n.o.p.q.r.s.t.y.z.{.|.}/O/P/Q/R/S/T/U/V/W/X/Y/Z/[/]/^/_/`/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/{/|/}0O0P0Q0R0S0T0U0V0W0X0Y0Z0[0]0^0_0`0a0b0c0d0e0f0g0h0i0j0k0l0m0n0o0p0q0r0s0t0u0w0x0y0z0|1O1Q1S1V1W1X1Y1Z1]1^1_1`1g1h1i1j1k1l1m1n1o1p1q1r1s1t1u1v1w1x1y1z1{1|1}2O2P2Q2R2S2T2U2V2W2X2Y2Z2[2]2^2_2`2a2b2c2d2e2f2g2h2i2j2k2l2m2n2o2p2q2r2s2t2u2v2w2x2y2z2{2|2}3O3P3Q3R3S3T3U3V3W3X3Y3Z3[3]3^3_3`3a3b3c3d3e3f3g3h3i3j3k3l3m3n3o3p3q3r3s3t3u3v3w3x3y3z3{3|3}4O4P4Q4R4S4T4U4V4W4X4Y4Z4[4]4^4_4`4a4b4c4d4e4f4g4h4i4j4k4l4m4n4o4p4q4r4s4t4u4v4w4x4y4z4{4|4}5O5P5Q5R5S5T5U5V5W5X5Y5Z5[5]5^5_5`5a5b5c5d!RuOVY!W!X!b!g!j#[#r$[$^$d$z%b%g%i%w&h-w-x-y-z/}!RtOVY!W!X!b!g!j#[#r$[$^$d$z%b%g%i%w&h-w-x-y-z/}Z%]#p-h-i-j-kR#r!UQ!WOR#t!WQ#z!ZQ#|![Q$Q!^V%j#z#|$Qb!aV!b$U$[%b-w-x-y-zR$T!a`!jV!b$[%b-w-x-y-zR$_!j^!lV#[%b-w-x-y-zQ$X!bU$b!l$X&eR&e%f[$z#[%b-w-x-y-zQ%g#rQ%w$dW&U$z%g%w&hR&h%i[$|#[%b-w-x-y-zQ%x$dT&W$|%xQ#UcQ#j|Q#p!SS$c!n'cS$g!s'eS$l#V#_#j$s#p$c$g%u%{&k&m&}'O'X'Y'_'`(t(u(v(w(x(y(z)x)y)z){*Q*R*S*m*n*o*p*q*r*s+Y+Z+[+]+^+_+`+u+v+w+x+y+z+{,V,W,X,Y,Z,[,]-h-i-j-kQ%]#kS%u(W(YQ%{(sQ%|$tQ&]%^Q&k)^Q&m)oQ&q&RQ&w&^Q&}*_Q'O*hQ'R&rQ'V&xQ'X+OQ'Y+XQ'['SQ'^'WQ'_+kQ'`+tS(t'j.jS(u'k.gS(v'l.hS(w'm.iS(x'n.pS(y'o.nS(z'p.oS)x.t.|S)y.q.yS)z.r.zS){.s.{Q*Q/PQ*R.}Q*S/OQ*m/TQ*n/QQ*o/RQ*p/SQ*q/WQ*r/UQ*s/VQ+Y/[Q+Z/XQ+[/YQ+]/ZQ+^/_Q+_/]Q+`/^Q+u/cQ+v/`Q+w/aQ+x/bQ+y/fQ+z/dQ+{/eQ,V/jQ,W/gQ,X/hQ,Y/iQ,Z/mQ,[/kQ,]/lQ-h/yQ-i/zQ-j/{R-k/|Q!XOR#x!XS!VO!Ws!dV!b!j#[#r$[$d$z%b%g%i%w&h-w-x-y-z",
+      nodeNames: "⚠ ReporterLeft1Args ReporterLeft2Args ReporterLeft1ArgsOpt GlobalStr ExtensionStr BreedStr PlusMinus Own Set Let To End And Or Identifier Directive Command Reporter Extension TurtleVar PatchVar LinkVar Constant Unsupported SpecialReporter SpecialCommand BreedToken AndOr APCommand APReporterFlip APReporterVar APReporter UnsupportedPrim Reporter0Args Reporter1Args Reporter2Args Reporter3Args Reporter4Args Reporter5Args Reporter6Args Reporter0ArgsVar Reporter1ArgsVar Reporter2ArgsVar Reporter3ArgsVar Reporter4ArgsVar Reporter5ArgsVar Reporter6ArgsVar Reporter2ArgsVar0 Reporter1ArgsVar0 SpecialReporter0Args SpecialReporter1Args SpecialReporter2Args SpecialReporter3Args SpecialReporter4Args SpecialReporter5Args SpecialReporter6Args SpecialReporter1ArgsBoth SpecialReporter0ArgsLink SpecialReporter1ArgsLink SpecialReporter2ArgsTurtle SpecialReporter0ArgsTurtle SpecialReporter1ArgsTurtle SpecialReporter0ArgsLinkP Command0Args Command1Args Command2Args Command3Args Command4Args Command5Args Command6Args Command0ArgsVar Command1ArgsVar Command2ArgsVar Command3ArgsVar Command4ArgsVar Command5ArgsVar Command6ArgsVar Command3ArgsVar2 SpecialCommand0Args SpecialCommand1Args SpecialCommand2Args SpecialCommand3Args SpecialCommand4Args SpecialCommand5Args SpecialCommand6Args SpecialCommandCreateTurtle SpecialCommandCreateLink LineComment Program Normal CloseBracket Extensions OpenBracket Globals Breed BreedPlural BreedSingular BreedsOwn Misplaced CommandStatement Arg Value OpenParen CloseParen List Literal Numeric String CodeBlock ProcedureContent Error VariableName AnonymousProcedure AnonArguments Arguments Arrow ReporterContent ReporterStatement Reporters ShortAnonymousProcedure ReporterBlock Property VariableDeclaration NewVariableDeclaration SetVariable Commands Procedure ProcedureName OnelineReporter Embedded",
+      maxTerm: 147,
       context: contextTracker,
       nodeProps: [
         ["openedBy", 91,"OpenBracket"],
         ["closedBy", 93,"CloseBracket"]
       ],
       skippedNodes: [0,7,13,14,16,17,18,19,25,88],
-      repeatNodeCount: 8,
-      tokenData: "&d~R]XYzYZz]^zpqzrs!]xy#yyz$O}!O$T!O!P$a!Q![%^!]!^%q!}#O&Y#P#Q&_~!PS$R~XYzYZz]^zpqz~!`VOr!]rs!us#O!]#O#P!z#P;'S!];'S;=`#s<%lO!]~!zO#`~~!}RO;'S!];'S;=`#W;=`O!]~#ZWOr!]rs!us#O!]#O#P!z#P;'S!];'S;=`#s;=`<%l!]<%lO!]~#vP;=`<%l!]~$OO#[~~$TO#]~~$WR!O!P$a!Q![%^!`!a%l~$dP!Q![$g~$lQ#d~!Q![$g#X#Y$r~$uR{|%O}!O%O!Q![%U~%RP!Q![%U~%ZP#d~!Q![%U~%cR#d~!O!P$g!Q![%^#X#Y$r~%qO#h~~%vS!z~OY%qZ;'S%q;'S;=`&S<%lO%q~&VP;=`<%l%q~&_O#P~~&dO!}~",
+      repeatNodeCount: 9,
+      tokenData: "&d~R]XYzYZz]^zpqzrs!]xy#yyz$O}!O$T!O!P$a!Q![%^!]!^%q!}#O&Y#P#Q&_~!PS$S~XYzYZz]^zpqz~!`VOr!]rs!us#O!]#O#P!z#P;'S!];'S;=`#s<%lO!]~!zO#`~~!}RO;'S!];'S;=`#W;=`O!]~#ZWOr!]rs!us#O!]#O#P!z#P;'S!];'S;=`#s;=`<%l!]<%lO!]~#vP;=`<%l!]~$OO#Z~~$TO#[~~$WR!O!P$a!Q![%^!`!a%l~$dP!Q![$g~$lQ#_~!Q![$g#X#Y$r~$uR{|%O}!O%O!Q![%U~%RP!Q![%U~%ZP#_~!Q![%U~%cR#_~!O!P$g!Q![%^#X#Y$r~%qO#h~~%vS!z~OY%qZ;'S%q;'S;=`&S<%lO%q~&VP;=`<%l%q~&_O#P~~&dO!}~",
       tokenizers: [0, keyword],
       topRules: {"Program":[0,89]},
+      dynamicPrecedences: {"109":-1,"144":10,"145":10,"146":-5,"147":-5},
       specialized: [{term: 18, get: (value, stack) => (specializeReporter(value) << 1), external: specializeReporter},{term: 25, get: (value, stack) => (specializeSpecialReporter(value) << 1), external: specializeSpecialReporter},{term: 17, get: (value, stack) => (specializeCommand(value) << 1), external: specializeCommand},{term: 26, get: (value, stack) => (specializeSpecialCommand(value) << 1), external: specializeSpecialCommand}],
       tokenPrec: 0
     });
@@ -30410,61 +30657,46 @@
             return true;
         // checks if identifier is a variable already declared in the procedure
         // collects list of valid local variables for given position
-        let procedureVars = getLocalVars(Node, context.state, context.parseState);
+        let procedureVars = getLocalVariables(Node, context.state, context.parseState);
         //checks if the identifier is in the list of possible variables
         return procedureVars.includes(value);
     };
-    // getLocalVars: collects list of valid local variables for given position
-    const getLocalVars = function (Node, state, parseState) {
-        // get the procedure name
-        let curr_node = Node;
-        let procedureName = '';
-        while (curr_node.parent) {
-            curr_node = curr_node.parent;
-            if (curr_node.name == 'Procedure') {
-                curr_node.getChildren('ProcedureName').map((child) => {
-                    procedureName = state.sliceDoc(child.from, child.to);
-                });
-                break;
-            }
-        }
-        // gets list of procedure variables from own procedure, as well as list of all procedure names
+    /* getLocalVariables: collects list of valid local variables for given position. */
+    const getLocalVariables = function (Node, State, parseState) {
         let procedureVars = [];
-        if (procedureName != '') {
-            let procedure = parseState.Procedures.get(procedureName.toLowerCase());
-            procedure === null || procedure === void 0 ? void 0 : procedure.Variables.map((variable) => {
-                // makes sure the variable has already been created
-                if (variable.CreationPos < Node.from) {
-                    procedureVars.push(variable.Name);
-                }
-            });
-            //pulls out all local variables within the anonymous procedures up until current position
-            if (procedure) {
-                procedureVars.push(...gatherAnonVars(procedure.AnonymousProcedures, Node));
-                procedureVars.push(...gatherAnonVars(procedure.CodeBlocks, Node));
-            }
-            if (procedure === null || procedure === void 0 ? void 0 : procedure.Arguments) {
-                procedureVars.push(...procedure.Arguments);
-            }
-        }
+        // get the procedure name
+        var procedureName = getParentProcedure(State, Node);
+        if (!procedureName)
+            return [];
+        // gets list of procedure variables from own procedure, as well as list of all procedure names
+        let procedure = parseState.Procedures.get(procedureName.toLowerCase());
+        if (!procedure)
+            return procedureVars;
+        procedure.Variables.map((variable) => {
+            // makes sure the variable has already been created
+            if (variable.CreationPos < Node.from)
+                procedureVars.push(variable.Name);
+        });
+        // pulls out all local variables within the anonymous procedures up until current position
+        gatherAnonymousVariables(procedure.AnonymousProcedures, Node, procedureVars);
+        gatherAnonymousVariables(procedure.CodeBlocks, Node, procedureVars);
+        if (procedure.Arguments)
+            procedureVars.push(...procedure.Arguments);
         return procedureVars;
     };
-    // gatherAnonVars: collects out valid local variables from anonymous procedures and code blocks
-    const gatherAnonVars = function (group, Node) {
-        let procedureVars = [];
-        group.map((anonProc) => {
+    /* gatherAnonymousVariables: Collects out valid local variables from anonymous procedures and code blocks. */
+    const gatherAnonymousVariables = function (Group, Node, Vars) {
+        Group.map((anonProc) => {
             if (Node.from >= anonProc.PositionStart && Node.to <= anonProc.PositionEnd) {
-                anonProc.Variables.map((variable) => {
-                    if (variable.CreationPos < Node.from) {
-                        procedureVars.push(variable.Name);
-                    }
+                anonProc.Variables.map((Var) => {
+                    if (Var.CreationPos < Node.from)
+                        Vars.push(Var.Name);
                 });
-                procedureVars.push(...anonProc.Arguments);
-                procedureVars.push(...gatherAnonVars(anonProc.CodeBlocks, Node));
-                procedureVars.push(...gatherAnonVars(anonProc.AnonymousProcedures, Node));
+                Vars.push(...anonProc.Arguments);
+                gatherAnonymousVariables(anonProc.CodeBlocks, Node, Vars);
+                gatherAnonymousVariables(anonProc.AnonymousProcedures, Node, Vars);
             }
         });
-        return procedureVars;
     };
 
     /** AutoCompletion: Auto completion service for a NetLogo model. */
@@ -30650,7 +30882,7 @@
                     });
                 }
                 // Valid local variables
-                results.push(...this.KeywordsToCompletions(getLocalVars(node, Context.state, context), 'Variable-Local'));
+                results.push(...this.KeywordsToCompletions(getLocalVariables(node, Context.state, context), 'Variable-Local'));
                 return { from, options: results };
             }
             // Failed
@@ -30964,191 +31196,6 @@
         return Context.Context;
     }
 
-    /** CodeEditing: Functions for editing code. */
-    class CodeEditing {
-        /** Constructor: Create a new code editing service. */
-        constructor(View) {
-            this.View = View;
-            this.Galapagos = View.state.field(preprocessStateExtension).Editor;
-        }
-        /** ChangeCode: Send a changeset into the editor. */
-        ChangeCode(Changes) {
-            this.View.dispatch({ changes: Changes });
-        }
-        /** GetSlice: Get a slice of the code. */
-        GetSlice(From, To) {
-            return this.View.state.sliceDoc(From, To);
-        }
-        /** FindFirstChild: Find the first child that matches a condition. */
-        FindFirstChild(Parent, Field, Condition) {
-            var _a;
-            for (let Child of Parent.getChildren(Field)) {
-                if ((_a = Condition === null || Condition === void 0 ? void 0 : Condition(Child)) !== null && _a !== void 0 ? _a : true)
-                    return Child;
-            }
-            return null;
-        }
-        /** AddTermToBracket: Add a term to a bracket. */
-        AddTermToBracket(Contents, Node) {
-            // De-duplicate the contents
-            var Identifiers = Node.node.getChildren('Identifier').map((Child) => this.GetSlice(Child.from, Child.to).trim());
-            Contents = Contents.filter((Content) => Identifiers.indexOf(Content) == -1);
-            if (Contents.length == 0)
-                return false;
-            // Find the spaces between the brackets
-            let Seperator = this.View.state.sliceDoc(Node.from, Node.to).includes('\n') ? '\n' : ' ';
-            var From = this.FindFirstChild(Node, 'CloseBracket').from;
-            // Insert the contents
-            for (let Content of Contents.reverse()) {
-                this.ChangeCode({
-                    from: From,
-                    to: From,
-                    insert: Content + Seperator,
-                });
-                this.ChangeCode(indentRange(this.View.state, From, From + 1 + Content.length));
-            }
-            return true;
-        }
-        // #endregion
-        // #region "Global Statements"
-        /** AppendGlobals: Append items of a global statement to the editor. */
-        AppendGlobals(Field, Items) {
-            Items = [...new Set(Items.filter((Item) => reserved.indexOf(Item) == -1))];
-            if (Items.length == 0)
-                return false;
-            // Find the cursor
-            let Cursor = GetCursorUntilMode(this.View.state);
-            // Find the first global statement
-            if (Cursor) {
-                var Statement = this.FindFirstChild(Cursor.node, Field);
-                if (Statement)
-                    return this.AddTermToBracket(Items, Statement);
-            }
-            // If not found, append a new global statement
-            this.ChangeCode({
-                from: 0,
-                to: 0,
-                insert: `${Field.toLowerCase()} [ ${Items.join(' ')} ]\n`,
-            });
-            return true;
-        }
-        /** AppendBreed: Append a breed to the editor. */
-        AppendBreed(Type, Plural, Singular) {
-            // Check if the breed already exists
-            if (Plural == 'patches' || Singular == 'patch')
-                return false;
-            if (Plural == Singular)
-                Singular = getSingularName(Plural);
-            for (let [Sin, Breed] of this.Galapagos.LintContext.Breeds) {
-                if (Breed.Plural == Plural || Breed.Singular == Singular || Breed.Singular == Plural || Breed.Plural == Singular)
-                    return false;
-            }
-            // TODO: Find the most appropriate place to insert the breed
-            // Add the breed
-            var Name = 'breed';
-            if (Type == BreedType$1.DirectedLink)
-                Name = 'directed-link-breed';
-            if (Type == BreedType$1.UndirectedLink)
-                Name = 'undirected-link-breed';
-            this.ChangeCode({
-                from: 0,
-                to: 0,
-                insert: `${Name} [ ${Plural} ${Singular} ]\n`,
-            });
-            return true;
-        }
-        /** AppendBreedVariables: Add variables to a breed. */
-        AppendBreedVariables(Plural, Variables) {
-            Variables = [...new Set(Variables.filter((Item) => reserved.indexOf(Item) == -1))];
-            if (Variables.length == 0)
-                return false;
-            let Cursor = GetCursorInsideMode(this.View.state);
-            // Find the first existing statement
-            if (Cursor) {
-                while (true) {
-                    if (Cursor.node.name == 'BreedsOwn') {
-                        var Own = this.FindFirstChild(Cursor.node, 'Own');
-                        var Name = this.GetSlice(Own.from, Own.to).trim().toLowerCase();
-                        if (Name === Plural.toLowerCase() + '-own') {
-                            this.AddTermToBracket(Variables, Cursor.node);
-                            return true;
-                        }
-                    }
-                    if (!Cursor.nextSibling() || Cursor.node.name === 'Procedure')
-                        break;
-                }
-            }
-            // TODO: Find the most appropriate place to insert the breed
-            // If not found, append a new statement
-            this.ChangeCode({
-                from: 0,
-                to: 0,
-                insert: `${Plural.toLowerCase()}-own [ ${Variables.join(' ')} ]\n`,
-            });
-            return true;
-        }
-        // #endregion
-        ReplaceProcedure(view, name, content) {
-            syntaxTree(view.state)
-                .cursor()
-                .iterate((node) => {
-                if (node.name == 'Procedure' && view.state.sliceDoc(node.from, node.to) == name) {
-                    node.from + content.length;
-                    view.dispatch({
-                        changes: {
-                            from: node.from,
-                            to: node.to,
-                            insert: content,
-                        },
-                    });
-                }
-            });
-        }
-    }
-
-    /** addBreedAction: Add an adding a breed action. */
-    const addBreedAction = function (diagnostic, type, plural, singular) {
-        var _a;
-        diagnostic.actions = [
-            ...((_a = diagnostic.actions) !== null && _a !== void 0 ? _a : []),
-            {
-                name: Localized.Get('Add'),
-                apply(view, from, to) {
-                    new CodeEditing(view).AppendBreed(type, plural, singular);
-                },
-            },
-        ];
-        return diagnostic;
-    };
-    /** addGlobalsAction: Add an adding global variables action. */
-    const addGlobalsAction = function (diagnostic, type, items) {
-        var _a;
-        diagnostic.actions = [
-            ...((_a = diagnostic.actions) !== null && _a !== void 0 ? _a : []),
-            {
-                name: Localized.Get('Add'),
-                apply(view, from, to) {
-                    new CodeEditing(view).AppendGlobals(type, items);
-                },
-            },
-        ];
-        return diagnostic;
-    };
-    /** RemoveAction: Add an removing the snippet action. */
-    const removeAction = function (diagnostic) {
-        var _a;
-        diagnostic.actions = [
-            ...((_a = diagnostic.actions) !== null && _a !== void 0 ? _a : []),
-            {
-                name: Localized.Get('Remove'),
-                apply(view, from, to) {
-                    view.dispatch({ changes: { from, to, insert: '' } });
-                },
-            },
-        ];
-        return diagnostic;
-    };
-
     // IdentifierLinter: Checks anything labelled 'Identifier'
     const IdentifierLinter = (view, preprocessContext, lintContext) => {
         const diagnostics = [];
@@ -31185,6 +31232,7 @@
                                 plural = getPluralName(breedinfo.breed);
                             }
                             addBreedAction(diagnostic, breedinfo.isLink ? BreedType$1.UndirectedLink : BreedType$1.Turtle, plural, singular);
+                            diagnostics.push(diagnostic);
                         }
                     }
                 }
@@ -31287,13 +31335,13 @@
                 noderef.name == 'SpecialCommandCreateLink' ||
                 noderef.name == 'Own') {
                 //console.log(lintContext)
-                const Node = noderef.node;
-                const value = view.state.sliceDoc(noderef.from, noderef.to).toLowerCase();
-                let result = checkValidBreed(Node, value, context, breeds);
+                const node = noderef.node;
+                const value = getCodeName(view.state, node);
+                let result = checkValidBreed(node, value, context, breeds);
                 if (!result.isValid) {
                     let breed_result = getBreedName(value);
                     let diagnostic = getDiagnostic(view, noderef, 'Unrecognized breed name _', 'error', value);
-                    if (result.make_new_breed) {
+                    if (result.newBreed) {
                         let plural = '';
                         let singular = '';
                         if (result.isPlural) {
@@ -31306,6 +31354,7 @@
                         }
                         addBreedAction(diagnostic, result.isLink ? BreedType$1.UndirectedLink : BreedType$1.Turtle, plural, singular);
                     }
+                    diagnostics.push(diagnostic);
                 }
             }
         });
@@ -31319,7 +31368,7 @@
             isValid: true,
             isPlural: false,
             isLink: false,
-            make_new_breed: true,
+            newBreed: true,
         };
         //console.log(breeds)
         //collect possible breed names in the correct categories
@@ -31373,7 +31422,7 @@
             result.isPlural = true;
         }
         else {
-            result.make_new_breed = false;
+            result.newBreed = false;
         }
         // some procedure names I've come across accidentally use the structure of a
         // breed command/reporter, e.g. ___-with, so this makes sure it's not a procedure name
@@ -31910,7 +31959,7 @@
                 let child = (_c = noderef.node.getChild('Identifier')) !== null && _c !== void 0 ? _c : noderef.node.getChild('UnsupportedPrim');
                 if (!child)
                     return;
-                let localvars = getLocalVars(child, view.state, lintContext);
+                let localvars = getLocalVariables(child, view.state, lintContext);
                 NameCheck(child, 'Local variable', localvars);
             }
             else if (noderef.name == 'Arguments') {
@@ -31919,7 +31968,7 @@
                     let parent = noderef.node.parent.parent;
                     if (parent) {
                         let prev_node = parent === null || parent === void 0 ? void 0 : parent.cursor().moveTo(parent.from - 2).node;
-                        current = getLocalVars(prev_node, view.state, lintContext);
+                        current = getLocalVariables(prev_node, view.state, lintContext);
                     }
                 }
                 for (var key of ['Identifier', 'UnsupportedPrim']) {
@@ -32056,6 +32105,37 @@
         return contexts.join('/');
     };
 
+    // BracketLinter: Checks if all brackets/parentheses have matches
+    const CodeBlockLinter = (view, preprocessContext, lintContext) => {
+        const diagnostics = [];
+        syntaxTree(view.state)
+            .cursor()
+            .iterate((node) => {
+            if (node.name == 'CodeBlock') {
+                let c = node.node.cursor();
+                c.firstChild();
+                if (c) {
+                    let type = !['LineComment', 'OpenBracket', 'CloseBracket'].includes(c.name)
+                        ? c.name == 'ProcedureContent'
+                        : null;
+                    while (c.nextSibling()) {
+                        // console.log(c.name,type)
+                        if (!['LineComment', 'OpenBracket', 'CloseBracket'].includes(c.name) && type == null) {
+                            type = c.name == 'ProcedureContent';
+                        }
+                        if (type == true && !['LineComment', 'OpenBracket', 'CloseBracket', 'ProcedureContent'].includes(c.name)) {
+                            diagnostics.push(getDiagnostic(view, c, 'Inconsistent code block type _', 'error', 'procedure content', c.name));
+                        }
+                        else if (type == false && c.name == 'ProcedureContent') {
+                            diagnostics.push(getDiagnostic(view, c, 'Inconsistent code block type _', 'error', 'Non-procedure content', c.name));
+                        }
+                    }
+                }
+            }
+        });
+        return diagnostics;
+    };
+
     const netlogoLinters = [
         UnrecognizedLinter,
         UnrecognizedGlobalLinter,
@@ -32068,6 +32148,7 @@
         BracketLinter,
         ModeLinter,
         ContextLinter,
+        CodeBlockLinter,
     ];
 
     // CompilerLinter: Present all linting results from the compiler.
@@ -32888,7 +32969,7 @@
             changes.push({
                 from: procedureStart !== null && procedureStart !== void 0 ? procedureStart : state.doc.toString().length,
                 to: procedureStart !== null && procedureStart !== void 0 ? procedureStart : state.doc.toString().length,
-                insert: 'to play\n' + intoProcedure.join('\n') + '\nend\n\n',
+                insert: '\nto play\n' + intoProcedure.join('\n') + '\nend\n\n',
             });
         }
         // Log("CHANGES",changes)
@@ -33552,9 +33633,11 @@
         }
         /** SendRequest: Send a request to the chat backend and handle its outputs. */
         SendRequest(Request) {
+            var _a;
             if (ChatManager.IsRequesting)
                 return;
             Request.Language = this.Thread.Language;
+            Request.Context = (_a = Request.Context) !== null && _a !== void 0 ? _a : { PreviousMessages: [] };
             // Make it a record and put it in the thread
             var Record = Request;
             var Subthread = this.Thread.AddToSubthread(Record);
@@ -35775,17 +35858,17 @@
         static PostprocessLintMessage(Message) {
             return Message;
         }
-    }
-    /** ErrorToDiagnostic: Convert a runtime error to a diagnostic. */
-    function ErrorToDiagnostic(Error) {
-        return {
-            Message: Error.message,
-            Code: Error.code,
-        };
-    }
-    /** ErrorsToDiagnostics: Convert runtime errors to diagnostics. */
-    function ErrorsToDiagnostics(Errors) {
-        return Errors.map(ErrorToDiagnostic);
+        /** ErrorToDiagnostic: Convert a runtime error to a diagnostic. */
+        static ErrorToDiagnostic(Error) {
+            return {
+                Message: Error.message,
+                Code: Error.code,
+            };
+        }
+        /** ErrorsToDiagnostics: Convert runtime errors to diagnostics. */
+        static ErrorsToDiagnostics(Errors) {
+            return Errors.map(this.ErrorToDiagnostic);
+        }
     }
 
     /** FullTextDisplay: Display the full-text help information. */
@@ -36098,7 +36181,7 @@
         }
         /** SubmitParameters: Submit the parameters to the server. */
         SubmitParameters() {
-            var _a, _b, _c;
+            var _a, _b;
             // Compose the input
             var Composed = {};
             this.Children.forEach(Renderer => {
@@ -36114,7 +36197,7 @@
                 return;
             // Build the messages
             var Message = JSON.stringify({
-                Need: (_c = (_b = (_a = Record.Response.Sections.find(Section => Section.Field == "Needs")) === null || _a === void 0 ? void 0 : _a.Parsed) === null || _b === void 0 ? void 0 : _b[0]) !== null && _c !== void 0 ? _c : "Unknown",
+                Need: (_b = (_a = Record.Response.Sections.find(Section => Section.Field == "Need")) === null || _a === void 0 ? void 0 : _a.Content) !== null && _b !== void 0 ? _b : "Unknown",
                 Details: Composed
             });
             var Friendly = `${Localized.Get("Summary of request")}`;
@@ -36256,7 +36339,12 @@
             // Create the shared editor if necessary
             if (!NetLogoUtils.SharedEditor) {
                 NetLogoUtils.SharedEditor = new GalapagosEditor($(`<div class="hidden-editor"></div>`).appendTo(this.Container).get(0), {
-                    ParseMode: ParseMode.Generative
+                    ParseMode: ParseMode.Generative,
+                    OnDictionaryClick: (Text) => this.Tab.ExplainPrimitive(Text),
+                    OnExplain: (Diagnostic, Context) => this.Tab.ExplainDiagnostic({
+                        Message: NetLogoUtils.PostprocessLintMessage(Diagnostic.message),
+                        Code: this.Editor.GetCodeSlice(Diagnostic.from, Diagnostic.to)
+                    }, Context, false)
                 });
                 NetLogoUtils.SharedEditor.SetVisible(false);
                 this.Tab.Editor.EditorTabs[0].Galapagos.AddChild(NetLogoUtils.SharedEditor);
@@ -37275,7 +37363,7 @@
         /** FinishExecution: Notify the completion of the command. */
         FinishExecution(Status, Code, Message) {
             if (Array.isArray(Message) && Message.length > 0) {
-                var Diagnostics = ErrorsToDiagnostics(Message);
+                var Diagnostics = NetLogoUtils.ErrorsToDiagnostics(Message);
                 this.RenderResponses([{
                         Type: Status == "CompileError" ? ChatResponseType.CompileError : ChatResponseType.RuntimeError,
                         Parsed: Diagnostics.length
@@ -37497,7 +37585,7 @@
                 ParseMode: ParseMode.Oneline,
                 Placeholder: this.Placeholder.get(0),
                 OnKeyUp: (Event) => this.InputKeyHandler(Event),
-                OnDictionaryClick: (Text) => this.ExplainFull(Text)
+                OnDictionaryClick: (Text) => this.ExplainPrimitive(Text)
             });
             // Send button
             this.SendButton = $(`<div class="command-send"><div class="dot-stretching"></div></div>`).on("click", () => {
@@ -37659,6 +37747,28 @@
             this.SendButton.toggleClass("disabled", this.Disabled);
         }
         // #endregion
+        // #region "Documentation"
+        /** ExplainPrimitive: Explain the selected text in the command center in full. */
+        ExplainPrimitive(Command) {
+            if (!EditorDictionary.Check(Command))
+                return false;
+            this.ExecuteCommand("observer", `help ${Command} -full`, false);
+        }
+        /** ExplainDiagnostic: Explain the diagnostic. */
+        ExplainDiagnostic(Diagnostic, Context, NewThread) {
+            var _a, _b;
+            if (!this.Visible)
+                this.Show();
+            this.ChatManager.SendRequest({
+                Input: JSON.stringify(Diagnostic),
+                FriendlyInput: Localized.Get("Can you explain the error message?"),
+                Operation: "CodeExplain",
+                SubOperation: "CompileError",
+                ThreadID: NewThread ? undefined : (_b = (_a = this.Outputs.Subthread) === null || _a === void 0 ? void 0 : _a.GetData()) === null || _b === void 0 ? void 0 : _b.RootID,
+                Context: { CodeSnippet: Context, PreviousMessages: [] }
+            });
+        }
+        // #endregion
         // #region "Command Execution"
         /** ExecuteInput: Execute a human-sent command. */
         ExecuteInput(Objective, Content, Temporary) {
@@ -37746,12 +37856,6 @@
         FormatArgument(Value) {
             return !Value.startsWith("[") && !Value.startsWith("\"") && Value.indexOf(" ") != -1 && !Value.endsWith("]") ? `"${Value}"` : Value;
         }
-        /** ExplainFull: ExplainFull: Explain the selected text in the command center in full. */
-        ExplainFull(Command) {
-            if (!EditorDictionary.Check(Command))
-                return false;
-            this.ExecuteCommand("observer", `help ${Command} -full`, false);
-        }
         /** RecompileTemporarily Recompile the code snippet temporarily. */
         RecompileTemporarily(Code, Procedures, Callback) {
             if (this.Disabled)
@@ -37795,7 +37899,7 @@
                 // Build the diagnostics
                 var Diagnostics = {
                     Type: DiagnosticType.Compile,
-                    Diagnostics: ErrorsToDiagnostics(Errors),
+                    Diagnostics: NetLogoUtils.ErrorsToDiagnostics(Errors),
                     Code: this.TemporaryCode
                 };
                 // Show the diagnostics
@@ -37854,7 +37958,11 @@
                     if (Changed)
                         this.Galapagos.SetCompilerErrors([]);
                 },
-                OnDictionaryClick: (Text) => this.Editor.CommandTab.ExplainFull(Text)
+                OnDictionaryClick: (Text) => this.Editor.CommandTab.ExplainPrimitive(Text),
+                OnExplain: (Diagnostic, Context) => this.Editor.CommandTab.ExplainDiagnostic({
+                    Message: NetLogoUtils.PostprocessLintMessage(Diagnostic.message),
+                    Code: this.Galapagos.GetCodeSlice(Diagnostic.from, Diagnostic.to)
+                }, Context, true)
             });
         }
         // Show the tips

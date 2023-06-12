@@ -1,4 +1,5 @@
 import { EditorView, ViewUpdate } from '@codemirror/view';
+import { Diagnostic } from '@codemirror/lint';
 /** Options: Options of an editor. */
 export interface EditorConfig {
     /** Language: The programming language of this editor. */
@@ -23,6 +24,8 @@ export interface EditorConfig {
     OnFocused?: (View: EditorView) => void;
     /** OnBlurred: Handle the blurred event. */
     OnBlurred?: (View: EditorView) => void;
+    /** OnExplain: Triggers when a linting tooltip needs explanation. */
+    OnExplain?: (Diagnostic: Diagnostic, Context: string) => void;
     /** OnDictionaryClick: Triggers when a dictionary tooltip is clicked. */
     OnDictionaryClick?: (Key: string) => void;
 }

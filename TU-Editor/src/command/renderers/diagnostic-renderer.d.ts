@@ -14,6 +14,8 @@ export declare class DiagnosticsRenderer extends JSONSectionRenderer<Diagnostics
     protected RenderInternal(): void;
     /** SubmitDiagnostics: Submit the diagnostics to the server. */
     private SubmitDiagnostics;
+    /** ClipDiagnostics: Clip the diagnostics to the specified count. */
+    private ClipDiagnostics;
     /** GetChooser: Return the section chooser for this renderer. */
     static GetChooser(): RendererChooser;
 }

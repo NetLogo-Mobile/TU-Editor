@@ -28467,6 +28467,8 @@
             this.RecognizedMode = 'Unknown';
             /** ContextErrors: Context errors detected during processing. */
             this.ContextErrors = [];
+            /** EditorID: The id of the editor. */
+            this.EditorID = 0;
             // #endregion
         }
         // #endregion
@@ -28480,6 +28482,9 @@
             return this.IsDirty;
         }
         // #endregion
+        setID(id) {
+            this.EditorID = id;
+        }
         // #region "Parsing"
         /** ParseState: Parse the state from an editor state. */
         ParseState(State) {
@@ -28583,8 +28588,25 @@
                         return this;
                 }
             }
-            else if (this.RecognizedMode == 'Command') ;
+            else if (this.RecognizedMode == 'Command') {
+                let procedure = this.gatherEmbeddedProcedure(Cursor.node, State);
+                this.Procedures.set(procedure.Name, procedure);
+            }
             return this;
+        }
+        /** gatherProcedure: Gather all information about a procedure in embedded mode. */
+        gatherEmbeddedProcedure(node, State) {
+            let procedure = new Procedure();
+            procedure.PositionStart = node.from;
+            procedure.PositionEnd = node.to;
+            procedure.IsCommand = true;
+            procedure.Name = '⚠EmbeddedProcedure⚠';
+            procedure.Arguments = [];
+            procedure.Variables = this.getLocalVarsCommand(node, State, false);
+            procedure.AnonymousProcedures = this.gatherAnonProcedures(node, State, procedure);
+            procedure.Context = this.getContext(node, State);
+            procedure.CodeBlocks = this.gatherCodeBlocks(node, State, procedure.Context, procedure.Variables, procedure.Arguments);
+            return procedure;
         }
         /** gatherProcedure: Gather all information about a procedure. */
         gatherProcedure(node, State) {
@@ -29115,7 +29137,7 @@
         var Extension = linter(BuiltSource);
         Extension.Source = BuiltSource;
         // Remove the default tooltip of linting. We will provide our own.
-        if (Extension.length > 2 && Extension[2].length == 4) {
+        if (Extension[2].length == 4) {
             lintState = Extension[2][0];
             Extension[2].splice(2, 1);
             console.log(Extension);
@@ -29130,16 +29152,14 @@
     /** getDiagnostic: Returns a diagnostic object from a node and message. */
     const getDiagnostic = function (view, node, message, severity = 'error', ...values) {
         var value = view.state.sliceDoc(node.from, node.to).trim();
-        var length = value.length;
-        if (values.length == 0) {
-            // Cut short the value if it's too long
-            if (value.length >= 20)
-                value = value.substring(0, 17) + '...';
+        // Cut short the value if it's too long
+        if (value.length >= 20)
+            value = value.substring(0, 17) + '...';
+        if (values.length == 0)
             values.push(value);
-        }
         return {
             from: node.from,
-            to: node.from + length,
+            to: node.from + value.length,
             severity: severity,
             message: Localized.Get(message, ...values),
         };
@@ -30664,12 +30684,20 @@
     /* getLocalVariables: collects list of valid local variables for given position. */
     const getLocalVariables = function (Node, State, parseState) {
         let procedureVars = [];
+        let procedure = null;
         // get the procedure name
         var procedureName = getParentProcedure(State, Node);
-        if (!procedureName)
-            return [];
+        if (procedureName) {
+            procedure = parseState.Procedures.get(procedureName.toLowerCase());
+        }
+        if (State.field(stateExtension).EditorID != 0) {
+            for (var p of parseState.Procedures.values()) {
+                if (p.EditorID == State.field(stateExtension).EditorID) {
+                    procedure = p;
+                }
+            }
+        }
         // gets list of procedure variables from own procedure, as well as list of all procedure names
-        let procedure = parseState.Procedures.get(procedureName.toLowerCase());
         if (!procedure)
             return procedureVars;
         procedure.Variables.map((variable) => {
@@ -31905,79 +31933,106 @@
                 }
             }
         };
-        // Go through the syntax tree
-        syntaxTree(view.state)
-            .cursor()
-            .iterate((noderef) => {
-            var _a, _b, _c, _d;
-            if (noderef.name == 'BreedSingular' || noderef.name == 'BreedPlural') {
-                NameCheck(noderef, 'Breed');
-            }
-            else if (noderef.name == 'Identifier' && ((_a = noderef.node.parent) === null || _a === void 0 ? void 0 : _a.name) == 'Globals') {
-                NameCheck(noderef, 'Global variable');
-            }
-            else if (noderef.name == 'ProcedureName') {
-                view.state.sliceDoc(noderef.from, noderef.to).toLowerCase();
-                if (((_b = noderef.node.parent) === null || _b === void 0 ? void 0 : _b.getChildren('To').length) == 0) {
-                    diagnostics.push(getDiagnostic(view, noderef, 'Unrecognized global statement _', 'error'));
+        if (view.state.field(stateExtension).EditorID != 0) {
+            syntaxTree(view.state)
+                .cursor()
+                .iterate((noderef) => {
+                var _a;
+                if (noderef.name == 'NewVariableDeclaration') {
+                    // TODO: Optimize it so that whenever we see a procedure, we check the local variables
+                    // Now, for each new variable declaration, we look back again
+                    // It would also solve the issue of arguments & local variables using the same name
+                    // Since the new variable definition is typically few, not a high priority
+                    let child = (_a = noderef.node.getChild('Identifier')) !== null && _a !== void 0 ? _a : noderef.node.getChild('UnsupportedPrim');
+                    if (!child)
+                        return;
+                    let localvars = [
+                        ...lintContext.Globals.keys(),
+                        ...lintContext.WidgetGlobals.keys(),
+                        ...lintContext.Procedures.keys(),
+                        ...lintContext.Breeds.keys(),
+                        ...lintContext.Extensions.keys(),
+                        ...getLocalVariables(child, view.state, lintContext),
+                    ];
+                    NameCheck(child, 'Local variable', localvars);
                 }
-                else {
-                    NameCheck(noderef, 'Procedure');
+            });
+        }
+        else {
+            // Go through the syntax tree
+            syntaxTree(view.state)
+                .cursor()
+                .iterate((noderef) => {
+                var _a, _b, _c, _d;
+                if (noderef.name == 'BreedSingular' || noderef.name == 'BreedPlural') {
+                    NameCheck(noderef, 'Breed');
                 }
-            }
-            else if (noderef.name == 'BreedsOwn') {
-                let own = noderef.node.getChild('Own');
-                let breedvars = [];
-                if (!own)
-                    return;
-                let breedName = view.state.sliceDoc(own.from, own.to).toLowerCase();
-                breedName = breedName.substring(0, breedName.length - 4);
-                noderef.node.getChildren('Identifier').map((child) => {
-                    if (breedName == 'turtles') {
-                        NameCheck(child, 'Turtle variable');
-                    }
-                    else if (breedName == 'links') {
-                        NameCheck(child, 'Link variable');
-                    }
-                    else if (breedName == 'patches') {
-                        NameCheck(child, 'Patch variable');
-                    }
-                    else if (isLinkBreed(breedName, lintContext)) {
-                        NameCheck(child, 'Link variable', breedvars, true);
+                else if (noderef.name == 'Identifier' && ((_a = noderef.node.parent) === null || _a === void 0 ? void 0 : _a.name) == 'Globals') {
+                    NameCheck(noderef, 'Global variable');
+                }
+                else if (noderef.name == 'ProcedureName') {
+                    view.state.sliceDoc(noderef.from, noderef.to).toLowerCase();
+                    if (((_b = noderef.node.parent) === null || _b === void 0 ? void 0 : _b.getChildren('To').length) == 0) {
+                        diagnostics.push(getDiagnostic(view, noderef, 'Unrecognized global statement _', 'error'));
                     }
                     else {
-                        NameCheck(child, 'Turtle variable', breedvars, true);
-                    }
-                });
-                breedDefined.push(...breedvars);
-            }
-            else if (noderef.name == 'NewVariableDeclaration') {
-                // TODO: Optimize it so that whenever we see a procedure, we check the local variables
-                // Now, for each new variable declaration, we look back again
-                // It would also solve the issue of arguments & local variables using the same name
-                // Since the new variable definition is typically few, not a high priority
-                let child = (_c = noderef.node.getChild('Identifier')) !== null && _c !== void 0 ? _c : noderef.node.getChild('UnsupportedPrim');
-                if (!child)
-                    return;
-                let localvars = getLocalVariables(child, view.state, lintContext);
-                NameCheck(child, 'Local variable', localvars);
-            }
-            else if (noderef.name == 'Arguments') {
-                let current = [];
-                if (((_d = noderef.node.parent) === null || _d === void 0 ? void 0 : _d.name) == 'AnonArguments') {
-                    let parent = noderef.node.parent.parent;
-                    if (parent) {
-                        let prev_node = parent === null || parent === void 0 ? void 0 : parent.cursor().moveTo(parent.from - 2).node;
-                        current = getLocalVariables(prev_node, view.state, lintContext);
+                        NameCheck(noderef, 'Procedure');
                     }
                 }
-                for (var key of ['Identifier', 'UnsupportedPrim']) {
-                    noderef.node.getChildren(key).map((child) => {
-                        NameCheck(child, 'Argument', current);
+                else if (noderef.name == 'BreedsOwn') {
+                    let own = noderef.node.getChild('Own');
+                    let breedvars = [];
+                    if (!own)
+                        return;
+                    let breedName = view.state.sliceDoc(own.from, own.to).toLowerCase();
+                    breedName = breedName.substring(0, breedName.length - 4);
+                    noderef.node.getChildren('Identifier').map((child) => {
+                        if (breedName == 'turtles') {
+                            NameCheck(child, 'Turtle variable');
+                        }
+                        else if (breedName == 'links') {
+                            NameCheck(child, 'Link variable');
+                        }
+                        else if (breedName == 'patches') {
+                            NameCheck(child, 'Patch variable');
+                        }
+                        else if (isLinkBreed(breedName, lintContext)) {
+                            NameCheck(child, 'Link variable', breedvars, true);
+                        }
+                        else {
+                            NameCheck(child, 'Turtle variable', breedvars, true);
+                        }
                     });
+                    breedDefined.push(...breedvars);
                 }
-            }
-        });
+                else if (noderef.name == 'NewVariableDeclaration') {
+                    // TODO: Optimize it so that whenever we see a procedure, we check the local variables
+                    // Now, for each new variable declaration, we look back again
+                    // It would also solve the issue of arguments & local variables using the same name
+                    // Since the new variable definition is typically few, not a high priority
+                    let child = (_c = noderef.node.getChild('Identifier')) !== null && _c !== void 0 ? _c : noderef.node.getChild('UnsupportedPrim');
+                    if (!child)
+                        return;
+                    let localvars = getLocalVariables(child, view.state, lintContext);
+                    NameCheck(child, 'Local variable', localvars);
+                }
+                else if (noderef.name == 'Arguments') {
+                    let current = [];
+                    if (((_d = noderef.node.parent) === null || _d === void 0 ? void 0 : _d.name) == 'AnonArguments') {
+                        let parent = noderef.node.parent.parent;
+                        if (parent) {
+                            let prev_node = parent === null || parent === void 0 ? void 0 : parent.cursor().moveTo(parent.from - 2).node;
+                            current = getLocalVariables(prev_node, view.state, lintContext);
+                        }
+                    }
+                    for (var key of ['Identifier', 'UnsupportedPrim']) {
+                        noderef.node.getChildren(key).map((child) => {
+                            NameCheck(child, 'Argument', current);
+                        });
+                    }
+                }
+            });
+        }
         return diagnostics;
     };
     const isLinkBreed = (breedName, lintContext) => {
@@ -33323,6 +33378,7 @@
             this.Children.push(Child);
             Child.ID = this.Children.length;
             Child.ParentEditor = this;
+            Child.CodeMirror.state.field(stateExtension).setID(Child.ID);
             // Generative editors are sort of independent
             if (Child.Options.ParseMode !== ParseMode.Generative) {
                 Child.LintContext = this.LintContext;
@@ -33478,31 +33534,31 @@
         UpdateSharedContext() {
             var mainLint = this.LintContext.Clear();
             for (var child of this.GetChildren()) {
-                if (child.Options.ParseMode == ParseMode.Normal || child == this) {
-                    let state = child.CodeMirror.state.field(stateExtension);
-                    for (var name of state.Extensions)
-                        mainLint.Extensions.set(name, child.ID);
-                    for (var name of state.Globals)
-                        mainLint.Globals.set(name, child.ID);
-                    for (var name of state.WidgetGlobals)
-                        mainLint.WidgetGlobals.set(name, child.ID);
-                    for (var [name, procedure] of state.Procedures) {
-                        procedure.EditorID = child.ID;
-                        mainLint.Procedures.set(name, procedure);
+                //if (child.Options.ParseMode == ParseMode.Normal || child == this) {
+                let state = child.CodeMirror.state.field(stateExtension);
+                for (var name of state.Extensions)
+                    mainLint.Extensions.set(name, child.ID);
+                for (var name of state.Globals)
+                    mainLint.Globals.set(name, child.ID);
+                for (var name of state.WidgetGlobals)
+                    mainLint.WidgetGlobals.set(name, child.ID);
+                for (var [name, procedure] of state.Procedures) {
+                    procedure.EditorID = child.ID;
+                    mainLint.Procedures.set(name, procedure);
+                }
+                for (var [name, breed] of state.Breeds) {
+                    breed.EditorID = child.ID;
+                    if (mainLint.Breeds.has(name)) {
+                        var variables = mainLint.Breeds.get(name).Variables;
+                        breed.Variables.forEach((variable) => {
+                            if (!variables.includes(variable))
+                                variables.push(variable);
+                        });
                     }
-                    for (var [name, breed] of state.Breeds) {
-                        breed.EditorID = child.ID;
-                        if (mainLint.Breeds.has(name)) {
-                            var variables = mainLint.Breeds.get(name).Variables;
-                            breed.Variables.forEach((variable) => {
-                                if (!variables.includes(variable))
-                                    variables.push(variable);
-                            });
-                        }
-                        else {
-                            mainLint.Breeds.set(name, breed);
-                        }
+                    else {
+                        mainLint.Breeds.set(name, breed);
                     }
+                    //}
                 }
             }
             this.RefreshContexts();
@@ -36241,37 +36297,23 @@
             Inheritance: ContextInheritance.Drop
         };
     }
-    /** AskCode: Ask a question about the code. */
-    function AskCode(Label, Style, Transparent) {
+    /** ExplainErrors: Explain the code. */
+    function ExplainCode(Label) {
         return {
-            Label: Label !== null && Label !== void 0 ? Label : "Can I ask a question?",
-            Style: Style !== null && Style !== void 0 ? Style : "followup",
-            Operation: "CodeAsk",
-            AskInput: true,
-            TextInContext: ContextMessage.MessagesAsText,
-            CodeInContext: true,
-            Transparent: Transparent !== null && Transparent !== void 0 ? Transparent : false,
-            Inheritance: ContextInheritance.InheritOne
-        };
-    }
-    /** FixCode: Fix the current code snippet. */
-    function FixCode(Label) {
-        return {
-            Label: Label !== null && Label !== void 0 ? Label : "Help me fix this code",
-            Style: "code",
-            Operation: "CodeFix",
-            AskInput: true,
+            Label: Label !== null && Label !== void 0 ? Label : "Can you explain the code?",
+            Operation: "CodeExplain",
+            SubOperation: "Explain",
+            AskInput: false,
             InputInContext: false,
             TextInContext: ContextMessage.Nothing,
             CodeInContext: true,
-            Transparent: true,
             Inheritance: ContextInheritance.InheritOne
         };
     }
     /** ExplainErrors: Explain the errors. */
     function ExplainErrors(Type, Label) {
         return {
-            Label: Label !== null && Label !== void 0 ? Label : "Explain the error",
+            Label: Label !== null && Label !== void 0 ? Label : "Can you explain the error?",
             Operation: "CodeExplain",
             SubOperation: Type,
             AskInput: true,
@@ -36411,9 +36453,14 @@
             // Hide previous records
             var NeedHiding = true;
             for (var Child of this.Subthread.Children) {
-                Child.Container.toggleClass("code-hidden", NeedHiding);
-                if (Child.GetData() == Record)
+                if (Child.GetData() == Record) {
+                    Child.Container.toggleClass("code-output", true);
                     NeedHiding = false;
+                }
+                else {
+                    Child.Container.toggleClass("code-output", false);
+                }
+                Child.Container.toggleClass("code-hidden", NeedHiding);
             }
             this.UpdateHistory();
         }
@@ -36634,11 +36681,11 @@
             // Render the statistics
             var Metadata = this.GetParsed();
             if (!Metadata.Hidden) {
-                for (var Diagnostic of Metadata.Diagnostics) {
+                for (var I = 0; I < Metadata.Diagnostics.length; I++) {
                     var Renderer = new DiagnosticRenderer();
                     this.AddChild(Renderer, false);
                     Renderer.Container.appendTo(this.ContentContainer);
-                    Renderer.SetData(Diagnostic);
+                    Renderer.SetData(Metadata.Diagnostics[I]);
                     Renderer.Render();
                 }
                 NetLogoUtils.AnnotateCodes(this.ContentContainer.find("code"));
@@ -36647,7 +36694,6 @@
             if (!ChatManager.Available)
                 return;
             this.ShowPseudoOption(ExplainErrors(Metadata.Type), (Option) => this.SubmitDiagnostics(Option, false));
-            this.ShowPseudoOption(FixCode(), (Option) => this.SubmitDiagnostics(Option, true));
         }
         /** SubmitDiagnostics: Submit the diagnostics to the server. */
         SubmitDiagnostics(Option, Fixing) {
@@ -36660,15 +36706,24 @@
             // Export the diagnostics
             if (Metadata.Code) {
                 // Export the diagnostics from the metadata
-                Manager.SendMessage(JSON.stringify(Metadata.Diagnostics), (_a = Option.LocalizedLabel) !== null && _a !== void 0 ? _a : Localized.Get(Option.Label));
+                Manager.SendMessage(JSON.stringify(this.ClipDiagnostics(Metadata.Diagnostics, 3)), (_a = Option.LocalizedLabel) !== null && _a !== void 0 ? _a : Localized.Get(Option.Label));
             }
             else {
                 // Re-export the diagnostics from the latest code snippet
                 CodeDisplay.Instance.ExportDiagnostics().then(Diagnostics => {
                     var _a;
-                    return Manager.SendMessage(JSON.stringify(Diagnostics.Diagnostics), (_a = Option.LocalizedLabel) !== null && _a !== void 0 ? _a : Localized.Get(Option.Label));
+                    return Manager.SendMessage(JSON.stringify(this.ClipDiagnostics(Diagnostics.Diagnostics, 3)), (_a = Option.LocalizedLabel) !== null && _a !== void 0 ? _a : Localized.Get(Option.Label));
                 });
             }
+        }
+        /** ClipDiagnostics: Clip the diagnostics to the specified count. */
+        ClipDiagnostics(Diagnostics, Count) {
+            if (Diagnostics.length <= Count)
+                return Diagnostics;
+            var Clipped = [];
+            for (var I = 0; I < Count; I++)
+                Clipped.push(Diagnostics[I]);
+            return Clipped;
         }
         /** GetChooser: Return the section chooser for this renderer. */
         static GetChooser() {
@@ -37296,9 +37351,9 @@
         /** RenderResponses: Render response sections immediately in the current record. */
         RenderResponses(Sections, Finalizing) {
             var _a;
-            if (Sections.length == 0 && !Finalizing)
-                return;
             var LastRecord = this.Subthread.Children[this.Subthread.Children.length - 1];
+            if (Sections.length == 0 && !Finalizing)
+                return LastRecord === null || LastRecord === void 0 ? void 0 : LastRecord.GetData();
             // Check if the last record is finished
             // If so, create a new record
             if (!LastRecord.Processing)
@@ -37311,6 +37366,7 @@
                 LastRecord.SetFinalized();
             this.Subthread.Render();
             this.ScrollToBottom();
+            return LastRecord.GetData();
         }
         /** RenderOption: Render a response option in the current record. */
         RenderOption(Option) {
@@ -37362,6 +37418,7 @@
         }
         /** FinishExecution: Notify the completion of the command. */
         FinishExecution(Status, Code, Message) {
+            var _a;
             if (Array.isArray(Message) && Message.length > 0) {
                 var Diagnostics = NetLogoUtils.ErrorsToDiagnostics(Message);
                 this.RenderResponses([{
@@ -37377,14 +37434,18 @@
                         }
                     }], true);
             }
-            else {
+            else if (typeof (Message) == "string") {
                 this.PrintOutput(Status, Message);
                 this.RestartBatch();
                 if (ChatManager.Available) {
-                    this.RenderOptions([AskCode()]);
+                    this.RenderOptions([ExplainCode()]);
                     this.RenderOptions([ChangeTopic()]);
                 }
-                this.RenderResponses([], true);
+                var Record = this.RenderResponses([], true);
+                if (Record) {
+                    Record.Context = (_a = Record.Context) !== null && _a !== void 0 ? _a : { PreviousMessages: [] };
+                    Record.Context.CodeSnippet = Message.length == 0 ? Code : Message;
+                }
             }
             this.Tab.SetDisabled(false);
         }

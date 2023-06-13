@@ -28,7 +28,7 @@ export declare class OutputDisplay extends Display {
     /** RenderRequest: Render an offline chat request and return a new record. */
     RenderRequest(Input?: string, Parent?: ChatRecord, FriendlyInput?: string): RecordRenderer;
     /** RenderResponses: Render response sections immediately in the current record. */
-    RenderResponses(Sections: ChatResponseSection[], Finalizing: boolean): void;
+    RenderResponses(Sections: ChatResponseSection[], Finalizing: boolean): ChatRecord | undefined;
     /** RenderOption: Render a response option in the current record. */
     RenderOption(Option: ChatResponseOption): void;
     /** RenderOptions: Render response options in the current record. */
@@ -48,7 +48,7 @@ export declare class OutputDisplay extends Display {
     /** PrintCommandInput: Print a line of input to the screen. */
     PrintCommandInput(Content: string, Restart?: boolean): ChatRecord;
     /** FinishExecution: Notify the completion of the command. */
-    FinishExecution(Status: string, Code: string, Message: any | RuntimeError[]): void;
+    FinishExecution(Status: string, Code: string, Message: string | RuntimeError[]): void;
     /** PrintOutput: Provide for Unity to print compiled output. */
     PrintOutput(Class: string, Content: any): void;
     /** ShowWelcome: Show the initial welcome message. */

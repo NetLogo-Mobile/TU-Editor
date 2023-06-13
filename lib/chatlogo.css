@@ -384,15 +384,19 @@
 	color: #cc2200;
 }
 
-.command-output .compile-error ul li {
-	color: #cc2200;
+.command-output ul.diagnostics li {
+	display: none;
+}
+
+.command-output ul.diagnostics li:nth-child(-n+4) {
+	display: block;
 }
 
 .command-output .succeeded {
 	color: #007F69;
 }
 
-.command-output :not(:first-child).code {
+.command-output div:not(:first-child).code {
 	margin-top: 0.5rem;
 	margin-bottom: 0.5rem;
 }
@@ -464,6 +468,7 @@
 
 .command-output .code-ideation p:not(.chosen) a {
 	color: #cc2200;
+	margin-left: 0.2rem;
 }
 
 .command-output .parameter input {
@@ -577,6 +582,14 @@
 }
 
 .command-output.code-enabled .subthread:not(.activated) {
+	display: none;
+}
+
+.command-output.code-enabled .record.code-output .input {
+	display: none;
+}
+
+.command-output.code-enabled .record.code-output .section.code {
 	display: none;
 }
 

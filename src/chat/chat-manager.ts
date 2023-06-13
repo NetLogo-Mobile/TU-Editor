@@ -36,9 +36,10 @@ export class ChatManager {
     /** IsRequesting: Whether we are currently requesting anything. */
     public static IsRequesting: boolean = false;
     /** SendRequest: Send a request to the chat backend and handle its outputs. */
-    private SendRequest(Request: ClientChatRequest) {
+    public SendRequest(Request: ClientChatRequest) {
         if (ChatManager.IsRequesting) return;
         Request.Language = this.Thread.Language;
+        Request.Context = Request.Context ?? { PreviousMessages: [] };
         // Make it a record and put it in the thread
         var Record = Request as ChatRecord;
         var Subthread = this.Thread.AddToSubthread(Record);

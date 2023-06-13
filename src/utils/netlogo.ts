@@ -49,17 +49,15 @@ export class NetLogoUtils {
 	public static PostprocessLintMessage(Message: string): string {
 		return Message;
 	}
-}
-
-/** ErrorToDiagnostic: Convert a runtime error to a diagnostic. */
-export function ErrorToDiagnostic(Error: RuntimeError): Diagnostic {
-	return {
-		Message: Error.message,
-		Code: Error.code!,
-	};
-}
-
-/** ErrorsToDiagnostics: Convert runtime errors to diagnostics. */
-export function ErrorsToDiagnostics(Errors: RuntimeError[]): Diagnostic[] {
-	return Errors.map(ErrorToDiagnostic);
+	/** ErrorToDiagnostic: Convert a runtime error to a diagnostic. */
+	public static ErrorToDiagnostic(Error: RuntimeError): Diagnostic {
+		return {
+			Message: Error.message,
+			Code: Error.code!,
+		};
+	}
+	/** ErrorsToDiagnostics: Convert runtime errors to diagnostics. */
+	public static ErrorsToDiagnostics(Errors: RuntimeError[]): Diagnostic[] {
+		return Errors.map(this.ErrorToDiagnostic);
+	}
 }

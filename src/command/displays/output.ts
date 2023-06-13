@@ -13,7 +13,7 @@ import { ErrorsToDiagnostics } from "../../utils/netlogo";
 import { DiagnosticType } from "../../chat/client/languages/netlogo-context";
 import { GenerateObjectID } from "../../utils/misc";
 import { CodeSectionRenderer } from "../sections/code-section-renderer";
-import { AskCode, ChangeTopic } from "../../chat/client/options/option-templates";
+import { AskCode, ChangeTopic, ExplainCode } from "../../chat/client/options/option-templates";
 
 /** OutputDisplay: Display the output section. */
 export class OutputDisplay extends Display {
@@ -117,9 +117,9 @@ export class OutputDisplay extends Display {
 		return this.RenderRecord(Record, Subthread);
 	}
 	/** RenderResponses: Render response sections immediately in the current record. */
-	public RenderResponses(Sections: ChatResponseSection[], Finalizing: boolean) {
-		if (Sections.length == 0 && !Finalizing) return;
+	public RenderResponses(Sections: ChatResponseSection[], Finalizing: boolean): ChatRecord | undefined {
 		var LastRecord = this.Subthread!.Children[this.Subthread!.Children.length - 1] as RecordRenderer;
+		if (Sections.length == 0 && !Finalizing) return LastRecord?.GetData();
 		// Check if the last record is finished
 		// If so, create a new record
 		if (!LastRecord.Processing) 
@@ -131,6 +131,7 @@ export class OutputDisplay extends Display {
 		if (Finalizing) LastRecord.SetFinalized();
 		this.Subthread!.Render();
 		this.ScrollToBottom();
+		return LastRecord.GetData();
 	}
 	/** RenderOption: Render a response option in the current record. */
 	public RenderOption(Option: ChatResponseOption) {
@@ -182,7 +183,7 @@ export class OutputDisplay extends Display {
 		return this.RenderRequest(`\`\`\`\n${Content.replace("`", "\`")}\n\`\`\``, Parent).GetData();
 	}
 	/** FinishExecution: Notify the completion of the command. */
-	public FinishExecution(Status: string, Code: string, Message: any | RuntimeError[]) {
+	public FinishExecution(Status: string, Code: string, Message: string | RuntimeError[]) {
 		if (Array.isArray(Message) && Message.length > 0) {
 			var Diagnostics = ErrorsToDiagnostics(Message as RuntimeError[]);
 			this.RenderResponses([{
@@ -197,14 +198,18 @@ export class OutputDisplay extends Display {
 					Code: Code
 				}
 			}], true);
-		} else {
+		} else if (typeof(Message) == "string") {
 			this.PrintOutput(Status, Message);
 			this.RestartBatch();
 			if (ChatManager.Available) {
-				this.RenderOptions([ AskCode() ]);
+				this.RenderOptions([ ExplainCode() ]);
 				this.RenderOptions([ ChangeTopic() ]);
 			}
-			this.RenderResponses([], true);
+			var Record = this.RenderResponses([], true);
+			if (Record) {
+				Record.Context = Record.Context ?? { PreviousMessages: [] };
+				Record.Context.CodeSnippet = Message.length == 0 ? Code : Message;
+			}
 		}
 		this.Tab.SetDisabled(false);
 	}

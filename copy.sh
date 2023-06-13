@@ -4,3 +4,8 @@ cp ./dist/tortuga-editor.js ../Mobile/Assets/StreamingAssets/Dependency/
 cp ./dist/lib/chatlogo.css ../Mobile/Assets/StreamingAssets/Dependency/lib/
 cp ./dist/lib/editor.css ../Mobile/Assets/StreamingAssets/Dependency/lib/
 cp ./dist/images/*.png ../Mobile/Assets/StreamingAssets/Dependency/images/
+cp ./dist/editor.html ../Mobile/Builds/Dependencies/Latest/
+cp ./dist/tortuga-editor.js ../Mobile/Builds/Dependencies/Latest/
+cp ./dist/lib/chatlogo.css ../Mobile/Builds/Dependencies/Latest/lib/
+cp ./dist/lib/editor.css ../Mobile/Builds/Dependencies/Latest/lib/
+cp ./dist/images/*.png ../Mobile/Builds/Dependencies/Latest/images/

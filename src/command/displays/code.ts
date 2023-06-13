@@ -117,8 +117,13 @@ export class CodeDisplay extends Display {
 		// Hide previous records
         var NeedHiding = true;
         for (var Child of this.Subthread!.Children) {
+            if ((Child as RecordRenderer).GetData() == Record) {
+				Child.Container.toggleClass("code-output", true);
+				NeedHiding = false;
+			} else {
+				Child.Container.toggleClass("code-output", false);
+			}
             Child.Container.toggleClass("code-hidden", NeedHiding);
-            if ((Child as RecordRenderer).GetData() == Record) NeedHiding = false;
         }
 		this.UpdateHistory();
 	}

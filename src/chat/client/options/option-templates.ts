@@ -104,14 +104,28 @@ export function AskCode(Label?: string, Style?: string, Transparent?: boolean): 
 /** FixCode: Fix the current code snippet. */
 export function FixCode(Label?: string): ChatResponseOption {
     return {
-        Label: Label ?? "Help me fix this code",
+        Label: Label ?? "Can you try to fix the code?",
         Style: "code",
         Operation: "CodeFix",
         AskInput: true,
         InputInContext: false,
-        TextInContext: ContextMessage.Nothing,
+        TextInContext: ContextMessage.MessagesAsText,
         CodeInContext: true,
         Transparent: true,
+        Inheritance: ContextInheritance.InheritOne
+    }
+}
+
+/** ExplainErrors: Explain the code. */
+export function ExplainCode(Label?: string): ChatResponseOption {
+    return {
+        Label: Label ?? "Can you explain the code?",
+        Operation: "CodeExplain",
+        SubOperation: "Explain",
+        AskInput: false,
+        InputInContext: false,
+        TextInContext: ContextMessage.Nothing,
+        CodeInContext: true,
         Inheritance: ContextInheritance.InheritOne
     }
 }
@@ -119,7 +133,7 @@ export function FixCode(Label?: string): ChatResponseOption {
 /** ExplainErrors: Explain the errors. */
 export function ExplainErrors(Type: DiagnosticType, Label?: string): ChatResponseOption {
     return {
-        Label: Label ?? "Explain the error",
+        Label: Label ?? "Can you explain the error?",
         Operation: "CodeExplain",
         SubOperation: Type,
         AskInput: true,

@@ -1,7 +1,5 @@
-import { Localized } from "../../CodeMirror-NetLogo/src/editor";
 import { ChatManager } from "./chat/chat-manager";
 import { ChatNetwork } from "./chat/chat-network";
-import { ChatResponseType } from "./chat/client/chat-response";
 import { Breed, NetLogoContext, Procedure } from "./chat/client/languages/netlogo-context";
 import { CommandTab } from "./command/command-tab";
 import { EditorTab } from "./editor/editor-tab";

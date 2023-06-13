@@ -25,11 +25,11 @@ export class DiagnosticsRenderer extends JSONSectionRenderer<Diagnostics> {
         // Render the statistics
         var Metadata = this.GetParsed();
         if (!Metadata.Hidden) {
-            for (var Diagnostic of Metadata.Diagnostics) {
+            for (var I = 0; I < Metadata.Diagnostics.length; I++) {
                 var Renderer = new DiagnosticRenderer();
                 this.AddChild(Renderer, false);
                 Renderer.Container.appendTo(this.ContentContainer);
-                Renderer.SetData(Diagnostic);
+                Renderer.SetData(Metadata.Diagnostics[I]);
                 Renderer.Render();
             }
             NetLogoUtils.AnnotateCodes(this.ContentContainer.find("code"));
@@ -37,7 +37,6 @@ export class DiagnosticsRenderer extends JSONSectionRenderer<Diagnostics> {
         // Show the options
         if (!ChatManager.Available) return;
         this.ShowPseudoOption(ExplainErrors(Metadata.Type), (Option) => this.SubmitDiagnostics(Option, false));
-        this.ShowPseudoOption(FixCode(), (Option) => this.SubmitDiagnostics(Option, true));
     }
     /** SubmitDiagnostics: Submit the diagnostics to the server. */
     private SubmitDiagnostics(Option: ChatResponseOption, Fixing: boolean): void {
@@ -50,14 +49,21 @@ export class DiagnosticsRenderer extends JSONSectionRenderer<Diagnostics> {
         // Export the diagnostics
         if (Metadata.Code) {
             // Export the diagnostics from the metadata
-            Manager.SendMessage(JSON.stringify(Metadata.Diagnostics), 
+            Manager.SendMessage(JSON.stringify(this.ClipDiagnostics(Metadata.Diagnostics, 3)), 
                 Option.LocalizedLabel ?? Localized.Get(Option.Label));
         } else {
             // Re-export the diagnostics from the latest code snippet
             CodeDisplay.Instance.ExportDiagnostics().then(Diagnostics =>
-                Manager.SendMessage(JSON.stringify(Diagnostics.Diagnostics), 
+                Manager.SendMessage(JSON.stringify(this.ClipDiagnostics(Diagnostics.Diagnostics, 3)), 
                     Option.LocalizedLabel ?? Localized.Get(Option.Label)));
         }
+    }
+    /** ClipDiagnostics: Clip the diagnostics to the specified count. */
+    private ClipDiagnostics(Diagnostics: Diagnostic[], Count: number): Diagnostic[] {
+        if (Diagnostics.length <= Count) return Diagnostics;
+        var Clipped: Diagnostic[] = [];
+        for (var I = 0; I < Count; I++) Clipped.push(Diagnostics[I]);
+        return Clipped;
     }
     /** GetChooser: Return the section chooser for this renderer. */
     public static GetChooser(): RendererChooser {

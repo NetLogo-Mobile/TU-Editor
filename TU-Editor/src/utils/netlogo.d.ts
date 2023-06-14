@@ -24,4 +24,6 @@ export declare class NetLogoUtils {
     static ErrorToDiagnostic(Error: RuntimeError): Diagnostic;
     /** ErrorsToDiagnostics: Convert runtime errors to diagnostics. */
     static ErrorsToDiagnostics(Errors: RuntimeError[]): Diagnostic[];
+    /** GetUniqueDiagnostics: Get the unique diagnostics. */
+    static GetUniqueDiagnostics(Diagnostics: Diagnostic[]): Diagnostic[];
 }

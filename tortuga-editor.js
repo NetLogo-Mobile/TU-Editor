@@ -30672,7 +30672,7 @@
         if (procedureName)
             procedure = parseState.Procedures.get(procedureName.toLowerCase());
         // If the procedure is not found, it is likely an anonymous procedure
-        if (!procedure && !procedureName && State.field(stateExtension).EditorID != 0) {
+        if (!procedure && !procedureName && State.field(stateExtension).RecognizedMode != 'Model') {
             for (var p of parseState.Procedures.values()) {
                 if (p.EditorID == State.field(stateExtension).EditorID)
                     procedure = p;
@@ -33491,7 +33491,9 @@
                 return [this.ParentEditor, this];
             if (this.Options.ParseMode == ParseMode.Normal)
                 return [...this.Children, this];
-            return [];
+            else {
+                return [this];
+            }
         }
         /** UpdateContext: Try to update the context of this editor. */
         UpdateContext() {
@@ -35910,6 +35912,13 @@
         static ErrorsToDiagnostics(Errors) {
             return Errors.map(this.ErrorToDiagnostic);
         }
+        /** GetUniqueDiagnostics: Get the unique diagnostics. */
+        static GetUniqueDiagnostics(Diagnostics) {
+            var Results = new Map();
+            for (var I = 0; I < Diagnostics.length; I++)
+                Results.set(Diagnostics[I].Code + "|" + Diagnostics[I].Message, Diagnostics[I]);
+            return Array.from(Results.values());
+        }
     }
 
     /** FullTextDisplay: Display the full-text help information. */
@@ -36524,12 +36533,12 @@
                 return {
                     Type: DiagnosticType.Compile,
                     Code: this.Editor.GetCode(),
-                    Diagnostics: Diagnostics.map(Diagnostic => {
+                    Diagnostics: NetLogoUtils.GetUniqueDiagnostics(Diagnostics.map(Diagnostic => {
                         return {
                             Message: NetLogoUtils.PostprocessLintMessage(Diagnostic.message),
                             Code: this.Editor.GetCodeSlice(Diagnostic.from, Diagnostic.to)
                         };
-                    })
+                    }))
                 };
             });
         }
@@ -36933,14 +36942,15 @@
         RenderInternal() {
             var _a, _b, _c;
             var Section = this.GetData();
-            var Content = (_a = Section.Content) !== null && _a !== void 0 ? _a : "";
+            var Content = ((_a = Section.Content) !== null && _a !== void 0 ? _a : "").trim();
             // Only post-process when it is finalized & sent by AI
             if (this.Finalized && this.GetRecord().Operation) {
                 Content = Content.replace(/\'([^`^\n]+?)\'/g, (Match) => {
                     if (Match.length == 3 || Match.match(/\'\S /g))
                         return Match;
                     return `\`${Match.substring(1, Match.length - 1)}\``;
-                }).replace(/\n\n([^`]*?)\n\n/gs, "\n```\n$1\n```\n");
+                });
+                // .replace(/\n\n([^`]*?)\n\n/gs, "\n```\n$1\n```\n")
             }
             // Render the text
             this.ContentContainer.html(MarkdownToHTML(Content));

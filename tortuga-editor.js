@@ -24,6 +24,14 @@
         /** ServerError: The response is a server error message. */
         ChatResponseType[ChatResponseType["ServerError"] = 6] = "ServerError";
     })(ChatResponseType || (ChatResponseType = {}));
+    /** GetField: Returns the section with the given field. */
+    function GetField(Sections, Field) {
+        var Last;
+        for (var Section of Sections)
+            if (Section.Field == Field)
+                Last = Section;
+        return Last;
+    }
     /** IsTextLike: Returns true if the section is text-like. */
     function IsTextLike(Section) {
         return Section.Type == ChatResponseType.Text || Section.Type == ChatResponseType.CompileError || Section.Type == ChatResponseType.RuntimeError;
@@ -32,17 +40,6 @@
     function ExcludeCode(Section) {
         var _a, _b;
         return Section.Type != ChatResponseType.Code && Section.Type != ChatResponseType.RuntimeError && !((_b = (_a = Section.Field) === null || _a === void 0 ? void 0 : _a.startsWith("__")) !== null && _b !== void 0 ? _b : true);
-    }
-    /** SectionsToJSON: Serialize a number of sections to JSON5. */
-    function SectionsToJSON(Sections) {
-        var _a;
-        var Result = "{";
-        for (var Section of Sections) {
-            Result += `${(_a = Section.Field) !== null && _a !== void 0 ? _a : ChatResponseType[Section.Type]}:${Section.Type == ChatResponseType.JSON ? Section.Content : JSON.stringify(Section.Content)}`;
-            if (Section != Sections[Sections.length - 1])
-                Result += ",\n";
-        }
-        return Result + "}";
     }
 
     /** ChatThread: Record a conversation between human-AI. */
@@ -329,35 +326,19 @@
     /** ChatRole: The role of the speaker. */
     var ChatRole;
     (function (ChatRole) {
-        /** System: The system. */
-        ChatRole["System"] = "system";
-        /** User: The user. */
+        /** User: A raw input of a user. */
         ChatRole["User"] = "user";
-        /** Assistant: The assistant. */
+        /** Assistant: A response from the assistant. */
         ChatRole["Assistant"] = "assistant";
     })(ChatRole || (ChatRole = {}));
 
-    /** ContextMessage: How to inherit an output message for the context. */
-    var ContextMessage;
-    (function (ContextMessage) {
-        /** Nothing: Nothing should be retained. */
-        ContextMessage[ContextMessage["Nothing"] = 0] = "Nothing";
-        /** TextOnly: Only text messages should be retained, in a text format. */
-        ContextMessage[ContextMessage["MessagesAsText"] = 1] = "MessagesAsText";
-        /** MessagesAsJSON: Only text messages should be retained, in a JSON format. */
-        ContextMessage[ContextMessage["MessagesAsJSON"] = 2] = "MessagesAsJSON";
-        /** FirstJSON: Only the first JSON message should be retained. */
-        ContextMessage[ContextMessage["FirstJSON"] = 3] = "FirstJSON";
-        /** AllAsJSON: Except for the code, all should be retained in a JSON format. */
-        ContextMessage[ContextMessage["AllAsJSON"] = 4] = "AllAsJSON";
-    })(ContextMessage || (ContextMessage = {}));
     /** ContextInheritance: How to inherit the parent context. */
     var ContextInheritance;
     (function (ContextInheritance) {
         /** Drop: Drop the context. */
         ContextInheritance[ContextInheritance["Drop"] = 0] = "Drop";
-        /** InheritOne: Only inherit the current message segment. */
-        ContextInheritance[ContextInheritance["InheritOne"] = 1] = "InheritOne";
+        /** CurrentOnly: Only inherit the current message segment. */
+        ContextInheritance[ContextInheritance["CurrentOnly"] = 1] = "CurrentOnly";
         /** InheritParent: Only inherit the current message segment and its parent context. */
         ContextInheritance[ContextInheritance["InheritParent"] = 2] = "InheritParent";
         /** InheritRecursive: Inherit the current message segment and its parent context, recursively based on the parent's strategy. */
@@ -11360,15 +11341,16 @@
             if (flush)
                 this.observer.forceFlush();
             let updated = null;
-            let sDOM = this.scrollDOM, { scrollAnchorPos, scrollAnchorHeight } = this.viewState;
+            let sDOM = this.scrollDOM, { scrollTop } = sDOM;
+            let { scrollAnchorPos, scrollAnchorHeight } = this.viewState;
             this.viewState.scrollAnchorHeight = -1;
-            if (scrollAnchorHeight < 0 || sDOM.scrollTop != this.viewState.scrollTop) {
-                if (sDOM.scrollTop > sDOM.scrollHeight - sDOM.clientHeight - 4) {
+            if (scrollAnchorHeight < 0 || scrollTop != this.viewState.scrollTop) {
+                if (scrollTop > sDOM.scrollHeight - sDOM.clientHeight - 4) {
                     scrollAnchorPos = -1;
                     scrollAnchorHeight = this.viewState.heightMap.height;
                 }
                 else {
-                    let block = this.viewState.lineBlockAtHeight(sDOM.scrollTop);
+                    let block = this.viewState.lineBlockAtHeight(scrollTop);
                     scrollAnchorPos = block.from;
                     scrollAnchorHeight = block.top;
                 }
@@ -11434,7 +11416,7 @@
                                 this.viewState.lineBlockAt(scrollAnchorPos).top;
                             let diff = newAnchorHeight - scrollAnchorHeight;
                             if (diff > 1 || diff < -1) {
-                                sDOM.scrollTop += diff;
+                                sDOM.scrollTop = scrollTop + diff;
                                 scrolled = true;
                             }
                         }
@@ -30687,14 +30669,13 @@
         let procedure = null;
         // get the procedure name
         var procedureName = getParentProcedure(State, Node);
-        if (procedureName) {
+        if (procedureName)
             procedure = parseState.Procedures.get(procedureName.toLowerCase());
-        }
-        if (State.field(stateExtension).EditorID != 0) {
+        // If the procedure is not found, it is likely an anonymous procedure
+        if (!procedure && !procedureName && State.field(stateExtension).EditorID != 0) {
             for (var p of parseState.Procedures.values()) {
-                if (p.EditorID == State.field(stateExtension).EditorID) {
+                if (p.EditorID == State.field(stateExtension).EditorID)
                     procedure = p;
-                }
             }
         }
         // gets list of procedure variables from own procedure, as well as list of all procedure names
@@ -33679,11 +33660,22 @@
         }
         /** SendMessage: Send a direct message to the chat backend. */
         SendMessage(Content, Friendly) {
-            var _a, _b;
+            var _a, _b, _c;
             this.PendingRequest = (_a = this.PendingRequest) !== null && _a !== void 0 ? _a : { Input: "" };
             this.PendingRequest.Input = Content;
             this.PendingRequest.FriendlyInput = Friendly;
-            this.PendingRequest.Context = (_b = this.PendingRequest.Context) !== null && _b !== void 0 ? _b : { PreviousMessages: [] };
+            // Clarify the pending request
+            var Context = (_b = this.PendingRequest.Context) !== null && _b !== void 0 ? _b : {};
+            this.PendingRequest.Context = Context;
+            if (Context.PendingActions && Context.PendingActions.length > 0) {
+                var LastAction = Context.PendingActions[Context.PendingActions.length - 1];
+                if (LastAction.Observation === "$Input$") {
+                    LastAction.Observation = this.PendingRequest.Input;
+                    this.PendingRequest.FriendlyInput = (_c = this.PendingRequest.FriendlyInput) !== null && _c !== void 0 ? _c : this.PendingRequest.Input;
+                    this.PendingRequest.Input = "";
+                }
+            }
+            // Send the request
             this.SendRequest(this.PendingRequest);
             this.PendingRequest = null;
         }
@@ -33693,7 +33685,7 @@
             if (ChatManager.IsRequesting)
                 return;
             Request.Language = this.Thread.Language;
-            Request.Context = (_a = Request.Context) !== null && _a !== void 0 ? _a : { PreviousMessages: [] };
+            Request.Context = (_a = Request.Context) !== null && _a !== void 0 ? _a : {};
             // Make it a record and put it in the thread
             var Record = Request;
             var Subthread = this.Thread.AddToSubthread(Record);
@@ -33789,7 +33781,7 @@
         // #region " Options and Contexts "
         /** RequestOption: Choose a chat option and send the request. */
         RequestOption(Option, Record, Postprocessor) {
-            var _a, _b, _c, _d;
+            var _a, _b, _c;
             if (this.Commands.Disabled)
                 return false;
             // Construct the request
@@ -33802,7 +33794,7 @@
             if (Option.ActualInput)
                 this.PendingRequest.FriendlyInput = (_c = Option.LocalizedLabel) !== null && _c !== void 0 ? _c : Option.Label;
             // Find a parent
-            this.PendingRequest.Context = { PreviousMessages: [] };
+            this.PendingRequest.Context = {};
             if (Option.Inheritance !== ContextInheritance.Drop) {
                 var RealParent = Record;
                 // If the option is transparent, find the first could-be-transparent parent
@@ -33816,8 +33808,6 @@
                 if (RealParent) {
                     this.PendingRequest.ParentID = RealParent === null || RealParent === void 0 ? void 0 : RealParent.ID;
                     this.InheritContext(Option, RealParent, -1);
-                    if ((_d = Option.InputInContext) !== null && _d !== void 0 ? _d : true)
-                        this.PendingRequest.Context.PreviousMessages.shift();
                 }
             }
             else {
@@ -33837,13 +33827,15 @@
         }
         /** InheritContext: Inherit the context from the previous request. */
         InheritContext(Option, Record, Layers = -1) {
-            var _a, _b, _c, _d;
-            Option = Option !== null && Option !== void 0 ? Option : { Inheritance: ContextInheritance.InheritOne, Label: "" };
+            var _a, _b, _c, _d, _e, _f, _g, _h, _j;
+            Option = Option !== null && Option !== void 0 ? Option : { Inheritance: ContextInheritance.CurrentOnly, Label: "" };
             var Context = this.PendingRequest.Context;
+            Context.PreviousMessages = (_a = Context.PreviousMessages) !== null && _a !== void 0 ? _a : [];
+            Context.PendingActions = (_b = Context.PendingActions) !== null && _b !== void 0 ? _b : [];
             if (Layers == -1) {
                 switch (Option.Inheritance) {
                     case ContextInheritance.Drop:
-                    case ContextInheritance.InheritOne:
+                    case ContextInheritance.CurrentOnly:
                         // Stop after this
                         Layers = -2;
                         break;
@@ -33858,53 +33850,46 @@
                 }
             }
             // Inherit the last action (from new to old)
-            this.PendingRequest.Operation = (_a = this.PendingRequest.Operation) !== null && _a !== void 0 ? _a : Record.Operation;
+            this.PendingRequest.Operation = (_c = this.PendingRequest.Operation) !== null && _c !== void 0 ? _c : Record.Operation;
+            // Inherit the action log
+            if (Context.PreviousMessages.length === 0) {
+                var Action = (_d = GetField(Record.Response.Sections, "Action")) === null || _d === void 0 ? void 0 : _d.Content;
+                var Parameter = (_e = GetField(Record.Response.Sections, "Parameter")) === null || _e === void 0 ? void 0 : _e.Content;
+                var Observation = GetField(Record.Response.Sections, "Observation");
+                if (Observation && Action && Parameter) {
+                    var ActionLog = {
+                        Action: Action.trim(),
+                        Parameter: Parameter.trim(),
+                        Observation: ""
+                    };
+                    Object.defineProperty(ActionLog, "Observation", {
+                        get: () => { var _a, _b; return (_b = (_a = Observation.Content) === null || _a === void 0 ? void 0 : _a.trim()) !== null && _b !== void 0 ? _b : ""; },
+                        set: (Value) => Observation.Content = Value
+                    });
+                    Context.PendingActions.unshift(ActionLog);
+                }
+            }
             // Inherit the last text message (from new to old)
-            switch (Option.TextInContext) {
-                case ContextMessage.Nothing:
-                    break;
-                case ContextMessage.MessagesAsText:
-                    Context.PreviousMessages.unshift({
-                        Text: Record.Response.Sections.filter(ExcludeCode).filter(IsTextLike)
-                            .map(Section => Section.Content).join("\n"),
-                        Role: ChatRole.Assistant
-                    });
-                    break;
-                case ContextMessage.MessagesAsJSON:
-                    Context.PreviousMessages.unshift({
-                        Text: SectionsToJSON(Record.Response.Sections.filter(ExcludeCode).filter(IsTextLike)),
-                        Role: ChatRole.Assistant
-                    });
-                    break;
-                case ContextMessage.FirstJSON:
-                    var JSON = Record.Response.Sections.find(Section => Section.Type == ChatResponseType.JSON);
-                    if (JSON && JSON.Content) {
-                        Context.PreviousMessages.unshift({
-                            Text: JSON.Content,
-                            Role: ChatRole.Assistant
-                        });
-                    }
-                    break;
-                case ContextMessage.AllAsJSON:
-                default:
-                    Context.PreviousMessages.unshift({
-                        Text: SectionsToJSON(Record.Response.Sections.filter(ExcludeCode)),
-                        Role: ChatRole.Assistant
-                    });
+            if ((_f = Option.TextInContext) !== null && _f !== void 0 ? _f : true) {
+                Context.PreviousMessages.unshift({
+                    Text: Record.Response.Sections.filter(ExcludeCode).filter(IsTextLike)
+                        .map(Section => Section.Content).join("\n"),
+                    Role: ChatRole.Assistant
+                });
             }
             // Inherit the last input (from new to old)
-            if ((_b = Option.InputInContext) !== null && _b !== void 0 ? _b : true)
+            if (((_g = Option.InputInContext) !== null && _g !== void 0 ? _g : true) && Record.Input !== "")
                 Context.PreviousMessages.unshift({
                     Text: Record.Input,
                     Role: ChatRole.User
                 });
             // Inherit the last code message (from new to old)
-            if (((_c = Option.CodeInContext) !== null && _c !== void 0 ? _c : true) === true && Context.CodeSnippet === undefined) {
+            if (((_h = Option.CodeInContext) !== null && _h !== void 0 ? _h : true) === true && Context.CodeSnippet === undefined) {
                 var Code = Record.Response.Sections.find(Section => Section.Type == ChatResponseType.Code || Section.Field == "Code");
                 if (Code != null)
                     Context.CodeSnippet = Code.Content;
                 else
-                    Context.CodeSnippet = (_d = Record.Context) === null || _d === void 0 ? void 0 : _d.CodeSnippet;
+                    Context.CodeSnippet = (_j = Record.Context) === null || _j === void 0 ? void 0 : _j.CodeSnippet;
             }
             // Inherit previous messages
             if (Layers == -2 || !Record.ParentID)
@@ -36293,7 +36278,7 @@
             AskInput: true,
             InputInContext: false,
             CodeInContext: false,
-            TextInContext: ContextMessage.Nothing,
+            TextInContext: false,
             Inheritance: ContextInheritance.Drop
         };
     }
@@ -36305,9 +36290,9 @@
             SubOperation: "Explain",
             AskInput: false,
             InputInContext: false,
-            TextInContext: ContextMessage.Nothing,
+            TextInContext: false,
             CodeInContext: true,
-            Inheritance: ContextInheritance.InheritOne
+            Inheritance: ContextInheritance.CurrentOnly
         };
     }
     /** ExplainErrors: Explain the errors. */
@@ -36318,9 +36303,9 @@
             SubOperation: Type,
             AskInput: true,
             InputInContext: false,
-            TextInContext: ContextMessage.Nothing,
+            TextInContext: false,
             CodeInContext: true,
-            Inheritance: ContextInheritance.InheritOne
+            Inheritance: ContextInheritance.CurrentOnly
         };
     }
 

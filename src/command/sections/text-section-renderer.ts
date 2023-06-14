@@ -23,13 +23,14 @@ export class TextSectionRenderer extends SectionRenderer {
     /** RenderInternal: Render the UI element. */
     protected RenderInternal(): void {
         var Section = this.GetData();
-        var Content = Section.Content ?? "";
+        var Content = (Section.Content ?? "").trim();
         // Only post-process when it is finalized & sent by AI
         if (this.Finalized && this.GetRecord().Operation) {
             Content = Content.replace(/\'([^`^\n]+?)\'/g, (Match) => {
                 if (Match.length == 3 || Match.match(/\'\S /g)) return Match;
                 return `\`${Match.substring(1, Match.length - 1)}\``; 
-            }).replace(/\n\n([^`]*?)\n\n/gs, "\n```\n$1\n```\n");
+            });
+            // .replace(/\n\n([^`]*?)\n\n/gs, "\n```\n$1\n```\n")
         }
         // Render the text
         this.ContentContainer.html(MarkdownToHTML(Content));

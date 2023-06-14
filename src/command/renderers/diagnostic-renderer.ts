@@ -5,7 +5,7 @@ import { JSONSectionRenderer } from "../sections/json-section-renderer";
 import { ChatManager } from '../../chat/chat-manager';
 import { Diagnostic, Diagnostics } from "../../chat/client/languages/netlogo-context";
 import { ChatResponseOption } from '../../chat/client/chat-option';
-import { ExplainErrors, FixCode } from '../../chat/client/options/option-templates';
+import { ExplainErrors } from '../../chat/client/options/option-templates';
 import { NetLogoUtils } from '../../utils/netlogo';
 import { Localized } from '../../../../CodeMirror-NetLogo/src/editor';
 

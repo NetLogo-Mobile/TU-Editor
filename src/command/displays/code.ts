@@ -203,12 +203,12 @@ export class CodeDisplay extends Display {
 		return {
 			Type: DiagnosticType.Compile,
 			Code: this.Editor.GetCode(),
-			Diagnostics: Diagnostics.map(Diagnostic => {
+			Diagnostics: NetLogoUtils.GetUniqueDiagnostics(Diagnostics.map(Diagnostic => {
 				return {
 					Message: NetLogoUtils.PostprocessLintMessage(Diagnostic.message),
 					Code: this.Editor.GetCodeSlice(Diagnostic.from, Diagnostic.to)
 				};
-			})
+			}))
 		};
 	}
 	/** Play: Try to play the code. */

@@ -60,4 +60,11 @@ export class NetLogoUtils {
 	public static ErrorsToDiagnostics(Errors: RuntimeError[]): Diagnostic[] {
 		return Errors.map(this.ErrorToDiagnostic);
 	}
+	/** GetUniqueDiagnostics: Get the unique diagnostics. */
+	public static GetUniqueDiagnostics(Diagnostics: Diagnostic[]): Diagnostic[] {
+		var Results = new Map<string, Diagnostic>();
+		for (var I = 0; I < Diagnostics.length; I++)
+			Results.set(Diagnostics[I].Code + "|" + Diagnostics[I].Message, Diagnostics[I]);
+		return Array.from(Results.values());
+	}
 }

@@ -1,4 +1,4 @@
-import { ChatResponseOption, ContextInheritance, ContextMessage } from "../chat-option";
+import { ChatResponseOption, ContextInheritance } from "../chat-option";
 import { DiagnosticType } from "../languages/netlogo-context";
 
 /** ChangeTopic: Generate a template change topic option. */
@@ -10,7 +10,7 @@ export function ChangeTopic(Label?: string): ChatResponseOption {
         AskInput: true,
         InputInContext: false,
         CodeInContext: false,
-        TextInContext: ContextMessage.Nothing,
+        TextInContext: false,
         Inheritance: ContextInheritance.Drop
     }
 }
@@ -25,7 +25,7 @@ export function NewTopic(Input: string, Label?: string): ChatResponseOption {
         AskInput: false,
         InputInContext: false,
         CodeInContext: false,
-        TextInContext: ContextMessage.Nothing,
+        TextInContext: false,
         Inheritance: ContextInheritance.Drop
     }
 }
@@ -33,7 +33,7 @@ export function NewTopic(Input: string, Label?: string): ChatResponseOption {
 /** FollowUp: Generate a template follow-up option. */
 export function FollowUp(Label?: string): ChatResponseOption {
     return {
-        Label: Label ?? "Actually, I mean...",
+        Label: Label ?? "Can I ask a followup question?",
         Style: "followup",
         AskInput: true,
         Inheritance: ContextInheritance.InheritRecursive
@@ -47,19 +47,8 @@ export function Clarify(Label?: string): ChatResponseOption {
         Style: Label == undefined ? "followup" : undefined,
         AskInput: Label == undefined,
         SubOperation: "Clarify",
-        TextInContext: ContextMessage.MessagesAsText,
+        TextInContext: false,
         Inheritance: ContextInheritance.InheritRecursive
-    }
-}
-
-/** AskFurther: Generate a template ask further option. */
-export function AskFurther(Label?: string): ChatResponseOption {
-    return {
-        Label: Label ?? "Actually, I mean...",
-        Style: "followup",
-        AskInput: true,
-        Inheritance: ContextInheritance.InheritRecursive,
-        Transparent: true
     }
 }
 
@@ -70,8 +59,8 @@ export function EditCode(Label?: string): ChatResponseOption {
         Style: "followup",
         Operation: "EditCode",
         AskInput: true,
-        TextInContext: ContextMessage.Nothing,
-        Inheritance: ContextInheritance.InheritOne
+        TextInContext: false,
+        Inheritance: ContextInheritance.CurrentOnly
     }
 }
 
@@ -83,21 +72,21 @@ export function ExampleCode(Label?: string): ChatResponseOption {
         Operation: "CodeCompose",
         AskInput: false,
         Inheritance: ContextInheritance.InheritParent,
-        TextInContext: ContextMessage.MessagesAsText
+        TextInContext: true
     }
 }
 
 /** AskCode: Ask a question about the code. */
-export function AskCode(Label?: string, Style?: string, Transparent?: boolean): ChatResponseOption {
+export function AskCode(Label?: string, Style?: string, CodeOnly?: boolean): ChatResponseOption {
     return {
         Label: Label ?? "Can I ask a question?",
         Style: Style ?? "followup",
         Operation: "CodeAsk",
         AskInput: true,
-        TextInContext: ContextMessage.MessagesAsText,
+        InputInContext: !(CodeOnly ?? false),
+        TextInContext: !(CodeOnly ?? false),
         CodeInContext: true,
-        Transparent: Transparent ?? false,
-        Inheritance: ContextInheritance.InheritOne
+        Inheritance: ContextInheritance.CurrentOnly
     }
 }
 
@@ -109,10 +98,10 @@ export function FixCode(Label?: string): ChatResponseOption {
         Operation: "CodeFix",
         AskInput: true,
         InputInContext: false,
-        TextInContext: ContextMessage.MessagesAsText,
+        TextInContext: true,
         CodeInContext: true,
         Transparent: true,
-        Inheritance: ContextInheritance.InheritOne
+        Inheritance: ContextInheritance.CurrentOnly
     }
 }
 
@@ -124,9 +113,9 @@ export function ExplainCode(Label?: string): ChatResponseOption {
         SubOperation: "Explain",
         AskInput: false,
         InputInContext: false,
-        TextInContext: ContextMessage.Nothing,
+        TextInContext: false,
         CodeInContext: true,
-        Inheritance: ContextInheritance.InheritOne
+        Inheritance: ContextInheritance.CurrentOnly
     }
 }
 
@@ -138,8 +127,8 @@ export function ExplainErrors(Type: DiagnosticType, Label?: string): ChatRespons
         SubOperation: Type,
         AskInput: true,
         InputInContext: false,
-        TextInContext: ContextMessage.Nothing,
+        TextInContext: false,
         CodeInContext: true,
-        Inheritance: ContextInheritance.InheritOne
+        Inheritance: ContextInheritance.CurrentOnly
     }
 }

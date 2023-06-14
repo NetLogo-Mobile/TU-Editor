@@ -1,11 +1,11 @@
 import { CommandTab } from "../command/command-tab";
 import { OutputDisplay } from "../command/displays/output";
 import { ClientChatRequest } from "./client/chat-request";
-import { ChatResponseType, ExcludeCode, IsTextLike, SectionsToJSON } from "./client/chat-response";
+import { ChatResponseType, ExcludeCode, GetField, IsTextLike } from "./client/chat-response";
 import { ChatThread } from "./client/chat-thread";
 import { ChatNetwork } from "./chat-network";
 import { ChatRole } from "./client/chat-context";
-import { ChatResponseOption, ContextInheritance, ContextMessage } from "./client/chat-option";
+import { ChatResponseOption, ContextInheritance } from "./client/chat-option";
 import { ChatRecord } from "./client/chat-record";
 import { SectionRenderer } from "../command/sections/section-renderer";
 import { Localized } from "../../../CodeMirror-NetLogo/src/editor";
@@ -29,7 +29,18 @@ export class ChatManager {
         this.PendingRequest = this.PendingRequest ?? { Input: "" };
         this.PendingRequest.Input = Content;
         this.PendingRequest.FriendlyInput = Friendly;
-        this.PendingRequest.Context = this.PendingRequest.Context ?? { PreviousMessages: [] };
+        // Clarify the pending request
+        var Context = this.PendingRequest.Context ?? { };
+        this.PendingRequest.Context = Context
+        if (Context.PendingActions && Context.PendingActions.length > 0) {
+            var LastAction = Context.PendingActions[Context.PendingActions.length - 1];
+            if (LastAction.Observation === "$Input$") {
+                LastAction.Observation = this.PendingRequest.Input;
+                this.PendingRequest.FriendlyInput = this.PendingRequest.FriendlyInput ?? this.PendingRequest.Input;
+                this.PendingRequest.Input = "";
+            }
+        }
+        // Send the request
         this.SendRequest(this.PendingRequest);
         this.PendingRequest = null;
     }
@@ -39,7 +50,7 @@ export class ChatManager {
     public SendRequest(Request: ClientChatRequest) {
         if (ChatManager.IsRequesting) return;
         Request.Language = this.Thread.Language;
-        Request.Context = Request.Context ?? { PreviousMessages: [] };
+        Request.Context = Request.Context ?? { };
         // Make it a record and put it in the thread
         var Record = Request as ChatRecord;
         var Subthread = this.Thread.AddToSubthread(Record);
@@ -137,7 +148,7 @@ export class ChatManager {
         if (Option.ActualInput)
             this.PendingRequest.FriendlyInput = Option.LocalizedLabel ?? Option.Label;
         // Find a parent
-        this.PendingRequest.Context = { PreviousMessages: [] };
+        this.PendingRequest.Context = { };
         if (Option.Inheritance !== ContextInheritance.Drop) {
             var RealParent: ChatRecord | undefined = Record;
             // If the option is transparent, find the first could-be-transparent parent
@@ -150,8 +161,6 @@ export class ChatManager {
             if (RealParent) {
                 this.PendingRequest.ParentID = RealParent?.ID;
                 this.InheritContext(Option, RealParent, -1);
-                if (Option.InputInContext ?? true) 
-                    this.PendingRequest.Context.PreviousMessages.shift();
             }
         } else {
             this.Outputs.ActivateSubthread();
@@ -169,12 +178,14 @@ export class ChatManager {
     }
     /** InheritContext: Inherit the context from the previous request. */
     private InheritContext(Option: ChatResponseOption | undefined, Record: ChatRecord, Layers: number = -1) {
-        Option = Option ?? { Inheritance: ContextInheritance.InheritOne, Label: "" };
+        Option = Option ?? { Inheritance: ContextInheritance.CurrentOnly, Label: "" };
         var Context = this.PendingRequest!.Context!;
+        Context.PreviousMessages = Context.PreviousMessages ?? [];
+        Context.PendingActions = Context.PendingActions ?? [];
         if (Layers == -1) {
             switch (Option.Inheritance) {
                 case ContextInheritance.Drop:
-                case ContextInheritance.InheritOne:
+                case ContextInheritance.CurrentOnly:
                     // Stop after this
                     Layers = -2;
                     break;
@@ -190,41 +201,34 @@ export class ChatManager {
         }
         // Inherit the last action (from new to old)
         this.PendingRequest!.Operation = this.PendingRequest!.Operation ?? Record.Operation;
+        // Inherit the action log
+        if (Context.PreviousMessages.length === 0) {
+            var Action = GetField(Record.Response.Sections, "Action")?.Content;
+            var Parameter = GetField(Record.Response.Sections, "Parameter")?.Content;
+            var Observation = GetField(Record.Response.Sections, "Observation");
+            if (Observation && Action && Parameter) {
+                var ActionLog = {
+                    Action: Action.trim(),
+                    Parameter: Parameter.trim(),
+                    Observation: ""
+                };
+                Object.defineProperty(ActionLog, "Observation", { 
+                    get: () => Observation!.Content?.trim() ?? "",
+                    set: (Value) => Observation!.Content = Value
+                });
+                Context.PendingActions.unshift(ActionLog);
+            }
+        }
         // Inherit the last text message (from new to old)
-        switch (Option.TextInContext) {
-            case ContextMessage.Nothing:
-                break;
-            case ContextMessage.MessagesAsText:
-                Context.PreviousMessages.unshift({ 
-                    Text: Record.Response.Sections.filter(ExcludeCode).filter(IsTextLike)
-                        .map(Section => Section.Content).join("\n"), 
-                    Role: ChatRole.Assistant
-                });
-                break;
-            case ContextMessage.MessagesAsJSON:
-                Context.PreviousMessages.unshift({ 
-                    Text: SectionsToJSON(Record.Response.Sections.filter(ExcludeCode).filter(IsTextLike)), 
-                    Role: ChatRole.Assistant
-                });
-                break;
-            case ContextMessage.FirstJSON:
-                var JSON = Record.Response.Sections.find(Section => Section.Type == ChatResponseType.JSON);
-                if (JSON && JSON.Content) {
-                    Context.PreviousMessages.unshift({ 
-                        Text: JSON.Content, 
-                        Role: ChatRole.Assistant
-                    });
-                }
-                break;
-            case ContextMessage.AllAsJSON:
-            default:
-                Context.PreviousMessages.unshift({ 
-                    Text: SectionsToJSON(Record.Response.Sections.filter(ExcludeCode)), 
-                    Role: ChatRole.Assistant
-                });
+        if (Option.TextInContext ?? true) {
+            Context.PreviousMessages.unshift({ 
+                Text: Record.Response.Sections.filter(ExcludeCode).filter(IsTextLike)
+                    .map(Section => Section.Content).join("\n"), 
+                Role: ChatRole.Assistant
+            });
         }
         // Inherit the last input (from new to old)
-        if (Option.InputInContext ?? true)
+        if ((Option.InputInContext ?? true) && Record.Input !== "")
             Context.PreviousMessages.unshift({ 
                 Text: Record.Input, 
                 Role: ChatRole.User

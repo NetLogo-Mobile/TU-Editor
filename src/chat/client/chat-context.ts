@@ -11,7 +11,9 @@ export interface ChatContext {
     /** CodeSnippet: The code snippet in the context. */
     CodeSnippet?: string;
     /** PreviousMessages: The previous messages in the context. */
-    PreviousMessages: ChatMessage[];
+    PreviousMessages?: ChatMessage[];
+    /** PendingActions: The pending actions in the context. */
+    PendingActions?: ActionLog[];
 }
 
 /** LanguageContext: The context for a language request. */
@@ -22,7 +24,7 @@ export interface LanguageContext {
 
 /** ChatMessage: A previous message in a chat context. */
 export interface ChatMessage {
-    /** Text: The message. */
+    /** Text: The message text. */
     Text: string;
     /** Role: The role of the speaker. */
     Role: ChatRole;
@@ -30,10 +32,20 @@ export interface ChatMessage {
 
 /** ChatRole: The role of the speaker. */
 export enum ChatRole {
-    /** System: The system. */
-    System = "system",
-    /** User: The user. */
+    /** User: A raw input of a user. */
     User = "user",
-    /** Assistant: The assistant. */
+    /** Assistant: A response from the assistant. */
     Assistant = "assistant"
+}
+
+/** ActionLog: The log of an action. */
+export interface ActionLog {
+    /** Action: The action. */
+    Action: string;
+    /** Thought: The thought. */
+    Thought?: string;
+    /** Parameter: The parameter. */
+    Parameter: string;
+    /** Observation: The action result. */
+    Observation: string | object | object[];
 }

@@ -53,9 +53,11 @@ export enum ChatResponseType {
 
 /** GetField: Returns the section with the given field. */
 export function GetField(Sections: ChatResponseSection[], Field: string): ChatResponseSection | undefined {
+    var Last: ChatResponseSection | undefined;
     for (var Section of Sections)
         if (Section.Field == Field)
-            return Section;
+            Last = Section;
+    return Last;
 }
 
 /** IsTextLike: Returns true if the section is text-like. */

@@ -91,21 +91,20 @@ export function AskCode(Label?: string, Style?: string, CodeOnly?: boolean): Cha
 }
 
 /** FixCode: Fix the current code snippet. */
-export function FixCode(Label?: string): ChatResponseOption {
+export function FixCode(Label?: string, Errors?: string): ChatResponseOption {
     return {
         Label: Label ?? "Can you try to fix the code?",
         Style: "code",
         Operation: "CodeFix",
-        AskInput: true,
-        InputInContext: false,
+        AskInput: false,
+        InputInContext: true,
         TextInContext: true,
         CodeInContext: true,
-        Transparent: true,
         Inheritance: ContextInheritance.CurrentOnly
     }
 }
 
-/** ExplainErrors: Explain the code. */
+/** ExplainCode: Explain the code. */
 export function ExplainCode(Label?: string): ChatResponseOption {
     return {
         Label: Label ?? "Can you explain the code?",

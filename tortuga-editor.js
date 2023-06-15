@@ -36291,7 +36291,7 @@
             Inheritance: ContextInheritance.Drop
         };
     }
-    /** ExplainErrors: Explain the code. */
+    /** ExplainCode: Explain the code. */
     function ExplainCode(Label) {
         return {
             Label: Label !== null && Label !== void 0 ? Label : "Can you explain the code?",

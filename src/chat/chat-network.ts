@@ -3,6 +3,7 @@ import { ChatRecord } from "./client/chat-record";
 import { ChatResponseSection, ChatResponseType } from "./client/chat-response";
 import { SSEClient } from "./sse-client";
 import { ClientChatRequest } from "./client/chat-request";
+import { Knowledge } from "./client/knowledge";
 declare const { JSON5 }: any;
 
 /** ChatNetwork: Class that handles the network communication for the chat. */
@@ -130,5 +131,20 @@ export class ChatNetwork {
             console.log(Exception);
             return {};
         }
+    }
+    /** GetKnowledge: Get a piece of knowledge. */
+    public static async GetKnowledge(ID: string): Promise<Knowledge> {
+        return new Promise<Knowledge>((Resolve, Reject) => {
+            var Request = new XMLHttpRequest();
+            Request.open("GET", `${ChatNetwork.Domain}knowledge/${ID}`);
+            Request.send();
+            Request.onload = () => {
+                var Knowledge: Knowledge = JSON.parse(Request.responseText);
+                Resolve(Knowledge);
+            };
+            Request.onerror = () => {
+                Reject(Request.statusText);
+            };
+        });
     }
 }

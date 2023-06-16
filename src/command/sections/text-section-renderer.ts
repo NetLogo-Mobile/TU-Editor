@@ -3,7 +3,6 @@ import { MarkdownToHTML, PostprocessHTML } from "../../utils/element";
 import { CopyCode } from "../../utils/misc";
 import { NetLogoUtils } from "../../utils/netlogo";
 import { OutputDisplay } from "../displays/output";
-import { RecordRenderer } from "../outputs/record-renderer";
 import { UIRendererOf } from "../outputs/ui-renderer";
 import { SectionRenderer } from "./section-renderer";
 
@@ -16,8 +15,10 @@ export class TextSectionRenderer extends SectionRenderer {
     }
     /** SetData: Set the data to render. */
     public SetData(Data: ChatResponseSection): UIRendererOf<ChatResponseSection> {
-        if (Data.Field?.startsWith("__"))
+        if (Data.Field?.startsWith("__")) {
             this.Container.removeClass("first");
+            this.Container.addClass(Data.Field.substring(2).toLowerCase());
+        }
         return super.SetData(Data);
     }
     /** RenderInternal: Render the UI element. */

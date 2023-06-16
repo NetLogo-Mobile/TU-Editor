@@ -46,7 +46,6 @@ export function Clarify(Label?: string): ChatResponseOption {
         Label: Label ?? "Let me clarify it",
         Style: Label == undefined ? "followup" : undefined,
         AskInput: Label == undefined,
-        SubOperation: "Clarify",
         TextInContext: false,
         Inheritance: ContextInheritance.InheritRecursive
     }

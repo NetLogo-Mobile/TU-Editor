@@ -76,6 +76,10 @@ export const XSSOptions = {
         tt: [],
         u: [],
         ul: []
+    },
+    safeAttrValue: (Tag: string, Attribute: string, Value: string, CSSFilter: XSS.ICSSFilter) => {
+        if (Attribute === "href") return Value;
+        return xss.safeAttrValue(Tag, Attribute, Value, CSSFilter);
     }
 };
 
@@ -83,6 +87,8 @@ export const XSSOptions = {
 export function SafeguardHTML(Source: string): string {
     return xss.filterXSS(Source, XSSOptions);
 }
+
+(window as any).SafeguardHTML = SafeguardHTML;
 
 /** PostprocessHTML: Postprocess the HTML, esp. links. */
 export function PostprocessHTML(Editor: TurtleEditor, Source: JQuery<HTMLElement>) {
@@ -108,6 +114,8 @@ export function PostprocessHTML(Editor: TurtleEditor, Source: JQuery<HTMLElement
                 Current.on("click", () => {
                     if (!Editor.CommandTab.Disabled) Editor.CommandTab.ExecuteCommand(Scheme, Target, false);
                 });
+            } else if (Scheme == "knowledge") {
+                Current.on("click", () => Editor.CommandTab.FullText.ShowKnowledge(Target));
             } else if (Current.hasClass("external") || Href.match(/^(https?:)?\/\/([^.]*?\.|)(turtlesim.com|hicivitas.com|northwestern.edu|netlogoweb.org)\//)) {
                 // Handle external links
                 if (!TurtleEditor.PostMessage) {

@@ -204,7 +204,7 @@ export class ChatManager {
         // Inherit the action log
         if (Context.PreviousMessages.length === 0) {
             var Action = GetField(Record.Response.Sections, "Action")?.Content;
-            var Parameter = GetField(Record.Response.Sections, "Parameter")?.Content;
+            var Parameter = GetField(Record.Response.Sections, "Detail")?.Content;
             var Observation = GetField(Record.Response.Sections, "Observation");
             if (Observation && Action && Parameter) {
                 var ActionLog = {

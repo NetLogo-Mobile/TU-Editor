@@ -69,6 +69,7 @@ export declare const XSSOptions: {
         u: never[];
         ul: never[];
     };
+    safeAttrValue: (Tag: string, Attribute: string, Value: string, CSSFilter: XSS.ICSSFilter) => string;
 };
 /** SafeguardHTML: Safeguard the HTML output. */
 export declare function SafeguardHTML(Source: string): string;

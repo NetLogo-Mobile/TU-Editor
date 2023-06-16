@@ -319,6 +319,23 @@
                 return {};
             }
         }
+        /** GetKnowledge: Get a piece of knowledge. */
+        static GetKnowledge(ID) {
+            return __awaiter(this, void 0, void 0, function* () {
+                return new Promise((Resolve, Reject) => {
+                    var Request = new XMLHttpRequest();
+                    Request.open("GET", `${ChatNetwork.Domain}knowledge/${ID}`);
+                    Request.send();
+                    Request.onload = () => {
+                        var Knowledge = JSON.parse(Request.responseText);
+                        Resolve(Knowledge);
+                    };
+                    Request.onerror = () => {
+                        Reject(Request.statusText);
+                    };
+                });
+            });
+        }
     }
     /** Domain: The domain of the chat backend. */
     ChatNetwork.Domain = "";
@@ -27538,9 +27555,13 @@
         Add: () => 'Add',
         // Linting messages
         'Unrecognized breed name _': (Name) => `Cannot recognize the breed name "${Name}". Did you define it at the beginning?`,
-        'Unrecognized identifier _': (Name) => `Nothing called "${Name}" was found. Did you forget to define it?`,
+        'Unrecognized identifier _': (Name) => `Nothing called "${Name}" was defined or reserved by NetLogo. Did you forget to define it?`,
+        'Unrecognized identifier with replacement _': (Name, Suggested) => `Nothing called "${Name}" was defined or reserved by NetLogo. Maybe try "${Suggested}"?`,
         'Unrecognized global statement _': (Name) => `Cannot recognize "${Name}" as a proper global statement here. Did you spell it correctly?`,
-        'Unrecognized statement _': (Name) => `Cannot recognize "${Name}" as a piece of NetLogo code. Did you put it in the correct place?`,
+        'Unrecognized statement _': (Name) => `"${Name}" is out of place. Did you put it in the correct place?`,
+        'Unrecognized statement with replacement _': (Name, Suggested) => `"${Name}" is out of place. Maybe try "${Suggested}"？`,
+        'Invalid content for code block _': (Name) => `"${Name}" is out of place in the surrounding code block.`,
+        'Invalid content for list _': (Name) => `"${Name}" is out of place in the surrounding list.`,
         'Unsupported statement _': (Name) => `"${Name}" is not supported in this version of NetLogo, so linting may be incorrect.`,
         'Invalid for Normal mode _': (Value) => `This editor mode expects a full NetLogo model.`,
         'Invalid for Embedded mode _': (Value) => `This editor mode expects a few command statements.`,
@@ -27566,7 +27587,6 @@
         'Infinite loop _': (Name) => `This "${Name}" loop will run forever and likely block the model. Do you want to re-write into a "go" loop?`,
         'Argument is reserved _': (Name) => `The argument "${Name}" is a reserved NetLogo keyword. Do you want to replace it?`,
         'Argument is invalid _': (Name) => `The argument "${Name}" is invalid. Do you want to replace it?`,
-        'Inconsistent code block type _': (Prior, New) => `The code block type "${New}" does not match the preceding code block type "${Prior}".`,
         // Agent types and basic names
         Observer: () => 'Observer',
         Turtle: () => 'Turtle',
@@ -27613,6 +27633,7 @@
         '~BreedCommand': (Name) => `A command for the "${Name}" breed. `,
         '~CustomCommand': (Name) => `A user-defined command. `,
         // Chat and AI assistant
+        ClickHere: () => 'Click here',
         Reconnect: () => `Reconnect`,
         RunCode: () => `Run`,
         'Trying to run the code': () => `Trying to run the code...`,
@@ -27623,9 +27644,16 @@
         'Trying to add the code': () => `Trying to add the code to the project...`,
         PreviousVersion: () => `Back`,
         NextVersion: () => `Next`,
+        PreviousPage: () => `Previous page`,
+        NextPage: () => `Next page`,
+        'Original version': () => `Showing the original content.`,
+        'Translated version': () => `Showing the AI translated content.`,
+        'Switch to original': () => `switch to original.`,
+        'Switch to translated': () => `switch to AI translated.`,
         Finish: () => `Finish`,
         'Expand messages _': (Number) => `Expand ${Number} message` + (Number > 1 ? 's' : ''),
         FullText: () => `Read more`,
+        Acknowledgement: () => 'Acknowledgement',
         SeeAlso: () => `See also`,
         OK: () => `OK`,
         Cancel: () => `Cancel`,
@@ -27661,6 +27689,7 @@
         'Showing full text help of _': (Name) => `Here is the help information of [${Name}](<observer=help ${Name} -full>).`,
         'Arguments needed for execution _': (Name, Arguments) => `The "${Name}" procedure needs argument${Arguments > 1 ? 's' : ''} to run. Please provide them.`,
         'Please download Turtle Universe': () => `The feature is unavailable in Web Preview. Please download [Turtle Universe](https://www.turtlesim.com/products/turtle-universe/) to continue.`,
+        'Failed to retrieve knowledge': () => `Sorry, we did not find the specific knowledge.`,
         // Options
         'Help me fix this code': () => `Help me fix this code`,
         'Explain the error': () => `Explain the error`,
@@ -27680,9 +27709,13 @@
         Add: () => '添加',
         // Linting messages
         'Unrecognized breed name _': (Name) => `未能识别出名为 "${Name}" 的海龟种类。种类需要在代码的开头处进行定义。`,
-        'Unrecognized identifier _': (Name) => `未能识别 "${Name}"。是否忘记定义它了？`,
+        'Unrecognized identifier _': (Name) => `"${Name}" 既没有被定义，也不是 NetLogo 的关键字。`,
+        'Unrecognized identifier with replacement _': (Name, Suggested) => `"${Name}" 既没有被定义，也不是 NetLogo 的关键字。也许你想用的是 "${Suggested}"？`,
         'Unrecognized global statement _': (Name) => `未能识别出名为 "${Name}" 的全局声明。请检查你的拼写是否正确。`,
-        'Unrecognized statement _': (Name) => `"${Name}" 似乎不是合理的 NetLogo 代码。`,
+        'Unrecognized statement _': (Name) => `"${Name}" 不是合理的 NetLogo 代码。`,
+        'Unrecognized statement with replacement _': (Name, Suggested) => `"${Name}" 不是合理的 NetLogo 代码。试试 "${Suggested}"。`,
+        'Invalid content for code block _': (Name) => `"${Name}" 不应存在于代码块之中。`,
+        'Invalid content for list _': (Name) => `"${Name}" 不应存在于列表之中`,
         'Unsupported statement _': (Name) => `此版本 NetLogo 不支持 "${Name}"。`,
         'Invalid for Normal mode _': (Value) => `此编辑器模式只用于编辑 NetLogo 模型。`,
         'Invalid for Embedded mode _': (Value) => `此编辑器模式只用于编辑 NetLogo 模型中的一小段代码。`,
@@ -27755,6 +27788,7 @@
         '~BreedCommand': (Name) => `关于 "${Name}" 种类的过程。 `,
         '~CustomCommand': (Name) => `代码中定义的一个过程。`,
         // Editor interfaces
+        ClickHere: () => '点击这里',
         MoreFeatures: () => '更多功能',
         SelectAll: () => '全选',
         Undo: () => '撤销',
@@ -27778,9 +27812,16 @@
         'Trying to add the code': () => `尝试将代码放入作品……`,
         PreviousVersion: () => `后退`,
         NextVersion: () => `前进`,
+        PreviousPage: () => `返回上一页`,
+        NextPage: () => `进入下一页`,
+        'Original version': () => `正在显示原文。`,
+        'Translated version': () => `正在显示 AI 翻译的内容。`,
+        'Switch to original': () => `显示原文。`,
+        'Switch to translated': () => `显示 AI 翻译的内容。`,
         Finish: () => `完成`,
         'Expand messages _': (Number) => `展开 ${Number} 条消息`,
         FullText: () => `阅读全文`,
+        Acknowledgement: () => '致谢',
         SeeAlso: () => `参见`,
         OK: () => `确定`,
         Cancel: () => `取消`,
@@ -27804,6 +27845,7 @@
         'Showing full text help of _': (Name) => `显示 [${Name}](<observer=help ${Name} -full>) 的帮助文档。`,
         'Arguments needed for execution _': (Name, Arguments) => `在执行 \`${Name}\` 之前，需要知道它的参数。`,
         'Please download Turtle Universe': () => `功能在网页模式下不可用。请下载[海龟实验室](https://www.turtlesim.com/products/turtle-universe/index-cn.html)以获得更好的体验。`,
+        'Failed to retrieve knowledge': () => `抱歉，未能找到相应知识。`,
         // Options
         'Help me fix this code': () => `试试 AI 自动修复代码`,
         'Explain the error': () => `让 AI 解释错误信息`,
@@ -28577,36 +28619,36 @@
             return this;
         }
         /** gatherProcedure: Gather all information about a procedure in embedded mode. */
-        gatherEmbeddedProcedure(node, State) {
+        gatherEmbeddedProcedure(Node, State) {
             let procedure = new Procedure();
-            procedure.PositionStart = node.from;
-            procedure.PositionEnd = node.to;
+            procedure.PositionStart = Node.from;
+            procedure.PositionEnd = Node.to;
             procedure.IsCommand = true;
             procedure.Name = '⚠EmbeddedProcedure⚠';
             procedure.Arguments = [];
-            procedure.Variables = this.getLocalVarsCommand(node, State, false);
-            procedure.AnonymousProcedures = this.gatherAnonProcedures(node, State, procedure);
-            procedure.Context = this.getContext(node, State);
-            procedure.CodeBlocks = this.gatherCodeBlocks(node, State, procedure.Context, procedure.Variables, procedure.Arguments);
+            procedure.Variables = this.getLocalVarsCommand(Node, State, false);
+            procedure.AnonymousProcedures = this.gatherAnonProcedures(Node, State, procedure);
+            procedure.Context = this.getContext(Node, State);
+            procedure.CodeBlocks = this.gatherCodeBlocks(State, Node, procedure.Context, procedure.Variables, procedure.Arguments);
             return procedure;
         }
         /** gatherProcedure: Gather all information about a procedure. */
-        gatherProcedure(node, State) {
+        gatherProcedure(Node, State) {
             let procedure = new Procedure();
-            procedure.PositionStart = node.from;
-            procedure.PositionEnd = node.to;
+            procedure.PositionStart = Node.from;
+            procedure.PositionEnd = Node.to;
             procedure.IsCommand = true;
-            if (node.getChild('To')) {
-                procedure.IsCommand = getCodeName(State, node.getChildren('To')[0].node).toLowerCase() == 'to';
+            if (Node.getChild('To')) {
+                procedure.IsCommand = getCodeName(State, Node.getChildren('To')[0].node).toLowerCase() == 'to';
             }
-            node.getChildren('ProcedureName').map((node) => {
-                procedure.Name = getCodeName(State, node);
+            Node.getChildren('ProcedureName').map((Children) => {
+                procedure.Name = getCodeName(State, Children);
             });
-            procedure.Arguments = this.getArgs(node, State);
-            procedure.Variables = this.getLocalVars(node, State, false);
-            procedure.AnonymousProcedures = this.gatherAnonProcedures(node, State, procedure);
-            procedure.Context = this.getContext(node, State);
-            procedure.CodeBlocks = this.gatherCodeBlocks(node, State, procedure.Context, procedure.Variables, procedure.Arguments);
+            procedure.Arguments = this.getArgs(Node, State);
+            procedure.Variables = this.getLocalVars(Node, State, false);
+            procedure.AnonymousProcedures = this.gatherAnonProcedures(Node, State, procedure);
+            procedure.Context = this.getContext(Node, State);
+            procedure.CodeBlocks = this.gatherCodeBlocks(State, Node, procedure.Context, procedure.Variables, procedure.Arguments);
             return procedure;
         }
         /** getContext: Identify context of a block by looking at primitives and variable names. */
@@ -28623,47 +28665,48 @@
                         if (cursor.node.name.includes('Command') &&
                             !cursor.node.name.includes('Commands') &&
                             !cursor.node.name.includes('Special')) {
-                            let c = this.getPrimitiveContext(cursor.node, state);
-                            if (c) {
-                                newContext = combineContexts(c, priorContext);
+                            let name = getCodeName(state, cursor.node);
+                            let context = this.getPrimitiveContext(state, cursor.node, name);
+                            if (context) {
+                                newContext = combineContexts(context, priorContext);
                                 if (!noContext(newContext)) {
                                     priorContext = newContext;
                                 }
                                 else {
-                                    this.ContextErrors.push(new ContextError(cursor.node.from, cursor.node.to, priorContext, c, state.sliceDoc(cursor.node.from, cursor.node.to)));
+                                    this.ContextErrors.push(new ContextError(cursor.node.from, cursor.node.to, priorContext, context, name));
                                 }
                             }
                         }
                         else if (cursor.node.name == 'VariableDeclaration') {
                             let n = (_a = cursor.node.getChild('SetVariable')) === null || _a === void 0 ? void 0 : _a.getChild('VariableName');
-                            let c = new AgentContexts();
-                            let name = state.sliceDoc(n === null || n === void 0 ? void 0 : n.from, n === null || n === void 0 ? void 0 : n.to);
-                            if (['shape', 'breed', 'hidden?', 'label', 'label-color', 'color'].includes(name)) {
-                                c = new AgentContexts('-T-L');
-                            }
-                            else if (n === null || n === void 0 ? void 0 : n.getChild('PatchVar')) {
-                                c = new AgentContexts('-TP-');
-                            }
-                            else if (n === null || n === void 0 ? void 0 : n.getChild('TurtleVar')) {
-                                c = new AgentContexts('-T--');
-                            }
-                            else if (n === null || n === void 0 ? void 0 : n.getChild('LinkVar')) {
-                                c = new AgentContexts('---L');
-                            }
-                            else if (n) {
-                                for (let breed of this.Breeds.values()) {
-                                    if (breed.Variables.includes(name))
-                                        c = this.getBreedContext(breed, true);
+                            if (n) {
+                                let context = new AgentContexts();
+                                let name = getCodeName(state, n);
+                                if (['shape', 'breed', 'hidden?', 'label', 'label-color', 'color'].includes(name)) {
+                                    context = new AgentContexts('-T-L');
+                                }
+                                else if (n === null || n === void 0 ? void 0 : n.getChild('PatchVar')) {
+                                    context = new AgentContexts('-TP-');
+                                }
+                                else if (n === null || n === void 0 ? void 0 : n.getChild('TurtleVar')) {
+                                    context = new AgentContexts('-T--');
+                                }
+                                else if (n === null || n === void 0 ? void 0 : n.getChild('LinkVar')) {
+                                    context = new AgentContexts('---L');
+                                }
+                                else {
+                                    for (let breed of this.Breeds.values())
+                                        if (breed.Variables.includes(name))
+                                            context = this.getBreedContext(breed, true);
+                                }
+                                newContext = combineContexts(context, priorContext);
+                                if (!noContext(newContext)) {
+                                    priorContext = newContext;
+                                }
+                                else {
+                                    this.ContextErrors.push(new ContextError(cursor.node.from, cursor.node.to, priorContext, context, name));
                                 }
                             }
-                            newContext = combineContexts(c, priorContext);
-                            if (!noContext(newContext)) {
-                                priorContext = newContext;
-                            }
-                            else {
-                                this.ContextErrors.push(new ContextError(cursor.node.from, cursor.node.to, priorContext, c, name));
-                            }
-                            //context = combineContexts(c, context);
                         }
                         child = cursor.nextSibling();
                     }
@@ -28671,94 +28714,26 @@
             });
             return priorContext;
         }
-        getContextCommandStatement(node, state) {
-            let context = new AgentContexts();
-            let priorContext = new AgentContexts();
-            let newContext = context;
-            node.getChildren('CommandStatement').map((node3) => {
-                var _a;
-                let cursor = node3.cursor();
-                let child = cursor.firstChild();
-                while (child) {
-                    if (cursor.node.name.includes('Command') &&
-                        !cursor.node.name.includes('Commands') &&
-                        !cursor.node.name.includes('Special')) {
-                        let c = this.getPrimitiveContext(cursor.node, state);
-                        if (c) {
-                            newContext = combineContexts(c, priorContext);
-                            if (!noContext(newContext)) {
-                                priorContext = newContext;
-                            }
-                            else {
-                                this.ContextErrors.push(new ContextError(cursor.node.from, cursor.node.to, priorContext, c, state.sliceDoc(cursor.node.from, cursor.node.to)));
-                            }
-                        }
-                    }
-                    else if (cursor.node.name == 'VariableDeclaration') {
-                        let n = (_a = cursor.node.getChild('SetVariable')) === null || _a === void 0 ? void 0 : _a.getChild('VariableName');
-                        let c = new AgentContexts();
-                        let name = state.sliceDoc(n === null || n === void 0 ? void 0 : n.from, n === null || n === void 0 ? void 0 : n.to);
-                        if (['shape', 'breed', 'hidden?', 'label', 'label-color', 'color'].includes(name)) {
-                            c = new AgentContexts('-T-L');
-                        }
-                        else if (n === null || n === void 0 ? void 0 : n.getChild('PatchVar')) {
-                            c = new AgentContexts('-TP-');
-                        }
-                        else if (n === null || n === void 0 ? void 0 : n.getChild('TurtleVar')) {
-                            c = new AgentContexts('-T--');
-                        }
-                        else if (n === null || n === void 0 ? void 0 : n.getChild('LinkVar')) {
-                            c = new AgentContexts('---L');
-                        }
-                        else if (n) {
-                            for (let breed of this.Breeds.values()) {
-                                if (breed.Variables.includes(name)) {
-                                    c = this.getBreedContext(breed);
-                                    // if (breed.IsLinkBreed) {
-                                    //   c = new AgentContexts('---L');
-                                    // } else if (breed.Singular == 'patch') {
-                                    //   c = new AgentContexts('-TP-');
-                                    // } else {
-                                    //   c = new AgentContexts('-T--');
-                                    // }
-                                }
-                            }
-                        }
-                        newContext = combineContexts(c, priorContext);
-                        if (!noContext(newContext)) {
-                            priorContext = newContext;
-                        }
-                        else {
-                            this.ContextErrors.push(new ContextError(cursor.node.from, cursor.node.to, priorContext, c, name));
-                        }
-                        //context = combineContexts(c, context);
-                    }
-                    child = cursor.nextSibling();
-                }
-            });
-            return priorContext;
-        }
         /** getPrimitiveContext: Identify context for a builtin primitive. */
-        getPrimitiveContext(node, state) {
-            let prim = state.sliceDoc(node.from, node.to);
+        getPrimitiveContext(state, node, prim) {
             let prim_data = primitives$5.GetNamedPrimitive(prim);
             return prim_data === null || prim_data === void 0 ? void 0 : prim_data.AgentContext;
         }
         /** gatherCodeBlocks: Gather all information about code blocks inside a given node. */
-        gatherCodeBlocks(node, state, parentContext, vars, args) {
+        gatherCodeBlocks(state, node, parentContext, vars, args) {
             var blocks = [];
             node.cursor().iterate((noderef) => {
                 if (noderef.node.to > node.to)
                     return false;
                 if (noderef.name == 'Value')
                     noderef.node.getChildren('CodeBlock').map((child) => {
-                        this.gatherCodeBlock(child, state, blocks, parentContext, vars, args);
+                        this.gatherCodeBlock(state, child, blocks, parentContext, vars, args);
                     });
             });
             return blocks;
         }
         /** gatherCodeBlocks: Gather all information about a given code block. */
-        gatherCodeBlock(node, state, blocks, parentContext, vars, args) {
+        gatherCodeBlock(state, node, blocks, parentContext, vars, args) {
             if (this.checkRanges(blocks, node))
                 return;
             let block = new CodeBlock();
@@ -28781,7 +28756,7 @@
             block.Variables = vars.concat(this.getLocalVars(node.node, state, true));
             block.Arguments = args;
             block.Breed = prim.breed;
-            block.CodeBlocks = this.gatherCodeBlocks(node, state, block.Context, block.Variables, block.Arguments);
+            block.CodeBlocks = this.gatherCodeBlocks(state, node, block.Context, block.Variables, block.Arguments);
             blocks.push(block);
         }
         /** getPrimitive: Gather information about the primitive whose argument is a code block. */
@@ -29133,15 +29108,20 @@
     };
     /** getDiagnostic: Returns a diagnostic object from a node and message. */
     const getDiagnostic = function (view, node, message, severity = 'error', ...values) {
-        var value = view.state.sliceDoc(node.from, node.to).trim();
+        var value = view.state.sliceDoc(node.from, node.to);
+        var from = node.from + value.length - value.trimStart().length;
+        var to = node.to - value.length + value.trimEnd().length;
+        value = value.trim();
         // Cut short the value if it's too long
         if (value.length >= 20)
-            value = value.substring(0, 17) + '...';
+            value = value.replace('\n', ' ').substring(0, 17) + '...';
+        // Use the snippet if no parameters are provided
         if (values.length == 0)
             values.push(value);
+        // Build the diagnostic
         return {
-            from: node.from,
-            to: node.from + value.length,
+            from: from,
+            to: to,
             severity: severity,
             message: Localized.Get(message, ...values),
         };
@@ -30707,6 +30687,28 @@
             }
         });
     };
+    /** checkBreed: Checks if the term in the structure of a breed command/reporter and push lint messages */
+    function checkBreed(diagnostics, context, view, noderef) {
+        // pull out name of possible intended breed
+        let value = getCodeName(view.state, noderef);
+        let breedinfo = getBreedName(value);
+        // if the breed name is not recognized, add the lint message
+        if (breedinfo.breed !== '' && !context.breedNames.includes(breedinfo.breed)) {
+            let plural = '';
+            let singular = '';
+            let diagnostic = getDiagnostic(view, noderef, 'Unrecognized breed name _', 'error', breedinfo.breed);
+            if (breedinfo.isPlural) {
+                plural = breedinfo.breed;
+                singular = getSingularName(breedinfo.breed);
+            }
+            else {
+                singular = breedinfo.breed;
+                plural = getPluralName(breedinfo.breed);
+            }
+            addBreedAction(diagnostic, breedinfo.isLink ? BreedType$1.UndirectedLink : BreedType$1.Turtle, plural, singular);
+            diagnostics.push(diagnostic);
+        }
+    }
 
     /** AutoCompletion: Auto completion service for a NetLogo model. */
     /* Possible Types of Autocompletion Tokens:
@@ -31214,64 +31216,32 @@
             .iterate((noderef) => {
             var _a;
             if (noderef.name == 'Identifier' && ((_a = noderef.node.parent) === null || _a === void 0 ? void 0 : _a.name) != '⚠') {
-                const Node = noderef.node;
-                const value = view.state.sliceDoc(noderef.from, noderef.to);
-                //check if it meets some initial criteria for validity
-                if (!checkValidIdentifier(Node, value, context)) {
-                    //check if the identifier looks like a breed procedure (e.g. "create-___")
-                    let result = checkBreedLike(value);
-                    if (!result.found) {
-                        // console.log(value, noderef.name, noderef.node.parent?.name);
-                        diagnostics.push(getDiagnostic(view, noderef, 'Unrecognized identifier _'));
+                const node = noderef.node;
+                const value = getCodeName(view.state, node);
+                // check if it meets some initial criteria for validity
+                if (checkValidIdentifier(node, value, context))
+                    return;
+                // check if the identifier looks like a breed procedure (e.g. "create-___")
+                let result = checkBreedLike(value);
+                if (!result.found) {
+                    if (UnrecognizedSuggestions.hasOwnProperty(value)) {
+                        diagnostics.push(getDiagnostic(view, noderef, 'Unrecognized identifier with replacement _', 'error', value, UnrecognizedSuggestions[value]));
                     }
                     else {
-                        // pull out name of possible intended breed
-                        let breedinfo = getBreedName(value);
-                        Log(breedinfo);
-                        if (!context.breedNames.includes(breedinfo.breed)) {
-                            let plural = '';
-                            let singular = '';
-                            let diagnostic = getDiagnostic(view, noderef, 'Unrecognized breed name _', 'error', breedinfo.breed);
-                            if (breedinfo.isPlural) {
-                                plural = breedinfo.breed;
-                                singular = getSingularName(breedinfo.breed);
-                            }
-                            else {
-                                singular = breedinfo.breed;
-                                plural = getPluralName(breedinfo.breed);
-                            }
-                            addBreedAction(diagnostic, breedinfo.isLink ? BreedType$1.UndirectedLink : BreedType$1.Turtle, plural, singular);
-                            diagnostics.push(diagnostic);
-                        }
+                        diagnostics.push(getDiagnostic(view, noderef, 'Unrecognized identifier _'));
                     }
                 }
+                else {
+                    checkBreed(diagnostics, context, view, node);
+                }
             }
-            // else if (
-            //   noderef.name == 'Arg' &&
-            //   noderef.node.prevSibling &&
-            //   view.state
-            //     .sliceDoc(noderef.node.prevSibling.from, noderef.node.prevSibling.to)
-            //     .toLowerCase() == 'ask'
-            // ) {
-            //   let value = view.state.sliceDoc(noderef.from, noderef.to).toLowerCase();
-            //   if (!lintContext.GetPluralBreedNames().includes(value)) {
-            //     let plural = value;
-            //     let singular = otherBreedName(value, true);
-            //     let breed_type = 'breed';
-            //     diagnostics.push({
-            //       from: noderef.from,
-            //       to: noderef.to,
-            //       severity: 'error',
-            //       message: Localized.Get('Unrecognized breed name _', value),
-            //       actions: [
-            //         getAction(noderef.node, value, breed_type, plural, singular),
-            //       ],
-            //     });
-            //   }
-            //   return false;
-            // }
         });
         return diagnostics;
+    };
+    /** UnrecognizedSuggestions: Suggestions for unrecognized identifiers. */
+    const UnrecognizedSuggestions = {
+        else: 'if-else',
+        'set-patch-color': 'set pcolor',
     };
 
     // UnrecognizedGlobalLinter: Checks if something at the top layer isn't a procedure, global, etc.
@@ -31347,24 +31317,9 @@
                 const node = noderef.node;
                 const value = getCodeName(view.state, node);
                 let result = checkValidBreed(node, value, context, breeds);
-                if (!result.isValid) {
-                    let breed_result = getBreedName(value);
-                    let diagnostic = getDiagnostic(view, noderef, 'Unrecognized breed name _', 'error', value);
-                    if (result.newBreed) {
-                        let plural = '';
-                        let singular = '';
-                        if (result.isPlural) {
-                            plural = breed_result.breed;
-                            singular = getSingularName(breed_result.breed);
-                        }
-                        else {
-                            singular = breed_result.breed;
-                            plural = getPluralName(breed_result.breed);
-                        }
-                        addBreedAction(diagnostic, result.isLink ? BreedType$1.UndirectedLink : BreedType$1.Turtle, plural, singular);
-                    }
-                    diagnostics.push(diagnostic);
-                }
+                // JC: Honestly, I don't understand why we check breed in 2 places - I tried to merge the code, but there might be new problems
+                if (!result.isValid)
+                    checkBreed(diagnostics, context, view, node);
             }
         });
         return diagnostics;
@@ -31472,9 +31427,10 @@
                     parents.push(curr.parent.name);
                     curr = curr.parent;
                 }
-                const value = view.state.sliceDoc(node.from, node.to);
+                const value = view.state.sliceDoc(node.from, node.to).toLowerCase().trim();
                 Log(value, node.name, parents);
                 if (((_a = node.node.parent) === null || _a === void 0 ? void 0 : _a.name) == 'Arguments') {
+                    // Arguments should not be reserved words or command/reporter names
                     let child = node.node.firstChild;
                     if (reserved.includes(value) ||
                         (child && (child.name.startsWith('Command') || child.name.startsWith('Reporter')))) {
@@ -31485,6 +31441,7 @@
                     }
                 }
                 else if (!['[', ']', ')', '(', '"'].includes(value) && !checkBreedLike(value).found) {
+                    // Anything else could be an unrecognized statement
                     if (((_b = node.node.parent) === null || _b === void 0 ? void 0 : _b.name) == 'Normal') {
                         diagnostics.push(getDiagnostic(view, node, 'Unrecognized global statement _'));
                     }
@@ -32112,7 +32069,7 @@
         return Current;
     };
 
-    // ContextLinter: Checks if procedures and code blocks have a valid context
+    /** ContextLinter: Checks if procedures and code blocks have a valid context. */
     const ContextLinter = (view, preprocessContext, lintContext) => {
         const diagnostics = [];
         // for (let p of lintContext.Procedures.values()) {
@@ -32124,48 +32081,50 @@
         }
         return diagnostics;
     };
+    // contextToString: Converts context to string
     const contextToString = function (context) {
         let contexts = [];
-        if (context.Observer) {
+        if (context.Observer)
             contexts.push(Localized.Get('Observer'));
-        }
-        if (context.Turtle) {
+        if (context.Turtle)
             contexts.push(Localized.Get('Turtle'));
-        }
-        if (context.Patch) {
+        if (context.Patch)
             contexts.push(Localized.Get('Patch'));
-        }
-        if (context.Link) {
+        if (context.Link)
             contexts.push(Localized.Get('Link'));
-        }
         return contexts.join('/');
     };
 
-    // BracketLinter: Checks if all brackets/parentheses have matches
+    /** CodeBlockLinter: Linter for code blocks. */
     const CodeBlockLinter = (view, preprocessContext, lintContext) => {
         const diagnostics = [];
         syntaxTree(view.state)
             .cursor()
             .iterate((node) => {
-            if (node.name == 'CodeBlock') {
-                let c = node.node.cursor();
-                c.firstChild();
-                if (c) {
-                    let type = !['LineComment', 'OpenBracket', 'CloseBracket'].includes(c.name)
-                        ? c.name == 'ProcedureContent'
-                        : null;
-                    while (c.nextSibling()) {
-                        // console.log(c.name,type)
-                        if (!['LineComment', 'OpenBracket', 'CloseBracket'].includes(c.name) && type == null) {
-                            type = c.name == 'ProcedureContent';
-                        }
-                        if (type == true && !['LineComment', 'OpenBracket', 'CloseBracket', 'ProcedureContent'].includes(c.name)) {
-                            diagnostics.push(getDiagnostic(view, c, 'Inconsistent code block type _', 'error', 'procedure content', c.name));
-                        }
-                        else if (type == false && c.name == 'ProcedureContent') {
-                            diagnostics.push(getDiagnostic(view, c, 'Inconsistent code block type _', 'error', 'Non-procedure content', c.name));
-                        }
-                    }
+            if (node.name != 'CodeBlock' && node.name != 'Embedded')
+                return;
+            let cursor = node.node.cursor();
+            let isCodeBlock = null;
+            if (!cursor.firstChild())
+                return;
+            while (cursor.nextSibling()) {
+                var name = cursor.name;
+                // Use the first meaningful node to determine the type of the block.
+                if (isCodeBlock == null) {
+                    if (!['LineComment', 'OpenBracket', 'CloseBracket'].includes(name))
+                        isCodeBlock = cursor.name == 'ProcedureContent';
+                    else
+                        continue;
+                }
+                if (isCodeBlock && !['LineComment', 'OpenBracket', 'CloseBracket', 'ProcedureContent'].includes(name)) {
+                    // For code blocks, lint non-code-block content
+                    // Ignore identifiers: they are already linted
+                    if (name !== 'Identifier')
+                        diagnostics.push(getDiagnostic(view, cursor, 'Invalid content for code block _', 'error'));
+                }
+                else if (!isCodeBlock && cursor.name == 'ProcedureContent') {
+                    // For lists, lint code-block content
+                    diagnostics.push(getDiagnostic(view, cursor, 'Invalid content for list _', 'error'));
                 }
             }
         });
@@ -32449,10 +32408,11 @@
     const prettifyAll = function (view, Editor) {
         let doc = view.state.doc.toString();
         // eliminate extra spacing
+        Editor.ForceParse();
         let new_doc = removeSpacing(syntaxTree(view.state), doc);
         view.dispatch({ changes: { from: 0, to: doc.length, insert: new_doc } });
+        // parse it again
         Editor.ForceParse();
-        // console.log(view.state.doc.toString());
         // give certain nodes their own lines
         view.dispatch({
             changes: addSpacing(view, 0, new_doc.length, Editor.LineWidth),
@@ -32461,19 +32421,12 @@
         view.dispatch({ changes: { from: 0, to: view.state.doc.toString().length, insert: new_doc } });
         // doc = view.state.doc.toString();
         Editor.ForceParse();
-        //console.log(view.state.doc.toString())
-        // ensure spacing is correct
-        // doc = view.state.doc.toString();
-        // new_doc = avoidStrings(doc, finalSpacing).trim();
-        // view.dispatch({ changes: { from: 0, to: doc.length, insert: new_doc } });
-        // console.log(view.state.doc.toString());
         // add indentation
         view.dispatch({
             changes: indentRange(view.state, 0, view.state.doc.toString().length), //indent(view.state.doc.toString(),view.state)
         });
-        if (doc != view.state.doc.toString()) {
-            Log('made changes');
-        }
+        if (doc != view.state.doc.toString())
+            Log('Prettifier made changes');
     };
     const doubleLineBreaks = [
         // 'LineComment',
@@ -33163,7 +33116,6 @@
         }
         /** PrettifyAll: Prettify all the NetLogo code. */
         PrettifyAll() {
-            this.Galapagos.ForceParse();
             prettifyAll(this.CodeMirror, this.Galapagos);
         }
         /** PrettifyOrAll: Prettify the selected code. If no code is selected, prettify all. */
@@ -33856,7 +33808,7 @@
             // Inherit the action log
             if (Context.PreviousMessages.length === 0) {
                 var Action = (_d = GetField(Record.Response.Sections, "Action")) === null || _d === void 0 ? void 0 : _d.Content;
-                var Parameter = (_e = GetField(Record.Response.Sections, "Parameter")) === null || _e === void 0 ? void 0 : _e.Content;
+                var Parameter = (_e = GetField(Record.Response.Sections, "Detail")) === null || _e === void 0 ? void 0 : _e.Content;
                 var Observation = GetField(Record.Response.Sections, "Observation");
                 if (Observation && Action && Parameter) {
                     var ActionLog = {
@@ -35740,12 +35692,18 @@
             tt: [],
             u: [],
             ul: []
+        },
+        safeAttrValue: (Tag, Attribute, Value, CSSFilter) => {
+            if (Attribute === "href")
+                return Value;
+            return libExports.safeAttrValue(Tag, Attribute, Value, CSSFilter);
         }
     };
     /** SafeguardHTML: Safeguard the HTML output. */
     function SafeguardHTML(Source) {
         return libExports.filterXSS(Source, XSSOptions);
     }
+    window.SafeguardHTML = SafeguardHTML;
     /** PostprocessHTML: Postprocess the HTML, esp. links. */
     function PostprocessHTML(Editor, Source) {
         Source.find("a").each((Index, Element) => {
@@ -35774,6 +35732,9 @@
                         if (!Editor.CommandTab.Disabled)
                             Editor.CommandTab.ExecuteCommand(Scheme, Target, false);
                     });
+                }
+                else if (Scheme == "knowledge") {
+                    Current.on("click", () => Editor.CommandTab.FullText.ShowKnowledge(Target));
                 }
                 else if (Current.hasClass("external") || Href.match(/^(https?:)?\/\/([^.]*?\.|)(turtlesim.com|hicivitas.com|northwestern.edu|netlogoweb.org)\//)) {
                     // Handle external links
@@ -35921,53 +35882,140 @@
         }
     }
 
+    /** ShowConfirm: Show a confirm dialog. */
+    function ShowConfirm(Subject, Content, OK, Cancel) {
+        $.confirm({
+            title: Localized.Get(Subject),
+            content: Localized.Get(Content),
+            type: 'blue',
+            useBootstrap: false,
+            buttons: {
+                ok: {
+                    text: Localized.Get("OK"),
+                    btnClass: 'btn-primary',
+                    keys: ['enter'],
+                    action: OK
+                },
+                cancel: {
+                    text: Localized.Get("Cancel"),
+                    action: Cancel
+                }
+            }
+        });
+    }
+    /** Toast: Show a toast. */
+    function Toast(Type, Content, Subject) {
+        toastr[Type](Content, Subject);
+    }
+
     /** FullTextDisplay: Display the full-text help information. */
     class FullTextDisplay extends Display {
         /** Constructor: Create a new output section. */
         constructor(Tab) {
             super(Tab, ".command-fulltext");
-            /** RequestedTab: The tab that requested the full text. */
+            /** CurrentKnowledge: The current knowledge. */
+            this.CurrentKnowledge = null;
+            /** RequestedTab: The tab that requested the full-screen help. */
             this.RequestedTab = null;
+            // Create the header
+            var Header = $("<h2></h2>").appendTo(this.Container);
+            this.Header = $("<strong></strong>").appendTo(Header);
+            this.HeaderLabel = $("<span></span>").appendTo(Header);
+            // Return to the last page
+            var Previous = $(`<p>&lt; <a href="javascript:void(0)"></a></p>`).appendTo(this.Container);
+            Previous.find("a").text(Localized.Get("PreviousPage")).on("click", () => this.HideFullText());
+            // Machine translation
+            this.Translator = $(`
+		<div class="translator">
+			<p>${Localized.Get("Translated version")}<a href="javascript:void(0)">${Localized.Get("ClickHere")}</a> ${Localized.Get("Switch to original")}</p>
+			<p>${Localized.Get("Original version")}<a href="javascript:void(0)">${Localized.Get("ClickHere")}</a> ${Localized.Get("Switch to translated")}</p>
+		</div>`).appendTo(this.Container);
+            this.Translator.find("a")[0].onclick = () => this.ShowOriginal();
+            this.Translator.find("a")[1].onclick = () => this.ShowTranslated();
+            // Create the full text
+            this.Content = $("<div class='fulltext'></div>").appendTo(this.Container);
+            // Create the see-also list
+            $("<h4></h4>").text(Localized.Get("SeeAlso")).appendTo(this.Container);
+            this.SeeAlso = $("<ul class='SeeAlso'></ul>").appendTo(this.Container);
+            // Create the acknowledgement
+            $("<h4></h4>").text(Localized.Get("Acknowledgement")).appendTo(this.Container);
+            this.Acknowledgement = $("<p class='Acknowledge'></p>").appendTo(this.Container);
+            // Return to the last page
+            Previous = $(`<p>&lt; <a href="javascript:void(0)"></a></p>`).appendTo(this.Container);
+            Previous.find("a").text(Localized.Get("PreviousPage")).on("click", () => this.HideFullText());
         }
-        /** ShowFullText: Show the full text of a command. */
-        ShowFullText(Data) {
+        /** ShowKnowledge: Try to retrieve and show a knowledge. */
+        ShowKnowledge(ID) {
+            ChatNetwork.GetKnowledge(ID).then((Knowledge) => {
+                this.ShowFullText(Knowledge);
+            }).catch((Error) => {
+                console.error(Error);
+                Toast("error", Localized.Get("Failed to retrieve knowledge"));
+            });
+        }
+        /** ShowFullText: Show the full-screen help of a command. */
+        ShowFullText(Knowledge) {
+            // Show the current tab
             this.RequestedTab = this.Tab.Editor.CurrentTab;
+            this.CurrentKnowledge = Knowledge;
             this.Show();
             // Render the subject
-            this.Container.find("h2 strong").text(Data["display_name"]);
-            this.Container.find("h2 span").text(`(${Data["agents"].map((Agent) => `${RenderAgent(Agent)}`).join(", ")})`);
-            // Render the list
-            var SeeAlso = this.Container.find("ul.SeeAlso").empty();
-            for (var Primitive in Data["see_also"])
-                $(`<li><a href="help:${Primitive}">${Primitive}</a> - ${Data["see_also"][Primitive]}</li>`).appendTo(SeeAlso).find("a");
-            // Machine-translation
-            var Translator = this.Container.find(".translator");
-            if (Data["translation"] != null && Data["verified"] != true)
-                Translator.show();
-            else
-                Translator.hide();
-            var Original = Translator.find("a.Original").bind("click", () => {
-                Original.hide();
-                Translation.show();
-                SetCode(Data["content"]);
-            }).parent().show();
-            var Translation = Translator.find("a.Translation").bind("click", () => {
-                Translation.hide();
-                Original.show();
-                SetCode(Data["translation"]);
-            }).parent().hide();
+            this.Header.text(Knowledge.Title);
+            this.HeaderLabel.text(`(${Knowledge.Type})`);
             // Render the full text
-            var SetCode = (Content) => {
-                if (Content != null)
-                    this.Container.find("div.fulltext")
-                        .html(MarkdownToHTML(Content));
-                NetLogoUtils.AnnotateCodes(this.Container.find("code"));
-                this.Container.scrollTop(0);
+            if (Knowledge.Translated) {
+                this.ShowTranslated();
+                this.Translator.show();
+            }
+            else {
+                this.ShowOriginal();
+                this.Translator.hide();
+            }
+            // Render the acknowledgement
+            this.Acknowledgement.html(Knowledge.Acknowledgement);
+            // Render the see-also list
+            this.SeeAlso.empty();
+            for (var Primitive in Knowledge.SeeAlso) {
+                var Link = Knowledge.SeeAlso[Primitive];
+                $(`<li><a href="${Link}">${Primitive}</a></li>`).appendTo(this.SeeAlso);
+            }
+            PostprocessHTML(this.Tab.Editor, this.SeeAlso);
+        }
+        /** ShowOriginal: Show the original version of the full-text help. */
+        ShowOriginal() {
+            if (!this.CurrentKnowledge)
+                return;
+            this.SetContent(this.CurrentKnowledge.Content);
+        }
+        /** ShowTranslated: Show the translated version of the full-text help. */
+        ShowTranslated() {
+            var _a;
+            if (!((_a = this.CurrentKnowledge) === null || _a === void 0 ? void 0 : _a.Translated))
+                return;
+            this.SetContent(this.CurrentKnowledge.Translated);
+        }
+        /** SetContent: Set the content of the full-text help. */
+        SetContent(Content) {
+            this.Content.html(MarkdownToHTML(Content));
+            NetLogoUtils.AnnotateCodes(this.Content.find("code"));
+            PostprocessHTML(this.Tab.Editor, this.Content);
+            this.Container.scrollTop(0);
+        }
+        /** ShowPrimitive: Show the full-screen help of a primitive. */
+        ShowPrimitive(Primitive) {
+            var SeeAlso = {};
+            for (var Key in Primitive["see_also"])
+                SeeAlso[Key] = `help:${Key}`;
+            var Knowledge = {
+                ID: Primitive["display_name"],
+                Title: Primitive["display_name"],
+                Type: Primitive["agents"].map((Agent) => `${RenderAgent(Agent)}`).join(", "),
+                Content: Primitive["content"],
+                Translated: Primitive["translation"],
+                Acknowledgement: Primitive["acknowledge"],
+                SeeAlso: SeeAlso
             };
-            SetCode(Data["translation"] != null ? Data["translation"] : Data["content"]);
-            // Acknowledge
-            this.Container.find(".Acknowledge").html(Data["acknowledge"]);
-            PostprocessHTML(this.Tab.Editor, this.Container);
+            this.ShowFullText(Knowledge);
         }
         /** HideFullText: Hide the full text mode. */
         HideFullText() {
@@ -36316,32 +36364,6 @@
             CodeInContext: true,
             Inheritance: ContextInheritance.CurrentOnly
         };
-    }
-
-    /** ShowConfirm: Show a confirm dialog. */
-    function ShowConfirm(Subject, Content, OK, Cancel) {
-        $.confirm({
-            title: Localized.Get(Subject),
-            content: Localized.Get(Content),
-            type: 'blue',
-            useBootstrap: false,
-            buttons: {
-                ok: {
-                    text: Localized.Get("OK"),
-                    btnClass: 'btn-primary',
-                    keys: ['enter'],
-                    action: OK
-                },
-                cancel: {
-                    text: Localized.Get("Cancel"),
-                    action: Cancel
-                }
-            }
-        });
-    }
-    /** Toast: Show a toast. */
-    function Toast(Type, Content, Subject) {
-        toastr[Type](Content, Subject);
     }
 
     /** GenerateObjectID: Generate a random object ID. */
@@ -36934,8 +36956,10 @@
         /** SetData: Set the data to render. */
         SetData(Data) {
             var _a;
-            if ((_a = Data.Field) === null || _a === void 0 ? void 0 : _a.startsWith("__"))
+            if ((_a = Data.Field) === null || _a === void 0 ? void 0 : _a.startsWith("__")) {
                 this.Container.removeClass("first");
+                this.Container.addClass(Data.Field.substring(2).toLowerCase());
+            }
             return super.SetData(Data);
         }
         /** RenderInternal: Render the UI element. */

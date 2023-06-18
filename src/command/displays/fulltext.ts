@@ -16,6 +16,10 @@ export class FullTextDisplay extends Display {
 	public HeaderLabel: JQuery<HTMLElement>;
 	/** Translator: The translator of the full-text display. */
 	public Translator: JQuery<HTMLElement>;
+	/** OriginalButton: The button to show the original version. */
+	public OriginalButton: JQuery<HTMLElement>;
+	/** TranslatedButton: The button to show the translated version. */
+	public TranslatedButton: JQuery<HTMLElement>;
 	/** Content: The content of the full-text display. */
 	public Content: JQuery<HTMLElement>;
 	/** SeeAlso: The see-also list. */
@@ -40,8 +44,8 @@ export class FullTextDisplay extends Display {
 			<p>${Localized.Get("Translated version")}<a href="javascript:void(0)">${Localized.Get("ClickHere")}</a> ${Localized.Get("Switch to original")}</p>
 			<p>${Localized.Get("Original version")}<a href="javascript:void(0)">${Localized.Get("ClickHere")}</a> ${Localized.Get("Switch to translated")}</p>
 		</div>`).appendTo(this.Container);
-		this.Translator.find("a")[0].onclick = () => this.ShowOriginal();
-		this.Translator.find("a")[1].onclick = () => this.ShowTranslated();
+		this.OriginalButton = $(this.Translator.find("a")[0]).on("click", () => this.ShowOriginal());
+		this.TranslatedButton = $(this.Translator.find("a")[1]).on("click", () => this.ShowTranslated());
 		// Create the full text
 		this.Content = $("<div class='fulltext'></div>").appendTo(this.Container);
 		// Create the see-also list
@@ -96,11 +100,15 @@ export class FullTextDisplay extends Display {
 	public ShowOriginal() {
 		if (!this.CurrentKnowledge) return;
 		this.SetContent(this.CurrentKnowledge.Content);
+		this.OriginalButton.hide();
+		this.TranslatedButton.show();
 	}
 	/** ShowTranslated: Show the translated version of the full-text help. */
 	public ShowTranslated() {
 		if (!this.CurrentKnowledge?.Translated) return;
 		this.SetContent(this.CurrentKnowledge.Translated);
+		this.OriginalButton.show();
+		this.TranslatedButton.hide();
 	}
 	/** SetContent: Set the content of the full-text help. */
 	private SetContent(Content: string) {

@@ -11,6 +11,10 @@ export declare class FullTextDisplay extends Display {
     HeaderLabel: JQuery<HTMLElement>;
     /** Translator: The translator of the full-text display. */
     Translator: JQuery<HTMLElement>;
+    /** OriginalButton: The button to show the original version. */
+    OriginalButton: JQuery<HTMLElement>;
+    /** TranslatedButton: The button to show the translated version. */
+    TranslatedButton: JQuery<HTMLElement>;
     /** Content: The content of the full-text display. */
     Content: JQuery<HTMLElement>;
     /** SeeAlso: The see-also list. */

@@ -12,6 +12,8 @@ export declare function Clarify(Label?: string): ChatResponseOption;
 export declare function EditCode(Label?: string): ChatResponseOption;
 /** ExampleCode: Ask for an example code. */
 export declare function ExampleCode(Label?: string): ChatResponseOption;
+/** WriteCodeWithPlan: Write a code snippet based on the plan. */
+export declare function WriteCodeWithPlan(AskMore: boolean): ChatResponseOption;
 /** AskCode: Ask a question about the code. */
 export declare function AskCode(Label?: string, Style?: string, CodeOnly?: boolean): ChatResponseOption;
 /** FixCode: Fix the current code snippet. */

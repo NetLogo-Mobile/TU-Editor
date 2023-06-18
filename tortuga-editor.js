@@ -28493,9 +28493,13 @@
             this.ContextErrors = [];
             /** EditorID: The id of the editor. */
             this.EditorID = 0;
+            this.Context = 'observer';
             // #endregion
         }
         // #endregion
+        SetContext(context) {
+            this.Context = context;
+        }
         // #region "Version Control"
         /** SetDirty: Make the state dirty. */
         SetDirty() {
@@ -28535,7 +28539,7 @@
                 case 'Embedded':
                     this.RecognizedMode = 'Command';
                     break;
-                case 'OnelineReporter':
+                case 'OnelineReporter' :
                     this.RecognizedMode = 'Reporter';
                     break;
                 case 'Normal':
@@ -28616,15 +28620,32 @@
                 let procedure = this.gatherEmbeddedProcedure(Cursor.node, State);
                 this.Procedures.set(procedure.Name, procedure);
             }
+            else if (this.RecognizedMode == 'Reporter') {
+                let procedure = this.gatherOnelineProcedure(Cursor.node, State);
+                this.Procedures.set(procedure.Name, procedure);
+            }
             return this;
         }
-        /** gatherProcedure: Gather all information about a procedure in embedded mode. */
+        /** gatherEmbeddedProcedure: Gather all information about a procedure in embedded mode. */
         gatherEmbeddedProcedure(Node, State) {
             let procedure = new Procedure();
             procedure.PositionStart = Node.from;
             procedure.PositionEnd = Node.to;
             procedure.IsCommand = true;
             procedure.Name = '⚠EmbeddedProcedure⚠';
+            procedure.Arguments = [];
+            procedure.Variables = this.getLocalVarsCommand(Node, State, false);
+            procedure.AnonymousProcedures = this.gatherAnonProcedures(Node, State, procedure);
+            procedure.Context = this.getContext(Node, State);
+            return procedure;
+        }
+        /** gatherOnelineProcedure: Gather all information about a procedure in embedded mode. */
+        gatherOnelineProcedure(Node, State) {
+            let procedure = new Procedure();
+            procedure.PositionStart = Node.from;
+            procedure.PositionEnd = Node.to;
+            procedure.IsCommand = false;
+            procedure.Name = '⚠OnelineReporter⚠';
             procedure.Arguments = [];
             procedure.Variables = this.getLocalVarsCommand(Node, State, false);
             procedure.AnonymousProcedures = this.gatherAnonProcedures(Node, State, procedure);
@@ -28658,61 +28679,67 @@
             let newContext = context;
             node.getChildren('ProcedureContent').map((node2) => {
                 node2.getChildren('CommandStatement').map((node3) => {
-                    var _a;
-                    let cursor = node3.cursor();
-                    let child = cursor.firstChild();
-                    while (child) {
-                        if (cursor.node.name.includes('Command') &&
-                            !cursor.node.name.includes('Commands') &&
-                            !cursor.node.name.includes('Special')) {
-                            let name = getCodeName(state, cursor.node);
-                            let context = this.getPrimitiveContext(state, cursor.node, name);
-                            if (context) {
-                                newContext = combineContexts(context, priorContext);
-                                if (!noContext(newContext)) {
-                                    priorContext = newContext;
-                                }
-                                else {
-                                    this.ContextErrors.push(new ContextError(cursor.node.from, cursor.node.to, priorContext, context, name));
-                                }
-                            }
-                        }
-                        else if (cursor.node.name == 'VariableDeclaration') {
-                            let n = (_a = cursor.node.getChild('SetVariable')) === null || _a === void 0 ? void 0 : _a.getChild('VariableName');
-                            if (n) {
-                                let context = new AgentContexts();
-                                let name = getCodeName(state, n);
-                                if (['shape', 'breed', 'hidden?', 'label', 'label-color', 'color'].includes(name)) {
-                                    context = new AgentContexts('-T-L');
-                                }
-                                else if (n === null || n === void 0 ? void 0 : n.getChild('PatchVar')) {
-                                    context = new AgentContexts('-TP-');
-                                }
-                                else if (n === null || n === void 0 ? void 0 : n.getChild('TurtleVar')) {
-                                    context = new AgentContexts('-T--');
-                                }
-                                else if (n === null || n === void 0 ? void 0 : n.getChild('LinkVar')) {
-                                    context = new AgentContexts('---L');
-                                }
-                                else {
-                                    for (let breed of this.Breeds.values())
-                                        if (breed.Variables.includes(name))
-                                            context = this.getBreedContext(breed, true);
-                                }
-                                newContext = combineContexts(context, priorContext);
-                                if (!noContext(newContext)) {
-                                    priorContext = newContext;
-                                }
-                                else {
-                                    this.ContextErrors.push(new ContextError(cursor.node.from, cursor.node.to, priorContext, context, name));
-                                }
-                            }
-                        }
-                        child = cursor.nextSibling();
-                    }
+                    [priorContext, newContext] = this.getNewContext(node3, priorContext, state, newContext);
                 });
             });
             return priorContext;
+        }
+        getNewContext(node3, priorContext, state, newContext) {
+            var _a;
+            let cursor = node3.cursor();
+            let child = cursor.firstChild();
+            this.ContextErrors.length;
+            while (child) {
+                if ((cursor.node.name.includes('Command') || cursor.node.name.includes('Reporter')) &&
+                    !cursor.node.name.includes('Commands') &&
+                    !cursor.node.name.includes('Reporters') &&
+                    !cursor.node.name.includes('Special')) {
+                    let name = getCodeName(state, cursor.node);
+                    let context = this.getPrimitiveContext(state, cursor.node, name);
+                    if (context) {
+                        newContext = combineContexts(context, priorContext);
+                        if (!noContext(newContext)) {
+                            priorContext = newContext;
+                        }
+                        else {
+                            this.ContextErrors.push(new ContextError(cursor.node.from, cursor.node.to, priorContext, context, name));
+                        }
+                    }
+                }
+                else if (cursor.node.name == 'VariableDeclaration') {
+                    let n = (_a = cursor.node.getChild('SetVariable')) === null || _a === void 0 ? void 0 : _a.getChild('VariableName');
+                    if (n) {
+                        let context = new AgentContexts();
+                        let name = getCodeName(state, n);
+                        if (['shape', 'breed', 'hidden?', 'label', 'label-color', 'color'].includes(name)) {
+                            context = new AgentContexts('-T-L');
+                        }
+                        else if (n === null || n === void 0 ? void 0 : n.getChild('PatchVar')) {
+                            context = new AgentContexts('-TP-');
+                        }
+                        else if (n === null || n === void 0 ? void 0 : n.getChild('TurtleVar')) {
+                            context = new AgentContexts('-T--');
+                        }
+                        else if (n === null || n === void 0 ? void 0 : n.getChild('LinkVar')) {
+                            context = new AgentContexts('---L');
+                        }
+                        else {
+                            for (let breed of this.Breeds.values())
+                                if (breed.Variables.includes(name))
+                                    context = this.getBreedContext(breed, true);
+                        }
+                        newContext = combineContexts(context, priorContext);
+                        if (!noContext(newContext)) {
+                            priorContext = newContext;
+                        }
+                        else {
+                            this.ContextErrors.push(new ContextError(cursor.node.from, cursor.node.to, priorContext, context, name));
+                        }
+                    }
+                }
+                child = cursor.nextSibling();
+            }
+            return [priorContext, newContext];
         }
         /** getPrimitiveContext: Identify context for a builtin primitive. */
         getPrimitiveContext(state, node, prim) {
@@ -28743,7 +28770,7 @@
             block.PositionStart = node.from;
             block.PositionEnd = node.to;
             block.InheritParentContext = prim.inheritParentContext;
-            let originalContext = noContext(prim.context) ? parentContext : prim.context;
+            let originalContext = noContext(prim.context) || block.InheritParentContext ? parentContext : prim.context;
             block.Context = this.getContext(node, state, originalContext);
             // if (noContext(block.Context)) {
             //   console.log(
@@ -28787,9 +28814,9 @@
                         prim.type = cursor.node.name;
                     }
                     else if (cursor.node.name == 'Arg' && ask) {
-                        let plurals = [...state.field(stateExtension).Breeds.values()].map((b) => b.Plural);
-                        if (plurals.includes(state.sliceDoc(cursor.node.from, cursor.node.to).toLowerCase().trim())) {
-                            prim.breed = state.sliceDoc(cursor.node.from, cursor.node.to);
+                        let temp_breed = this.identifyBreed(cursor.node, state, [...state.field(stateExtension).Breeds.values()]);
+                        if (temp_breed != '') {
+                            prim.breed = temp_breed;
                         }
                         ask = false;
                     }
@@ -28818,6 +28845,67 @@
             if (noContext(prim.context))
                 Log('No available context: ' + prim.name);
             return prim;
+        }
+        identifyBreed(Node, state, breeds) {
+            let plurals = breeds.map((b) => b.Plural);
+            let singulars = breeds.map((b) => b.Singular);
+            let str = state.sliceDoc(Node.from, Node.to).toLowerCase().trim();
+            let breed = '';
+            if (plurals.includes(str)) {
+                return str;
+            }
+            for (let b of breeds) {
+                let reporters = [];
+                if (b.BreedType == BreedType$1.Turtle) {
+                    reporters.push(b.Plural + '-at');
+                    reporters.push(b.Plural + '-here');
+                    reporters.push(b.Plural + '-on');
+                }
+                else if (b.BreedType == BreedType$1.Patch) {
+                    reporters.push(b.Singular + '-at');
+                    reporters.push(b.Singular + '-here');
+                    reporters.push(b.Singular + '-ahead');
+                    reporters.push(b.Singular + '-at-heading-and-distance');
+                    reporters.push(b.Singular + '-left-and-ahead');
+                    reporters.push(b.Singular + '-right-and-ahead');
+                    reporters.push('neighbors');
+                    reporters.push('neighbors4');
+                    if (reporters.includes(str.split(' ')[0].trim())) {
+                        return b.Plural;
+                    }
+                }
+                else {
+                    reporters.push('out-' + b.Singular + '-to');
+                    reporters.push('in-' + b.Singular + '-from');
+                    reporters.push('my-' + b.Plural);
+                    reporters.push('my-in-' + b.Plural);
+                    reporters.push('my-out-' + b.Plural);
+                    reporters.push(b.Singular + '-with');
+                    if (reporters.includes(str.split(' ')[0].trim())) {
+                        return b.Plural;
+                    }
+                    reporters = [];
+                    reporters.push('out-' + b.Singular + '-neighbors');
+                    reporters.push('in-' + b.Singular + '-neighbors');
+                    reporters.push(b.Singular + '-neighbors');
+                    if (reporters.includes(str.split(' ')[0].trim())) {
+                        return 'turtles';
+                    }
+                }
+            }
+            Node.cursor().iterate((noderef) => {
+                if (breed != '')
+                    return false;
+                let str = state.sliceDoc(noderef.from, noderef.to).toLowerCase().trim();
+                if (str.startsWith('[')) {
+                    return false;
+                }
+                if (plurals.includes(str) || singulars.includes(str)) {
+                    breed = str;
+                    return false;
+                }
+            });
+            return breed;
         }
         /** getBreedContext: Get the context for a given breed. */
         getBreedContext(breed, isVar = false) {
@@ -32071,11 +32159,21 @@
 
     /** ContextLinter: Checks if procedures and code blocks have a valid context. */
     const ContextLinter = (view, preprocessContext, lintContext) => {
+        var _a, _b;
         const diagnostics = [];
         // for (let p of lintContext.Procedures.values()) {
         //   diagnostics.push(...checkProcedureContents(p, lintContext));
         // }
         let stateNetLogo = view.state.field(stateExtension);
+        if (stateNetLogo.Mode == 'Oneline' || stateNetLogo.Mode == 'OnelineReporter') {
+            let context = new AgentContexts('O---');
+            for (var b of lintContext.Breeds.values()) {
+                if (b.Plural == stateNetLogo.Context) {
+                    context = stateNetLogo.getBreedContext(b);
+                }
+            }
+            stateNetLogo.getNewContext((_b = (_a = syntaxTree(view.state).cursor().node.firstChild) === null || _a === void 0 ? void 0 : _a.firstChild) !== null && _b !== void 0 ? _b : syntaxTree(view.state).cursor().node, context, view.state, new AgentContexts());
+        }
         for (let c of stateNetLogo.ContextErrors) {
             diagnostics.push(getDiagnostic(view, { from: c.From, to: c.To }, 'Invalid context _', 'error', contextToString(c.PriorContext), contextToString(c.ConflictingContext), c.Primitive));
         }
@@ -33420,6 +33518,14 @@
                 }
             });
         }
+        SetContext(context) {
+            if ((this.Options.ParseMode == ParseMode.Oneline || this.Options.ParseMode == ParseMode.OnelineReporter) &&
+                context != 'observer') {
+                this.CodeMirror.state.field(stateExtension).SetContext(context);
+                this.ForceParse();
+                this.ForceLint();
+            }
+        }
         /** GetID: Get ID of the editor. */
         GetID() {
             return this.ID;
@@ -33806,9 +33912,10 @@
             // Inherit the last action (from new to old)
             this.PendingRequest.Operation = (_c = this.PendingRequest.Operation) !== null && _c !== void 0 ? _c : Record.Operation;
             // Inherit the action log
+            var AsAction = false; // Whether the last message is an action
             if (Context.PreviousMessages.length === 0) {
                 var Action = (_d = GetField(Record.Response.Sections, "Action")) === null || _d === void 0 ? void 0 : _d.Content;
-                var Parameter = (_e = GetField(Record.Response.Sections, "Detail")) === null || _e === void 0 ? void 0 : _e.Content;
+                var Parameter = (_e = GetField(Record.Response.Sections, "Parameter")) === null || _e === void 0 ? void 0 : _e.Content;
                 var Observation = GetField(Record.Response.Sections, "Observation");
                 if (Observation && Action && Parameter) {
                     var ActionLog = {
@@ -33821,10 +33928,11 @@
                         set: (Value) => Observation.Content = Value
                     });
                     Context.PendingActions.unshift(ActionLog);
+                    AsAction = true;
                 }
             }
             // Inherit the last text message (from new to old)
-            if ((_f = Option.TextInContext) !== null && _f !== void 0 ? _f : true) {
+            if (((_f = Option.TextInContext) !== null && _f !== void 0 ? _f : true) && !AsAction) {
                 Context.PreviousMessages.unshift({
                     Text: Record.Response.Sections.filter(ExcludeCode).filter(IsTextLike)
                         .map(Section => Section.Content).join("\n"),
@@ -35624,7 +35732,8 @@
     function MarkdownToHTML(Source) {
         return SafeguardHTML(new showdown.Converter({
             underline: true,
-            emoji: true
+            emoji: true,
+            disableForced4SpacesIndentedSublists: true
         }).makeHtml(Source));
     }
     /** XSSOptions: XSS filter options.*/
@@ -36467,7 +36576,7 @@
             this.Editor.ForceParse();
             this.Record = Record;
             // Hide previous records
-            var NeedHiding = true;
+            var NeedHiding = this.CurrentIndex !== 0;
             for (var Child of this.Subthread.Children) {
                 if (Child.GetData() == Record) {
                     Child.Container.toggleClass("code-output", true);
@@ -37438,7 +37547,7 @@
         /** FinishExecution: Notify the completion of the command. */
         FinishExecution(Status, Code, Message) {
             var _a;
-            if (Array.isArray(Message) && Message.length > 0) {
+            if (Array.isArray(Message) && Message.length > 0 && Message[0].code) {
                 var Diagnostics = NetLogoUtils.ErrorsToDiagnostics(Message);
                 this.RenderResponses([{
                         Type: Status == "CompileError" ? ChatResponseType.CompileError : ChatResponseType.RuntimeError,
@@ -37453,17 +37562,18 @@
                         }
                     }], true);
             }
-            else if (typeof (Message) == "string") {
+            else {
                 this.PrintOutput(Status, Message);
                 this.RestartBatch();
-                if (ChatManager.Available) {
+                if (Status !== "Help" && ChatManager.Available) {
                     this.RenderOptions([ExplainCode()]);
                     this.RenderOptions([ChangeTopic()]);
                 }
                 var Record = this.RenderResponses([], true);
                 if (Record) {
                     Record.Context = (_a = Record.Context) !== null && _a !== void 0 ? _a : { PreviousMessages: [] };
-                    Record.Context.CodeSnippet = Message.length == 0 ? Code : Message;
+                    if (Code !== "")
+                        Record.Context.CodeSnippet = Code;
                 }
             }
             this.Tab.SetDisabled(false);
@@ -37750,7 +37860,7 @@
                     this.ExecuteInput(Objective, Content, Temporary);
                 };
                 // Check if it is a command
-                if (!Chatable || (Objective != "chat" && Content != "help" && !Content.startsWith("help ") && !/^[\d\.]+$/.test(Content))) {
+                if (!Chatable || Objective != "chat" && !/^[\d\.]+$/.test(Content)) {
                     // Parse the code
                     this.Galapagos.ForceParse();
                     let Diagnostics = yield this.Galapagos.ForceLintAsync();
@@ -37770,6 +37880,11 @@
                         }
                         return;
                     }
+                }
+                // Help pseudo-command
+                if (Content.toLowerCase() == "help" || Content.toLowerCase().startsWith("help ")) {
+                    Execute(Objective, Content, false);
+                    return;
                 }
                 // Otherwise, assume it is a chat message
                 this.ClearInput();

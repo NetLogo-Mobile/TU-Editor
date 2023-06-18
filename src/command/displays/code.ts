@@ -120,7 +120,7 @@ export class CodeDisplay extends Display {
 		this.Editor.ForceParse();
 		this.Record = Record;
 		// Hide previous records
-        var NeedHiding = true;
+        var NeedHiding = this.CurrentIndex !== 0;
         for (var Child of this.Subthread!.Children) {
             if ((Child as RecordRenderer).GetData() == Record) {
 				Child.Container.toggleClass("code-output", true);

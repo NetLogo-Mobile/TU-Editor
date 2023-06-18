@@ -46,7 +46,7 @@ export function Clarify(Label?: string): ChatResponseOption {
         Label: Label ?? "Let me clarify it",
         Style: Label == undefined ? "followup" : undefined,
         AskInput: Label == undefined,
-        TextInContext: false,
+        TextInContext: true,
         Inheritance: ContextInheritance.InheritRecursive
     }
 }
@@ -69,9 +69,26 @@ export function ExampleCode(Label?: string): ChatResponseOption {
         Label: Label ?? "Can you show me an example code?",
         Style: "code",
         Operation: "CodeCompose",
+        SubOperation: "Example",
         AskInput: false,
         Inheritance: ContextInheritance.InheritParent,
-        TextInContext: true
+        TextInContext: true,
+        InputInContext: false
+    }
+}
+
+/** WriteCodeWithPlan: Write a code snippet based on the plan. */
+export function WriteCodeWithPlan(AskMore: boolean): ChatResponseOption {
+    return {
+        Label: AskMore ? "I think something could be added to the plan." : "Let's try out the plan!",
+        ActualInput: AskMore ? undefined : "",
+        Style: "code",
+        Operation: "CodeCompose",
+        SubOperation: "Planned",
+        AskInput: AskMore,
+        Inheritance: ContextInheritance.CurrentOnly,
+        TextInContext: true,
+        InputInContext: true
     }
 }
 

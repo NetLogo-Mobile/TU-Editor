@@ -7,7 +7,8 @@ declare const { showdown }: any;
 export function MarkdownToHTML(Source: string): string {
     return SafeguardHTML(new showdown.Converter({
         underline: true,
-        emoji: true
+        emoji: true,
+        disableForced4SpacesIndentedSublists: true
     }).makeHtml(Source));
 }
 

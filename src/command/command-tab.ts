@@ -188,7 +188,7 @@ export class CommandTab extends Tab {
 			this.ExecuteInput(Objective, Content, Temporary);
 		};
 		// Check if it is a command
-		if (!Chatable || (Objective != "chat" && Content != "help" && !Content.startsWith("help ") && !/^[\d\.]+$/.test(Content))) {
+		if (!Chatable || Objective != "chat" && !/^[\d\.]+$/.test(Content)) {
 			// Parse the code
 			this.Galapagos.ForceParse();
 			let Diagnostics = await this.Galapagos.ForceLintAsync();
@@ -206,6 +206,11 @@ export class CommandTab extends Tab {
 				}
 				return;
 			}
+		}
+		// Help pseudo-command
+		if (Content.toLowerCase() == "help" || Content.toLowerCase().startsWith("help ")) {
+			Execute(Objective, Content, false);
+			return;
 		}
 		// Otherwise, assume it is a chat message
 		this.ClearInput();

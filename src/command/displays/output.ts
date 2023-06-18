@@ -184,7 +184,7 @@ export class OutputDisplay extends Display {
 	}
 	/** FinishExecution: Notify the completion of the command. */
 	public FinishExecution(Status: string, Code: string, Message: string | RuntimeError[]) {
-		if (Array.isArray(Message) && Message.length > 0) {
+		if (Array.isArray(Message) && Message.length > 0 && Message[0].code) {
 			var Diagnostics = NetLogoUtils.ErrorsToDiagnostics(Message as RuntimeError[]);
 			this.RenderResponses([{
 				Type: Status == "CompileError" ? ChatResponseType.CompileError : ChatResponseType.RuntimeError,
@@ -198,17 +198,17 @@ export class OutputDisplay extends Display {
 					Code: Code
 				}
 			}], true);
-		} else if (typeof(Message) == "string") {
+		} else {
 			this.PrintOutput(Status, Message);
 			this.RestartBatch();
-			if (ChatManager.Available) {
+			if (Status !== "Help" && ChatManager.Available) {
 				this.RenderOptions([ ExplainCode() ]);
 				this.RenderOptions([ ChangeTopic() ]);
 			}
 			var Record = this.RenderResponses([], true);
 			if (Record) {
 				Record.Context = Record.Context ?? { PreviousMessages: [] };
-				Record.Context.CodeSnippet = Message.length == 0 ? Code : Message;
+				if (Code !== "") Record.Context.CodeSnippet = Code;
 			}
 		}
 		this.Tab.SetDisabled(false);

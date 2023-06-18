@@ -202,9 +202,10 @@ export class ChatManager {
         // Inherit the last action (from new to old)
         this.PendingRequest!.Operation = this.PendingRequest!.Operation ?? Record.Operation;
         // Inherit the action log
+        var AsAction = false; // Whether the last message is an action
         if (Context.PreviousMessages.length === 0) {
             var Action = GetField(Record.Response.Sections, "Action")?.Content;
-            var Parameter = GetField(Record.Response.Sections, "Detail")?.Content;
+            var Parameter = GetField(Record.Response.Sections, "Parameter")?.Content;
             var Observation = GetField(Record.Response.Sections, "Observation");
             if (Observation && Action && Parameter) {
                 var ActionLog = {
@@ -217,10 +218,11 @@ export class ChatManager {
                     set: (Value) => Observation!.Content = Value
                 });
                 Context.PendingActions.unshift(ActionLog);
+                AsAction = true;
             }
         }
         // Inherit the last text message (from new to old)
-        if (Option.TextInContext ?? true) {
+        if ((Option.TextInContext ?? true) && !AsAction) {
             Context.PreviousMessages.unshift({ 
                 Text: Record.Response.Sections.filter(ExcludeCode).filter(IsTextLike)
                     .map(Section => Section.Content).join("\n"), 

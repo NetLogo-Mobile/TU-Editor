@@ -44,8 +44,8 @@ export class FullTextDisplay extends Display {
 			<p>${Localized.Get("Translated version")}<a href="javascript:void(0)">${Localized.Get("ClickHere")}</a> ${Localized.Get("Switch to original")}</p>
 			<p>${Localized.Get("Original version")}<a href="javascript:void(0)">${Localized.Get("ClickHere")}</a> ${Localized.Get("Switch to translated")}</p>
 		</div>`).appendTo(this.Container);
-		this.OriginalButton = $(this.Translator.find("a")[0]).on("click", () => this.ShowOriginal());
-		this.TranslatedButton = $(this.Translator.find("a")[1]).on("click", () => this.ShowTranslated());
+		this.OriginalButton = $(this.Translator.find("a")[0]).on("click", () => this.ShowOriginal()).parent();
+		this.TranslatedButton = $(this.Translator.find("a")[1]).on("click", () => this.ShowTranslated()).parent();
 		// Create the full text
 		this.Content = $("<div class='fulltext'></div>").appendTo(this.Container);
 		// Create the see-also list

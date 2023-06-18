@@ -36118,7 +36118,7 @@
         ShowPrimitive(Primitive) {
             var SeeAlso = {};
             for (var Key in Primitive["see_also"])
-                SeeAlso[Key] = `help:${Key}`;
+                SeeAlso[Key] = `help:${Key} -full`;
             var Knowledge = {
                 ID: Primitive["display_name"],
                 Title: Primitive["display_name"],

@@ -35739,7 +35739,7 @@
     /** XSSOptions: XSS filter options.*/
     const XSSOptions = {
         whiteList: {
-            a: ["href", "title"],
+            a: ["href", "title", "class"],
             abbr: ["title"],
             address: [],
             area: ["shape", "coords", "href", "alt"],
@@ -36227,7 +36227,7 @@
         /** SetFirst: Set the first status of the section. */
         SetFirst() {
             this.First = true;
-            if (!this.GetData() || (this.GetData().Type != ChatResponseType.Thought && this.GetData().Type != ChatResponseType.JSON))
+            if (!this.GetData() || this.GetData().Type != ChatResponseType.Thought)
                 this.Container.addClass("first");
             return this;
         }
@@ -37625,7 +37625,7 @@
                             Type: ChatResponseType.Text,
                             Content: Localized.Get("Showing full text help of _", Content["display_name"])
                         });
-                        this.Tab.FullText.ShowFullText(Content);
+                        this.Tab.FullText.ShowPrimitive(Content);
                     }
                     else {
                         this.QueueResponse({

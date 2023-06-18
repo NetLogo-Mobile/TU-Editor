@@ -15,7 +15,7 @@ export function MarkdownToHTML(Source: string): string {
 /** XSSOptions: XSS filter options.*/
 export const XSSOptions = { 
     whiteList: {
-        a: ["href", "title"],
+        a: ["href", "title", "class"],
         abbr: ["title"],
         address: [],
         area: ["shape", "coords", "href", "alt"],

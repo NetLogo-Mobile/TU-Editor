@@ -12,7 +12,7 @@ export class SectionRenderer extends UIRendererOf<ChatResponseSection> {
     /** SetFirst: Set the first status of the section. */
     public SetFirst(): SectionRenderer {
         this.First = true;
-        if (!this.GetData() || (this.GetData().Type != ChatResponseType.Thought && this.GetData().Type != ChatResponseType.JSON))
+        if (!this.GetData() || this.GetData().Type != ChatResponseType.Thought)
             this.Container.addClass("first");
         return this;
     }

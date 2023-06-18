@@ -258,7 +258,7 @@ export class OutputDisplay extends Display {
 						Type: ChatResponseType.Text,
 						Content: Localized.Get("Showing full text help of _", Content["display_name"])
 					});
-					this.Tab.FullText.ShowFullText(Content);
+					this.Tab.FullText.ShowPrimitive(Content);
 				} else {
 					this.QueueResponse({
 						Type: ChatResponseType.JSON,

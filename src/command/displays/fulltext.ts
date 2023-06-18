@@ -121,7 +121,7 @@ export class FullTextDisplay extends Display {
 	public ShowPrimitive(Primitive: Record<string, any>) {
 		var SeeAlso: Record<string, string> = {};
 		for (var Key in Primitive["see_also"])
-			SeeAlso[Key] = `help:${Key}`;
+			SeeAlso[Key] = `help:${Key} -full`;
 		var Knowledge: Knowledge = {
 			ID: Primitive["display_name"],
 			Title: Primitive["display_name"],

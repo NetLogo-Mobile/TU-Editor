@@ -12,7 +12,7 @@ import { RuntimeError } from "../../../../CodeMirror-NetLogo/src/lang/linters/ru
 import { NetLogoUtils } from "../../utils/netlogo";
 import { DiagnosticType } from "../../chat/client/languages/netlogo-context";
 import { GenerateObjectID } from "../../utils/misc";
-import { CodeSectionRenderer } from "../sections/code-section-renderer";
+import { CodeSectionRenderer, EnterCode } from "../sections/code-section-renderer";
 import { ChangeTopic, ExplainCode } from "../../chat/client/options/option-templates";
 
 /** OutputDisplay: Display the output section. */
@@ -88,7 +88,7 @@ export class OutputDisplay extends Display {
 					var Child = Subthread.Children[I] as RecordRenderer;
 					var Code = Child.Children.find(Current => Current instanceof CodeSectionRenderer) as CodeSectionRenderer;
 					if (Code != null) {
-						Code.EnterCode();
+						EnterCode.bind(Code)();
 						break;
 					}
 				}

@@ -7,6 +7,6 @@ export declare class CodeSectionRenderer extends SectionRenderer {
     private Code?;
     /** RenderInternal: Render the UI element. */
     protected RenderInternal(): void;
-    /** EnterCode: Enter the code mode. */
-    EnterCode(): void;
 }
+/** EnterCode: Enter the code mode. */
+export declare function EnterCode(this: SectionRenderer): void;

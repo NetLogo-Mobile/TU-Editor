@@ -21,10 +21,13 @@ export class NetLogoUtils {
 	}
 	/** HighlightCode: Highlight a code snippet. */
 	public static HighlightCode(Content: string): [HTMLElement, string] {
-        this.SharedEditor.SetCode(Content);
-        this.SharedEditor.Semantics.PrettifyAll();
-		// TODO: Remove it when it is done
-        this.SharedEditor.SetCode(this.SharedEditor.GetCode().trim());
+        this.SharedEditor.SetCode(Content.trim());
+		// Prettify it if it contains a newline
+		if (Content.indexOf("\n") !== -1) {
+        	this.SharedEditor.Semantics.PrettifyAll();
+       		this.SharedEditor.SetCode(this.SharedEditor.GetCode().trim());
+		}
+		// Highlight it
         var Element = this.SharedEditor.Semantics.Highlight();
 		return [Element, Content];
 	}

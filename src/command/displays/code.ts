@@ -156,7 +156,8 @@ export class CodeDisplay extends Display {
 		this.Records = [];
 		for (var Renderer of Subthread.Children) {
 			var Current = (Renderer as RecordRenderer).GetData();
-			var Section = Current.Response.Sections.find(Section => Section.Type == ChatResponseType.Code);
+			var Section = Current.Response.Sections.find(Section => 
+				Section.Type == ChatResponseType.Code || Section.Edited !== undefined);
 			if (!Section) continue;
 			if (Current == Record) this.CurrentIndex = this.Records.length;
 			this.Records.push([Current, Section]);

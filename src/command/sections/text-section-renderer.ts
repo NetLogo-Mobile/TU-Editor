@@ -4,6 +4,7 @@ import { CopyCode } from "../../utils/misc";
 import { NetLogoUtils } from "../../utils/netlogo";
 import { OutputDisplay } from "../displays/output";
 import { UIRendererOf } from "../outputs/ui-renderer";
+import { EnterCode } from "./code-section-renderer";
 import { SectionRenderer } from "./section-renderer";
 
 /** TextSectionRenderer: A block that displays the a text response section. */
@@ -31,14 +32,31 @@ export class TextSectionRenderer extends SectionRenderer {
                 if (Match.length == 3 || Match.match(/\'\S /g)) return Match;
                 return `\`${Match.substring(1, Match.length - 1)}\``; 
             });
-            // .replace(/\n\n([^`]*?)\n\n/gs, "\n```\n$1\n```\n")
         }
         // Render the text
         this.ContentContainer.html(MarkdownToHTML(Content));
         PostprocessHTML(OutputDisplay.Instance.Tab.Editor, this.ContentContainer);
         if (this.Finalized) {
-            NetLogoUtils.AnnotateCodes(this.ContentContainer.find("code")
-                .on("click", function() { CopyCode($(this).data("code")!); }).addClass("copyable"));
+            // Find all code snippets
+            var Codes = this.ContentContainer.find("code");
+            var Multilines = Codes.filter((_, Element) => $(Element).text().indexOf("\n") !== -1);
+            // Fix the multi-line code
+            if (Multilines.length > 0) {
+                var Parent = this.GetRecord().Context?.CodeSnippet;
+                var ParentSnapshot = NetLogoUtils.BuildSnapshot(Parent);
+                for (var Multiline of Multilines) {
+                    $(Multiline).text(NetLogoUtils.FixGeneratedCode($(Multiline).text(), ParentSnapshot));
+                }
+                if (Multilines.length === 1) {
+                    Multilines.addClass("enterable");
+                    Section.Edited = Multilines.text();
+                }
+            }
+            // Actions for the code snippets
+            Codes.filter(":not(.enterable)").addClass("copyable").on("click", function() { CopyCode($(this).data("code")!); });
+            Codes.filter(".enterable").on("click", () => EnterCode.bind(this)());
+            // Annotate the code snippets
+            NetLogoUtils.AnnotateCodes(Codes);
         }
         // Remove the section if it's empty
         if (Content == "" && (Section.Options?.length ?? 0) == 0 && this.Finalized)

@@ -24,18 +24,19 @@ export class CodeSectionRenderer extends SectionRenderer {
             this.Code = Section.Content;
             // Render the code
             this.ContentContainer = $(`<code></code>`).replaceAll(this.ContentContainer)
-                .on("click", () => this.EnterCode()).addClass("enterable");
+                .on("click", () => EnterCode.bind(this)()).addClass("enterable");
             NetLogoUtils.AnnotateCode(this.ContentContainer, this.Code);
         } else {
             this.Code = Section.Content?.trim() ?? "";
             this.ContentContainer = $(`<pre></pre>`).replaceAll(this.ContentContainer).text(this.Code);
         }
     }
-    /** EnterCode: Enter the code mode. */
-    public EnterCode() {
-        var Subthread = this.Parent!.Parent! as SubthreadRenderer;
-        OutputDisplay.Instance.ActivateSubthread(Subthread);
-        CodeDisplay.Instance.SetContext(this.GetRecord(), Subthread);
-        CodeDisplay.Instance.Show();
-    }
+}
+
+/** EnterCode: Enter the code mode. */
+export function EnterCode(this: SectionRenderer) {
+    var Subthread = this.Parent!.Parent! as SubthreadRenderer;
+    OutputDisplay.Instance.ActivateSubthread(Subthread);
+    CodeDisplay.Instance.SetContext(this.GetRecord(), Subthread);
+    CodeDisplay.Instance.Show();
 }

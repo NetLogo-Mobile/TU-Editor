@@ -27,7 +27,7 @@ export class ChatManager {
     /** SendMessage: Send a direct message to the chat backend. */ 
     public SendMessage(Content: string, Friendly?: string) {
         this.PendingRequest = this.PendingRequest ?? { Input: "" };
-        this.PendingRequest.Input = Content;
+        this.PendingRequest.Input = Content.trim();
         this.PendingRequest.FriendlyInput = Friendly;
         // Clarify the pending request
         var Context = this.PendingRequest.Context ?? { };
@@ -36,8 +36,8 @@ export class ChatManager {
             var LastAction = Context.PendingActions[Context.PendingActions.length - 1];
             if (LastAction.Observation === "$Input$") {
                 LastAction.Observation = this.PendingRequest.Input;
+                this.PendingRequest.IgnoreInput = true;
                 this.PendingRequest.FriendlyInput = this.PendingRequest.FriendlyInput ?? this.PendingRequest.Input;
-                this.PendingRequest.Input = "";
             }
         }
         // Send the request

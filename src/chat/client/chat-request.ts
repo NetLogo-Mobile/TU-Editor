@@ -5,6 +5,8 @@ import { ChatResponseOption } from "./chat-option";
 export interface ChatRequest {
     /** Input: The requested message. */
     Input: string;
+    /** IgnoreInput: Whether to ignore the input. */
+    IgnoreInput?: boolean;
     /** Option: The option chosen. */
     Option?: ChatResponseOption;
     /** Operation: The requested operation. */

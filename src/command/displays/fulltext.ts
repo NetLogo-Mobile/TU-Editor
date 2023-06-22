@@ -87,7 +87,7 @@ export class FullTextDisplay extends Display {
 			this.Translator.hide();
 		}
 		// Render the acknowledgement
-		this.Acknowledgement.html(Knowledge.Acknowledgement);
+		this.Acknowledgement.html(MarkdownToHTML(Knowledge.Acknowledgement));
 		// Render the see-also list
 		this.SeeAlso.empty();
 		for (var Primitive in Knowledge.SeeAlso) {

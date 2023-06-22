@@ -45,7 +45,7 @@ export class CommandTab extends Tab {
 		bodyScrollLock.clearAllBodyScrollLocks();
 		bodyScrollLock.disableBodyScroll(this.Outputs.Container.get(0)!);
 		bodyScrollLock.disableBodyScroll(this.FullText.Container.get(0)!);
-		this.Outputs.Show();
+		if (!this.Outputs.Visible) this.Outputs.Show();
 	}
 	/** Hide: Hide the command tab. */
 	public Hide() {

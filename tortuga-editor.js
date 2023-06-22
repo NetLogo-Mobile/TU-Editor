@@ -24823,15 +24823,15 @@
         token(input, stack) {
             let start = input.pos, skipped = 0;
             for (;;) {
+                let nextPos = input.resolveOffset(1, -1);
                 readToken(this.data, input, stack, 0, this.data, this.precTable);
                 if (input.token.value > -1)
                     break;
                 if (this.elseToken == null)
                     return;
-                if (input.next < 0)
+                if (nextPos == null)
                     break;
-                input.advance();
-                input.reset(input.pos, input.token);
+                input.reset(nextPos, input.token);
                 skipped++;
             }
             if (skipped) {
@@ -36274,7 +36274,7 @@
                 this.Translator.hide();
             }
             // Render the acknowledgement
-            this.Acknowledgement.html(Knowledge.Acknowledgement);
+            this.Acknowledgement.html(MarkdownToHTML(Knowledge.Acknowledgement));
             // Render the see-also list
             this.SeeAlso.empty();
             for (var Primitive in Knowledge.SeeAlso) {
@@ -37926,7 +37926,8 @@
             bodyScrollLock.clearAllBodyScrollLocks();
             bodyScrollLock.disableBodyScroll(this.Outputs.Container.get(0));
             bodyScrollLock.disableBodyScroll(this.FullText.Container.get(0));
-            this.Outputs.Show();
+            if (!this.Outputs.Visible)
+                this.Outputs.Show();
         }
         /** Hide: Hide the command tab. */
         Hide() {

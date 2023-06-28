@@ -56,6 +56,7 @@ export class CodeDisplay extends Display {
 		this.Tab.Editor.EditorTabs[0].Galapagos.AddChild(this.Editor);
 		// Create the toolbar
 		var Toolbar = $(`<div class="toolbar"></div>`).appendTo(this.Container);
+		this.FinishButton = $(`<div class="button finish">${Localized.Get("Finish")}</div>`).on("click", () => this.Return()).appendTo(Toolbar);
 		this.PlayButton = $(`<div class="button run">${Localized.Get("RunCode")}</div>`).on("click", () => this.Play()).appendTo(Toolbar);
 		this.AskButton = $(`<div class="button ask">${Localized.Get("AskCode")}</div>`).hide().on("click", () => this.Ask()).appendTo(Toolbar);
 		this.AddToCodeButton = $(`<div class="button addtocode">${Localized.Get("AddCode")}</div>`).on("click", () => this.AddToCode()).appendTo(Toolbar);
@@ -64,7 +65,6 @@ export class CodeDisplay extends Display {
 		this.PreviousButton = $(`<div class="button prev">&lt;</div>`).on("click", () => this.ShowPrevious()).appendTo(History);
 		this.HistoryDisplay = $(`<div class="label">0 / 0</div>`).appendTo(History);
 		this.NextButton = $(`<div class="button next">&gt;</div>`).on("click", () => this.ShowNext()).appendTo(History);
-		this.FinishButton = $(`<div class="button finish">${Localized.Get("Finish")}</div>`).on("click", () => this.Return()).appendTo(Toolbar);
 		CodeDisplay.Instance = this;
 	}
     /** Show: Show the section. */

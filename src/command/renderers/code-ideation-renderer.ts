@@ -34,7 +34,7 @@ export class CodeIdeationRenderer extends JSONSectionRenderer<CodeParameter[]> {
                     this.SubmitParameters();
                     Link.addClass("chosen");
                 });
-        } else {
+        } else if (Parameters) {
             this.ContentContainer.empty();
             // When not finalized, render the questions
             for (var Parameter of Parameters) {
@@ -56,12 +56,14 @@ export class CodeIdeationRenderer extends JSONSectionRenderer<CodeParameter[]> {
         var Manager = ChatManager.Instance;
         var Record = this.GetRecord();
         if (!Manager.RequestOption(Record.Response.Options[0], Record)) return;
-        // Build the messages
+        // Build the server message
+        var Need = Record.Response.Sections.find(Section => Section.Field == "Need")?.Content ?? "Unknown";
         var Message = JSON.stringify({
-            Need: Record.Response.Sections.find(Section => Section.Field == "Need")?.Content ?? "Unknown",
+            Need: Need,
             Details: Composed
         });
-        var Friendly = `${Localized.Get("Summary of request")}`;
+        // Build the friendly message
+        var Friendly = `*${Localized.Get("Need")}*: ${Need}`;
         for (var Parameter in Composed) {
             Friendly += `\n- ${Parameter}: ${Composed[Parameter]}`;
         }
@@ -69,7 +71,6 @@ export class CodeIdeationRenderer extends JSONSectionRenderer<CodeParameter[]> {
     }
     /** GetChooser: Return the section chooser for this renderer. */
     public static GetChooser(): RendererChooser {
-        return (Record, Section) => Section.Field == "Parameters" && Section.Parsed && Array.isArray(Section.Parsed) && Section.Parsed.length > 0 &&
-            Section.Parsed[0].Name && Section.Parsed[0].Question ? new CodeIdeationRenderer() : undefined;
+        return (Record, Section) => Section.Field == "Parameters" && Section.Content?.startsWith("[") ? new CodeIdeationRenderer() : undefined;
     }
 }

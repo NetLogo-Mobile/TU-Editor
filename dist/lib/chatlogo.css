@@ -313,7 +313,7 @@
 	margin-left: 0.5rem;
 	line-height: 1.65rem;
 	border-radius: 0.2rem;
-	background: #666;
+	background: #5A648D;
 	text-align: center;
 	font-weight: bold;
 }
@@ -519,20 +519,20 @@
 }
 
 .command-code .toolbar {
+	color: #fff;
 	display: flex;
 	padding: 0 0.5rem;
 	flex-direction: row;
 	border-bottom: 1px solid #ccc;
-	background-color: #fafafa;
+	background-color: #5a648d;
 }
 
 .command-code .toolbar div.button {
-	color: #2881e0;
 	cursor: hand;
 	padding: 0.5rem 1rem;
 	margin-right: 1px;
 	background-size: 1rem;
-	background-color: #f7f7f7;
+	background-color: #535D82;
 	background-repeat: no-repeat;
 	background-position: left 0.6rem center;
 }
@@ -562,30 +562,25 @@
 }
 
 .command-code .toolbar div.button:hover {
-	background-color: #f0f0f0;
+	background-color: #4D5578;
 }
 
 .command-code .toolbar div.history {
 	display: flex;
 	flex-direction: row;
 	flex-grow: 1;
-	justify-content: center;
+	justify-content: right;
 }
 
 .command-code .toolbar div.history div.hidden {
-	visibility: hidden;
+	display: none;
 }
 
 .command-code .toolbar div.history div.label {
-	color: #333;
 	padding: 0.5rem 1rem;
 }
 
 .command-output.code-enabled .subthread:not(.activated) {
-	display: none;
-}
-
-.command-output.code-enabled .record.code-output .input {
 	display: none;
 }
 

@@ -17,6 +17,8 @@ export class CodeSectionRenderer extends SectionRenderer {
     protected RenderInternal(): void {
         var Section = this.GetData();
         if (this.Finalized && Section.Content) {
+            if (Section.Content.startsWith("NetLogo\n"))
+                Section.Content = Section.Content.substring(8);
             // Fix the code
             var Parent = this.GetRecord().Context?.CodeSnippet;
             var ParentSnapshot = NetLogoUtils.BuildSnapshot(Parent);

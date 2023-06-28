@@ -84,7 +84,7 @@ export class ChatManager {
                 // Special handling for ServerErrors
                 if (Section.Type == ChatResponseType.ServerError && Section.Field !== "Irrecoverable") {
                     if (Section.Field == "Temperature")
-                        Record.Temperature = Record.Temperature ?? 0 + 0.2;
+                        Record.Temperature = Record.Temperature ?? 0 + 0.4;
                     Section.Parsed = SendRequest;
                 }
                 CurrentRenderer.SetFinalized();

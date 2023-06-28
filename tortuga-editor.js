@@ -104,6 +104,11 @@
         });
     }
 
+    typeof SuppressedError === "function" ? SuppressedError : function (error, suppressed, message) {
+        var e = new Error(message);
+        return e.name = "SuppressedError", e.error = error, e.suppressed = suppressed, e;
+    };
+
     /** SSEClient: A simple client for handling Server-Sent Events. */
     class SSEClient {
         /** Constructor: Create a new SSEClient instance. */
@@ -5850,7 +5855,9 @@
         */
         static widget(spec) {
             let side = Math.max(-10000, Math.min(10000, spec.side || 0)), block = !!spec.block;
-            side += block ? (side > 0 ? 300000000 /* BlockAfter */ : -400000000 /* BlockBefore */) : (side > 0 ? 100000000 /* InlineAfter */ : -100000000 /* InlineBefore */);
+            side += (block && !spec.inlineOrder)
+                ? (side > 0 ? 300000000 /* BlockAfter */ : -400000000 /* BlockBefore */)
+                : (side > 0 ? 100000000 /* InlineAfter */ : -100000000 /* InlineBefore */);
             return new PointDecoration(spec, side, side, block, spec.widget || null, false);
         }
         /**
@@ -7794,7 +7801,7 @@
         if (yOffset > docHeight)
             return view.state.doc.length;
         // Scan for a text block near the queried y position
-        for (let halfLine = view.defaultLineHeight / 2, bounced = false;;) {
+        for (let halfLine = view.viewState.heightOracle.textHeight / 2, bounced = false;;) {
             block = view.elementAtHeight(yOffset);
             if (block.type == BlockType.Text)
                 break;
@@ -7874,7 +7881,8 @@
     function posAtCoordsImprecise(view, contentRect, block, x, y) {
         let into = Math.round((x - contentRect.left) * view.defaultCharacterWidth);
         if (view.lineWrapping && block.height > view.defaultLineHeight * 1.5) {
-            let line = Math.floor((y - block.top) / view.defaultLineHeight);
+            let textHeight = view.viewState.heightOracle.textHeight;
+            let line = Math.floor((y - block.top - (view.defaultLineHeight - textHeight) * 0.5) / textHeight);
             into += line * view.viewState.heightOracle.lineLength;
         }
         let content = view.state.sliceDoc(block.from, block.to);
@@ -7985,7 +7993,7 @@
             startY = (dir < 0 ? line.top : line.bottom) + docTop;
         }
         let resolvedGoal = rect.left + goal;
-        let dist = distance !== null && distance !== void 0 ? distance : (view.defaultLineHeight >> 1);
+        let dist = distance !== null && distance !== void 0 ? distance : (view.viewState.heightOracle.textHeight >> 1);
         for (let extra = 0;; extra += 10) {
             let curY = startY + (dist + extra) * dir;
             let pos = posAtCoords(view, { x: resolvedGoal, y: curY }, false, dir);
@@ -8268,7 +8276,6 @@
             doc.addEventListener("mouseup", this.up = this.up.bind(this));
             this.extend = startEvent.shiftKey;
             this.multiple = view.state.facet(EditorState.allowMultipleSelections) && addsSelectionRange(view, startEvent);
-            this.dragMove = dragMovesSelection(view, startEvent);
             this.dragging = isInPrimarySelection(view, startEvent) && getClickType(startEvent) == 1 ? null : false;
         }
         start(event) {
@@ -8606,7 +8613,7 @@
         let dropPos = view.posAtCoords({ x: event.clientX, y: event.clientY }, false);
         event.preventDefault();
         let { mouseSelection } = view.inputState;
-        let del = direct && mouseSelection && mouseSelection.dragging && mouseSelection.dragMove ?
+        let del = direct && mouseSelection && mouseSelection.dragging && dragMovesSelection(view, event) ?
             { from: mouseSelection.dragging.from, to: mouseSelection.dragging.to } : null;
         let ins = { from: dropPos, insert: text };
         let changes = view.state.changes(del ? [del, ins] : ins);
@@ -10125,7 +10132,7 @@
             }
         });
     }
-    const baseTheme$1$3 = /*@__PURE__*/buildTheme("." + baseThemeID, {
+    const baseTheme$1$2 = /*@__PURE__*/buildTheme("." + baseThemeID, {
         "&": {
             position: "relative !important",
             boxSizing: "border-box",
@@ -11503,7 +11510,7 @@
         }
         mountStyles() {
             this.styleModules = this.state.facet(styleModule);
-            StyleModule.mount(this.root, this.styleModules.concat(baseTheme$1$3).reverse());
+            StyleModule.mount(this.root, this.styleModules.concat(baseTheme$1$2).reverse());
         }
         readMeasured() {
             if (this.updateState == 2 /* Updating */)
@@ -13381,7 +13388,7 @@
             scroll() { this.maybeMeasure(); }
         }
     });
-    const baseTheme$4 = /*@__PURE__*/EditorView.baseTheme({
+    const baseTheme$5 = /*@__PURE__*/EditorView.baseTheme({
         ".cm-tooltip": {
             zIndex: 100,
             boxSizing: "border-box"
@@ -13448,7 +13455,7 @@
     Facet to which an extension can add a value to show a tooltip.
     */
     const showTooltip = /*@__PURE__*/Facet.define({
-        enables: [tooltipPlugin, baseTheme$4]
+        enables: [tooltipPlugin, baseTheme$5]
     });
     const showHoverTooltip = /*@__PURE__*/Facet.define();
     class HoverTooltipHost {
@@ -18306,7 +18313,7 @@
     Create an extension that configures code folding.
     */
     function codeFolding(config) {
-        let result = [foldState, baseTheme$1$2];
+        let result = [foldState, baseTheme$1$1];
         if (config)
             result.push(foldConfig.of(config));
         return result;
@@ -18415,7 +18422,7 @@
             codeFolding()
         ];
     }
-    const baseTheme$1$2 = /*@__PURE__*/EditorView.baseTheme({
+    const baseTheme$1$1 = /*@__PURE__*/EditorView.baseTheme({
         ".cm-foldPlaceholder": {
             backgroundColor: "#eee",
             border: "1px solid #ddd",
@@ -18589,7 +18596,7 @@
             color: "#f00" }
     ]);
 
-    const baseTheme$3 = /*@__PURE__*/EditorView.baseTheme({
+    const baseTheme$4 = /*@__PURE__*/EditorView.baseTheme({
         "&.cm-focused .cm-matchingBracket": { backgroundColor: "#328c8252" },
         "&.cm-focused .cm-nonmatchingBracket": { backgroundColor: "#bb555544" }
     });
@@ -18637,7 +18644,7 @@
     });
     const bracketMatchingUnique = [
         bracketMatchingState,
-        baseTheme$3
+        baseTheme$4
     ];
     /**
     Create an extension that enables bracket matching. Whenever the
@@ -18804,6 +18811,2567 @@
         });
         typeArray.push(type);
         return type.id;
+    }
+
+    /**
+    An instance of this is passed to completion source functions.
+    */
+    class CompletionContext {
+        /**
+        Create a new completion context. (Mostly useful for testing
+        completion sources—in the editor, the extension will create
+        these for you.)
+        */
+        constructor(
+        /**
+        The editor state that the completion happens in.
+        */
+        state, 
+        /**
+        The position at which the completion is happening.
+        */
+        pos, 
+        /**
+        Indicates whether completion was activated explicitly, or
+        implicitly by typing. The usual way to respond to this is to
+        only return completions when either there is part of a
+        completable entity before the cursor, or `explicit` is true.
+        */
+        explicit) {
+            this.state = state;
+            this.pos = pos;
+            this.explicit = explicit;
+            /**
+            @internal
+            */
+            this.abortListeners = [];
+        }
+        /**
+        Get the extent, content, and (if there is a token) type of the
+        token before `this.pos`.
+        */
+        tokenBefore(types) {
+            let token = syntaxTree(this.state).resolveInner(this.pos, -1);
+            while (token && types.indexOf(token.name) < 0)
+                token = token.parent;
+            return token ? { from: token.from, to: this.pos,
+                text: this.state.sliceDoc(token.from, this.pos),
+                type: token.type } : null;
+        }
+        /**
+        Get the match of the given expression directly before the
+        cursor.
+        */
+        matchBefore(expr) {
+            let line = this.state.doc.lineAt(this.pos);
+            let start = Math.max(line.from, this.pos - 250);
+            let str = line.text.slice(start - line.from, this.pos - line.from);
+            let found = str.search(ensureAnchor(expr, false));
+            return found < 0 ? null : { from: start + found, to: this.pos, text: str.slice(found) };
+        }
+        /**
+        Yields true when the query has been aborted. Can be useful in
+        asynchronous queries to avoid doing work that will be ignored.
+        */
+        get aborted() { return this.abortListeners == null; }
+        /**
+        Allows you to register abort handlers, which will be called when
+        the query is
+        [aborted](https://codemirror.net/6/docs/ref/#autocomplete.CompletionContext.aborted).
+        */
+        addEventListener(type, listener) {
+            if (type == "abort" && this.abortListeners)
+                this.abortListeners.push(listener);
+        }
+    }
+    function toSet(chars) {
+        let flat = Object.keys(chars).join("");
+        let words = /\w/.test(flat);
+        if (words)
+            flat = flat.replace(/\w/g, "");
+        return `[${words ? "\\w" : ""}${flat.replace(/[^\w\s]/g, "\\$&")}]`;
+    }
+    function prefixMatch(options) {
+        let first = Object.create(null), rest = Object.create(null);
+        for (let { label } of options) {
+            first[label[0]] = true;
+            for (let i = 1; i < label.length; i++)
+                rest[label[i]] = true;
+        }
+        let source = toSet(first) + toSet(rest) + "*$";
+        return [new RegExp("^" + source), new RegExp(source)];
+    }
+    /**
+    Given a a fixed array of options, return an autocompleter that
+    completes them.
+    */
+    function completeFromList(list) {
+        let options = list.map(o => typeof o == "string" ? { label: o } : o);
+        let [validFor, match] = options.every(o => /^\w+$/.test(o.label)) ? [/\w*$/, /\w+$/] : prefixMatch(options);
+        return (context) => {
+            let token = context.matchBefore(match);
+            return token || context.explicit ? { from: token ? token.from : context.pos, options, validFor } : null;
+        };
+    }
+    /**
+    Wrap the given completion source so that it will not fire when the
+    cursor is in a syntax node with one of the given names.
+    */
+    function ifNotIn(nodes, source) {
+        return (context) => {
+            for (let pos = syntaxTree(context.state).resolveInner(context.pos, -1); pos; pos = pos.parent) {
+                if (nodes.indexOf(pos.name) > -1)
+                    return null;
+                if (pos.type.isTop)
+                    break;
+            }
+            return source(context);
+        };
+    }
+    class Option {
+        constructor(completion, source, match, score) {
+            this.completion = completion;
+            this.source = source;
+            this.match = match;
+            this.score = score;
+        }
+    }
+    function cur(state) { return state.selection.main.from; }
+    // Make sure the given regexp has a $ at its end and, if `start` is
+    // true, a ^ at its start.
+    function ensureAnchor(expr, start) {
+        var _a;
+        let { source } = expr;
+        let addStart = start && source[0] != "^", addEnd = source[source.length - 1] != "$";
+        if (!addStart && !addEnd)
+            return expr;
+        return new RegExp(`${addStart ? "^" : ""}(?:${source})${addEnd ? "$" : ""}`, (_a = expr.flags) !== null && _a !== void 0 ? _a : (expr.ignoreCase ? "i" : ""));
+    }
+    /**
+    This annotation is added to transactions that are produced by
+    picking a completion.
+    */
+    const pickedCompletion = /*@__PURE__*/Annotation.define();
+    /**
+    Helper function that returns a transaction spec which inserts a
+    completion's text in the main selection range, and any other
+    selection range that has the same text in front of it.
+    */
+    function insertCompletionText(state, text, from, to) {
+        let { main } = state.selection, fromOff = from - main.from, toOff = to - main.from;
+        return Object.assign(Object.assign({}, state.changeByRange(range => {
+            if (range != main && from != to &&
+                state.sliceDoc(range.from + fromOff, range.from + toOff) != state.sliceDoc(from, to))
+                return { range };
+            return {
+                changes: { from: range.from + fromOff, to: to == main.from ? range.to : range.from + toOff, insert: text },
+                range: EditorSelection.cursor(range.from + fromOff + text.length)
+            };
+        })), { userEvent: "input.complete" });
+    }
+    const SourceCache = /*@__PURE__*/new WeakMap();
+    function asSource(source) {
+        if (!Array.isArray(source))
+            return source;
+        let known = SourceCache.get(source);
+        if (!known)
+            SourceCache.set(source, known = completeFromList(source));
+        return known;
+    }
+    const startCompletionEffect = /*@__PURE__*/StateEffect.define();
+    const closeCompletionEffect = /*@__PURE__*/StateEffect.define();
+
+    // A pattern matcher for fuzzy completion matching. Create an instance
+    // once for a pattern, and then use that to match any number of
+    // completions.
+    class FuzzyMatcher {
+        constructor(pattern) {
+            this.pattern = pattern;
+            this.chars = [];
+            this.folded = [];
+            // Buffers reused by calls to `match` to track matched character
+            // positions.
+            this.any = [];
+            this.precise = [];
+            this.byWord = [];
+            for (let p = 0; p < pattern.length;) {
+                let char = codePointAt(pattern, p), size = codePointSize(char);
+                this.chars.push(char);
+                let part = pattern.slice(p, p + size), upper = part.toUpperCase();
+                this.folded.push(codePointAt(upper == part ? part.toLowerCase() : upper, 0));
+                p += size;
+            }
+            this.astral = pattern.length != this.chars.length;
+        }
+        // Matches a given word (completion) against the pattern (input).
+        // Will return null for no match, and otherwise an array that starts
+        // with the match score, followed by any number of `from, to` pairs
+        // indicating the matched parts of `word`.
+        //
+        // The score is a number that is more negative the worse the match
+        // is. See `Penalty` above.
+        match(word) {
+            if (this.pattern.length == 0)
+                return [-100 /* NotFull */];
+            if (word.length < this.pattern.length)
+                return null;
+            let { chars, folded, any, precise, byWord } = this;
+            // For single-character queries, only match when they occur right
+            // at the start
+            if (chars.length == 1) {
+                let first = codePointAt(word, 0), firstSize = codePointSize(first);
+                let score = firstSize == word.length ? 0 : -100 /* NotFull */;
+                if (first == chars[0]) ;
+                else if (first == folded[0])
+                    score += -200 /* CaseFold */;
+                else
+                    return null;
+                return [score, 0, firstSize];
+            }
+            let direct = word.indexOf(this.pattern);
+            if (direct == 0)
+                return [word.length == this.pattern.length ? 0 : -100 /* NotFull */, 0, this.pattern.length];
+            let len = chars.length, anyTo = 0;
+            if (direct < 0) {
+                for (let i = 0, e = Math.min(word.length, 200); i < e && anyTo < len;) {
+                    let next = codePointAt(word, i);
+                    if (next == chars[anyTo] || next == folded[anyTo])
+                        any[anyTo++] = i;
+                    i += codePointSize(next);
+                }
+                // No match, exit immediately
+                if (anyTo < len)
+                    return null;
+            }
+            // This tracks the extent of the precise (non-folded, not
+            // necessarily adjacent) match
+            let preciseTo = 0;
+            // Tracks whether there is a match that hits only characters that
+            // appear to be starting words. `byWordFolded` is set to true when
+            // a case folded character is encountered in such a match
+            let byWordTo = 0, byWordFolded = false;
+            // If we've found a partial adjacent match, these track its state
+            let adjacentTo = 0, adjacentStart = -1, adjacentEnd = -1;
+            let hasLower = /[a-z]/.test(word), wordAdjacent = true;
+            // Go over the option's text, scanning for the various kinds of matches
+            for (let i = 0, e = Math.min(word.length, 200), prevType = 0 /* NonWord */; i < e && byWordTo < len;) {
+                let next = codePointAt(word, i);
+                if (direct < 0) {
+                    if (preciseTo < len && next == chars[preciseTo])
+                        precise[preciseTo++] = i;
+                    if (adjacentTo < len) {
+                        if (next == chars[adjacentTo] || next == folded[adjacentTo]) {
+                            if (adjacentTo == 0)
+                                adjacentStart = i;
+                            adjacentEnd = i + 1;
+                            adjacentTo++;
+                        }
+                        else {
+                            adjacentTo = 0;
+                        }
+                    }
+                }
+                let ch, type = next < 0xff
+                    ? (next >= 48 && next <= 57 || next >= 97 && next <= 122 ? 2 /* Lower */ : next >= 65 && next <= 90 ? 1 /* Upper */ : 0 /* NonWord */)
+                    : ((ch = fromCodePoint(next)) != ch.toLowerCase() ? 1 /* Upper */ : ch != ch.toUpperCase() ? 2 /* Lower */ : 0 /* NonWord */);
+                if (!i || type == 1 /* Upper */ && hasLower || prevType == 0 /* NonWord */ && type != 0 /* NonWord */) {
+                    if (chars[byWordTo] == next || (folded[byWordTo] == next && (byWordFolded = true)))
+                        byWord[byWordTo++] = i;
+                    else if (byWord.length)
+                        wordAdjacent = false;
+                }
+                prevType = type;
+                i += codePointSize(next);
+            }
+            if (byWordTo == len && byWord[0] == 0 && wordAdjacent)
+                return this.result(-100 /* ByWord */ + (byWordFolded ? -200 /* CaseFold */ : 0), byWord, word);
+            if (adjacentTo == len && adjacentStart == 0)
+                return [-200 /* CaseFold */ - word.length + (adjacentEnd == word.length ? 0 : -100 /* NotFull */), 0, adjacentEnd];
+            if (direct > -1)
+                return [-700 /* NotStart */ - word.length, direct, direct + this.pattern.length];
+            if (adjacentTo == len)
+                return [-200 /* CaseFold */ + -700 /* NotStart */ - word.length, adjacentStart, adjacentEnd];
+            if (byWordTo == len)
+                return this.result(-100 /* ByWord */ + (byWordFolded ? -200 /* CaseFold */ : 0) + -700 /* NotStart */ +
+                    (wordAdjacent ? 0 : -1100 /* Gap */), byWord, word);
+            return chars.length == 2 ? null : this.result((any[0] ? -700 /* NotStart */ : 0) + -200 /* CaseFold */ + -1100 /* Gap */, any, word);
+        }
+        result(score, positions, word) {
+            let result = [score - word.length], i = 1;
+            for (let pos of positions) {
+                let to = pos + (this.astral ? codePointSize(codePointAt(word, pos)) : 1);
+                if (i > 1 && result[i - 1] == pos)
+                    result[i - 1] = to;
+                else {
+                    result[i++] = pos;
+                    result[i++] = to;
+                }
+            }
+            return result;
+        }
+    }
+
+    const completionConfig = /*@__PURE__*/Facet.define({
+        combine(configs) {
+            return combineConfig(configs, {
+                activateOnTyping: true,
+                selectOnOpen: true,
+                override: null,
+                closeOnBlur: true,
+                maxRenderedOptions: 100,
+                defaultKeymap: true,
+                tooltipClass: () => "",
+                optionClass: () => "",
+                aboveCursor: false,
+                icons: true,
+                addToOptions: [],
+                positionInfo: defaultPositionInfo,
+                compareCompletions: (a, b) => a.label.localeCompare(b.label),
+                interactionDelay: 75
+            }, {
+                defaultKeymap: (a, b) => a && b,
+                closeOnBlur: (a, b) => a && b,
+                icons: (a, b) => a && b,
+                tooltipClass: (a, b) => c => joinClass(a(c), b(c)),
+                optionClass: (a, b) => c => joinClass(a(c), b(c)),
+                addToOptions: (a, b) => a.concat(b)
+            });
+        }
+    });
+    function joinClass(a, b) {
+        return a ? b ? a + " " + b : a : b;
+    }
+    function defaultPositionInfo(view, list, option, info, space) {
+        let rtl = view.textDirection == Direction.RTL, left = rtl, narrow = false;
+        let side = "top", offset, maxWidth;
+        let spaceLeft = list.left - space.left, spaceRight = space.right - list.right;
+        let infoWidth = info.right - info.left, infoHeight = info.bottom - info.top;
+        if (left && spaceLeft < Math.min(infoWidth, spaceRight))
+            left = false;
+        else if (!left && spaceRight < Math.min(infoWidth, spaceLeft))
+            left = true;
+        if (infoWidth <= (left ? spaceLeft : spaceRight)) {
+            offset = Math.max(space.top, Math.min(option.top, space.bottom - infoHeight)) - list.top;
+            maxWidth = Math.min(400 /* Width */, left ? spaceLeft : spaceRight);
+        }
+        else {
+            narrow = true;
+            maxWidth = Math.min(400 /* Width */, (rtl ? list.right : space.right - list.left) - 30 /* Margin */);
+            let spaceBelow = space.bottom - list.bottom;
+            if (spaceBelow >= infoHeight || spaceBelow > list.top) { // Below the completion
+                offset = option.bottom - list.top;
+            }
+            else { // Above it
+                side = "bottom";
+                offset = list.bottom - option.top;
+            }
+        }
+        return {
+            style: `${side}: ${offset}px; max-width: ${maxWidth}px`,
+            class: "cm-completionInfo-" + (narrow ? (rtl ? "left-narrow" : "right-narrow") : left ? "left" : "right")
+        };
+    }
+
+    function optionContent(config) {
+        let content = config.addToOptions.slice();
+        if (config.icons)
+            content.push({
+                render(completion) {
+                    let icon = document.createElement("div");
+                    icon.classList.add("cm-completionIcon");
+                    if (completion.type)
+                        icon.classList.add(...completion.type.split(/\s+/g).map(cls => "cm-completionIcon-" + cls));
+                    icon.setAttribute("aria-hidden", "true");
+                    return icon;
+                },
+                position: 20
+            });
+        content.push({
+            render(completion, _s, match) {
+                let labelElt = document.createElement("span");
+                labelElt.className = "cm-completionLabel";
+                let { label } = completion, off = 0;
+                for (let j = 1; j < match.length;) {
+                    let from = match[j++], to = match[j++];
+                    if (from > off)
+                        labelElt.appendChild(document.createTextNode(label.slice(off, from)));
+                    let span = labelElt.appendChild(document.createElement("span"));
+                    span.appendChild(document.createTextNode(label.slice(from, to)));
+                    span.className = "cm-completionMatchedText";
+                    off = to;
+                }
+                if (off < label.length)
+                    labelElt.appendChild(document.createTextNode(label.slice(off)));
+                return labelElt;
+            },
+            position: 50
+        }, {
+            render(completion) {
+                if (!completion.detail)
+                    return null;
+                let detailElt = document.createElement("span");
+                detailElt.className = "cm-completionDetail";
+                detailElt.textContent = completion.detail;
+                return detailElt;
+            },
+            position: 80
+        });
+        return content.sort((a, b) => a.position - b.position).map(a => a.render);
+    }
+    function rangeAroundSelected(total, selected, max) {
+        if (total <= max)
+            return { from: 0, to: total };
+        if (selected < 0)
+            selected = 0;
+        if (selected <= (total >> 1)) {
+            let off = Math.floor(selected / max);
+            return { from: off * max, to: (off + 1) * max };
+        }
+        let off = Math.floor((total - selected) / max);
+        return { from: total - (off + 1) * max, to: total - off * max };
+    }
+    class CompletionTooltip {
+        constructor(view, stateField, applyCompletion) {
+            this.view = view;
+            this.stateField = stateField;
+            this.applyCompletion = applyCompletion;
+            this.info = null;
+            this.infoDestroy = null;
+            this.placeInfoReq = {
+                read: () => this.measureInfo(),
+                write: (pos) => this.placeInfo(pos),
+                key: this
+            };
+            this.space = null;
+            this.currentClass = "";
+            let cState = view.state.field(stateField);
+            let { options, selected } = cState.open;
+            let config = view.state.facet(completionConfig);
+            this.optionContent = optionContent(config);
+            this.optionClass = config.optionClass;
+            this.tooltipClass = config.tooltipClass;
+            this.range = rangeAroundSelected(options.length, selected, config.maxRenderedOptions);
+            this.dom = document.createElement("div");
+            this.dom.className = "cm-tooltip-autocomplete";
+            this.updateTooltipClass(view.state);
+            this.dom.addEventListener("mousedown", (e) => {
+                for (let dom = e.target, match; dom && dom != this.dom; dom = dom.parentNode) {
+                    if (dom.nodeName == "LI" && (match = /-(\d+)$/.exec(dom.id)) && +match[1] < options.length) {
+                        this.applyCompletion(view, options[+match[1]]);
+                        e.preventDefault();
+                        return;
+                    }
+                }
+            });
+            this.dom.addEventListener("focusout", (e) => {
+                let state = view.state.field(this.stateField, false);
+                if (state && state.tooltip && view.state.facet(completionConfig).closeOnBlur &&
+                    e.relatedTarget != view.contentDOM)
+                    view.dispatch({ effects: closeCompletionEffect.of(null) });
+            });
+            this.list = this.dom.appendChild(this.createListBox(options, cState.id, this.range));
+            this.list.addEventListener("scroll", () => {
+                if (this.info)
+                    this.view.requestMeasure(this.placeInfoReq);
+            });
+        }
+        mount() { this.updateSel(); }
+        update(update) {
+            var _a, _b, _c;
+            let cState = update.state.field(this.stateField);
+            let prevState = update.startState.field(this.stateField);
+            this.updateTooltipClass(update.state);
+            if (cState != prevState) {
+                this.updateSel();
+                if (((_a = cState.open) === null || _a === void 0 ? void 0 : _a.disabled) != ((_b = prevState.open) === null || _b === void 0 ? void 0 : _b.disabled))
+                    this.dom.classList.toggle("cm-tooltip-autocomplete-disabled", !!((_c = cState.open) === null || _c === void 0 ? void 0 : _c.disabled));
+            }
+        }
+        updateTooltipClass(state) {
+            let cls = this.tooltipClass(state);
+            if (cls != this.currentClass) {
+                for (let c of this.currentClass.split(" "))
+                    if (c)
+                        this.dom.classList.remove(c);
+                for (let c of cls.split(" "))
+                    if (c)
+                        this.dom.classList.add(c);
+                this.currentClass = cls;
+            }
+        }
+        positioned(space) {
+            this.space = space;
+            if (this.info)
+                this.view.requestMeasure(this.placeInfoReq);
+        }
+        updateSel() {
+            let cState = this.view.state.field(this.stateField), open = cState.open;
+            if (open.selected > -1 && open.selected < this.range.from || open.selected >= this.range.to) {
+                this.range = rangeAroundSelected(open.options.length, open.selected, this.view.state.facet(completionConfig).maxRenderedOptions);
+                this.list.remove();
+                this.list = this.dom.appendChild(this.createListBox(open.options, cState.id, this.range));
+                this.list.addEventListener("scroll", () => {
+                    if (this.info)
+                        this.view.requestMeasure(this.placeInfoReq);
+                });
+            }
+            if (this.updateSelectedOption(open.selected)) {
+                this.destroyInfo();
+                let { completion } = open.options[open.selected];
+                let { info } = completion;
+                if (!info)
+                    return;
+                let infoResult = typeof info === "string" ? document.createTextNode(info) : info(completion);
+                if (!infoResult)
+                    return;
+                if ("then" in infoResult) {
+                    infoResult.then(obj => {
+                        if (obj && this.view.state.field(this.stateField, false) == cState)
+                            this.addInfoPane(obj, completion);
+                    }).catch(e => logException(this.view.state, e, "completion info"));
+                }
+                else {
+                    this.addInfoPane(infoResult, completion);
+                }
+            }
+        }
+        addInfoPane(content, completion) {
+            this.destroyInfo();
+            let wrap = this.info = document.createElement("div");
+            wrap.className = "cm-tooltip cm-completionInfo";
+            if (content.nodeType != null) {
+                wrap.appendChild(content);
+                this.infoDestroy = null;
+            }
+            else {
+                let { dom, destroy } = content;
+                wrap.appendChild(dom);
+                this.infoDestroy = destroy || null;
+            }
+            this.dom.appendChild(wrap);
+            this.view.requestMeasure(this.placeInfoReq);
+        }
+        updateSelectedOption(selected) {
+            let set = null;
+            for (let opt = this.list.firstChild, i = this.range.from; opt; opt = opt.nextSibling, i++) {
+                if (opt.nodeName != "LI" || !opt.id) {
+                    i--; // A section header
+                }
+                else if (i == selected) {
+                    if (!opt.hasAttribute("aria-selected")) {
+                        opt.setAttribute("aria-selected", "true");
+                        set = opt;
+                    }
+                }
+                else {
+                    if (opt.hasAttribute("aria-selected"))
+                        opt.removeAttribute("aria-selected");
+                }
+            }
+            if (set)
+                scrollIntoView(this.list, set);
+            return set;
+        }
+        measureInfo() {
+            let sel = this.dom.querySelector("[aria-selected]");
+            if (!sel || !this.info)
+                return null;
+            let listRect = this.dom.getBoundingClientRect();
+            let infoRect = this.info.getBoundingClientRect();
+            let selRect = sel.getBoundingClientRect();
+            let space = this.space;
+            if (!space) {
+                let win = this.dom.ownerDocument.defaultView || window;
+                space = { left: 0, top: 0, right: win.innerWidth, bottom: win.innerHeight };
+            }
+            if (selRect.top > Math.min(space.bottom, listRect.bottom) - 10 ||
+                selRect.bottom < Math.max(space.top, listRect.top) + 10)
+                return null;
+            return this.view.state.facet(completionConfig).positionInfo(this.view, listRect, selRect, infoRect, space);
+        }
+        placeInfo(pos) {
+            if (this.info) {
+                if (pos) {
+                    if (pos.style)
+                        this.info.style.cssText = pos.style;
+                    this.info.className = "cm-tooltip cm-completionInfo " + (pos.class || "");
+                }
+                else {
+                    this.info.style.cssText = "top: -1e6px";
+                }
+            }
+        }
+        createListBox(options, id, range) {
+            const ul = document.createElement("ul");
+            ul.id = id;
+            ul.setAttribute("role", "listbox");
+            ul.setAttribute("aria-expanded", "true");
+            ul.setAttribute("aria-label", this.view.state.phrase("Completions"));
+            let curSection = null;
+            for (let i = range.from; i < range.to; i++) {
+                let { completion, match } = options[i], { section } = completion;
+                if (section) {
+                    let name = typeof section == "string" ? section : section.name;
+                    if (name != curSection && (i > range.from || range.from == 0)) {
+                        curSection = name;
+                        if (typeof section != "string" && section.header) {
+                            ul.appendChild(section.header(section));
+                        }
+                        else {
+                            let header = ul.appendChild(document.createElement("completion-section"));
+                            header.textContent = name;
+                        }
+                    }
+                }
+                const li = ul.appendChild(document.createElement("li"));
+                li.id = id + "-" + i;
+                li.setAttribute("role", "option");
+                let cls = this.optionClass(completion);
+                if (cls)
+                    li.className = cls;
+                for (let source of this.optionContent) {
+                    let node = source(completion, this.view.state, match);
+                    if (node)
+                        li.appendChild(node);
+                }
+            }
+            if (range.from)
+                ul.classList.add("cm-completionListIncompleteTop");
+            if (range.to < options.length)
+                ul.classList.add("cm-completionListIncompleteBottom");
+            return ul;
+        }
+        destroyInfo() {
+            if (this.info) {
+                if (this.infoDestroy)
+                    this.infoDestroy();
+                this.info.remove();
+                this.info = null;
+            }
+        }
+        destroy() {
+            this.destroyInfo();
+        }
+    }
+    // We allocate a new function instance every time the completion
+    // changes to force redrawing/repositioning of the tooltip
+    function completionTooltip(stateField, applyCompletion) {
+        return (view) => new CompletionTooltip(view, stateField, applyCompletion);
+    }
+    function scrollIntoView(container, element) {
+        let parent = container.getBoundingClientRect();
+        let self = element.getBoundingClientRect();
+        if (self.top < parent.top)
+            container.scrollTop -= parent.top - self.top;
+        else if (self.bottom > parent.bottom)
+            container.scrollTop += self.bottom - parent.bottom;
+    }
+
+    // Used to pick a preferred option when two options with the same
+    // label occur in the result.
+    function score(option) {
+        return (option.boost || 0) * 100 + (option.apply ? 10 : 0) + (option.info ? 5 : 0) +
+            (option.type ? 1 : 0);
+    }
+    function sortOptions(active, state) {
+        let options = [];
+        let sections = null;
+        let addOption = (option) => {
+            options.push(option);
+            let { section } = option.completion;
+            if (section) {
+                if (!sections)
+                    sections = [];
+                let name = typeof section == "string" ? section : section.name;
+                if (!sections.some(s => s.name == name))
+                    sections.push(typeof section == "string" ? { name } : section);
+            }
+        };
+        for (let a of active)
+            if (a.hasResult()) {
+                if (a.result.filter === false) {
+                    let getMatch = a.result.getMatch;
+                    for (let option of a.result.options) {
+                        let match = [1e9 - options.length];
+                        if (getMatch)
+                            for (let n of getMatch(option))
+                                match.push(n);
+                        addOption(new Option(option, a.source, match, match[0]));
+                    }
+                }
+                else {
+                    let matcher = new FuzzyMatcher(state.sliceDoc(a.from, a.to)), match;
+                    for (let option of a.result.options)
+                        if (match = matcher.match(option.label)) {
+                            addOption(new Option(option, a.source, match, match[0] + (option.boost || 0)));
+                        }
+                }
+            }
+        if (sections) {
+            let sectionOrder = Object.create(null), pos = 0;
+            let cmp = (a, b) => { var _a, _b; return ((_a = a.rank) !== null && _a !== void 0 ? _a : 1e9) - ((_b = b.rank) !== null && _b !== void 0 ? _b : 1e9) || (a.name < b.name ? -1 : 1); };
+            for (let s of sections.sort(cmp)) {
+                pos -= 1e5;
+                sectionOrder[s.name] = pos;
+            }
+            for (let option of options) {
+                let { section } = option.completion;
+                if (section)
+                    option.score += sectionOrder[typeof section == "string" ? section : section.name];
+            }
+        }
+        let result = [], prev = null;
+        let compare = state.facet(completionConfig).compareCompletions;
+        for (let opt of options.sort((a, b) => (b.score - a.score) || compare(a.completion, b.completion))) {
+            let cur = opt.completion;
+            if (!prev || prev.label != cur.label || prev.detail != cur.detail ||
+                (prev.type != null && cur.type != null && prev.type != cur.type) ||
+                prev.apply != cur.apply || prev.boost != cur.boost)
+                result.push(opt);
+            else if (score(opt.completion) > score(prev))
+                result[result.length - 1] = opt;
+            prev = opt.completion;
+        }
+        return result;
+    }
+    class CompletionDialog {
+        constructor(options, attrs, tooltip, timestamp, selected, disabled) {
+            this.options = options;
+            this.attrs = attrs;
+            this.tooltip = tooltip;
+            this.timestamp = timestamp;
+            this.selected = selected;
+            this.disabled = disabled;
+        }
+        setSelected(selected, id) {
+            return selected == this.selected || selected >= this.options.length ? this
+                : new CompletionDialog(this.options, makeAttrs(id, selected), this.tooltip, this.timestamp, selected, this.disabled);
+        }
+        static build(active, state, id, prev, conf) {
+            let options = sortOptions(active, state);
+            if (!options.length) {
+                return prev && active.some(a => a.state == 1 /* Pending */) ?
+                    new CompletionDialog(prev.options, prev.attrs, prev.tooltip, prev.timestamp, prev.selected, true) : null;
+            }
+            let selected = state.facet(completionConfig).selectOnOpen ? 0 : -1;
+            if (prev && prev.selected != selected && prev.selected != -1) {
+                let selectedValue = prev.options[prev.selected].completion;
+                for (let i = 0; i < options.length; i++)
+                    if (options[i].completion == selectedValue) {
+                        selected = i;
+                        break;
+                    }
+            }
+            return new CompletionDialog(options, makeAttrs(id, selected), {
+                pos: active.reduce((a, b) => b.hasResult() ? Math.min(a, b.from) : a, 1e8),
+                create: completionTooltip(completionState, applyCompletion),
+                above: conf.aboveCursor,
+            }, prev ? prev.timestamp : Date.now(), selected, false);
+        }
+        map(changes) {
+            return new CompletionDialog(this.options, this.attrs, Object.assign(Object.assign({}, this.tooltip), { pos: changes.mapPos(this.tooltip.pos) }), this.timestamp, this.selected, this.disabled);
+        }
+    }
+    class CompletionState {
+        constructor(active, id, open) {
+            this.active = active;
+            this.id = id;
+            this.open = open;
+        }
+        static start() {
+            return new CompletionState(none$1, "cm-ac-" + Math.floor(Math.random() * 2e6).toString(36), null);
+        }
+        update(tr) {
+            let { state } = tr, conf = state.facet(completionConfig);
+            let sources = conf.override ||
+                state.languageDataAt("autocomplete", cur(state)).map(asSource);
+            let active = sources.map(source => {
+                let value = this.active.find(s => s.source == source) ||
+                    new ActiveSource(source, this.active.some(a => a.state != 0 /* Inactive */) ? 1 /* Pending */ : 0 /* Inactive */);
+                return value.update(tr, conf);
+            });
+            if (active.length == this.active.length && active.every((a, i) => a == this.active[i]))
+                active = this.active;
+            let open = this.open;
+            if (open && tr.docChanged)
+                open = open.map(tr.changes);
+            if (tr.selection || active.some(a => a.hasResult() && tr.changes.touchesRange(a.from, a.to)) ||
+                !sameResults(active, this.active))
+                open = CompletionDialog.build(active, state, this.id, open, conf);
+            else if (open && open.disabled && !active.some(a => a.state == 1 /* Pending */))
+                open = null;
+            if (!open && active.every(a => a.state != 1 /* Pending */) && active.some(a => a.hasResult()))
+                active = active.map(a => a.hasResult() ? new ActiveSource(a.source, 0 /* Inactive */) : a);
+            for (let effect of tr.effects)
+                if (effect.is(setSelectedEffect))
+                    open = open && open.setSelected(effect.value, this.id);
+            return active == this.active && open == this.open ? this : new CompletionState(active, this.id, open);
+        }
+        get tooltip() { return this.open ? this.open.tooltip : null; }
+        get attrs() { return this.open ? this.open.attrs : baseAttrs; }
+    }
+    function sameResults(a, b) {
+        if (a == b)
+            return true;
+        for (let iA = 0, iB = 0;;) {
+            while (iA < a.length && !a[iA].hasResult)
+                iA++;
+            while (iB < b.length && !b[iB].hasResult)
+                iB++;
+            let endA = iA == a.length, endB = iB == b.length;
+            if (endA || endB)
+                return endA == endB;
+            if (a[iA++].result != b[iB++].result)
+                return false;
+        }
+    }
+    const baseAttrs = {
+        "aria-autocomplete": "list"
+    };
+    function makeAttrs(id, selected) {
+        let result = {
+            "aria-autocomplete": "list",
+            "aria-haspopup": "listbox",
+            "aria-controls": id
+        };
+        if (selected > -1)
+            result["aria-activedescendant"] = id + "-" + selected;
+        return result;
+    }
+    const none$1 = [];
+    function getUserEvent(tr) {
+        return tr.isUserEvent("input.type") ? "input" : tr.isUserEvent("delete.backward") ? "delete" : null;
+    }
+    class ActiveSource {
+        constructor(source, state, explicitPos = -1) {
+            this.source = source;
+            this.state = state;
+            this.explicitPos = explicitPos;
+        }
+        hasResult() { return false; }
+        update(tr, conf) {
+            let event = getUserEvent(tr), value = this;
+            if (event)
+                value = value.handleUserEvent(tr, event, conf);
+            else if (tr.docChanged)
+                value = value.handleChange(tr);
+            else if (tr.selection && value.state != 0 /* Inactive */)
+                value = new ActiveSource(value.source, 0 /* Inactive */);
+            for (let effect of tr.effects) {
+                if (effect.is(startCompletionEffect))
+                    value = new ActiveSource(value.source, 1 /* Pending */, effect.value ? cur(tr.state) : -1);
+                else if (effect.is(closeCompletionEffect))
+                    value = new ActiveSource(value.source, 0 /* Inactive */);
+                else if (effect.is(setActiveEffect))
+                    for (let active of effect.value)
+                        if (active.source == value.source)
+                            value = active;
+            }
+            return value;
+        }
+        handleUserEvent(tr, type, conf) {
+            return type == "delete" || !conf.activateOnTyping ? this.map(tr.changes) : new ActiveSource(this.source, 1 /* Pending */);
+        }
+        handleChange(tr) {
+            return tr.changes.touchesRange(cur(tr.startState)) ? new ActiveSource(this.source, 0 /* Inactive */) : this.map(tr.changes);
+        }
+        map(changes) {
+            return changes.empty || this.explicitPos < 0 ? this : new ActiveSource(this.source, this.state, changes.mapPos(this.explicitPos));
+        }
+    }
+    class ActiveResult extends ActiveSource {
+        constructor(source, explicitPos, result, from, to) {
+            super(source, 2 /* Result */, explicitPos);
+            this.result = result;
+            this.from = from;
+            this.to = to;
+        }
+        hasResult() { return true; }
+        handleUserEvent(tr, type, conf) {
+            var _a;
+            let from = tr.changes.mapPos(this.from), to = tr.changes.mapPos(this.to, 1);
+            let pos = cur(tr.state);
+            if ((this.explicitPos < 0 ? pos <= from : pos < this.from) ||
+                pos > to ||
+                type == "delete" && cur(tr.startState) == this.from)
+                return new ActiveSource(this.source, type == "input" && conf.activateOnTyping ? 1 /* Pending */ : 0 /* Inactive */);
+            let explicitPos = this.explicitPos < 0 ? -1 : tr.changes.mapPos(this.explicitPos), updated;
+            if (checkValid(this.result.validFor, tr.state, from, to))
+                return new ActiveResult(this.source, explicitPos, this.result, from, to);
+            if (this.result.update &&
+                (updated = this.result.update(this.result, from, to, new CompletionContext(tr.state, pos, explicitPos >= 0))))
+                return new ActiveResult(this.source, explicitPos, updated, updated.from, (_a = updated.to) !== null && _a !== void 0 ? _a : cur(tr.state));
+            return new ActiveSource(this.source, 1 /* Pending */, explicitPos);
+        }
+        handleChange(tr) {
+            return tr.changes.touchesRange(this.from, this.to) ? new ActiveSource(this.source, 0 /* Inactive */) : this.map(tr.changes);
+        }
+        map(mapping) {
+            return mapping.empty ? this :
+                new ActiveResult(this.source, this.explicitPos < 0 ? -1 : mapping.mapPos(this.explicitPos), this.result, mapping.mapPos(this.from), mapping.mapPos(this.to, 1));
+        }
+    }
+    function checkValid(validFor, state, from, to) {
+        if (!validFor)
+            return false;
+        let text = state.sliceDoc(from, to);
+        return typeof validFor == "function" ? validFor(text, from, to, state) : ensureAnchor(validFor, true).test(text);
+    }
+    const setActiveEffect = /*@__PURE__*/StateEffect.define({
+        map(sources, mapping) { return sources.map(s => s.map(mapping)); }
+    });
+    const setSelectedEffect = /*@__PURE__*/StateEffect.define();
+    const completionState = /*@__PURE__*/StateField.define({
+        create() { return CompletionState.start(); },
+        update(value, tr) { return value.update(tr); },
+        provide: f => [
+            showTooltip.from(f, val => val.tooltip),
+            EditorView.contentAttributes.from(f, state => state.attrs)
+        ]
+    });
+    function applyCompletion(view, option) {
+        const apply = option.completion.apply || option.completion.label;
+        let result = view.state.field(completionState).active.find(a => a.source == option.source);
+        if (!(result instanceof ActiveResult))
+            return false;
+        if (typeof apply == "string")
+            view.dispatch(Object.assign(Object.assign({}, insertCompletionText(view.state, apply, result.from, result.to)), { annotations: pickedCompletion.of(option.completion) }));
+        else
+            apply(view, option.completion, result.from, result.to);
+        return true;
+    }
+
+    /**
+    Returns a command that moves the completion selection forward or
+    backward by the given amount.
+    */
+    function moveCompletionSelection(forward, by = "option") {
+        return (view) => {
+            let cState = view.state.field(completionState, false);
+            if (!cState || !cState.open || cState.open.disabled ||
+                Date.now() - cState.open.timestamp < view.state.facet(completionConfig).interactionDelay)
+                return false;
+            let step = 1, tooltip;
+            if (by == "page" && (tooltip = getTooltip$1(view, cState.open.tooltip)))
+                step = Math.max(2, Math.floor(tooltip.dom.offsetHeight /
+                    tooltip.dom.querySelector("li").offsetHeight) - 1);
+            let { length } = cState.open.options;
+            let selected = cState.open.selected > -1 ? cState.open.selected + step * (forward ? 1 : -1) : forward ? 0 : length - 1;
+            if (selected < 0)
+                selected = by == "page" ? 0 : length - 1;
+            else if (selected >= length)
+                selected = by == "page" ? length - 1 : 0;
+            view.dispatch({ effects: setSelectedEffect.of(selected) });
+            return true;
+        };
+    }
+    /**
+    Accept the current completion.
+    */
+    const acceptCompletion = (view) => {
+        let cState = view.state.field(completionState, false);
+        if (view.state.readOnly || !cState || !cState.open || cState.open.selected < 0 || cState.open.disabled ||
+            Date.now() - cState.open.timestamp < view.state.facet(completionConfig).interactionDelay)
+            return false;
+        return applyCompletion(view, cState.open.options[cState.open.selected]);
+    };
+    /**
+    Explicitly start autocompletion.
+    */
+    const startCompletion = (view) => {
+        let cState = view.state.field(completionState, false);
+        if (!cState)
+            return false;
+        view.dispatch({ effects: startCompletionEffect.of(true) });
+        return true;
+    };
+    /**
+    Close the currently active completion.
+    */
+    const closeCompletion = (view) => {
+        let cState = view.state.field(completionState, false);
+        if (!cState || !cState.active.some(a => a.state != 0 /* Inactive */))
+            return false;
+        view.dispatch({ effects: closeCompletionEffect.of(null) });
+        return true;
+    };
+    class RunningQuery {
+        constructor(active, context) {
+            this.active = active;
+            this.context = context;
+            this.time = Date.now();
+            this.updates = [];
+            // Note that 'undefined' means 'not done yet', whereas 'null' means
+            // 'query returned null'.
+            this.done = undefined;
+        }
+    }
+    const DebounceTime = 50, MaxUpdateCount = 50, MinAbortTime = 1000;
+    const completionPlugin = /*@__PURE__*/ViewPlugin.fromClass(class {
+        constructor(view) {
+            this.view = view;
+            this.debounceUpdate = -1;
+            this.running = [];
+            this.debounceAccept = -1;
+            this.composing = 0 /* None */;
+            for (let active of view.state.field(completionState).active)
+                if (active.state == 1 /* Pending */)
+                    this.startQuery(active);
+        }
+        update(update) {
+            let cState = update.state.field(completionState);
+            if (!update.selectionSet && !update.docChanged && update.startState.field(completionState) == cState)
+                return;
+            let doesReset = update.transactions.some(tr => {
+                return (tr.selection || tr.docChanged) && !getUserEvent(tr);
+            });
+            for (let i = 0; i < this.running.length; i++) {
+                let query = this.running[i];
+                if (doesReset ||
+                    query.updates.length + update.transactions.length > MaxUpdateCount && Date.now() - query.time > MinAbortTime) {
+                    for (let handler of query.context.abortListeners) {
+                        try {
+                            handler();
+                        }
+                        catch (e) {
+                            logException(this.view.state, e);
+                        }
+                    }
+                    query.context.abortListeners = null;
+                    this.running.splice(i--, 1);
+                }
+                else {
+                    query.updates.push(...update.transactions);
+                }
+            }
+            if (this.debounceUpdate > -1)
+                clearTimeout(this.debounceUpdate);
+            this.debounceUpdate = cState.active.some(a => a.state == 1 /* Pending */ && !this.running.some(q => q.active.source == a.source))
+                ? setTimeout(() => this.startUpdate(), DebounceTime) : -1;
+            if (this.composing != 0 /* None */)
+                for (let tr of update.transactions) {
+                    if (getUserEvent(tr) == "input")
+                        this.composing = 2 /* Changed */;
+                    else if (this.composing == 2 /* Changed */ && tr.selection)
+                        this.composing = 3 /* ChangedAndMoved */;
+                }
+        }
+        startUpdate() {
+            this.debounceUpdate = -1;
+            let { state } = this.view, cState = state.field(completionState);
+            for (let active of cState.active) {
+                if (active.state == 1 /* Pending */ && !this.running.some(r => r.active.source == active.source))
+                    this.startQuery(active);
+            }
+        }
+        startQuery(active) {
+            let { state } = this.view, pos = cur(state);
+            let context = new CompletionContext(state, pos, active.explicitPos == pos);
+            let pending = new RunningQuery(active, context);
+            this.running.push(pending);
+            Promise.resolve(active.source(context)).then(result => {
+                if (!pending.context.aborted) {
+                    pending.done = result || null;
+                    this.scheduleAccept();
+                }
+            }, err => {
+                this.view.dispatch({ effects: closeCompletionEffect.of(null) });
+                logException(this.view.state, err);
+            });
+        }
+        scheduleAccept() {
+            if (this.running.every(q => q.done !== undefined))
+                this.accept();
+            else if (this.debounceAccept < 0)
+                this.debounceAccept = setTimeout(() => this.accept(), DebounceTime);
+        }
+        // For each finished query in this.running, try to create a result
+        // or, if appropriate, restart the query.
+        accept() {
+            var _a;
+            if (this.debounceAccept > -1)
+                clearTimeout(this.debounceAccept);
+            this.debounceAccept = -1;
+            let updated = [];
+            let conf = this.view.state.facet(completionConfig);
+            for (let i = 0; i < this.running.length; i++) {
+                let query = this.running[i];
+                if (query.done === undefined)
+                    continue;
+                this.running.splice(i--, 1);
+                if (query.done) {
+                    let active = new ActiveResult(query.active.source, query.active.explicitPos, query.done, query.done.from, (_a = query.done.to) !== null && _a !== void 0 ? _a : cur(query.updates.length ? query.updates[0].startState : this.view.state));
+                    // Replay the transactions that happened since the start of
+                    // the request and see if that preserves the result
+                    for (let tr of query.updates)
+                        active = active.update(tr, conf);
+                    if (active.hasResult()) {
+                        updated.push(active);
+                        continue;
+                    }
+                }
+                let current = this.view.state.field(completionState).active.find(a => a.source == query.active.source);
+                if (current && current.state == 1 /* Pending */) {
+                    if (query.done == null) {
+                        // Explicitly failed. Should clear the pending status if it
+                        // hasn't been re-set in the meantime.
+                        let active = new ActiveSource(query.active.source, 0 /* Inactive */);
+                        for (let tr of query.updates)
+                            active = active.update(tr, conf);
+                        if (active.state != 1 /* Pending */)
+                            updated.push(active);
+                    }
+                    else {
+                        // Cleared by subsequent transactions. Restart.
+                        this.startQuery(current);
+                    }
+                }
+            }
+            if (updated.length)
+                this.view.dispatch({ effects: setActiveEffect.of(updated) });
+        }
+    }, {
+        eventHandlers: {
+            blur(event) {
+                let state = this.view.state.field(completionState, false);
+                if (state && state.tooltip && this.view.state.facet(completionConfig).closeOnBlur) {
+                    let dialog = state.open && getTooltip$1(this.view, state.open.tooltip);
+                    if (!dialog || !dialog.dom.contains(event.relatedTarget))
+                        this.view.dispatch({ effects: closeCompletionEffect.of(null) });
+                }
+            },
+            compositionstart() {
+                this.composing = 1 /* Started */;
+            },
+            compositionend() {
+                if (this.composing == 3 /* ChangedAndMoved */) {
+                    // Safari fires compositionend events synchronously, possibly
+                    // from inside an update, so dispatch asynchronously to avoid reentrancy
+                    setTimeout(() => this.view.dispatch({ effects: startCompletionEffect.of(false) }), 20);
+                }
+                this.composing = 0 /* None */;
+            }
+        }
+    });
+
+    const baseTheme$3 = /*@__PURE__*/EditorView.baseTheme({
+        ".cm-tooltip.cm-tooltip-autocomplete": {
+            "& > ul": {
+                fontFamily: "monospace",
+                whiteSpace: "nowrap",
+                overflow: "hidden auto",
+                maxWidth_fallback: "700px",
+                maxWidth: "min(700px, 95vw)",
+                minWidth: "250px",
+                maxHeight: "10em",
+                height: "100%",
+                listStyle: "none",
+                margin: 0,
+                padding: 0,
+                "& > li, & > completion-section": {
+                    padding: "1px 3px",
+                    lineHeight: 1.2
+                },
+                "& > li": {
+                    overflowX: "hidden",
+                    textOverflow: "ellipsis",
+                    cursor: "pointer"
+                },
+                "& > completion-section": {
+                    display: "list-item",
+                    borderBottom: "1px solid silver",
+                    paddingLeft: "0.5em",
+                    opacity: 0.7
+                }
+            }
+        },
+        "&light .cm-tooltip-autocomplete ul li[aria-selected]": {
+            background: "#17c",
+            color: "white",
+        },
+        "&light .cm-tooltip-autocomplete-disabled ul li[aria-selected]": {
+            background: "#777",
+        },
+        "&dark .cm-tooltip-autocomplete ul li[aria-selected]": {
+            background: "#347",
+            color: "white",
+        },
+        "&dark .cm-tooltip-autocomplete-disabled ul li[aria-selected]": {
+            background: "#444",
+        },
+        ".cm-completionListIncompleteTop:before, .cm-completionListIncompleteBottom:after": {
+            content: '"···"',
+            opacity: 0.5,
+            display: "block",
+            textAlign: "center"
+        },
+        ".cm-tooltip.cm-completionInfo": {
+            position: "absolute",
+            padding: "3px 9px",
+            width: "max-content",
+            maxWidth: `${400 /* Width */}px`,
+            boxSizing: "border-box"
+        },
+        ".cm-completionInfo.cm-completionInfo-left": { right: "100%" },
+        ".cm-completionInfo.cm-completionInfo-right": { left: "100%" },
+        ".cm-completionInfo.cm-completionInfo-left-narrow": { right: `${30 /* Margin */}px` },
+        ".cm-completionInfo.cm-completionInfo-right-narrow": { left: `${30 /* Margin */}px` },
+        "&light .cm-snippetField": { backgroundColor: "#00000022" },
+        "&dark .cm-snippetField": { backgroundColor: "#ffffff22" },
+        ".cm-snippetFieldPosition": {
+            verticalAlign: "text-top",
+            width: 0,
+            height: "1.15em",
+            display: "inline-block",
+            margin: "0 -0.7px -.7em",
+            borderLeft: "1.4px dotted #888"
+        },
+        ".cm-completionMatchedText": {
+            textDecoration: "underline"
+        },
+        ".cm-completionDetail": {
+            marginLeft: "0.5em",
+            fontStyle: "italic"
+        },
+        ".cm-completionIcon": {
+            fontSize: "90%",
+            width: ".8em",
+            display: "inline-block",
+            textAlign: "center",
+            paddingRight: ".6em",
+            opacity: "0.6",
+            boxSizing: "content-box"
+        },
+        ".cm-completionIcon-function, .cm-completionIcon-method": {
+            "&:after": { content: "'ƒ'" }
+        },
+        ".cm-completionIcon-class": {
+            "&:after": { content: "'○'" }
+        },
+        ".cm-completionIcon-interface": {
+            "&:after": { content: "'◌'" }
+        },
+        ".cm-completionIcon-variable": {
+            "&:after": { content: "'𝑥'" }
+        },
+        ".cm-completionIcon-constant": {
+            "&:after": { content: "'𝐶'" }
+        },
+        ".cm-completionIcon-type": {
+            "&:after": { content: "'𝑡'" }
+        },
+        ".cm-completionIcon-enum": {
+            "&:after": { content: "'∪'" }
+        },
+        ".cm-completionIcon-property": {
+            "&:after": { content: "'□'" }
+        },
+        ".cm-completionIcon-keyword": {
+            "&:after": { content: "'🔑\uFE0E'" } // Disable emoji rendering
+        },
+        ".cm-completionIcon-namespace": {
+            "&:after": { content: "'▢'" }
+        },
+        ".cm-completionIcon-text": {
+            "&:after": { content: "'abc'", fontSize: "50%", verticalAlign: "middle" }
+        }
+    });
+
+    class FieldPos {
+        constructor(field, line, from, to) {
+            this.field = field;
+            this.line = line;
+            this.from = from;
+            this.to = to;
+        }
+    }
+    class FieldRange {
+        constructor(field, from, to) {
+            this.field = field;
+            this.from = from;
+            this.to = to;
+        }
+        map(changes) {
+            let from = changes.mapPos(this.from, -1, MapMode.TrackDel);
+            let to = changes.mapPos(this.to, 1, MapMode.TrackDel);
+            return from == null || to == null ? null : new FieldRange(this.field, from, to);
+        }
+    }
+    class Snippet {
+        constructor(lines, fieldPositions) {
+            this.lines = lines;
+            this.fieldPositions = fieldPositions;
+        }
+        instantiate(state, pos) {
+            let text = [], lineStart = [pos];
+            let lineObj = state.doc.lineAt(pos), baseIndent = /^\s*/.exec(lineObj.text)[0];
+            for (let line of this.lines) {
+                if (text.length) {
+                    let indent = baseIndent, tabs = /^\t*/.exec(line)[0].length;
+                    for (let i = 0; i < tabs; i++)
+                        indent += state.facet(indentUnit);
+                    lineStart.push(pos + indent.length - tabs);
+                    line = indent + line.slice(tabs);
+                }
+                text.push(line);
+                pos += line.length + 1;
+            }
+            let ranges = this.fieldPositions.map(pos => new FieldRange(pos.field, lineStart[pos.line] + pos.from, lineStart[pos.line] + pos.to));
+            return { text, ranges };
+        }
+        static parse(template) {
+            let fields = [];
+            let lines = [], positions = [], m;
+            for (let line of template.split(/\r\n?|\n/)) {
+                while (m = /[#$]\{(?:(\d+)(?::([^}]*))?|([^}]*))\}/.exec(line)) {
+                    let seq = m[1] ? +m[1] : null, name = m[2] || m[3] || "", found = -1;
+                    for (let i = 0; i < fields.length; i++) {
+                        if (seq != null ? fields[i].seq == seq : name ? fields[i].name == name : false)
+                            found = i;
+                    }
+                    if (found < 0) {
+                        let i = 0;
+                        while (i < fields.length && (seq == null || (fields[i].seq != null && fields[i].seq < seq)))
+                            i++;
+                        fields.splice(i, 0, { seq, name });
+                        found = i;
+                        for (let pos of positions)
+                            if (pos.field >= found)
+                                pos.field++;
+                    }
+                    positions.push(new FieldPos(found, lines.length, m.index, m.index + name.length));
+                    line = line.slice(0, m.index) + name + line.slice(m.index + m[0].length);
+                }
+                for (let esc; esc = /\\([{}])/.exec(line);) {
+                    line = line.slice(0, esc.index) + esc[1] + line.slice(esc.index + esc[0].length);
+                    for (let pos of positions)
+                        if (pos.line == lines.length && pos.from > esc.index) {
+                            pos.from--;
+                            pos.to--;
+                        }
+                }
+                lines.push(line);
+            }
+            return new Snippet(lines, positions);
+        }
+    }
+    let fieldMarker = /*@__PURE__*/Decoration.widget({ widget: /*@__PURE__*/new class extends WidgetType {
+            toDOM() {
+                let span = document.createElement("span");
+                span.className = "cm-snippetFieldPosition";
+                return span;
+            }
+            ignoreEvent() { return false; }
+        } });
+    let fieldRange = /*@__PURE__*/Decoration.mark({ class: "cm-snippetField" });
+    class ActiveSnippet {
+        constructor(ranges, active) {
+            this.ranges = ranges;
+            this.active = active;
+            this.deco = Decoration.set(ranges.map(r => (r.from == r.to ? fieldMarker : fieldRange).range(r.from, r.to)));
+        }
+        map(changes) {
+            let ranges = [];
+            for (let r of this.ranges) {
+                let mapped = r.map(changes);
+                if (!mapped)
+                    return null;
+                ranges.push(mapped);
+            }
+            return new ActiveSnippet(ranges, this.active);
+        }
+        selectionInsideField(sel) {
+            return sel.ranges.every(range => this.ranges.some(r => r.field == this.active && r.from <= range.from && r.to >= range.to));
+        }
+    }
+    const setActive = /*@__PURE__*/StateEffect.define({
+        map(value, changes) { return value && value.map(changes); }
+    });
+    const moveToField = /*@__PURE__*/StateEffect.define();
+    const snippetState = /*@__PURE__*/StateField.define({
+        create() { return null; },
+        update(value, tr) {
+            for (let effect of tr.effects) {
+                if (effect.is(setActive))
+                    return effect.value;
+                if (effect.is(moveToField) && value)
+                    return new ActiveSnippet(value.ranges, effect.value);
+            }
+            if (value && tr.docChanged)
+                value = value.map(tr.changes);
+            if (value && tr.selection && !value.selectionInsideField(tr.selection))
+                value = null;
+            return value;
+        },
+        provide: f => EditorView.decorations.from(f, val => val ? val.deco : Decoration.none)
+    });
+    function fieldSelection(ranges, field) {
+        return EditorSelection.create(ranges.filter(r => r.field == field).map(r => EditorSelection.range(r.from, r.to)));
+    }
+    /**
+    Convert a snippet template to a function that can
+    [apply](https://codemirror.net/6/docs/ref/#autocomplete.Completion.apply) it. Snippets are written
+    using syntax like this:
+
+        "for (let ${index} = 0; ${index} < ${end}; ${index}++) {\n\t${}\n}"
+
+    Each `${}` placeholder (you may also use `#{}`) indicates a field
+    that the user can fill in. Its name, if any, will be the default
+    content for the field.
+
+    When the snippet is activated by calling the returned function,
+    the code is inserted at the given position. Newlines in the
+    template are indented by the indentation of the start line, plus
+    one [indent unit](https://codemirror.net/6/docs/ref/#language.indentUnit) per tab character after
+    the newline.
+
+    On activation, (all instances of) the first field are selected.
+    The user can move between fields with Tab and Shift-Tab as long as
+    the fields are active. Moving to the last field or moving the
+    cursor out of the current field deactivates the fields.
+
+    The order of fields defaults to textual order, but you can add
+    numbers to placeholders (`${1}` or `${1:defaultText}`) to provide
+    a custom order.
+
+    To include a literal `{` or `}` in your template, put a backslash
+    in front of it. This will be removed and the brace will not be
+    interpreted as indicating a placeholder.
+    */
+    function snippet(template) {
+        let snippet = Snippet.parse(template);
+        return (editor, completion, from, to) => {
+            let { text, ranges } = snippet.instantiate(editor.state, from);
+            let spec = {
+                changes: { from, to, insert: Text.of(text) },
+                scrollIntoView: true,
+                annotations: completion ? pickedCompletion.of(completion) : undefined
+            };
+            if (ranges.length)
+                spec.selection = fieldSelection(ranges, 0);
+            if (ranges.length > 1) {
+                let active = new ActiveSnippet(ranges, 0);
+                let effects = spec.effects = [setActive.of(active)];
+                if (editor.state.field(snippetState, false) === undefined)
+                    effects.push(StateEffect.appendConfig.of([snippetState, addSnippetKeymap, snippetPointerHandler, baseTheme$3]));
+            }
+            editor.dispatch(editor.state.update(spec));
+        };
+    }
+    function moveField(dir) {
+        return ({ state, dispatch }) => {
+            let active = state.field(snippetState, false);
+            if (!active || dir < 0 && active.active == 0)
+                return false;
+            let next = active.active + dir, last = dir > 0 && !active.ranges.some(r => r.field == next + dir);
+            dispatch(state.update({
+                selection: fieldSelection(active.ranges, next),
+                effects: setActive.of(last ? null : new ActiveSnippet(active.ranges, next))
+            }));
+            return true;
+        };
+    }
+    /**
+    A command that clears the active snippet, if any.
+    */
+    const clearSnippet = ({ state, dispatch }) => {
+        let active = state.field(snippetState, false);
+        if (!active)
+            return false;
+        dispatch(state.update({ effects: setActive.of(null) }));
+        return true;
+    };
+    /**
+    Move to the next snippet field, if available.
+    */
+    const nextSnippetField = /*@__PURE__*/moveField(1);
+    /**
+    Move to the previous snippet field, if available.
+    */
+    const prevSnippetField = /*@__PURE__*/moveField(-1);
+    const defaultSnippetKeymap = [
+        { key: "Tab", run: nextSnippetField, shift: prevSnippetField },
+        { key: "Escape", run: clearSnippet }
+    ];
+    /**
+    A facet that can be used to configure the key bindings used by
+    snippets. The default binds Tab to
+    [`nextSnippetField`](https://codemirror.net/6/docs/ref/#autocomplete.nextSnippetField), Shift-Tab to
+    [`prevSnippetField`](https://codemirror.net/6/docs/ref/#autocomplete.prevSnippetField), and Escape
+    to [`clearSnippet`](https://codemirror.net/6/docs/ref/#autocomplete.clearSnippet).
+    */
+    const snippetKeymap = /*@__PURE__*/Facet.define({
+        combine(maps) { return maps.length ? maps[0] : defaultSnippetKeymap; }
+    });
+    const addSnippetKeymap = /*@__PURE__*/Prec.highest(/*@__PURE__*/keymap.compute([snippetKeymap], state => state.facet(snippetKeymap)));
+    /**
+    Create a completion from a snippet. Returns an object with the
+    properties from `completion`, plus an `apply` function that
+    applies the snippet.
+    */
+    function snippetCompletion(template, completion) {
+        return Object.assign(Object.assign({}, completion), { apply: snippet(template) });
+    }
+    const snippetPointerHandler = /*@__PURE__*/EditorView.domEventHandlers({
+        mousedown(event, view) {
+            let active = view.state.field(snippetState, false), pos;
+            if (!active || (pos = view.posAtCoords({ x: event.clientX, y: event.clientY })) == null)
+                return false;
+            let match = active.ranges.find(r => r.from <= pos && r.to >= pos);
+            if (!match || match.field == active.active)
+                return false;
+            view.dispatch({
+                selection: fieldSelection(active.ranges, match.field),
+                effects: setActive.of(active.ranges.some(r => r.field > match.field) ? new ActiveSnippet(active.ranges, match.field) : null)
+            });
+            return true;
+        }
+    });
+
+    const defaults = {
+        brackets: ["(", "[", "{", "'", '"'],
+        before: ")]}:;>",
+        stringPrefixes: []
+    };
+    const closeBracketEffect = /*@__PURE__*/StateEffect.define({
+        map(value, mapping) {
+            let mapped = mapping.mapPos(value, -1, MapMode.TrackAfter);
+            return mapped == null ? undefined : mapped;
+        }
+    });
+    const closedBracket = /*@__PURE__*/new class extends RangeValue {
+    };
+    closedBracket.startSide = 1;
+    closedBracket.endSide = -1;
+    const bracketState = /*@__PURE__*/StateField.define({
+        create() { return RangeSet.empty; },
+        update(value, tr) {
+            if (tr.selection) {
+                let lineStart = tr.state.doc.lineAt(tr.selection.main.head).from;
+                let prevLineStart = tr.startState.doc.lineAt(tr.startState.selection.main.head).from;
+                if (lineStart != tr.changes.mapPos(prevLineStart, -1))
+                    value = RangeSet.empty;
+            }
+            value = value.map(tr.changes);
+            for (let effect of tr.effects)
+                if (effect.is(closeBracketEffect))
+                    value = value.update({ add: [closedBracket.range(effect.value, effect.value + 1)] });
+            return value;
+        }
+    });
+    /**
+    Extension to enable bracket-closing behavior. When a closeable
+    bracket is typed, its closing bracket is immediately inserted
+    after the cursor. When closing a bracket directly in front of a
+    closing bracket inserted by the extension, the cursor moves over
+    that bracket.
+    */
+    function closeBrackets() {
+        return [inputHandler, bracketState];
+    }
+    const definedClosing = "()[]{}<>";
+    function closing(ch) {
+        for (let i = 0; i < definedClosing.length; i += 2)
+            if (definedClosing.charCodeAt(i) == ch)
+                return definedClosing.charAt(i + 1);
+        return fromCodePoint(ch < 128 ? ch : ch + 1);
+    }
+    function config(state, pos) {
+        return state.languageDataAt("closeBrackets", pos)[0] || defaults;
+    }
+    const android$1 = typeof navigator == "object" && /*@__PURE__*//Android\b/.test(navigator.userAgent);
+    const inputHandler = /*@__PURE__*/EditorView.inputHandler.of((view, from, to, insert) => {
+        if ((android$1 ? view.composing : view.compositionStarted) || view.state.readOnly)
+            return false;
+        let sel = view.state.selection.main;
+        if (insert.length > 2 || insert.length == 2 && codePointSize(codePointAt(insert, 0)) == 1 ||
+            from != sel.from || to != sel.to)
+            return false;
+        let tr = insertBracket(view.state, insert);
+        if (!tr)
+            return false;
+        view.dispatch(tr);
+        return true;
+    });
+    /**
+    Command that implements deleting a pair of matching brackets when
+    the cursor is between them.
+    */
+    const deleteBracketPair = ({ state, dispatch }) => {
+        if (state.readOnly)
+            return false;
+        let conf = config(state, state.selection.main.head);
+        let tokens = conf.brackets || defaults.brackets;
+        let dont = null, changes = state.changeByRange(range => {
+            if (range.empty) {
+                let before = prevChar(state.doc, range.head);
+                for (let token of tokens) {
+                    if (token == before && nextChar(state.doc, range.head) == closing(codePointAt(token, 0)))
+                        return { changes: { from: range.head - token.length, to: range.head + token.length },
+                            range: EditorSelection.cursor(range.head - token.length) };
+                }
+            }
+            return { range: dont = range };
+        });
+        if (!dont)
+            dispatch(state.update(changes, { scrollIntoView: true, userEvent: "delete.backward" }));
+        return !dont;
+    };
+    /**
+    Close-brackets related key bindings. Binds Backspace to
+    [`deleteBracketPair`](https://codemirror.net/6/docs/ref/#autocomplete.deleteBracketPair).
+    */
+    const closeBracketsKeymap = [
+        { key: "Backspace", run: deleteBracketPair }
+    ];
+    /**
+    Implements the extension's behavior on text insertion. If the
+    given string counts as a bracket in the language around the
+    selection, and replacing the selection with it requires custom
+    behavior (inserting a closing version or skipping past a
+    previously-closed bracket), this function returns a transaction
+    representing that custom behavior. (You only need this if you want
+    to programmatically insert brackets—the
+    [`closeBrackets`](https://codemirror.net/6/docs/ref/#autocomplete.closeBrackets) extension will
+    take care of running this for user input.)
+    */
+    function insertBracket(state, bracket) {
+        let conf = config(state, state.selection.main.head);
+        let tokens = conf.brackets || defaults.brackets;
+        for (let tok of tokens) {
+            let closed = closing(codePointAt(tok, 0));
+            if (bracket == tok)
+                return closed == tok ? handleSame(state, tok, tokens.indexOf(tok + tok + tok) > -1, conf)
+                    : handleOpen(state, tok, closed, conf.before || defaults.before);
+            if (bracket == closed && closedBracketAt(state, state.selection.main.from))
+                return handleClose(state, tok, closed);
+        }
+        return null;
+    }
+    function closedBracketAt(state, pos) {
+        let found = false;
+        state.field(bracketState).between(0, state.doc.length, from => {
+            if (from == pos)
+                found = true;
+        });
+        return found;
+    }
+    function nextChar(doc, pos) {
+        let next = doc.sliceString(pos, pos + 2);
+        return next.slice(0, codePointSize(codePointAt(next, 0)));
+    }
+    function prevChar(doc, pos) {
+        let prev = doc.sliceString(pos - 2, pos);
+        return codePointSize(codePointAt(prev, 0)) == prev.length ? prev : prev.slice(1);
+    }
+    function handleOpen(state, open, close, closeBefore) {
+        let dont = null, changes = state.changeByRange(range => {
+            if (!range.empty)
+                return { changes: [{ insert: open, from: range.from }, { insert: close, from: range.to }],
+                    effects: closeBracketEffect.of(range.to + open.length),
+                    range: EditorSelection.range(range.anchor + open.length, range.head + open.length) };
+            let next = nextChar(state.doc, range.head);
+            if (!next || /\s/.test(next) || closeBefore.indexOf(next) > -1)
+                return { changes: { insert: open + close, from: range.head },
+                    effects: closeBracketEffect.of(range.head + open.length),
+                    range: EditorSelection.cursor(range.head + open.length) };
+            return { range: dont = range };
+        });
+        return dont ? null : state.update(changes, {
+            scrollIntoView: true,
+            userEvent: "input.type"
+        });
+    }
+    function handleClose(state, _open, close) {
+        let dont = null, changes = state.changeByRange(range => {
+            if (range.empty && nextChar(state.doc, range.head) == close)
+                return { changes: { from: range.head, to: range.head + close.length, insert: close },
+                    range: EditorSelection.cursor(range.head + close.length) };
+            return dont = { range };
+        });
+        return dont ? null : state.update(changes, {
+            scrollIntoView: true,
+            userEvent: "input.type"
+        });
+    }
+    // Handles cases where the open and close token are the same, and
+    // possibly triple quotes (as in `"""abc"""`-style quoting).
+    function handleSame(state, token, allowTriple, config) {
+        let stringPrefixes = config.stringPrefixes || defaults.stringPrefixes;
+        let dont = null, changes = state.changeByRange(range => {
+            if (!range.empty)
+                return { changes: [{ insert: token, from: range.from }, { insert: token, from: range.to }],
+                    effects: closeBracketEffect.of(range.to + token.length),
+                    range: EditorSelection.range(range.anchor + token.length, range.head + token.length) };
+            let pos = range.head, next = nextChar(state.doc, pos), start;
+            if (next == token) {
+                if (nodeStart(state, pos)) {
+                    return { changes: { insert: token + token, from: pos },
+                        effects: closeBracketEffect.of(pos + token.length),
+                        range: EditorSelection.cursor(pos + token.length) };
+                }
+                else if (closedBracketAt(state, pos)) {
+                    let isTriple = allowTriple && state.sliceDoc(pos, pos + token.length * 3) == token + token + token;
+                    let content = isTriple ? token + token + token : token;
+                    return { changes: { from: pos, to: pos + content.length, insert: content },
+                        range: EditorSelection.cursor(pos + content.length) };
+                }
+            }
+            else if (allowTriple && state.sliceDoc(pos - 2 * token.length, pos) == token + token &&
+                (start = canStartStringAt(state, pos - 2 * token.length, stringPrefixes)) > -1 &&
+                nodeStart(state, start)) {
+                return { changes: { insert: token + token + token + token, from: pos },
+                    effects: closeBracketEffect.of(pos + token.length),
+                    range: EditorSelection.cursor(pos + token.length) };
+            }
+            else if (state.charCategorizer(pos)(next) != CharCategory.Word) {
+                if (canStartStringAt(state, pos, stringPrefixes) > -1 && !probablyInString(state, pos, token, stringPrefixes))
+                    return { changes: { insert: token + token, from: pos },
+                        effects: closeBracketEffect.of(pos + token.length),
+                        range: EditorSelection.cursor(pos + token.length) };
+            }
+            return { range: dont = range };
+        });
+        return dont ? null : state.update(changes, {
+            scrollIntoView: true,
+            userEvent: "input.type"
+        });
+    }
+    function nodeStart(state, pos) {
+        let tree = syntaxTree(state).resolveInner(pos + 1);
+        return tree.parent && tree.from == pos;
+    }
+    function probablyInString(state, pos, quoteToken, prefixes) {
+        let node = syntaxTree(state).resolveInner(pos, -1);
+        let maxPrefix = prefixes.reduce((m, p) => Math.max(m, p.length), 0);
+        for (let i = 0; i < 5; i++) {
+            let start = state.sliceDoc(node.from, Math.min(node.to, node.from + quoteToken.length + maxPrefix));
+            let quotePos = start.indexOf(quoteToken);
+            if (!quotePos || quotePos > -1 && prefixes.indexOf(start.slice(0, quotePos)) > -1) {
+                let first = node.firstChild;
+                while (first && first.from == node.from && first.to - first.from > quoteToken.length + quotePos) {
+                    if (state.sliceDoc(first.to - quoteToken.length, first.to) == quoteToken)
+                        return false;
+                    first = first.firstChild;
+                }
+                return true;
+            }
+            let parent = node.to == pos && node.parent;
+            if (!parent)
+                break;
+            node = parent;
+        }
+        return false;
+    }
+    function canStartStringAt(state, pos, prefixes) {
+        let charCat = state.charCategorizer(pos);
+        if (charCat(state.sliceDoc(pos - 1, pos)) != CharCategory.Word)
+            return pos;
+        for (let prefix of prefixes) {
+            let start = pos - prefix.length;
+            if (state.sliceDoc(start, pos) == prefix && charCat(state.sliceDoc(start - 1, start)) != CharCategory.Word)
+                return start;
+        }
+        return -1;
+    }
+
+    /**
+    Returns an extension that enables autocompletion.
+    */
+    function autocompletion(config = {}) {
+        return [
+            completionState,
+            completionConfig.of(config),
+            completionPlugin,
+            completionKeymapExt,
+            baseTheme$3
+        ];
+    }
+    /**
+    Basic keybindings for autocompletion.
+
+     - Ctrl-Space: [`startCompletion`](https://codemirror.net/6/docs/ref/#autocomplete.startCompletion)
+     - Escape: [`closeCompletion`](https://codemirror.net/6/docs/ref/#autocomplete.closeCompletion)
+     - ArrowDown: [`moveCompletionSelection`](https://codemirror.net/6/docs/ref/#autocomplete.moveCompletionSelection)`(true)`
+     - ArrowUp: [`moveCompletionSelection`](https://codemirror.net/6/docs/ref/#autocomplete.moveCompletionSelection)`(false)`
+     - PageDown: [`moveCompletionSelection`](https://codemirror.net/6/docs/ref/#autocomplete.moveCompletionSelection)`(true, "page")`
+     - PageDown: [`moveCompletionSelection`](https://codemirror.net/6/docs/ref/#autocomplete.moveCompletionSelection)`(true, "page")`
+     - Enter: [`acceptCompletion`](https://codemirror.net/6/docs/ref/#autocomplete.acceptCompletion)
+    */
+    const completionKeymap = [
+        { key: "Ctrl-Space", run: startCompletion },
+        { key: "Escape", run: closeCompletion },
+        { key: "ArrowDown", run: /*@__PURE__*/moveCompletionSelection(true) },
+        { key: "ArrowUp", run: /*@__PURE__*/moveCompletionSelection(false) },
+        { key: "PageDown", run: /*@__PURE__*/moveCompletionSelection(true, "page") },
+        { key: "PageUp", run: /*@__PURE__*/moveCompletionSelection(false, "page") },
+        { key: "Enter", run: acceptCompletion }
+    ];
+    const completionKeymapExt = /*@__PURE__*/Prec.highest(/*@__PURE__*/keymap.computeN([completionConfig], state => state.facet(completionConfig).defaultKeymap ? [completionKeymap] : []));
+
+    function crelt() {
+      var elt = arguments[0];
+      if (typeof elt == "string") elt = document.createElement(elt);
+      var i = 1, next = arguments[1];
+      if (next && typeof next == "object" && next.nodeType == null && !Array.isArray(next)) {
+        for (var name in next) if (Object.prototype.hasOwnProperty.call(next, name)) {
+          var value = next[name];
+          if (typeof value == "string") elt.setAttribute(name, value);
+          else if (value != null) elt[name] = value;
+        }
+        i++;
+      }
+      for (; i < arguments.length; i++) add(elt, arguments[i]);
+      return elt
+    }
+
+    function add(elt, child) {
+      if (typeof child == "string") {
+        elt.appendChild(document.createTextNode(child));
+      } else if (child == null) ; else if (child.nodeType != null) {
+        elt.appendChild(child);
+      } else if (Array.isArray(child)) {
+        for (var i = 0; i < child.length; i++) add(elt, child[i]);
+      } else {
+        throw new RangeError("Unsupported child node: " + child)
+      }
+    }
+
+    class SelectedDiagnostic$1 {
+        constructor(from, to, diagnostic) {
+            this.from = from;
+            this.to = to;
+            this.diagnostic = diagnostic;
+        }
+    }
+    class LintState {
+        constructor(diagnostics, panel, selected) {
+            this.diagnostics = diagnostics;
+            this.panel = panel;
+            this.selected = selected;
+        }
+        static init(diagnostics, panel, state) {
+            // Filter the list of diagnostics for which to create markers
+            let markedDiagnostics = diagnostics;
+            let diagnosticFilter = state.facet(lintConfig).markerFilter;
+            if (diagnosticFilter)
+                markedDiagnostics = diagnosticFilter(markedDiagnostics);
+            let ranges = Decoration.set(markedDiagnostics.map((d) => {
+                // For zero-length ranges or ranges covering only a line break, create a widget
+                return d.from == d.to || (d.from == d.to - 1 && state.doc.lineAt(d.from).to == d.from)
+                    ? Decoration.widget({
+                        widget: new DiagnosticWidget(d),
+                        diagnostic: d
+                    }).range(d.from)
+                    : Decoration.mark({
+                        attributes: { class: "cm-lintRange cm-lintRange-" + d.severity },
+                        diagnostic: d
+                    }).range(d.from, d.to);
+            }), true);
+            return new LintState(ranges, panel, findDiagnostic$1(ranges));
+        }
+    }
+    function findDiagnostic$1(diagnostics, diagnostic = null, after = 0) {
+        let found = null;
+        diagnostics.between(after, 1e9, (from, to, { spec }) => {
+            if (diagnostic && spec.diagnostic != diagnostic)
+                return;
+            found = new SelectedDiagnostic$1(from, to, spec.diagnostic);
+            return false;
+        });
+        return found;
+    }
+    function hideTooltip(tr, tooltip) {
+        let line = tr.startState.doc.lineAt(tooltip.pos);
+        return !!(tr.effects.some(e => e.is(setDiagnosticsEffect)) || tr.changes.touchesRange(line.from, line.to));
+    }
+    function maybeEnableLint(state, effects) {
+        return state.field(lintState$1, false) ? effects : effects.concat(StateEffect.appendConfig.of(lintExtensions));
+    }
+    /**
+    Returns a transaction spec which updates the current set of
+    diagnostics, and enables the lint extension if if wasn't already
+    active.
+    */
+    function setDiagnostics(state, diagnostics) {
+        return {
+            effects: maybeEnableLint(state, [setDiagnosticsEffect.of(diagnostics)])
+        };
+    }
+    /**
+    The state effect that updates the set of active diagnostics. Can
+    be useful when writing an extension that needs to track these.
+    */
+    const setDiagnosticsEffect = /*@__PURE__*/StateEffect.define();
+    const togglePanel$1 = /*@__PURE__*/StateEffect.define();
+    const movePanelSelection = /*@__PURE__*/StateEffect.define();
+    const lintState$1 = /*@__PURE__*/StateField.define({
+        create() {
+            return new LintState(Decoration.none, null, null);
+        },
+        update(value, tr) {
+            if (tr.docChanged) {
+                let mapped = value.diagnostics.map(tr.changes), selected = null;
+                if (value.selected) {
+                    let selPos = tr.changes.mapPos(value.selected.from, 1);
+                    selected = findDiagnostic$1(mapped, value.selected.diagnostic, selPos) || findDiagnostic$1(mapped, null, selPos);
+                }
+                value = new LintState(mapped, value.panel, selected);
+            }
+            for (let effect of tr.effects) {
+                if (effect.is(setDiagnosticsEffect)) {
+                    value = LintState.init(effect.value, value.panel, tr.state);
+                }
+                else if (effect.is(togglePanel$1)) {
+                    value = new LintState(value.diagnostics, effect.value ? LintPanel.open : null, value.selected);
+                }
+                else if (effect.is(movePanelSelection)) {
+                    value = new LintState(value.diagnostics, value.panel, effect.value);
+                }
+            }
+            return value;
+        },
+        provide: f => [showPanel.from(f, val => val.panel),
+            EditorView.decorations.from(f, s => s.diagnostics)]
+    });
+    const activeMark = /*@__PURE__*/Decoration.mark({ class: "cm-lintRange cm-lintRange-active" });
+    function lintTooltip(view, pos, side) {
+        let { diagnostics } = view.state.field(lintState$1);
+        let found = [], stackStart = 2e8, stackEnd = 0;
+        diagnostics.between(pos - (side < 0 ? 1 : 0), pos + (side > 0 ? 1 : 0), (from, to, { spec }) => {
+            if (pos >= from && pos <= to &&
+                (from == to || ((pos > from || side > 0) && (pos < to || side < 0)))) {
+                found.push(spec.diagnostic);
+                stackStart = Math.min(from, stackStart);
+                stackEnd = Math.max(to, stackEnd);
+            }
+        });
+        let diagnosticFilter = view.state.facet(lintConfig).tooltipFilter;
+        if (diagnosticFilter)
+            found = diagnosticFilter(found);
+        if (!found.length)
+            return null;
+        return {
+            pos: stackStart,
+            end: stackEnd,
+            above: view.state.doc.lineAt(stackStart).to < stackEnd,
+            create() {
+                return { dom: diagnosticsTooltip$1(view, found) };
+            }
+        };
+    }
+    function diagnosticsTooltip$1(view, diagnostics) {
+        return crelt("ul", { class: "cm-tooltip-lint" }, diagnostics.map(d => renderDiagnostic$1(view, d, false)));
+    }
+    /**
+    Command to open and focus the lint panel.
+    */
+    const openLintPanel = (view) => {
+        let field = view.state.field(lintState$1, false);
+        if (!field || !field.panel)
+            view.dispatch({ effects: maybeEnableLint(view.state, [togglePanel$1.of(true)]) });
+        let panel = getPanel(view, LintPanel.open);
+        if (panel)
+            panel.dom.querySelector(".cm-panel-lint ul").focus();
+        return true;
+    };
+    /**
+    Command to close the lint panel, when open.
+    */
+    const closeLintPanel = (view) => {
+        let field = view.state.field(lintState$1, false);
+        if (!field || !field.panel)
+            return false;
+        view.dispatch({ effects: togglePanel$1.of(false) });
+        return true;
+    };
+    /**
+    Move the selection to the next diagnostic.
+    */
+    const nextDiagnostic = (view) => {
+        let field = view.state.field(lintState$1, false);
+        if (!field)
+            return false;
+        let sel = view.state.selection.main, next = field.diagnostics.iter(sel.to + 1);
+        if (!next.value) {
+            next = field.diagnostics.iter(0);
+            if (!next.value || next.from == sel.from && next.to == sel.to)
+                return false;
+        }
+        view.dispatch({ selection: { anchor: next.from, head: next.to }, scrollIntoView: true });
+        return true;
+    };
+    /**
+    A set of default key bindings for the lint functionality.
+
+    - Ctrl-Shift-m (Cmd-Shift-m on macOS): [`openLintPanel`](https://codemirror.net/6/docs/ref/#lint.openLintPanel)
+    - F8: [`nextDiagnostic`](https://codemirror.net/6/docs/ref/#lint.nextDiagnostic)
+    */
+    const lintKeymap = [
+        { key: "Mod-Shift-m", run: openLintPanel, preventDefault: true },
+        { key: "F8", run: nextDiagnostic }
+    ];
+    const lintPlugin = /*@__PURE__*/ViewPlugin.fromClass(class {
+        constructor(view) {
+            this.view = view;
+            this.timeout = -1;
+            this.set = true;
+            let { delay } = view.state.facet(lintConfig);
+            this.lintTime = Date.now() + delay;
+            this.run = this.run.bind(this);
+            this.timeout = setTimeout(this.run, delay);
+        }
+        run() {
+            let now = Date.now();
+            if (now < this.lintTime - 10) {
+                setTimeout(this.run, this.lintTime - now);
+            }
+            else {
+                this.set = false;
+                let { state } = this.view, { sources } = state.facet(lintConfig);
+                Promise.all(sources.map(source => Promise.resolve(source(this.view)))).then(annotations => {
+                    let all = annotations.reduce((a, b) => a.concat(b));
+                    if (this.view.state.doc == state.doc)
+                        this.view.dispatch(setDiagnostics(this.view.state, all));
+                }, error => { logException(this.view.state, error); });
+            }
+        }
+        update(update) {
+            let config = update.state.facet(lintConfig);
+            if (update.docChanged || config != update.startState.facet(lintConfig) ||
+                config.needsRefresh && config.needsRefresh(update)) {
+                this.lintTime = Date.now() + config.delay;
+                if (!this.set) {
+                    this.set = true;
+                    this.timeout = setTimeout(this.run, config.delay);
+                }
+            }
+        }
+        force() {
+            if (this.set) {
+                this.lintTime = Date.now();
+                this.run();
+            }
+        }
+        destroy() {
+            clearTimeout(this.timeout);
+        }
+    });
+    const lintConfig = /*@__PURE__*/Facet.define({
+        combine(input) {
+            return Object.assign({ sources: input.map(i => i.source) }, combineConfig(input.map(i => i.config), {
+                delay: 750,
+                markerFilter: null,
+                tooltipFilter: null,
+                needsRefresh: null
+            }, {
+                needsRefresh: (a, b) => !a ? b : !b ? a : u => a(u) || b(u)
+            }));
+        }
+    });
+    /**
+    Given a diagnostic source, this function returns an extension that
+    enables linting with that source. It will be called whenever the
+    editor is idle (after its content changed).
+    */
+    function linter(source, config = {}) {
+        return [
+            lintConfig.of({ source, config }),
+            lintPlugin,
+            lintExtensions
+        ];
+    }
+    function assignKeys$1(actions) {
+        let assigned = [];
+        if (actions)
+            actions: for (let { name } of actions) {
+                for (let i = 0; i < name.length; i++) {
+                    let ch = name[i];
+                    if (/[a-zA-Z]/.test(ch) && !assigned.some(c => c.toLowerCase() == ch.toLowerCase())) {
+                        assigned.push(ch);
+                        continue actions;
+                    }
+                }
+                assigned.push("");
+            }
+        return assigned;
+    }
+    function renderDiagnostic$1(view, diagnostic, inPanel) {
+        var _a;
+        let keys = inPanel ? assignKeys$1(diagnostic.actions) : [];
+        return crelt("li", { class: "cm-diagnostic cm-diagnostic-" + diagnostic.severity }, crelt("span", { class: "cm-diagnosticText" }, diagnostic.renderMessage ? diagnostic.renderMessage() : diagnostic.message), (_a = diagnostic.actions) === null || _a === void 0 ? void 0 : _a.map((action, i) => {
+            let fired = false, click = (e) => {
+                e.preventDefault();
+                if (fired)
+                    return;
+                fired = true;
+                let found = findDiagnostic$1(view.state.field(lintState$1).diagnostics, diagnostic);
+                if (found)
+                    action.apply(view, found.from, found.to);
+            };
+            let { name } = action, keyIndex = keys[i] ? name.indexOf(keys[i]) : -1;
+            let nameElt = keyIndex < 0 ? name : [name.slice(0, keyIndex),
+                crelt("u", name.slice(keyIndex, keyIndex + 1)),
+                name.slice(keyIndex + 1)];
+            return crelt("button", {
+                type: "button",
+                class: "cm-diagnosticAction",
+                onclick: click,
+                onmousedown: click,
+                "aria-label": ` Action: ${name}${keyIndex < 0 ? "" : ` (access key "${keys[i]})"`}.`
+            }, nameElt);
+        }), diagnostic.source && crelt("div", { class: "cm-diagnosticSource" }, diagnostic.source));
+    }
+    class DiagnosticWidget extends WidgetType {
+        constructor(diagnostic) {
+            super();
+            this.diagnostic = diagnostic;
+        }
+        eq(other) { return other.diagnostic == this.diagnostic; }
+        toDOM() {
+            return crelt("span", { class: "cm-lintPoint cm-lintPoint-" + this.diagnostic.severity });
+        }
+    }
+    class PanelItem {
+        constructor(view, diagnostic) {
+            this.diagnostic = diagnostic;
+            this.id = "item_" + Math.floor(Math.random() * 0xffffffff).toString(16);
+            this.dom = renderDiagnostic$1(view, diagnostic, true);
+            this.dom.id = this.id;
+            this.dom.setAttribute("role", "option");
+        }
+    }
+    class LintPanel {
+        constructor(view) {
+            this.view = view;
+            this.items = [];
+            let onkeydown = (event) => {
+                if (event.keyCode == 27) { // Escape
+                    closeLintPanel(this.view);
+                    this.view.focus();
+                }
+                else if (event.keyCode == 38 || event.keyCode == 33) { // ArrowUp, PageUp
+                    this.moveSelection((this.selectedIndex - 1 + this.items.length) % this.items.length);
+                }
+                else if (event.keyCode == 40 || event.keyCode == 34) { // ArrowDown, PageDown
+                    this.moveSelection((this.selectedIndex + 1) % this.items.length);
+                }
+                else if (event.keyCode == 36) { // Home
+                    this.moveSelection(0);
+                }
+                else if (event.keyCode == 35) { // End
+                    this.moveSelection(this.items.length - 1);
+                }
+                else if (event.keyCode == 13) { // Enter
+                    this.view.focus();
+                }
+                else if (event.keyCode >= 65 && event.keyCode <= 90 && this.selectedIndex >= 0) { // A-Z
+                    let { diagnostic } = this.items[this.selectedIndex], keys = assignKeys$1(diagnostic.actions);
+                    for (let i = 0; i < keys.length; i++)
+                        if (keys[i].toUpperCase().charCodeAt(0) == event.keyCode) {
+                            let found = findDiagnostic$1(this.view.state.field(lintState$1).diagnostics, diagnostic);
+                            if (found)
+                                diagnostic.actions[i].apply(view, found.from, found.to);
+                        }
+                }
+                else {
+                    return;
+                }
+                event.preventDefault();
+            };
+            let onclick = (event) => {
+                for (let i = 0; i < this.items.length; i++) {
+                    if (this.items[i].dom.contains(event.target))
+                        this.moveSelection(i);
+                }
+            };
+            this.list = crelt("ul", {
+                tabIndex: 0,
+                role: "listbox",
+                "aria-label": this.view.state.phrase("Diagnostics"),
+                onkeydown,
+                onclick
+            });
+            this.dom = crelt("div", { class: "cm-panel-lint" }, this.list, crelt("button", {
+                type: "button",
+                name: "close",
+                "aria-label": this.view.state.phrase("close"),
+                onclick: () => closeLintPanel(this.view)
+            }, "×"));
+            this.update();
+        }
+        get selectedIndex() {
+            let selected = this.view.state.field(lintState$1).selected;
+            if (!selected)
+                return -1;
+            for (let i = 0; i < this.items.length; i++)
+                if (this.items[i].diagnostic == selected.diagnostic)
+                    return i;
+            return -1;
+        }
+        update() {
+            let { diagnostics, selected } = this.view.state.field(lintState$1);
+            let i = 0, needsSync = false, newSelectedItem = null;
+            diagnostics.between(0, this.view.state.doc.length, (_start, _end, { spec }) => {
+                let found = -1, item;
+                for (let j = i; j < this.items.length; j++)
+                    if (this.items[j].diagnostic == spec.diagnostic) {
+                        found = j;
+                        break;
+                    }
+                if (found < 0) {
+                    item = new PanelItem(this.view, spec.diagnostic);
+                    this.items.splice(i, 0, item);
+                    needsSync = true;
+                }
+                else {
+                    item = this.items[found];
+                    if (found > i) {
+                        this.items.splice(i, found - i);
+                        needsSync = true;
+                    }
+                }
+                if (selected && item.diagnostic == selected.diagnostic) {
+                    if (!item.dom.hasAttribute("aria-selected")) {
+                        item.dom.setAttribute("aria-selected", "true");
+                        newSelectedItem = item;
+                    }
+                }
+                else if (item.dom.hasAttribute("aria-selected")) {
+                    item.dom.removeAttribute("aria-selected");
+                }
+                i++;
+            });
+            while (i < this.items.length && !(this.items.length == 1 && this.items[0].diagnostic.from < 0)) {
+                needsSync = true;
+                this.items.pop();
+            }
+            if (this.items.length == 0) {
+                this.items.push(new PanelItem(this.view, {
+                    from: -1, to: -1,
+                    severity: "info",
+                    message: this.view.state.phrase("No diagnostics")
+                }));
+                needsSync = true;
+            }
+            if (newSelectedItem) {
+                this.list.setAttribute("aria-activedescendant", newSelectedItem.id);
+                this.view.requestMeasure({
+                    key: this,
+                    read: () => ({ sel: newSelectedItem.dom.getBoundingClientRect(), panel: this.list.getBoundingClientRect() }),
+                    write: ({ sel, panel }) => {
+                        if (sel.top < panel.top)
+                            this.list.scrollTop -= panel.top - sel.top;
+                        else if (sel.bottom > panel.bottom)
+                            this.list.scrollTop += sel.bottom - panel.bottom;
+                    }
+                });
+            }
+            else if (this.selectedIndex < 0) {
+                this.list.removeAttribute("aria-activedescendant");
+            }
+            if (needsSync)
+                this.sync();
+        }
+        sync() {
+            let domPos = this.list.firstChild;
+            function rm() {
+                let prev = domPos;
+                domPos = prev.nextSibling;
+                prev.remove();
+            }
+            for (let item of this.items) {
+                if (item.dom.parentNode == this.list) {
+                    while (domPos != item.dom)
+                        rm();
+                    domPos = item.dom.nextSibling;
+                }
+                else {
+                    this.list.insertBefore(item.dom, domPos);
+                }
+            }
+            while (domPos)
+                rm();
+        }
+        moveSelection(selectedIndex) {
+            if (this.selectedIndex < 0)
+                return;
+            let field = this.view.state.field(lintState$1);
+            let selection = findDiagnostic$1(field.diagnostics, this.items[selectedIndex].diagnostic);
+            if (!selection)
+                return;
+            this.view.dispatch({
+                selection: { anchor: selection.from, head: selection.to },
+                scrollIntoView: true,
+                effects: movePanelSelection.of(selection)
+            });
+        }
+        static open(view) { return new LintPanel(view); }
+    }
+    function svg(content, attrs = `viewBox="0 0 40 40"`) {
+        return `url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" ${attrs}>${encodeURIComponent(content)}</svg>')`;
+    }
+    function underline(color) {
+        return svg(`<path d="m0 2.5 l2 -1.5 l1 0 l2 1.5 l1 0" stroke="${color}" fill="none" stroke-width=".7"/>`, `width="6" height="3"`);
+    }
+    const baseTheme$2 = /*@__PURE__*/EditorView.baseTheme({
+        ".cm-diagnostic": {
+            padding: "3px 6px 3px 8px",
+            marginLeft: "-1px",
+            display: "block",
+            whiteSpace: "pre-wrap"
+        },
+        ".cm-diagnostic-error": { borderLeft: "5px solid #d11" },
+        ".cm-diagnostic-warning": { borderLeft: "5px solid orange" },
+        ".cm-diagnostic-info": { borderLeft: "5px solid #999" },
+        ".cm-diagnosticAction": {
+            font: "inherit",
+            border: "none",
+            padding: "2px 4px",
+            backgroundColor: "#444",
+            color: "white",
+            borderRadius: "3px",
+            marginLeft: "8px",
+            cursor: "pointer"
+        },
+        ".cm-diagnosticSource": {
+            fontSize: "70%",
+            opacity: .7
+        },
+        ".cm-lintRange": {
+            backgroundPosition: "left bottom",
+            backgroundRepeat: "repeat-x",
+            paddingBottom: "0.7px",
+        },
+        ".cm-lintRange-error": { backgroundImage: /*@__PURE__*/underline("#d11") },
+        ".cm-lintRange-warning": { backgroundImage: /*@__PURE__*/underline("orange") },
+        ".cm-lintRange-info": { backgroundImage: /*@__PURE__*/underline("#999") },
+        ".cm-lintRange-active": { backgroundColor: "#ffdd9980" },
+        ".cm-tooltip-lint": {
+            padding: 0,
+            margin: 0
+        },
+        ".cm-lintPoint": {
+            position: "relative",
+            "&:after": {
+                content: '""',
+                position: "absolute",
+                bottom: 0,
+                left: "-2px",
+                borderLeft: "3px solid transparent",
+                borderRight: "3px solid transparent",
+                borderBottom: "4px solid #d11"
+            }
+        },
+        ".cm-lintPoint-warning": {
+            "&:after": { borderBottomColor: "orange" }
+        },
+        ".cm-lintPoint-info": {
+            "&:after": { borderBottomColor: "#999" }
+        },
+        ".cm-panel.cm-panel-lint": {
+            position: "relative",
+            "& ul": {
+                maxHeight: "100px",
+                overflowY: "auto",
+                "& [aria-selected]": {
+                    backgroundColor: "#ddd",
+                    "& u": { textDecoration: "underline" }
+                },
+                "&:focus [aria-selected]": {
+                    background_fallback: "#bdf",
+                    backgroundColor: "Highlight",
+                    color_fallback: "white",
+                    color: "HighlightText"
+                },
+                "& u": { textDecoration: "none" },
+                padding: 0,
+                margin: 0
+            },
+            "& [name=close]": {
+                position: "absolute",
+                top: "0",
+                right: "2px",
+                background: "inherit",
+                border: "none",
+                font: "inherit",
+                padding: 0,
+                margin: 0
+            }
+        }
+    });
+    class LintGutterMarker extends GutterMarker {
+        constructor(diagnostics) {
+            super();
+            this.diagnostics = diagnostics;
+            this.severity = diagnostics.reduce((max, d) => {
+                let s = d.severity;
+                return s == "error" || s == "warning" && max == "info" ? s : max;
+            }, "info");
+        }
+        toDOM(view) {
+            let elt = document.createElement("div");
+            elt.className = "cm-lint-marker cm-lint-marker-" + this.severity;
+            let diagnostics = this.diagnostics;
+            let diagnosticsFilter = view.state.facet(lintGutterConfig).tooltipFilter;
+            if (diagnosticsFilter)
+                diagnostics = diagnosticsFilter(diagnostics);
+            if (diagnostics.length)
+                elt.onmouseover = () => gutterMarkerMouseOver(view, elt, diagnostics);
+            return elt;
+        }
+    }
+    function trackHoverOn(view, marker) {
+        let mousemove = (event) => {
+            let rect = marker.getBoundingClientRect();
+            if (event.clientX > rect.left - 10 /* Margin */ && event.clientX < rect.right + 10 /* Margin */ &&
+                event.clientY > rect.top - 10 /* Margin */ && event.clientY < rect.bottom + 10 /* Margin */)
+                return;
+            for (let target = event.target; target; target = target.parentNode) {
+                if (target.nodeType == 1 && target.classList.contains("cm-tooltip-lint"))
+                    return;
+            }
+            window.removeEventListener("mousemove", mousemove);
+            if (view.state.field(lintGutterTooltip))
+                view.dispatch({ effects: setLintGutterTooltip.of(null) });
+        };
+        window.addEventListener("mousemove", mousemove);
+    }
+    function gutterMarkerMouseOver(view, marker, diagnostics) {
+        function hovered() {
+            let line = view.elementAtHeight(marker.getBoundingClientRect().top + 5 - view.documentTop);
+            const linePos = view.coordsAtPos(line.from);
+            if (linePos) {
+                view.dispatch({ effects: setLintGutterTooltip.of({
+                        pos: line.from,
+                        above: false,
+                        create() {
+                            return {
+                                dom: diagnosticsTooltip$1(view, diagnostics),
+                                getCoords: () => marker.getBoundingClientRect()
+                            };
+                        }
+                    }) });
+            }
+            marker.onmouseout = marker.onmousemove = null;
+            trackHoverOn(view, marker);
+        }
+        let { hoverTime } = view.state.facet(lintGutterConfig);
+        let hoverTimeout = setTimeout(hovered, hoverTime);
+        marker.onmouseout = () => {
+            clearTimeout(hoverTimeout);
+            marker.onmouseout = marker.onmousemove = null;
+        };
+        marker.onmousemove = () => {
+            clearTimeout(hoverTimeout);
+            hoverTimeout = setTimeout(hovered, hoverTime);
+        };
+    }
+    function markersForDiagnostics(doc, diagnostics) {
+        let byLine = Object.create(null);
+        for (let diagnostic of diagnostics) {
+            let line = doc.lineAt(diagnostic.from);
+            (byLine[line.from] || (byLine[line.from] = [])).push(diagnostic);
+        }
+        let markers = [];
+        for (let line in byLine) {
+            markers.push(new LintGutterMarker(byLine[line]).range(+line));
+        }
+        return RangeSet.of(markers, true);
+    }
+    const lintGutterExtension = /*@__PURE__*/gutter({
+        class: "cm-gutter-lint",
+        markers: view => view.state.field(lintGutterMarkers),
+    });
+    const lintGutterMarkers = /*@__PURE__*/StateField.define({
+        create() {
+            return RangeSet.empty;
+        },
+        update(markers, tr) {
+            markers = markers.map(tr.changes);
+            let diagnosticFilter = tr.state.facet(lintGutterConfig).markerFilter;
+            for (let effect of tr.effects) {
+                if (effect.is(setDiagnosticsEffect)) {
+                    let diagnostics = effect.value;
+                    if (diagnosticFilter)
+                        diagnostics = diagnosticFilter(diagnostics || []);
+                    markers = markersForDiagnostics(tr.state.doc, diagnostics.slice(0));
+                }
+            }
+            return markers;
+        }
+    });
+    const setLintGutterTooltip = /*@__PURE__*/StateEffect.define();
+    const lintGutterTooltip = /*@__PURE__*/StateField.define({
+        create() { return null; },
+        update(tooltip, tr) {
+            if (tooltip && tr.docChanged)
+                tooltip = hideTooltip(tr, tooltip) ? null : Object.assign(Object.assign({}, tooltip), { pos: tr.changes.mapPos(tooltip.pos) });
+            return tr.effects.reduce((t, e) => e.is(setLintGutterTooltip) ? e.value : t, tooltip);
+        },
+        provide: field => showTooltip.from(field)
+    });
+    const lintGutterTheme = /*@__PURE__*/EditorView.baseTheme({
+        ".cm-gutter-lint": {
+            width: "1.4em",
+            "& .cm-gutterElement": {
+                padding: ".2em"
+            }
+        },
+        ".cm-lint-marker": {
+            width: "1em",
+            height: "1em"
+        },
+        ".cm-lint-marker-info": {
+            content: /*@__PURE__*/svg(`<path fill="#aaf" stroke="#77e" stroke-width="6" stroke-linejoin="round" d="M5 5L35 5L35 35L5 35Z"/>`)
+        },
+        ".cm-lint-marker-warning": {
+            content: /*@__PURE__*/svg(`<path fill="#fe8" stroke="#fd7" stroke-width="6" stroke-linejoin="round" d="M20 6L37 35L3 35Z"/>`),
+        },
+        ".cm-lint-marker-error": {
+            content: /*@__PURE__*/svg(`<circle cx="20" cy="20" r="15" fill="#f87" stroke="#f43" stroke-width="6"/>`)
+        },
+    });
+    const lintExtensions = [
+        lintState$1,
+        /*@__PURE__*/EditorView.decorations.compute([lintState$1], state => {
+            let { selected, panel } = state.field(lintState$1);
+            return !selected || !panel || selected.from == selected.to ? Decoration.none : Decoration.set([
+                activeMark.range(selected.from, selected.to)
+            ]);
+        }),
+        /*@__PURE__*/hoverTooltip(lintTooltip, { hideOn: hideTooltip }),
+        baseTheme$2
+    ];
+    const lintGutterConfig = /*@__PURE__*/Facet.define({
+        combine(configs) {
+            return combineConfig(configs, {
+                hoverTime: 300 /* Time */,
+                markerFilter: null,
+                tooltipFilter: null
+            });
+        }
+    });
+    /**
+    Returns an extension that installs a gutter showing markers for
+    each line that has diagnostics, which can be hovered over to see
+    the diagnostics.
+    */
+    function lintGutter(config = {}) {
+        return [lintGutterConfig.of(config), lintGutterMarkers, lintGutterExtension, lintGutterTheme, lintGutterTooltip];
+    }
+    /**
+    Iterate over the marked diagnostics for the given editor state,
+    calling `f` for each of them. Note that, if the document changed
+    since the diagnostics were created, the `Diagnostic` object will
+    hold the original outdated position, whereas the `to` and `from`
+    arguments hold the diagnostic's current position.
+    */
+    function forEachDiagnostic(state, f) {
+        let lState = state.field(lintState$1, false);
+        if (lState && lState.diagnostics.size)
+            for (let iter = RangeSet.iter([lState.diagnostics]); iter.value; iter.next())
+                f(iter.value.spec.diagnostic, iter.from, iter.to);
     }
 
     /**
@@ -19140,7 +21708,7 @@
         // transaction needs to be converted to an item. Returns null when
         // there are no changes or effects in the transaction.
         static fromTransaction(tr, selection) {
-            let effects = none$1;
+            let effects = none;
             for (let invert of tr.startState.facet(invertedEffects)) {
                 let result = invert(tr);
                 if (result.length)
@@ -19148,10 +21716,10 @@
             }
             if (!effects.length && tr.changes.empty)
                 return null;
-            return new HistEvent(tr.changes.invert(tr.startState.doc), effects, undefined, selection || tr.startState.selection, none$1);
+            return new HistEvent(tr.changes.invert(tr.startState.doc), effects, undefined, selection || tr.startState.selection, none);
         }
         static selection(selections) {
-            return new HistEvent(undefined, none$1, undefined, undefined, selections);
+            return new HistEvent(undefined, none, undefined, undefined, selections);
         }
     }
     function updateBranch(branch, to, maxLen, newEvent) {
@@ -19179,7 +21747,7 @@
     function conc(a, b) {
         return !a.length ? b : !b.length ? a : a.concat(b);
     }
-    const none$1 = [];
+    const none = [];
     const MaxSelectionsPerEvent = 200;
     function addSelection(branch, selection) {
         if (!branch.length) {
@@ -19207,7 +21775,7 @@
     function addMappingToBranch(branch, mapping) {
         if (!branch.length)
             return branch;
-        let length = branch.length, selections = none$1;
+        let length = branch.length, selections = none;
         while (length) {
             let event = mapEvent(branch[length - 1], mapping, selections);
             if (event.changes && !event.changes.empty || event.effects.length) { // Event survived mapping
@@ -19221,10 +21789,10 @@
                 selections = event.selectionsAfter;
             }
         }
-        return selections.length ? [HistEvent.selection(selections)] : none$1;
+        return selections.length ? [HistEvent.selection(selections)] : none;
     }
     function mapEvent(event, mapping, extraSelections) {
-        let selections = conc(event.selectionsAfter.length ? event.selectionsAfter.map(s => s.map(mapping)) : none$1, extraSelections);
+        let selections = conc(event.selectionsAfter.length ? event.selectionsAfter.map(s => s.map(mapping)) : none, extraSelections);
         // Change-less events don't store mappings (they are always the last event in a branch)
         if (!event.changes)
             return HistEvent.selection(selections);
@@ -19252,15 +21820,15 @@
                     config.joinToEvent(tr, isAdjacent(lastEvent.changes, event.changes))) ||
                     // For compose (but not compose.start) events, always join with previous event
                     userEvent == "input.type.compose")) {
-                done = updateBranch(done, done.length - 1, config.minDepth, new HistEvent(event.changes.compose(lastEvent.changes), conc(event.effects, lastEvent.effects), lastEvent.mapped, lastEvent.startSelection, none$1));
+                done = updateBranch(done, done.length - 1, config.minDepth, new HistEvent(event.changes.compose(lastEvent.changes), conc(event.effects, lastEvent.effects), lastEvent.mapped, lastEvent.startSelection, none));
             }
             else {
                 done = updateBranch(done, done.length, config.minDepth, event);
             }
-            return new HistoryState(done, none$1, time, userEvent);
+            return new HistoryState(done, none, time, userEvent);
         }
         addSelection(selection, time, userEvent, newGroupDelay) {
-            let last = this.done.length ? this.done[this.done.length - 1].selectionsAfter : none$1;
+            let last = this.done.length ? this.done[this.done.length - 1].selectionsAfter : none;
             if (last.length > 0 &&
                 time - this.prevTime < newGroupDelay &&
                 userEvent == this.prevUserEvent && userEvent && /^select($|\.)/.test(userEvent) &&
@@ -19288,7 +21856,7 @@
                 return null;
             }
             else {
-                let rest = branch.length == 1 ? none$1 : branch.slice(0, branch.length - 1);
+                let rest = branch.length == 1 ? none : branch.slice(0, branch.length - 1);
                 if (event.mapped)
                     rest = addMappingToBranch(rest, event.mapped);
                 return state.update({
@@ -19303,7 +21871,7 @@
             }
         }
     }
-    HistoryState.empty = /*@__PURE__*/new HistoryState(none$1, none$1);
+    HistoryState.empty = /*@__PURE__*/new HistoryState(none, none);
     /**
     Default key bindings for the undo history.
 
@@ -20206,3825 +22774,6 @@
     this.
     */
     const indentWithTab = { key: "Tab", run: indentMore, shift: indentLess };
-
-    function crelt() {
-      var elt = arguments[0];
-      if (typeof elt == "string") elt = document.createElement(elt);
-      var i = 1, next = arguments[1];
-      if (next && typeof next == "object" && next.nodeType == null && !Array.isArray(next)) {
-        for (var name in next) if (Object.prototype.hasOwnProperty.call(next, name)) {
-          var value = next[name];
-          if (typeof value == "string") elt.setAttribute(name, value);
-          else if (value != null) elt[name] = value;
-        }
-        i++;
-      }
-      for (; i < arguments.length; i++) add(elt, arguments[i]);
-      return elt
-    }
-
-    function add(elt, child) {
-      if (typeof child == "string") {
-        elt.appendChild(document.createTextNode(child));
-      } else if (child == null) ; else if (child.nodeType != null) {
-        elt.appendChild(child);
-      } else if (Array.isArray(child)) {
-        for (var i = 0; i < child.length; i++) add(elt, child[i]);
-      } else {
-        throw new RangeError("Unsupported child node: " + child)
-      }
-    }
-
-    const basicNormalize = typeof String.prototype.normalize == "function"
-        ? x => x.normalize("NFKD") : x => x;
-    /**
-    A search cursor provides an iterator over text matches in a
-    document.
-    */
-    class SearchCursor {
-        /**
-        Create a text cursor. The query is the search string, `from` to
-        `to` provides the region to search.
-        
-        When `normalize` is given, it will be called, on both the query
-        string and the content it is matched against, before comparing.
-        You can, for example, create a case-insensitive search by
-        passing `s => s.toLowerCase()`.
-        
-        Text is always normalized with
-        [`.normalize("NFKD")`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/normalize)
-        (when supported).
-        */
-        constructor(text, query, from = 0, to = text.length, normalize, test) {
-            this.test = test;
-            /**
-            The current match (only holds a meaningful value after
-            [`next`](https://codemirror.net/6/docs/ref/#search.SearchCursor.next) has been called and when
-            `done` is false).
-            */
-            this.value = { from: 0, to: 0 };
-            /**
-            Whether the end of the iterated region has been reached.
-            */
-            this.done = false;
-            this.matches = [];
-            this.buffer = "";
-            this.bufferPos = 0;
-            this.iter = text.iterRange(from, to);
-            this.bufferStart = from;
-            this.normalize = normalize ? x => normalize(basicNormalize(x)) : basicNormalize;
-            this.query = this.normalize(query);
-        }
-        peek() {
-            if (this.bufferPos == this.buffer.length) {
-                this.bufferStart += this.buffer.length;
-                this.iter.next();
-                if (this.iter.done)
-                    return -1;
-                this.bufferPos = 0;
-                this.buffer = this.iter.value;
-            }
-            return codePointAt(this.buffer, this.bufferPos);
-        }
-        /**
-        Look for the next match. Updates the iterator's
-        [`value`](https://codemirror.net/6/docs/ref/#search.SearchCursor.value) and
-        [`done`](https://codemirror.net/6/docs/ref/#search.SearchCursor.done) properties. Should be called
-        at least once before using the cursor.
-        */
-        next() {
-            while (this.matches.length)
-                this.matches.pop();
-            return this.nextOverlapping();
-        }
-        /**
-        The `next` method will ignore matches that partially overlap a
-        previous match. This method behaves like `next`, but includes
-        such matches.
-        */
-        nextOverlapping() {
-            for (;;) {
-                let next = this.peek();
-                if (next < 0) {
-                    this.done = true;
-                    return this;
-                }
-                let str = fromCodePoint(next), start = this.bufferStart + this.bufferPos;
-                this.bufferPos += codePointSize(next);
-                let norm = this.normalize(str);
-                for (let i = 0, pos = start;; i++) {
-                    let code = norm.charCodeAt(i);
-                    let match = this.match(code, pos);
-                    if (match) {
-                        this.value = match;
-                        return this;
-                    }
-                    if (i == norm.length - 1)
-                        break;
-                    if (pos == start && i < str.length && str.charCodeAt(i) == code)
-                        pos++;
-                }
-            }
-        }
-        match(code, pos) {
-            let match = null;
-            for (let i = 0; i < this.matches.length; i += 2) {
-                let index = this.matches[i], keep = false;
-                if (this.query.charCodeAt(index) == code) {
-                    if (index == this.query.length - 1) {
-                        match = { from: this.matches[i + 1], to: pos + 1 };
-                    }
-                    else {
-                        this.matches[i]++;
-                        keep = true;
-                    }
-                }
-                if (!keep) {
-                    this.matches.splice(i, 2);
-                    i -= 2;
-                }
-            }
-            if (this.query.charCodeAt(0) == code) {
-                if (this.query.length == 1)
-                    match = { from: pos, to: pos + 1 };
-                else
-                    this.matches.push(1, pos);
-            }
-            if (match && this.test && !this.test(match.from, match.to, this.buffer, this.bufferPos))
-                match = null;
-            return match;
-        }
-    }
-    if (typeof Symbol != "undefined")
-        SearchCursor.prototype[Symbol.iterator] = function () { return this; };
-
-    const empty = { from: -1, to: -1, match: /*@__PURE__*//.*/.exec("") };
-    const baseFlags = "gm" + (/x/.unicode == null ? "" : "u");
-    /**
-    This class is similar to [`SearchCursor`](https://codemirror.net/6/docs/ref/#search.SearchCursor)
-    but searches for a regular expression pattern instead of a plain
-    string.
-    */
-    class RegExpCursor {
-        /**
-        Create a cursor that will search the given range in the given
-        document. `query` should be the raw pattern (as you'd pass it to
-        `new RegExp`).
-        */
-        constructor(text, query, options, from = 0, to = text.length) {
-            this.text = text;
-            this.to = to;
-            this.curLine = "";
-            /**
-            Set to `true` when the cursor has reached the end of the search
-            range.
-            */
-            this.done = false;
-            /**
-            Will contain an object with the extent of the match and the
-            match object when [`next`](https://codemirror.net/6/docs/ref/#search.RegExpCursor.next)
-            sucessfully finds a match.
-            */
-            this.value = empty;
-            if (/\\[sWDnr]|\n|\r|\[\^/.test(query))
-                return new MultilineRegExpCursor(text, query, options, from, to);
-            this.re = new RegExp(query, baseFlags + ((options === null || options === void 0 ? void 0 : options.ignoreCase) ? "i" : ""));
-            this.test = options === null || options === void 0 ? void 0 : options.test;
-            this.iter = text.iter();
-            let startLine = text.lineAt(from);
-            this.curLineStart = startLine.from;
-            this.matchPos = toCharEnd(text, from);
-            this.getLine(this.curLineStart);
-        }
-        getLine(skip) {
-            this.iter.next(skip);
-            if (this.iter.lineBreak) {
-                this.curLine = "";
-            }
-            else {
-                this.curLine = this.iter.value;
-                if (this.curLineStart + this.curLine.length > this.to)
-                    this.curLine = this.curLine.slice(0, this.to - this.curLineStart);
-                this.iter.next();
-            }
-        }
-        nextLine() {
-            this.curLineStart = this.curLineStart + this.curLine.length + 1;
-            if (this.curLineStart > this.to)
-                this.curLine = "";
-            else
-                this.getLine(0);
-        }
-        /**
-        Move to the next match, if there is one.
-        */
-        next() {
-            for (let off = this.matchPos - this.curLineStart;;) {
-                this.re.lastIndex = off;
-                let match = this.matchPos <= this.to && this.re.exec(this.curLine);
-                if (match) {
-                    let from = this.curLineStart + match.index, to = from + match[0].length;
-                    this.matchPos = toCharEnd(this.text, to + (from == to ? 1 : 0));
-                    if (from == this.curLineStart + this.curLine.length)
-                        this.nextLine();
-                    if ((from < to || from > this.value.to) && (!this.test || this.test(from, to, match))) {
-                        this.value = { from, to, match };
-                        return this;
-                    }
-                    off = this.matchPos - this.curLineStart;
-                }
-                else if (this.curLineStart + this.curLine.length < this.to) {
-                    this.nextLine();
-                    off = 0;
-                }
-                else {
-                    this.done = true;
-                    return this;
-                }
-            }
-        }
-    }
-    const flattened = /*@__PURE__*/new WeakMap();
-    // Reusable (partially) flattened document strings
-    class FlattenedDoc {
-        constructor(from, text) {
-            this.from = from;
-            this.text = text;
-        }
-        get to() { return this.from + this.text.length; }
-        static get(doc, from, to) {
-            let cached = flattened.get(doc);
-            if (!cached || cached.from >= to || cached.to <= from) {
-                let flat = new FlattenedDoc(from, doc.sliceString(from, to));
-                flattened.set(doc, flat);
-                return flat;
-            }
-            if (cached.from == from && cached.to == to)
-                return cached;
-            let { text, from: cachedFrom } = cached;
-            if (cachedFrom > from) {
-                text = doc.sliceString(from, cachedFrom) + text;
-                cachedFrom = from;
-            }
-            if (cached.to < to)
-                text += doc.sliceString(cached.to, to);
-            flattened.set(doc, new FlattenedDoc(cachedFrom, text));
-            return new FlattenedDoc(from, text.slice(from - cachedFrom, to - cachedFrom));
-        }
-    }
-    class MultilineRegExpCursor {
-        constructor(text, query, options, from, to) {
-            this.text = text;
-            this.to = to;
-            this.done = false;
-            this.value = empty;
-            this.matchPos = toCharEnd(text, from);
-            this.re = new RegExp(query, baseFlags + ((options === null || options === void 0 ? void 0 : options.ignoreCase) ? "i" : ""));
-            this.test = options === null || options === void 0 ? void 0 : options.test;
-            this.flat = FlattenedDoc.get(text, from, this.chunkEnd(from + 5000 /* Base */));
-        }
-        chunkEnd(pos) {
-            return pos >= this.to ? this.to : this.text.lineAt(pos).to;
-        }
-        next() {
-            for (;;) {
-                let off = this.re.lastIndex = this.matchPos - this.flat.from;
-                let match = this.re.exec(this.flat.text);
-                // Skip empty matches directly after the last match
-                if (match && !match[0] && match.index == off) {
-                    this.re.lastIndex = off + 1;
-                    match = this.re.exec(this.flat.text);
-                }
-                if (match) {
-                    let from = this.flat.from + match.index, to = from + match[0].length;
-                    // If a match goes almost to the end of a noncomplete chunk, try
-                    // again, since it'll likely be able to match more
-                    if ((this.flat.to >= this.to || match.index + match[0].length <= this.flat.text.length - 10) &&
-                        (!this.test || this.test(from, to, match))) {
-                        this.value = { from, to, match };
-                        this.matchPos = toCharEnd(this.text, to + (from == to ? 1 : 0));
-                        return this;
-                    }
-                }
-                if (this.flat.to == this.to) {
-                    this.done = true;
-                    return this;
-                }
-                // Grow the flattened doc
-                this.flat = FlattenedDoc.get(this.text, this.flat.from, this.chunkEnd(this.flat.from + this.flat.text.length * 2));
-            }
-        }
-    }
-    if (typeof Symbol != "undefined") {
-        RegExpCursor.prototype[Symbol.iterator] = MultilineRegExpCursor.prototype[Symbol.iterator] =
-            function () { return this; };
-    }
-    function validRegExp(source) {
-        try {
-            new RegExp(source, baseFlags);
-            return true;
-        }
-        catch (_a) {
-            return false;
-        }
-    }
-    function toCharEnd(text, pos) {
-        if (pos >= text.length)
-            return pos;
-        let line = text.lineAt(pos), next;
-        while (pos < line.to && (next = line.text.charCodeAt(pos - line.from)) >= 0xDC00 && next < 0xE000)
-            pos++;
-        return pos;
-    }
-
-    function createLineDialog(view) {
-        let input = crelt("input", { class: "cm-textfield", name: "line" });
-        let dom = crelt("form", {
-            class: "cm-gotoLine",
-            onkeydown: (event) => {
-                if (event.keyCode == 27) { // Escape
-                    event.preventDefault();
-                    view.dispatch({ effects: dialogEffect.of(false) });
-                    view.focus();
-                }
-                else if (event.keyCode == 13) { // Enter
-                    event.preventDefault();
-                    go();
-                }
-            },
-            onsubmit: (event) => {
-                event.preventDefault();
-                go();
-            }
-        }, crelt("label", view.state.phrase("Go to line"), ": ", input), " ", crelt("button", { class: "cm-button", type: "submit" }, view.state.phrase("go")));
-        function go() {
-            let match = /^([+-])?(\d+)?(:\d+)?(%)?$/.exec(input.value);
-            if (!match)
-                return;
-            let { state } = view, startLine = state.doc.lineAt(state.selection.main.head);
-            let [, sign, ln, cl, percent] = match;
-            let col = cl ? +cl.slice(1) : 0;
-            let line = ln ? +ln : startLine.number;
-            if (ln && percent) {
-                let pc = line / 100;
-                if (sign)
-                    pc = pc * (sign == "-" ? -1 : 1) + (startLine.number / state.doc.lines);
-                line = Math.round(state.doc.lines * pc);
-            }
-            else if (ln && sign) {
-                line = line * (sign == "-" ? -1 : 1) + startLine.number;
-            }
-            let docLine = state.doc.line(Math.max(1, Math.min(state.doc.lines, line)));
-            view.dispatch({
-                effects: dialogEffect.of(false),
-                selection: EditorSelection.cursor(docLine.from + Math.max(0, Math.min(col, docLine.length))),
-                scrollIntoView: true
-            });
-            view.focus();
-        }
-        return { dom };
-    }
-    const dialogEffect = /*@__PURE__*/StateEffect.define();
-    const dialogField = /*@__PURE__*/StateField.define({
-        create() { return true; },
-        update(value, tr) {
-            for (let e of tr.effects)
-                if (e.is(dialogEffect))
-                    value = e.value;
-            return value;
-        },
-        provide: f => showPanel.from(f, val => val ? createLineDialog : null)
-    });
-    /**
-    Command that shows a dialog asking the user for a line number, and
-    when a valid position is provided, moves the cursor to that line.
-
-    Supports line numbers, relative line offsets prefixed with `+` or
-    `-`, document percentages suffixed with `%`, and an optional
-    column position by adding `:` and a second number after the line
-    number.
-    */
-    const gotoLine = view => {
-        let panel = getPanel(view, createLineDialog);
-        if (!panel) {
-            let effects = [dialogEffect.of(true)];
-            if (view.state.field(dialogField, false) == null)
-                effects.push(StateEffect.appendConfig.of([dialogField, baseTheme$1$1]));
-            view.dispatch({ effects });
-            panel = getPanel(view, createLineDialog);
-        }
-        if (panel)
-            panel.dom.querySelector("input").focus();
-        return true;
-    };
-    const baseTheme$1$1 = /*@__PURE__*/EditorView.baseTheme({
-        ".cm-panel.cm-gotoLine": {
-            padding: "2px 6px 4px",
-            "& label": { fontSize: "80%" }
-        }
-    });
-
-    const defaultHighlightOptions = {
-        highlightWordAroundCursor: false,
-        minSelectionLength: 1,
-        maxMatches: 100,
-        wholeWords: false
-    };
-    const highlightConfig = /*@__PURE__*/Facet.define({
-        combine(options) {
-            return combineConfig(options, defaultHighlightOptions, {
-                highlightWordAroundCursor: (a, b) => a || b,
-                minSelectionLength: Math.min,
-                maxMatches: Math.min
-            });
-        }
-    });
-    /**
-    This extension highlights text that matches the selection. It uses
-    the `"cm-selectionMatch"` class for the highlighting. When
-    `highlightWordAroundCursor` is enabled, the word at the cursor
-    itself will be highlighted with `"cm-selectionMatch-main"`.
-    */
-    function highlightSelectionMatches(options) {
-        let ext = [defaultTheme, matchHighlighter];
-        if (options)
-            ext.push(highlightConfig.of(options));
-        return ext;
-    }
-    const matchDeco = /*@__PURE__*/Decoration.mark({ class: "cm-selectionMatch" });
-    const mainMatchDeco = /*@__PURE__*/Decoration.mark({ class: "cm-selectionMatch cm-selectionMatch-main" });
-    // Whether the characters directly outside the given positions are non-word characters
-    function insideWordBoundaries(check, state, from, to) {
-        return (from == 0 || check(state.sliceDoc(from - 1, from)) != CharCategory.Word) &&
-            (to == state.doc.length || check(state.sliceDoc(to, to + 1)) != CharCategory.Word);
-    }
-    // Whether the characters directly at the given positions are word characters
-    function insideWord(check, state, from, to) {
-        return check(state.sliceDoc(from, from + 1)) == CharCategory.Word
-            && check(state.sliceDoc(to - 1, to)) == CharCategory.Word;
-    }
-    const matchHighlighter = /*@__PURE__*/ViewPlugin.fromClass(class {
-        constructor(view) {
-            this.decorations = this.getDeco(view);
-        }
-        update(update) {
-            if (update.selectionSet || update.docChanged || update.viewportChanged)
-                this.decorations = this.getDeco(update.view);
-        }
-        getDeco(view) {
-            let conf = view.state.facet(highlightConfig);
-            let { state } = view, sel = state.selection;
-            if (sel.ranges.length > 1)
-                return Decoration.none;
-            let range = sel.main, query, check = null;
-            if (range.empty) {
-                if (!conf.highlightWordAroundCursor)
-                    return Decoration.none;
-                let word = state.wordAt(range.head);
-                if (!word)
-                    return Decoration.none;
-                check = state.charCategorizer(range.head);
-                query = state.sliceDoc(word.from, word.to);
-            }
-            else {
-                let len = range.to - range.from;
-                if (len < conf.minSelectionLength || len > 200)
-                    return Decoration.none;
-                if (conf.wholeWords) {
-                    query = state.sliceDoc(range.from, range.to); // TODO: allow and include leading/trailing space?
-                    check = state.charCategorizer(range.head);
-                    if (!(insideWordBoundaries(check, state, range.from, range.to)
-                        && insideWord(check, state, range.from, range.to)))
-                        return Decoration.none;
-                }
-                else {
-                    query = state.sliceDoc(range.from, range.to).trim();
-                    if (!query)
-                        return Decoration.none;
-                }
-            }
-            let deco = [];
-            for (let part of view.visibleRanges) {
-                let cursor = new SearchCursor(state.doc, query, part.from, part.to);
-                while (!cursor.next().done) {
-                    let { from, to } = cursor.value;
-                    if (!check || insideWordBoundaries(check, state, from, to)) {
-                        if (range.empty && from <= range.from && to >= range.to)
-                            deco.push(mainMatchDeco.range(from, to));
-                        else if (from >= range.to || to <= range.from)
-                            deco.push(matchDeco.range(from, to));
-                        if (deco.length > conf.maxMatches)
-                            return Decoration.none;
-                    }
-                }
-            }
-            return Decoration.set(deco);
-        }
-    }, {
-        decorations: v => v.decorations
-    });
-    const defaultTheme = /*@__PURE__*/EditorView.baseTheme({
-        ".cm-selectionMatch": { backgroundColor: "#99ff7780" },
-        ".cm-searchMatch .cm-selectionMatch": { backgroundColor: "transparent" }
-    });
-    // Select the words around the cursors.
-    const selectWord = ({ state, dispatch }) => {
-        let { selection } = state;
-        let newSel = EditorSelection.create(selection.ranges.map(range => state.wordAt(range.head) || EditorSelection.cursor(range.head)), selection.mainIndex);
-        if (newSel.eq(selection))
-            return false;
-        dispatch(state.update({ selection: newSel }));
-        return true;
-    };
-    // Find next occurrence of query relative to last cursor. Wrap around
-    // the document if there are no more matches.
-    function findNextOccurrence(state, query) {
-        let { main, ranges } = state.selection;
-        let word = state.wordAt(main.head), fullWord = word && word.from == main.from && word.to == main.to;
-        for (let cycled = false, cursor = new SearchCursor(state.doc, query, ranges[ranges.length - 1].to);;) {
-            cursor.next();
-            if (cursor.done) {
-                if (cycled)
-                    return null;
-                cursor = new SearchCursor(state.doc, query, 0, Math.max(0, ranges[ranges.length - 1].from - 1));
-                cycled = true;
-            }
-            else {
-                if (cycled && ranges.some(r => r.from == cursor.value.from))
-                    continue;
-                if (fullWord) {
-                    let word = state.wordAt(cursor.value.from);
-                    if (!word || word.from != cursor.value.from || word.to != cursor.value.to)
-                        continue;
-                }
-                return cursor.value;
-            }
-        }
-    }
-    /**
-    Select next occurrence of the current selection. Expand selection
-    to the surrounding word when the selection is empty.
-    */
-    const selectNextOccurrence = ({ state, dispatch }) => {
-        let { ranges } = state.selection;
-        if (ranges.some(sel => sel.from === sel.to))
-            return selectWord({ state, dispatch });
-        let searchedText = state.sliceDoc(ranges[0].from, ranges[0].to);
-        if (state.selection.ranges.some(r => state.sliceDoc(r.from, r.to) != searchedText))
-            return false;
-        let range = findNextOccurrence(state, searchedText);
-        if (!range)
-            return false;
-        dispatch(state.update({
-            selection: state.selection.addRange(EditorSelection.range(range.from, range.to), false),
-            effects: EditorView.scrollIntoView(range.to)
-        }));
-        return true;
-    };
-
-    const searchConfigFacet = /*@__PURE__*/Facet.define({
-        combine(configs) {
-            return combineConfig(configs, {
-                top: false,
-                caseSensitive: false,
-                literal: false,
-                regexp: false,
-                wholeWord: false,
-                createPanel: view => new SearchPanel(view),
-                scrollToMatch: range => EditorView.scrollIntoView(range)
-            });
-        }
-    });
-    /**
-    A search query. Part of the editor's search state.
-    */
-    class SearchQuery {
-        /**
-        Create a query object.
-        */
-        constructor(config) {
-            this.search = config.search;
-            this.caseSensitive = !!config.caseSensitive;
-            this.literal = !!config.literal;
-            this.regexp = !!config.regexp;
-            this.replace = config.replace || "";
-            this.valid = !!this.search && (!this.regexp || validRegExp(this.search));
-            this.unquoted = this.unquote(this.search);
-            this.wholeWord = !!config.wholeWord;
-        }
-        /**
-        @internal
-        */
-        unquote(text) {
-            return this.literal ? text :
-                text.replace(/\\([nrt\\])/g, (_, ch) => ch == "n" ? "\n" : ch == "r" ? "\r" : ch == "t" ? "\t" : "\\");
-        }
-        /**
-        Compare this query to another query.
-        */
-        eq(other) {
-            return this.search == other.search && this.replace == other.replace &&
-                this.caseSensitive == other.caseSensitive && this.regexp == other.regexp &&
-                this.wholeWord == other.wholeWord;
-        }
-        /**
-        @internal
-        */
-        create() {
-            return this.regexp ? new RegExpQuery(this) : new StringQuery(this);
-        }
-        /**
-        Get a search cursor for this query, searching through the given
-        range in the given state.
-        */
-        getCursor(state, from = 0, to) {
-            let st = state.doc ? state : EditorState.create({ doc: state });
-            if (to == null)
-                to = st.doc.length;
-            return this.regexp ? regexpCursor(this, st, from, to) : stringCursor(this, st, from, to);
-        }
-    }
-    class QueryType {
-        constructor(spec) {
-            this.spec = spec;
-        }
-    }
-    function stringCursor(spec, state, from, to) {
-        return new SearchCursor(state.doc, spec.unquoted, from, to, spec.caseSensitive ? undefined : x => x.toLowerCase(), spec.wholeWord ? stringWordTest(state.doc, state.charCategorizer(state.selection.main.head)) : undefined);
-    }
-    function stringWordTest(doc, categorizer) {
-        return (from, to, buf, bufPos) => {
-            if (bufPos > from || bufPos + buf.length < to) {
-                bufPos = Math.max(0, from - 2);
-                buf = doc.sliceString(bufPos, Math.min(doc.length, to + 2));
-            }
-            return (categorizer(charBefore(buf, from - bufPos)) != CharCategory.Word ||
-                categorizer(charAfter(buf, from - bufPos)) != CharCategory.Word) &&
-                (categorizer(charAfter(buf, to - bufPos)) != CharCategory.Word ||
-                    categorizer(charBefore(buf, to - bufPos)) != CharCategory.Word);
-        };
-    }
-    class StringQuery extends QueryType {
-        constructor(spec) {
-            super(spec);
-        }
-        nextMatch(state, curFrom, curTo) {
-            let cursor = stringCursor(this.spec, state, curTo, state.doc.length).nextOverlapping();
-            if (cursor.done)
-                cursor = stringCursor(this.spec, state, 0, curFrom).nextOverlapping();
-            return cursor.done ? null : cursor.value;
-        }
-        // Searching in reverse is, rather than implementing an inverted search
-        // cursor, done by scanning chunk after chunk forward.
-        prevMatchInRange(state, from, to) {
-            for (let pos = to;;) {
-                let start = Math.max(from, pos - 10000 /* ChunkSize */ - this.spec.unquoted.length);
-                let cursor = stringCursor(this.spec, state, start, pos), range = null;
-                while (!cursor.nextOverlapping().done)
-                    range = cursor.value;
-                if (range)
-                    return range;
-                if (start == from)
-                    return null;
-                pos -= 10000 /* ChunkSize */;
-            }
-        }
-        prevMatch(state, curFrom, curTo) {
-            return this.prevMatchInRange(state, 0, curFrom) ||
-                this.prevMatchInRange(state, curTo, state.doc.length);
-        }
-        getReplacement(_result) { return this.spec.unquote(this.spec.replace); }
-        matchAll(state, limit) {
-            let cursor = stringCursor(this.spec, state, 0, state.doc.length), ranges = [];
-            while (!cursor.next().done) {
-                if (ranges.length >= limit)
-                    return null;
-                ranges.push(cursor.value);
-            }
-            return ranges;
-        }
-        highlight(state, from, to, add) {
-            let cursor = stringCursor(this.spec, state, Math.max(0, from - this.spec.unquoted.length), Math.min(to + this.spec.unquoted.length, state.doc.length));
-            while (!cursor.next().done)
-                add(cursor.value.from, cursor.value.to);
-        }
-    }
-    function regexpCursor(spec, state, from, to) {
-        return new RegExpCursor(state.doc, spec.search, {
-            ignoreCase: !spec.caseSensitive,
-            test: spec.wholeWord ? regexpWordTest(state.charCategorizer(state.selection.main.head)) : undefined
-        }, from, to);
-    }
-    function charBefore(str, index) {
-        return str.slice(findClusterBreak(str, index, false), index);
-    }
-    function charAfter(str, index) {
-        return str.slice(index, findClusterBreak(str, index));
-    }
-    function regexpWordTest(categorizer) {
-        return (_from, _to, match) => !match[0].length ||
-            (categorizer(charBefore(match.input, match.index)) != CharCategory.Word ||
-                categorizer(charAfter(match.input, match.index)) != CharCategory.Word) &&
-                (categorizer(charAfter(match.input, match.index + match[0].length)) != CharCategory.Word ||
-                    categorizer(charBefore(match.input, match.index + match[0].length)) != CharCategory.Word);
-    }
-    class RegExpQuery extends QueryType {
-        nextMatch(state, curFrom, curTo) {
-            let cursor = regexpCursor(this.spec, state, curTo, state.doc.length).next();
-            if (cursor.done)
-                cursor = regexpCursor(this.spec, state, 0, curFrom).next();
-            return cursor.done ? null : cursor.value;
-        }
-        prevMatchInRange(state, from, to) {
-            for (let size = 1;; size++) {
-                let start = Math.max(from, to - size * 10000 /* ChunkSize */);
-                let cursor = regexpCursor(this.spec, state, start, to), range = null;
-                while (!cursor.next().done)
-                    range = cursor.value;
-                if (range && (start == from || range.from > start + 10))
-                    return range;
-                if (start == from)
-                    return null;
-            }
-        }
-        prevMatch(state, curFrom, curTo) {
-            return this.prevMatchInRange(state, 0, curFrom) ||
-                this.prevMatchInRange(state, curTo, state.doc.length);
-        }
-        getReplacement(result) {
-            return this.spec.unquote(this.spec.replace.replace(/\$([$&\d+])/g, (m, i) => i == "$" ? "$"
-                : i == "&" ? result.match[0]
-                    : i != "0" && +i < result.match.length ? result.match[i]
-                        : m));
-        }
-        matchAll(state, limit) {
-            let cursor = regexpCursor(this.spec, state, 0, state.doc.length), ranges = [];
-            while (!cursor.next().done) {
-                if (ranges.length >= limit)
-                    return null;
-                ranges.push(cursor.value);
-            }
-            return ranges;
-        }
-        highlight(state, from, to, add) {
-            let cursor = regexpCursor(this.spec, state, Math.max(0, from - 250 /* HighlightMargin */), Math.min(to + 250 /* HighlightMargin */, state.doc.length));
-            while (!cursor.next().done)
-                add(cursor.value.from, cursor.value.to);
-        }
-    }
-    /**
-    A state effect that updates the current search query. Note that
-    this only has an effect if the search state has been initialized
-    (by including [`search`](https://codemirror.net/6/docs/ref/#search.search) in your configuration or
-    by running [`openSearchPanel`](https://codemirror.net/6/docs/ref/#search.openSearchPanel) at least
-    once).
-    */
-    const setSearchQuery = /*@__PURE__*/StateEffect.define();
-    const togglePanel$1 = /*@__PURE__*/StateEffect.define();
-    const searchState = /*@__PURE__*/StateField.define({
-        create(state) {
-            return new SearchState(defaultQuery(state).create(), null);
-        },
-        update(value, tr) {
-            for (let effect of tr.effects) {
-                if (effect.is(setSearchQuery))
-                    value = new SearchState(effect.value.create(), value.panel);
-                else if (effect.is(togglePanel$1))
-                    value = new SearchState(value.query, effect.value ? createSearchPanel : null);
-            }
-            return value;
-        },
-        provide: f => showPanel.from(f, val => val.panel)
-    });
-    class SearchState {
-        constructor(query, panel) {
-            this.query = query;
-            this.panel = panel;
-        }
-    }
-    const matchMark = /*@__PURE__*/Decoration.mark({ class: "cm-searchMatch" }), selectedMatchMark = /*@__PURE__*/Decoration.mark({ class: "cm-searchMatch cm-searchMatch-selected" });
-    const searchHighlighter = /*@__PURE__*/ViewPlugin.fromClass(class {
-        constructor(view) {
-            this.view = view;
-            this.decorations = this.highlight(view.state.field(searchState));
-        }
-        update(update) {
-            let state = update.state.field(searchState);
-            if (state != update.startState.field(searchState) || update.docChanged || update.selectionSet || update.viewportChanged)
-                this.decorations = this.highlight(state);
-        }
-        highlight({ query, panel }) {
-            if (!panel || !query.spec.valid)
-                return Decoration.none;
-            let { view } = this;
-            let builder = new RangeSetBuilder();
-            for (let i = 0, ranges = view.visibleRanges, l = ranges.length; i < l; i++) {
-                let { from, to } = ranges[i];
-                while (i < l - 1 && to > ranges[i + 1].from - 2 * 250 /* HighlightMargin */)
-                    to = ranges[++i].to;
-                query.highlight(view.state, from, to, (from, to) => {
-                    let selected = view.state.selection.ranges.some(r => r.from == from && r.to == to);
-                    builder.add(from, to, selected ? selectedMatchMark : matchMark);
-                });
-            }
-            return builder.finish();
-        }
-    }, {
-        decorations: v => v.decorations
-    });
-    function searchCommand(f) {
-        return view => {
-            let state = view.state.field(searchState, false);
-            return state && state.query.spec.valid ? f(view, state) : openSearchPanel(view);
-        };
-    }
-    /**
-    Open the search panel if it isn't already open, and move the
-    selection to the first match after the current main selection.
-    Will wrap around to the start of the document when it reaches the
-    end.
-    */
-    const findNext = /*@__PURE__*/searchCommand((view, { query }) => {
-        let { to } = view.state.selection.main;
-        let next = query.nextMatch(view.state, to, to);
-        if (!next)
-            return false;
-        let selection = EditorSelection.single(next.from, next.to);
-        let config = view.state.facet(searchConfigFacet);
-        view.dispatch({
-            selection,
-            effects: [announceMatch(view, next), config.scrollToMatch(selection.main, view)],
-            userEvent: "select.search"
-        });
-        selectSearchInput(view);
-        return true;
-    });
-    /**
-    Move the selection to the previous instance of the search query,
-    before the current main selection. Will wrap past the start
-    of the document to start searching at the end again.
-    */
-    const findPrevious = /*@__PURE__*/searchCommand((view, { query }) => {
-        let { state } = view, { from } = state.selection.main;
-        let prev = query.prevMatch(state, from, from);
-        if (!prev)
-            return false;
-        let selection = EditorSelection.single(prev.from, prev.to);
-        let config = view.state.facet(searchConfigFacet);
-        view.dispatch({
-            selection,
-            effects: [announceMatch(view, prev), config.scrollToMatch(selection.main, view)],
-            userEvent: "select.search"
-        });
-        selectSearchInput(view);
-        return true;
-    });
-    /**
-    Select all instances of the search query.
-    */
-    const selectMatches = /*@__PURE__*/searchCommand((view, { query }) => {
-        let ranges = query.matchAll(view.state, 1000);
-        if (!ranges || !ranges.length)
-            return false;
-        view.dispatch({
-            selection: EditorSelection.create(ranges.map(r => EditorSelection.range(r.from, r.to))),
-            userEvent: "select.search.matches"
-        });
-        return true;
-    });
-    /**
-    Select all instances of the currently selected text.
-    */
-    const selectSelectionMatches = ({ state, dispatch }) => {
-        let sel = state.selection;
-        if (sel.ranges.length > 1 || sel.main.empty)
-            return false;
-        let { from, to } = sel.main;
-        let ranges = [], main = 0;
-        for (let cur = new SearchCursor(state.doc, state.sliceDoc(from, to)); !cur.next().done;) {
-            if (ranges.length > 1000)
-                return false;
-            if (cur.value.from == from)
-                main = ranges.length;
-            ranges.push(EditorSelection.range(cur.value.from, cur.value.to));
-        }
-        dispatch(state.update({
-            selection: EditorSelection.create(ranges, main),
-            userEvent: "select.search.matches"
-        }));
-        return true;
-    };
-    /**
-    Replace the current match of the search query.
-    */
-    const replaceNext = /*@__PURE__*/searchCommand((view, { query }) => {
-        let { state } = view, { from, to } = state.selection.main;
-        if (state.readOnly)
-            return false;
-        let next = query.nextMatch(state, from, from);
-        if (!next)
-            return false;
-        let changes = [], selection, replacement;
-        let effects = [];
-        if (next.from == from && next.to == to) {
-            replacement = state.toText(query.getReplacement(next));
-            changes.push({ from: next.from, to: next.to, insert: replacement });
-            next = query.nextMatch(state, next.from, next.to);
-            effects.push(EditorView.announce.of(state.phrase("replaced match on line $", state.doc.lineAt(from).number) + "."));
-        }
-        if (next) {
-            let off = changes.length == 0 || changes[0].from >= next.to ? 0 : next.to - next.from - replacement.length;
-            selection = EditorSelection.single(next.from - off, next.to - off);
-            effects.push(announceMatch(view, next));
-            effects.push(state.facet(searchConfigFacet).scrollToMatch(selection.main, view));
-        }
-        view.dispatch({
-            changes, selection, effects,
-            userEvent: "input.replace"
-        });
-        return true;
-    });
-    /**
-    Replace all instances of the search query with the given
-    replacement.
-    */
-    const replaceAll = /*@__PURE__*/searchCommand((view, { query }) => {
-        if (view.state.readOnly)
-            return false;
-        let changes = query.matchAll(view.state, 1e9).map(match => {
-            let { from, to } = match;
-            return { from, to, insert: query.getReplacement(match) };
-        });
-        if (!changes.length)
-            return false;
-        let announceText = view.state.phrase("replaced $ matches", changes.length) + ".";
-        view.dispatch({
-            changes,
-            effects: EditorView.announce.of(announceText),
-            userEvent: "input.replace.all"
-        });
-        return true;
-    });
-    function createSearchPanel(view) {
-        return view.state.facet(searchConfigFacet).createPanel(view);
-    }
-    function defaultQuery(state, fallback) {
-        var _a, _b, _c, _d, _e;
-        let sel = state.selection.main;
-        let selText = sel.empty || sel.to > sel.from + 100 ? "" : state.sliceDoc(sel.from, sel.to);
-        if (fallback && !selText)
-            return fallback;
-        let config = state.facet(searchConfigFacet);
-        return new SearchQuery({
-            search: ((_a = fallback === null || fallback === void 0 ? void 0 : fallback.literal) !== null && _a !== void 0 ? _a : config.literal) ? selText : selText.replace(/\n/g, "\\n"),
-            caseSensitive: (_b = fallback === null || fallback === void 0 ? void 0 : fallback.caseSensitive) !== null && _b !== void 0 ? _b : config.caseSensitive,
-            literal: (_c = fallback === null || fallback === void 0 ? void 0 : fallback.literal) !== null && _c !== void 0 ? _c : config.literal,
-            regexp: (_d = fallback === null || fallback === void 0 ? void 0 : fallback.regexp) !== null && _d !== void 0 ? _d : config.regexp,
-            wholeWord: (_e = fallback === null || fallback === void 0 ? void 0 : fallback.wholeWord) !== null && _e !== void 0 ? _e : config.wholeWord
-        });
-    }
-    function getSearchInput(view) {
-        let panel = getPanel(view, createSearchPanel);
-        return panel && panel.dom.querySelector("[main-field]");
-    }
-    function selectSearchInput(view) {
-        let input = getSearchInput(view);
-        if (input && input == view.root.activeElement)
-            input.select();
-    }
-    /**
-    Make sure the search panel is open and focused.
-    */
-    const openSearchPanel = view => {
-        let state = view.state.field(searchState, false);
-        if (state && state.panel) {
-            let searchInput = getSearchInput(view);
-            if (searchInput && searchInput != view.root.activeElement) {
-                let query = defaultQuery(view.state, state.query.spec);
-                if (query.valid)
-                    view.dispatch({ effects: setSearchQuery.of(query) });
-                searchInput.focus();
-                searchInput.select();
-            }
-        }
-        else {
-            view.dispatch({ effects: [
-                    togglePanel$1.of(true),
-                    state ? setSearchQuery.of(defaultQuery(view.state, state.query.spec)) : StateEffect.appendConfig.of(searchExtensions)
-                ] });
-        }
-        return true;
-    };
-    /**
-    Close the search panel.
-    */
-    const closeSearchPanel = view => {
-        let state = view.state.field(searchState, false);
-        if (!state || !state.panel)
-            return false;
-        let panel = getPanel(view, createSearchPanel);
-        if (panel && panel.dom.contains(view.root.activeElement))
-            view.focus();
-        view.dispatch({ effects: togglePanel$1.of(false) });
-        return true;
-    };
-    /**
-    Default search-related key bindings.
-
-     - Mod-f: [`openSearchPanel`](https://codemirror.net/6/docs/ref/#search.openSearchPanel)
-     - F3, Mod-g: [`findNext`](https://codemirror.net/6/docs/ref/#search.findNext)
-     - Shift-F3, Shift-Mod-g: [`findPrevious`](https://codemirror.net/6/docs/ref/#search.findPrevious)
-     - Alt-g: [`gotoLine`](https://codemirror.net/6/docs/ref/#search.gotoLine)
-     - Mod-d: [`selectNextOccurrence`](https://codemirror.net/6/docs/ref/#search.selectNextOccurrence)
-    */
-    const searchKeymap = [
-        { key: "Mod-f", run: openSearchPanel, scope: "editor search-panel" },
-        { key: "F3", run: findNext, shift: findPrevious, scope: "editor search-panel", preventDefault: true },
-        { key: "Mod-g", run: findNext, shift: findPrevious, scope: "editor search-panel", preventDefault: true },
-        { key: "Escape", run: closeSearchPanel, scope: "editor search-panel" },
-        { key: "Mod-Shift-l", run: selectSelectionMatches },
-        { key: "Alt-g", run: gotoLine },
-        { key: "Mod-d", run: selectNextOccurrence, preventDefault: true },
-    ];
-    class SearchPanel {
-        constructor(view) {
-            this.view = view;
-            let query = this.query = view.state.field(searchState).query.spec;
-            this.commit = this.commit.bind(this);
-            this.searchField = crelt("input", {
-                value: query.search,
-                placeholder: phrase(view, "Find"),
-                "aria-label": phrase(view, "Find"),
-                class: "cm-textfield",
-                name: "search",
-                form: "",
-                "main-field": "true",
-                onchange: this.commit,
-                onkeyup: this.commit
-            });
-            this.replaceField = crelt("input", {
-                value: query.replace,
-                placeholder: phrase(view, "Replace"),
-                "aria-label": phrase(view, "Replace"),
-                class: "cm-textfield",
-                name: "replace",
-                form: "",
-                onchange: this.commit,
-                onkeyup: this.commit
-            });
-            this.caseField = crelt("input", {
-                type: "checkbox",
-                name: "case",
-                form: "",
-                checked: query.caseSensitive,
-                onchange: this.commit
-            });
-            this.reField = crelt("input", {
-                type: "checkbox",
-                name: "re",
-                form: "",
-                checked: query.regexp,
-                onchange: this.commit
-            });
-            this.wordField = crelt("input", {
-                type: "checkbox",
-                name: "word",
-                form: "",
-                checked: query.wholeWord,
-                onchange: this.commit
-            });
-            function button(name, onclick, content) {
-                return crelt("button", { class: "cm-button", name, onclick, type: "button" }, content);
-            }
-            this.dom = crelt("div", { onkeydown: (e) => this.keydown(e), class: "cm-search" }, [
-                this.searchField,
-                button("next", () => findNext(view), [phrase(view, "next")]),
-                button("prev", () => findPrevious(view), [phrase(view, "previous")]),
-                button("select", () => selectMatches(view), [phrase(view, "all")]),
-                crelt("label", null, [this.caseField, phrase(view, "match case")]),
-                crelt("label", null, [this.reField, phrase(view, "regexp")]),
-                crelt("label", null, [this.wordField, phrase(view, "by word")]),
-                ...view.state.readOnly ? [] : [
-                    crelt("br"),
-                    this.replaceField,
-                    button("replace", () => replaceNext(view), [phrase(view, "replace")]),
-                    button("replaceAll", () => replaceAll(view), [phrase(view, "replace all")])
-                ],
-                crelt("button", {
-                    name: "close",
-                    onclick: () => closeSearchPanel(view),
-                    "aria-label": phrase(view, "close"),
-                    type: "button"
-                }, ["×"])
-            ]);
-        }
-        commit() {
-            let query = new SearchQuery({
-                search: this.searchField.value,
-                caseSensitive: this.caseField.checked,
-                regexp: this.reField.checked,
-                wholeWord: this.wordField.checked,
-                replace: this.replaceField.value,
-            });
-            if (!query.eq(this.query)) {
-                this.query = query;
-                this.view.dispatch({ effects: setSearchQuery.of(query) });
-            }
-        }
-        keydown(e) {
-            if (runScopeHandlers(this.view, e, "search-panel")) {
-                e.preventDefault();
-            }
-            else if (e.keyCode == 13 && e.target == this.searchField) {
-                e.preventDefault();
-                (e.shiftKey ? findPrevious : findNext)(this.view);
-            }
-            else if (e.keyCode == 13 && e.target == this.replaceField) {
-                e.preventDefault();
-                replaceNext(this.view);
-            }
-        }
-        update(update) {
-            for (let tr of update.transactions)
-                for (let effect of tr.effects) {
-                    if (effect.is(setSearchQuery) && !effect.value.eq(this.query))
-                        this.setQuery(effect.value);
-                }
-        }
-        setQuery(query) {
-            this.query = query;
-            this.searchField.value = query.search;
-            this.replaceField.value = query.replace;
-            this.caseField.checked = query.caseSensitive;
-            this.reField.checked = query.regexp;
-            this.wordField.checked = query.wholeWord;
-        }
-        mount() {
-            this.searchField.select();
-        }
-        get pos() { return 80; }
-        get top() { return this.view.state.facet(searchConfigFacet).top; }
-    }
-    function phrase(view, phrase) { return view.state.phrase(phrase); }
-    const AnnounceMargin = 30;
-    const Break = /[\s\.,:;?!]/;
-    function announceMatch(view, { from, to }) {
-        let line = view.state.doc.lineAt(from), lineEnd = view.state.doc.lineAt(to).to;
-        let start = Math.max(line.from, from - AnnounceMargin), end = Math.min(lineEnd, to + AnnounceMargin);
-        let text = view.state.sliceDoc(start, end);
-        if (start != line.from) {
-            for (let i = 0; i < AnnounceMargin; i++)
-                if (!Break.test(text[i + 1]) && Break.test(text[i])) {
-                    text = text.slice(i);
-                    break;
-                }
-        }
-        if (end != lineEnd) {
-            for (let i = text.length - 1; i > text.length - AnnounceMargin; i--)
-                if (!Break.test(text[i - 1]) && Break.test(text[i])) {
-                    text = text.slice(0, i);
-                    break;
-                }
-        }
-        return EditorView.announce.of(`${view.state.phrase("current match")}. ${text} ${view.state.phrase("on line")} ${line.number}.`);
-    }
-    const baseTheme$2 = /*@__PURE__*/EditorView.baseTheme({
-        ".cm-panel.cm-search": {
-            padding: "2px 6px 4px",
-            position: "relative",
-            "& [name=close]": {
-                position: "absolute",
-                top: "0",
-                right: "4px",
-                backgroundColor: "inherit",
-                border: "none",
-                font: "inherit",
-                padding: 0,
-                margin: 0
-            },
-            "& input, & button, & label": {
-                margin: ".2em .6em .2em 0"
-            },
-            "& input[type=checkbox]": {
-                marginRight: ".2em"
-            },
-            "& label": {
-                fontSize: "80%",
-                whiteSpace: "pre"
-            }
-        },
-        "&light .cm-searchMatch": { backgroundColor: "#ffff0054" },
-        "&dark .cm-searchMatch": { backgroundColor: "#00ffff8a" },
-        "&light .cm-searchMatch-selected": { backgroundColor: "#ff6a0054" },
-        "&dark .cm-searchMatch-selected": { backgroundColor: "#ff00ff8a" }
-    });
-    const searchExtensions = [
-        searchState,
-        /*@__PURE__*/Prec.lowest(searchHighlighter),
-        baseTheme$2
-    ];
-
-    /**
-    An instance of this is passed to completion source functions.
-    */
-    class CompletionContext {
-        /**
-        Create a new completion context. (Mostly useful for testing
-        completion sources—in the editor, the extension will create
-        these for you.)
-        */
-        constructor(
-        /**
-        The editor state that the completion happens in.
-        */
-        state, 
-        /**
-        The position at which the completion is happening.
-        */
-        pos, 
-        /**
-        Indicates whether completion was activated explicitly, or
-        implicitly by typing. The usual way to respond to this is to
-        only return completions when either there is part of a
-        completable entity before the cursor, or `explicit` is true.
-        */
-        explicit) {
-            this.state = state;
-            this.pos = pos;
-            this.explicit = explicit;
-            /**
-            @internal
-            */
-            this.abortListeners = [];
-        }
-        /**
-        Get the extent, content, and (if there is a token) type of the
-        token before `this.pos`.
-        */
-        tokenBefore(types) {
-            let token = syntaxTree(this.state).resolveInner(this.pos, -1);
-            while (token && types.indexOf(token.name) < 0)
-                token = token.parent;
-            return token ? { from: token.from, to: this.pos,
-                text: this.state.sliceDoc(token.from, this.pos),
-                type: token.type } : null;
-        }
-        /**
-        Get the match of the given expression directly before the
-        cursor.
-        */
-        matchBefore(expr) {
-            let line = this.state.doc.lineAt(this.pos);
-            let start = Math.max(line.from, this.pos - 250);
-            let str = line.text.slice(start - line.from, this.pos - line.from);
-            let found = str.search(ensureAnchor(expr, false));
-            return found < 0 ? null : { from: start + found, to: this.pos, text: str.slice(found) };
-        }
-        /**
-        Yields true when the query has been aborted. Can be useful in
-        asynchronous queries to avoid doing work that will be ignored.
-        */
-        get aborted() { return this.abortListeners == null; }
-        /**
-        Allows you to register abort handlers, which will be called when
-        the query is
-        [aborted](https://codemirror.net/6/docs/ref/#autocomplete.CompletionContext.aborted).
-        */
-        addEventListener(type, listener) {
-            if (type == "abort" && this.abortListeners)
-                this.abortListeners.push(listener);
-        }
-    }
-    function toSet(chars) {
-        let flat = Object.keys(chars).join("");
-        let words = /\w/.test(flat);
-        if (words)
-            flat = flat.replace(/\w/g, "");
-        return `[${words ? "\\w" : ""}${flat.replace(/[^\w\s]/g, "\\$&")}]`;
-    }
-    function prefixMatch(options) {
-        let first = Object.create(null), rest = Object.create(null);
-        for (let { label } of options) {
-            first[label[0]] = true;
-            for (let i = 1; i < label.length; i++)
-                rest[label[i]] = true;
-        }
-        let source = toSet(first) + toSet(rest) + "*$";
-        return [new RegExp("^" + source), new RegExp(source)];
-    }
-    /**
-    Given a a fixed array of options, return an autocompleter that
-    completes them.
-    */
-    function completeFromList(list) {
-        let options = list.map(o => typeof o == "string" ? { label: o } : o);
-        let [validFor, match] = options.every(o => /^\w+$/.test(o.label)) ? [/\w*$/, /\w+$/] : prefixMatch(options);
-        return (context) => {
-            let token = context.matchBefore(match);
-            return token || context.explicit ? { from: token ? token.from : context.pos, options, validFor } : null;
-        };
-    }
-    /**
-    Wrap the given completion source so that it will not fire when the
-    cursor is in a syntax node with one of the given names.
-    */
-    function ifNotIn(nodes, source) {
-        return (context) => {
-            for (let pos = syntaxTree(context.state).resolveInner(context.pos, -1); pos; pos = pos.parent) {
-                if (nodes.indexOf(pos.name) > -1)
-                    return null;
-                if (pos.type.isTop)
-                    break;
-            }
-            return source(context);
-        };
-    }
-    class Option {
-        constructor(completion, source, match, score) {
-            this.completion = completion;
-            this.source = source;
-            this.match = match;
-            this.score = score;
-        }
-    }
-    function cur(state) { return state.selection.main.from; }
-    // Make sure the given regexp has a $ at its end and, if `start` is
-    // true, a ^ at its start.
-    function ensureAnchor(expr, start) {
-        var _a;
-        let { source } = expr;
-        let addStart = start && source[0] != "^", addEnd = source[source.length - 1] != "$";
-        if (!addStart && !addEnd)
-            return expr;
-        return new RegExp(`${addStart ? "^" : ""}(?:${source})${addEnd ? "$" : ""}`, (_a = expr.flags) !== null && _a !== void 0 ? _a : (expr.ignoreCase ? "i" : ""));
-    }
-    /**
-    This annotation is added to transactions that are produced by
-    picking a completion.
-    */
-    const pickedCompletion = /*@__PURE__*/Annotation.define();
-    /**
-    Helper function that returns a transaction spec which inserts a
-    completion's text in the main selection range, and any other
-    selection range that has the same text in front of it.
-    */
-    function insertCompletionText(state, text, from, to) {
-        let { main } = state.selection, fromOff = from - main.from, toOff = to - main.from;
-        return Object.assign(Object.assign({}, state.changeByRange(range => {
-            if (range != main && from != to &&
-                state.sliceDoc(range.from + fromOff, range.from + toOff) != state.sliceDoc(from, to))
-                return { range };
-            return {
-                changes: { from: range.from + fromOff, to: to == main.from ? range.to : range.from + toOff, insert: text },
-                range: EditorSelection.cursor(range.from + fromOff + text.length)
-            };
-        })), { userEvent: "input.complete" });
-    }
-    const SourceCache = /*@__PURE__*/new WeakMap();
-    function asSource(source) {
-        if (!Array.isArray(source))
-            return source;
-        let known = SourceCache.get(source);
-        if (!known)
-            SourceCache.set(source, known = completeFromList(source));
-        return known;
-    }
-    const startCompletionEffect = /*@__PURE__*/StateEffect.define();
-    const closeCompletionEffect = /*@__PURE__*/StateEffect.define();
-
-    // A pattern matcher for fuzzy completion matching. Create an instance
-    // once for a pattern, and then use that to match any number of
-    // completions.
-    class FuzzyMatcher {
-        constructor(pattern) {
-            this.pattern = pattern;
-            this.chars = [];
-            this.folded = [];
-            // Buffers reused by calls to `match` to track matched character
-            // positions.
-            this.any = [];
-            this.precise = [];
-            this.byWord = [];
-            for (let p = 0; p < pattern.length;) {
-                let char = codePointAt(pattern, p), size = codePointSize(char);
-                this.chars.push(char);
-                let part = pattern.slice(p, p + size), upper = part.toUpperCase();
-                this.folded.push(codePointAt(upper == part ? part.toLowerCase() : upper, 0));
-                p += size;
-            }
-            this.astral = pattern.length != this.chars.length;
-        }
-        // Matches a given word (completion) against the pattern (input).
-        // Will return null for no match, and otherwise an array that starts
-        // with the match score, followed by any number of `from, to` pairs
-        // indicating the matched parts of `word`.
-        //
-        // The score is a number that is more negative the worse the match
-        // is. See `Penalty` above.
-        match(word) {
-            if (this.pattern.length == 0)
-                return [-100 /* NotFull */];
-            if (word.length < this.pattern.length)
-                return null;
-            let { chars, folded, any, precise, byWord } = this;
-            // For single-character queries, only match when they occur right
-            // at the start
-            if (chars.length == 1) {
-                let first = codePointAt(word, 0), firstSize = codePointSize(first);
-                let score = firstSize == word.length ? 0 : -100 /* NotFull */;
-                if (first == chars[0]) ;
-                else if (first == folded[0])
-                    score += -200 /* CaseFold */;
-                else
-                    return null;
-                return [score, 0, firstSize];
-            }
-            let direct = word.indexOf(this.pattern);
-            if (direct == 0)
-                return [word.length == this.pattern.length ? 0 : -100 /* NotFull */, 0, this.pattern.length];
-            let len = chars.length, anyTo = 0;
-            if (direct < 0) {
-                for (let i = 0, e = Math.min(word.length, 200); i < e && anyTo < len;) {
-                    let next = codePointAt(word, i);
-                    if (next == chars[anyTo] || next == folded[anyTo])
-                        any[anyTo++] = i;
-                    i += codePointSize(next);
-                }
-                // No match, exit immediately
-                if (anyTo < len)
-                    return null;
-            }
-            // This tracks the extent of the precise (non-folded, not
-            // necessarily adjacent) match
-            let preciseTo = 0;
-            // Tracks whether there is a match that hits only characters that
-            // appear to be starting words. `byWordFolded` is set to true when
-            // a case folded character is encountered in such a match
-            let byWordTo = 0, byWordFolded = false;
-            // If we've found a partial adjacent match, these track its state
-            let adjacentTo = 0, adjacentStart = -1, adjacentEnd = -1;
-            let hasLower = /[a-z]/.test(word), wordAdjacent = true;
-            // Go over the option's text, scanning for the various kinds of matches
-            for (let i = 0, e = Math.min(word.length, 200), prevType = 0 /* NonWord */; i < e && byWordTo < len;) {
-                let next = codePointAt(word, i);
-                if (direct < 0) {
-                    if (preciseTo < len && next == chars[preciseTo])
-                        precise[preciseTo++] = i;
-                    if (adjacentTo < len) {
-                        if (next == chars[adjacentTo] || next == folded[adjacentTo]) {
-                            if (adjacentTo == 0)
-                                adjacentStart = i;
-                            adjacentEnd = i + 1;
-                            adjacentTo++;
-                        }
-                        else {
-                            adjacentTo = 0;
-                        }
-                    }
-                }
-                let ch, type = next < 0xff
-                    ? (next >= 48 && next <= 57 || next >= 97 && next <= 122 ? 2 /* Lower */ : next >= 65 && next <= 90 ? 1 /* Upper */ : 0 /* NonWord */)
-                    : ((ch = fromCodePoint(next)) != ch.toLowerCase() ? 1 /* Upper */ : ch != ch.toUpperCase() ? 2 /* Lower */ : 0 /* NonWord */);
-                if (!i || type == 1 /* Upper */ && hasLower || prevType == 0 /* NonWord */ && type != 0 /* NonWord */) {
-                    if (chars[byWordTo] == next || (folded[byWordTo] == next && (byWordFolded = true)))
-                        byWord[byWordTo++] = i;
-                    else if (byWord.length)
-                        wordAdjacent = false;
-                }
-                prevType = type;
-                i += codePointSize(next);
-            }
-            if (byWordTo == len && byWord[0] == 0 && wordAdjacent)
-                return this.result(-100 /* ByWord */ + (byWordFolded ? -200 /* CaseFold */ : 0), byWord, word);
-            if (adjacentTo == len && adjacentStart == 0)
-                return [-200 /* CaseFold */ - word.length + (adjacentEnd == word.length ? 0 : -100 /* NotFull */), 0, adjacentEnd];
-            if (direct > -1)
-                return [-700 /* NotStart */ - word.length, direct, direct + this.pattern.length];
-            if (adjacentTo == len)
-                return [-200 /* CaseFold */ + -700 /* NotStart */ - word.length, adjacentStart, adjacentEnd];
-            if (byWordTo == len)
-                return this.result(-100 /* ByWord */ + (byWordFolded ? -200 /* CaseFold */ : 0) + -700 /* NotStart */ +
-                    (wordAdjacent ? 0 : -1100 /* Gap */), byWord, word);
-            return chars.length == 2 ? null : this.result((any[0] ? -700 /* NotStart */ : 0) + -200 /* CaseFold */ + -1100 /* Gap */, any, word);
-        }
-        result(score, positions, word) {
-            let result = [score - word.length], i = 1;
-            for (let pos of positions) {
-                let to = pos + (this.astral ? codePointSize(codePointAt(word, pos)) : 1);
-                if (i > 1 && result[i - 1] == pos)
-                    result[i - 1] = to;
-                else {
-                    result[i++] = pos;
-                    result[i++] = to;
-                }
-            }
-            return result;
-        }
-    }
-
-    const completionConfig = /*@__PURE__*/Facet.define({
-        combine(configs) {
-            return combineConfig(configs, {
-                activateOnTyping: true,
-                selectOnOpen: true,
-                override: null,
-                closeOnBlur: true,
-                maxRenderedOptions: 100,
-                defaultKeymap: true,
-                tooltipClass: () => "",
-                optionClass: () => "",
-                aboveCursor: false,
-                icons: true,
-                addToOptions: [],
-                positionInfo: defaultPositionInfo,
-                compareCompletions: (a, b) => a.label.localeCompare(b.label),
-                interactionDelay: 75
-            }, {
-                defaultKeymap: (a, b) => a && b,
-                closeOnBlur: (a, b) => a && b,
-                icons: (a, b) => a && b,
-                tooltipClass: (a, b) => c => joinClass(a(c), b(c)),
-                optionClass: (a, b) => c => joinClass(a(c), b(c)),
-                addToOptions: (a, b) => a.concat(b)
-            });
-        }
-    });
-    function joinClass(a, b) {
-        return a ? b ? a + " " + b : a : b;
-    }
-    function defaultPositionInfo(view, list, option, info, space) {
-        let rtl = view.textDirection == Direction.RTL, left = rtl, narrow = false;
-        let side = "top", offset, maxWidth;
-        let spaceLeft = list.left - space.left, spaceRight = space.right - list.right;
-        let infoWidth = info.right - info.left, infoHeight = info.bottom - info.top;
-        if (left && spaceLeft < Math.min(infoWidth, spaceRight))
-            left = false;
-        else if (!left && spaceRight < Math.min(infoWidth, spaceLeft))
-            left = true;
-        if (infoWidth <= (left ? spaceLeft : spaceRight)) {
-            offset = Math.max(space.top, Math.min(option.top, space.bottom - infoHeight)) - list.top;
-            maxWidth = Math.min(400 /* Width */, left ? spaceLeft : spaceRight);
-        }
-        else {
-            narrow = true;
-            maxWidth = Math.min(400 /* Width */, (rtl ? list.right : space.right - list.left) - 30 /* Margin */);
-            let spaceBelow = space.bottom - list.bottom;
-            if (spaceBelow >= infoHeight || spaceBelow > list.top) { // Below the completion
-                offset = option.bottom - list.top;
-            }
-            else { // Above it
-                side = "bottom";
-                offset = list.bottom - option.top;
-            }
-        }
-        return {
-            style: `${side}: ${offset}px; max-width: ${maxWidth}px`,
-            class: "cm-completionInfo-" + (narrow ? (rtl ? "left-narrow" : "right-narrow") : left ? "left" : "right")
-        };
-    }
-
-    function optionContent(config) {
-        let content = config.addToOptions.slice();
-        if (config.icons)
-            content.push({
-                render(completion) {
-                    let icon = document.createElement("div");
-                    icon.classList.add("cm-completionIcon");
-                    if (completion.type)
-                        icon.classList.add(...completion.type.split(/\s+/g).map(cls => "cm-completionIcon-" + cls));
-                    icon.setAttribute("aria-hidden", "true");
-                    return icon;
-                },
-                position: 20
-            });
-        content.push({
-            render(completion, _s, match) {
-                let labelElt = document.createElement("span");
-                labelElt.className = "cm-completionLabel";
-                let { label } = completion, off = 0;
-                for (let j = 1; j < match.length;) {
-                    let from = match[j++], to = match[j++];
-                    if (from > off)
-                        labelElt.appendChild(document.createTextNode(label.slice(off, from)));
-                    let span = labelElt.appendChild(document.createElement("span"));
-                    span.appendChild(document.createTextNode(label.slice(from, to)));
-                    span.className = "cm-completionMatchedText";
-                    off = to;
-                }
-                if (off < label.length)
-                    labelElt.appendChild(document.createTextNode(label.slice(off)));
-                return labelElt;
-            },
-            position: 50
-        }, {
-            render(completion) {
-                if (!completion.detail)
-                    return null;
-                let detailElt = document.createElement("span");
-                detailElt.className = "cm-completionDetail";
-                detailElt.textContent = completion.detail;
-                return detailElt;
-            },
-            position: 80
-        });
-        return content.sort((a, b) => a.position - b.position).map(a => a.render);
-    }
-    function rangeAroundSelected(total, selected, max) {
-        if (total <= max)
-            return { from: 0, to: total };
-        if (selected < 0)
-            selected = 0;
-        if (selected <= (total >> 1)) {
-            let off = Math.floor(selected / max);
-            return { from: off * max, to: (off + 1) * max };
-        }
-        let off = Math.floor((total - selected) / max);
-        return { from: total - (off + 1) * max, to: total - off * max };
-    }
-    class CompletionTooltip {
-        constructor(view, stateField, applyCompletion) {
-            this.view = view;
-            this.stateField = stateField;
-            this.applyCompletion = applyCompletion;
-            this.info = null;
-            this.infoDestroy = null;
-            this.placeInfoReq = {
-                read: () => this.measureInfo(),
-                write: (pos) => this.placeInfo(pos),
-                key: this
-            };
-            this.space = null;
-            this.currentClass = "";
-            let cState = view.state.field(stateField);
-            let { options, selected } = cState.open;
-            let config = view.state.facet(completionConfig);
-            this.optionContent = optionContent(config);
-            this.optionClass = config.optionClass;
-            this.tooltipClass = config.tooltipClass;
-            this.range = rangeAroundSelected(options.length, selected, config.maxRenderedOptions);
-            this.dom = document.createElement("div");
-            this.dom.className = "cm-tooltip-autocomplete";
-            this.updateTooltipClass(view.state);
-            this.dom.addEventListener("mousedown", (e) => {
-                for (let dom = e.target, match; dom && dom != this.dom; dom = dom.parentNode) {
-                    if (dom.nodeName == "LI" && (match = /-(\d+)$/.exec(dom.id)) && +match[1] < options.length) {
-                        this.applyCompletion(view, options[+match[1]]);
-                        e.preventDefault();
-                        return;
-                    }
-                }
-            });
-            this.dom.addEventListener("focusout", (e) => {
-                let state = view.state.field(this.stateField, false);
-                if (state && state.tooltip && view.state.facet(completionConfig).closeOnBlur &&
-                    e.relatedTarget != view.contentDOM)
-                    view.dispatch({ effects: closeCompletionEffect.of(null) });
-            });
-            this.list = this.dom.appendChild(this.createListBox(options, cState.id, this.range));
-            this.list.addEventListener("scroll", () => {
-                if (this.info)
-                    this.view.requestMeasure(this.placeInfoReq);
-            });
-        }
-        mount() { this.updateSel(); }
-        update(update) {
-            var _a, _b, _c;
-            let cState = update.state.field(this.stateField);
-            let prevState = update.startState.field(this.stateField);
-            this.updateTooltipClass(update.state);
-            if (cState != prevState) {
-                this.updateSel();
-                if (((_a = cState.open) === null || _a === void 0 ? void 0 : _a.disabled) != ((_b = prevState.open) === null || _b === void 0 ? void 0 : _b.disabled))
-                    this.dom.classList.toggle("cm-tooltip-autocomplete-disabled", !!((_c = cState.open) === null || _c === void 0 ? void 0 : _c.disabled));
-            }
-        }
-        updateTooltipClass(state) {
-            let cls = this.tooltipClass(state);
-            if (cls != this.currentClass) {
-                for (let c of this.currentClass.split(" "))
-                    if (c)
-                        this.dom.classList.remove(c);
-                for (let c of cls.split(" "))
-                    if (c)
-                        this.dom.classList.add(c);
-                this.currentClass = cls;
-            }
-        }
-        positioned(space) {
-            this.space = space;
-            if (this.info)
-                this.view.requestMeasure(this.placeInfoReq);
-        }
-        updateSel() {
-            let cState = this.view.state.field(this.stateField), open = cState.open;
-            if (open.selected > -1 && open.selected < this.range.from || open.selected >= this.range.to) {
-                this.range = rangeAroundSelected(open.options.length, open.selected, this.view.state.facet(completionConfig).maxRenderedOptions);
-                this.list.remove();
-                this.list = this.dom.appendChild(this.createListBox(open.options, cState.id, this.range));
-                this.list.addEventListener("scroll", () => {
-                    if (this.info)
-                        this.view.requestMeasure(this.placeInfoReq);
-                });
-            }
-            if (this.updateSelectedOption(open.selected)) {
-                this.destroyInfo();
-                let { completion } = open.options[open.selected];
-                let { info } = completion;
-                if (!info)
-                    return;
-                let infoResult = typeof info === "string" ? document.createTextNode(info) : info(completion);
-                if (!infoResult)
-                    return;
-                if ("then" in infoResult) {
-                    infoResult.then(obj => {
-                        if (obj && this.view.state.field(this.stateField, false) == cState)
-                            this.addInfoPane(obj, completion);
-                    }).catch(e => logException(this.view.state, e, "completion info"));
-                }
-                else {
-                    this.addInfoPane(infoResult, completion);
-                }
-            }
-        }
-        addInfoPane(content, completion) {
-            this.destroyInfo();
-            let wrap = this.info = document.createElement("div");
-            wrap.className = "cm-tooltip cm-completionInfo";
-            if (content.nodeType != null) {
-                wrap.appendChild(content);
-                this.infoDestroy = null;
-            }
-            else {
-                let { dom, destroy } = content;
-                wrap.appendChild(dom);
-                this.infoDestroy = destroy || null;
-            }
-            this.dom.appendChild(wrap);
-            this.view.requestMeasure(this.placeInfoReq);
-        }
-        updateSelectedOption(selected) {
-            let set = null;
-            for (let opt = this.list.firstChild, i = this.range.from; opt; opt = opt.nextSibling, i++) {
-                if (opt.nodeName != "LI" || !opt.id) {
-                    i--; // A section header
-                }
-                else if (i == selected) {
-                    if (!opt.hasAttribute("aria-selected")) {
-                        opt.setAttribute("aria-selected", "true");
-                        set = opt;
-                    }
-                }
-                else {
-                    if (opt.hasAttribute("aria-selected"))
-                        opt.removeAttribute("aria-selected");
-                }
-            }
-            if (set)
-                scrollIntoView(this.list, set);
-            return set;
-        }
-        measureInfo() {
-            let sel = this.dom.querySelector("[aria-selected]");
-            if (!sel || !this.info)
-                return null;
-            let listRect = this.dom.getBoundingClientRect();
-            let infoRect = this.info.getBoundingClientRect();
-            let selRect = sel.getBoundingClientRect();
-            let space = this.space;
-            if (!space) {
-                let win = this.dom.ownerDocument.defaultView || window;
-                space = { left: 0, top: 0, right: win.innerWidth, bottom: win.innerHeight };
-            }
-            if (selRect.top > Math.min(space.bottom, listRect.bottom) - 10 ||
-                selRect.bottom < Math.max(space.top, listRect.top) + 10)
-                return null;
-            return this.view.state.facet(completionConfig).positionInfo(this.view, listRect, selRect, infoRect, space);
-        }
-        placeInfo(pos) {
-            if (this.info) {
-                if (pos) {
-                    if (pos.style)
-                        this.info.style.cssText = pos.style;
-                    this.info.className = "cm-tooltip cm-completionInfo " + (pos.class || "");
-                }
-                else {
-                    this.info.style.cssText = "top: -1e6px";
-                }
-            }
-        }
-        createListBox(options, id, range) {
-            const ul = document.createElement("ul");
-            ul.id = id;
-            ul.setAttribute("role", "listbox");
-            ul.setAttribute("aria-expanded", "true");
-            ul.setAttribute("aria-label", this.view.state.phrase("Completions"));
-            let curSection = null;
-            for (let i = range.from; i < range.to; i++) {
-                let { completion, match } = options[i], { section } = completion;
-                if (section) {
-                    let name = typeof section == "string" ? section : section.name;
-                    if (name != curSection && (i > range.from || range.from == 0)) {
-                        curSection = name;
-                        if (typeof section != "string" && section.header) {
-                            ul.appendChild(section.header(section));
-                        }
-                        else {
-                            let header = ul.appendChild(document.createElement("completion-section"));
-                            header.textContent = name;
-                        }
-                    }
-                }
-                const li = ul.appendChild(document.createElement("li"));
-                li.id = id + "-" + i;
-                li.setAttribute("role", "option");
-                let cls = this.optionClass(completion);
-                if (cls)
-                    li.className = cls;
-                for (let source of this.optionContent) {
-                    let node = source(completion, this.view.state, match);
-                    if (node)
-                        li.appendChild(node);
-                }
-            }
-            if (range.from)
-                ul.classList.add("cm-completionListIncompleteTop");
-            if (range.to < options.length)
-                ul.classList.add("cm-completionListIncompleteBottom");
-            return ul;
-        }
-        destroyInfo() {
-            if (this.info) {
-                if (this.infoDestroy)
-                    this.infoDestroy();
-                this.info.remove();
-                this.info = null;
-            }
-        }
-        destroy() {
-            this.destroyInfo();
-        }
-    }
-    // We allocate a new function instance every time the completion
-    // changes to force redrawing/repositioning of the tooltip
-    function completionTooltip(stateField, applyCompletion) {
-        return (view) => new CompletionTooltip(view, stateField, applyCompletion);
-    }
-    function scrollIntoView(container, element) {
-        let parent = container.getBoundingClientRect();
-        let self = element.getBoundingClientRect();
-        if (self.top < parent.top)
-            container.scrollTop -= parent.top - self.top;
-        else if (self.bottom > parent.bottom)
-            container.scrollTop += self.bottom - parent.bottom;
-    }
-
-    // Used to pick a preferred option when two options with the same
-    // label occur in the result.
-    function score(option) {
-        return (option.boost || 0) * 100 + (option.apply ? 10 : 0) + (option.info ? 5 : 0) +
-            (option.type ? 1 : 0);
-    }
-    function sortOptions(active, state) {
-        let options = [];
-        let sections = null;
-        let addOption = (option) => {
-            options.push(option);
-            let { section } = option.completion;
-            if (section) {
-                if (!sections)
-                    sections = [];
-                let name = typeof section == "string" ? section : section.name;
-                if (!sections.some(s => s.name == name))
-                    sections.push(typeof section == "string" ? { name } : section);
-            }
-        };
-        for (let a of active)
-            if (a.hasResult()) {
-                if (a.result.filter === false) {
-                    let getMatch = a.result.getMatch;
-                    for (let option of a.result.options) {
-                        let match = [1e9 - options.length];
-                        if (getMatch)
-                            for (let n of getMatch(option))
-                                match.push(n);
-                        addOption(new Option(option, a.source, match, match[0]));
-                    }
-                }
-                else {
-                    let matcher = new FuzzyMatcher(state.sliceDoc(a.from, a.to)), match;
-                    for (let option of a.result.options)
-                        if (match = matcher.match(option.label)) {
-                            addOption(new Option(option, a.source, match, match[0] + (option.boost || 0)));
-                        }
-                }
-            }
-        if (sections) {
-            let sectionOrder = Object.create(null), pos = 0;
-            let cmp = (a, b) => { var _a, _b; return ((_a = a.rank) !== null && _a !== void 0 ? _a : 1e9) - ((_b = b.rank) !== null && _b !== void 0 ? _b : 1e9) || (a.name < b.name ? -1 : 1); };
-            for (let s of sections.sort(cmp)) {
-                pos -= 1e5;
-                sectionOrder[s.name] = pos;
-            }
-            for (let option of options) {
-                let { section } = option.completion;
-                if (section)
-                    option.score += sectionOrder[typeof section == "string" ? section : section.name];
-            }
-        }
-        let result = [], prev = null;
-        let compare = state.facet(completionConfig).compareCompletions;
-        for (let opt of options.sort((a, b) => (b.score - a.score) || compare(a.completion, b.completion))) {
-            if (!prev || prev.label != opt.completion.label || prev.detail != opt.completion.detail ||
-                (prev.type != null && opt.completion.type != null && prev.type != opt.completion.type) ||
-                prev.apply != opt.completion.apply)
-                result.push(opt);
-            else if (score(opt.completion) > score(prev))
-                result[result.length - 1] = opt;
-            prev = opt.completion;
-        }
-        return result;
-    }
-    class CompletionDialog {
-        constructor(options, attrs, tooltip, timestamp, selected, disabled) {
-            this.options = options;
-            this.attrs = attrs;
-            this.tooltip = tooltip;
-            this.timestamp = timestamp;
-            this.selected = selected;
-            this.disabled = disabled;
-        }
-        setSelected(selected, id) {
-            return selected == this.selected || selected >= this.options.length ? this
-                : new CompletionDialog(this.options, makeAttrs(id, selected), this.tooltip, this.timestamp, selected, this.disabled);
-        }
-        static build(active, state, id, prev, conf) {
-            let options = sortOptions(active, state);
-            if (!options.length) {
-                return prev && active.some(a => a.state == 1 /* Pending */) ?
-                    new CompletionDialog(prev.options, prev.attrs, prev.tooltip, prev.timestamp, prev.selected, true) : null;
-            }
-            let selected = state.facet(completionConfig).selectOnOpen ? 0 : -1;
-            if (prev && prev.selected != selected && prev.selected != -1) {
-                let selectedValue = prev.options[prev.selected].completion;
-                for (let i = 0; i < options.length; i++)
-                    if (options[i].completion == selectedValue) {
-                        selected = i;
-                        break;
-                    }
-            }
-            return new CompletionDialog(options, makeAttrs(id, selected), {
-                pos: active.reduce((a, b) => b.hasResult() ? Math.min(a, b.from) : a, 1e8),
-                create: completionTooltip(completionState, applyCompletion),
-                above: conf.aboveCursor,
-            }, prev ? prev.timestamp : Date.now(), selected, false);
-        }
-        map(changes) {
-            return new CompletionDialog(this.options, this.attrs, Object.assign(Object.assign({}, this.tooltip), { pos: changes.mapPos(this.tooltip.pos) }), this.timestamp, this.selected, this.disabled);
-        }
-    }
-    class CompletionState {
-        constructor(active, id, open) {
-            this.active = active;
-            this.id = id;
-            this.open = open;
-        }
-        static start() {
-            return new CompletionState(none, "cm-ac-" + Math.floor(Math.random() * 2e6).toString(36), null);
-        }
-        update(tr) {
-            let { state } = tr, conf = state.facet(completionConfig);
-            let sources = conf.override ||
-                state.languageDataAt("autocomplete", cur(state)).map(asSource);
-            let active = sources.map(source => {
-                let value = this.active.find(s => s.source == source) ||
-                    new ActiveSource(source, this.active.some(a => a.state != 0 /* Inactive */) ? 1 /* Pending */ : 0 /* Inactive */);
-                return value.update(tr, conf);
-            });
-            if (active.length == this.active.length && active.every((a, i) => a == this.active[i]))
-                active = this.active;
-            let open = this.open;
-            if (open && tr.docChanged)
-                open = open.map(tr.changes);
-            if (tr.selection || active.some(a => a.hasResult() && tr.changes.touchesRange(a.from, a.to)) ||
-                !sameResults(active, this.active))
-                open = CompletionDialog.build(active, state, this.id, open, conf);
-            else if (open && open.disabled && !active.some(a => a.state == 1 /* Pending */))
-                open = null;
-            if (!open && active.every(a => a.state != 1 /* Pending */) && active.some(a => a.hasResult()))
-                active = active.map(a => a.hasResult() ? new ActiveSource(a.source, 0 /* Inactive */) : a);
-            for (let effect of tr.effects)
-                if (effect.is(setSelectedEffect))
-                    open = open && open.setSelected(effect.value, this.id);
-            return active == this.active && open == this.open ? this : new CompletionState(active, this.id, open);
-        }
-        get tooltip() { return this.open ? this.open.tooltip : null; }
-        get attrs() { return this.open ? this.open.attrs : baseAttrs; }
-    }
-    function sameResults(a, b) {
-        if (a == b)
-            return true;
-        for (let iA = 0, iB = 0;;) {
-            while (iA < a.length && !a[iA].hasResult)
-                iA++;
-            while (iB < b.length && !b[iB].hasResult)
-                iB++;
-            let endA = iA == a.length, endB = iB == b.length;
-            if (endA || endB)
-                return endA == endB;
-            if (a[iA++].result != b[iB++].result)
-                return false;
-        }
-    }
-    const baseAttrs = {
-        "aria-autocomplete": "list"
-    };
-    function makeAttrs(id, selected) {
-        let result = {
-            "aria-autocomplete": "list",
-            "aria-haspopup": "listbox",
-            "aria-controls": id
-        };
-        if (selected > -1)
-            result["aria-activedescendant"] = id + "-" + selected;
-        return result;
-    }
-    const none = [];
-    function getUserEvent(tr) {
-        return tr.isUserEvent("input.type") ? "input" : tr.isUserEvent("delete.backward") ? "delete" : null;
-    }
-    class ActiveSource {
-        constructor(source, state, explicitPos = -1) {
-            this.source = source;
-            this.state = state;
-            this.explicitPos = explicitPos;
-        }
-        hasResult() { return false; }
-        update(tr, conf) {
-            let event = getUserEvent(tr), value = this;
-            if (event)
-                value = value.handleUserEvent(tr, event, conf);
-            else if (tr.docChanged)
-                value = value.handleChange(tr);
-            else if (tr.selection && value.state != 0 /* Inactive */)
-                value = new ActiveSource(value.source, 0 /* Inactive */);
-            for (let effect of tr.effects) {
-                if (effect.is(startCompletionEffect))
-                    value = new ActiveSource(value.source, 1 /* Pending */, effect.value ? cur(tr.state) : -1);
-                else if (effect.is(closeCompletionEffect))
-                    value = new ActiveSource(value.source, 0 /* Inactive */);
-                else if (effect.is(setActiveEffect))
-                    for (let active of effect.value)
-                        if (active.source == value.source)
-                            value = active;
-            }
-            return value;
-        }
-        handleUserEvent(tr, type, conf) {
-            return type == "delete" || !conf.activateOnTyping ? this.map(tr.changes) : new ActiveSource(this.source, 1 /* Pending */);
-        }
-        handleChange(tr) {
-            return tr.changes.touchesRange(cur(tr.startState)) ? new ActiveSource(this.source, 0 /* Inactive */) : this.map(tr.changes);
-        }
-        map(changes) {
-            return changes.empty || this.explicitPos < 0 ? this : new ActiveSource(this.source, this.state, changes.mapPos(this.explicitPos));
-        }
-    }
-    class ActiveResult extends ActiveSource {
-        constructor(source, explicitPos, result, from, to) {
-            super(source, 2 /* Result */, explicitPos);
-            this.result = result;
-            this.from = from;
-            this.to = to;
-        }
-        hasResult() { return true; }
-        handleUserEvent(tr, type, conf) {
-            var _a;
-            let from = tr.changes.mapPos(this.from), to = tr.changes.mapPos(this.to, 1);
-            let pos = cur(tr.state);
-            if ((this.explicitPos < 0 ? pos <= from : pos < this.from) ||
-                pos > to ||
-                type == "delete" && cur(tr.startState) == this.from)
-                return new ActiveSource(this.source, type == "input" && conf.activateOnTyping ? 1 /* Pending */ : 0 /* Inactive */);
-            let explicitPos = this.explicitPos < 0 ? -1 : tr.changes.mapPos(this.explicitPos), updated;
-            if (checkValid(this.result.validFor, tr.state, from, to))
-                return new ActiveResult(this.source, explicitPos, this.result, from, to);
-            if (this.result.update &&
-                (updated = this.result.update(this.result, from, to, new CompletionContext(tr.state, pos, explicitPos >= 0))))
-                return new ActiveResult(this.source, explicitPos, updated, updated.from, (_a = updated.to) !== null && _a !== void 0 ? _a : cur(tr.state));
-            return new ActiveSource(this.source, 1 /* Pending */, explicitPos);
-        }
-        handleChange(tr) {
-            return tr.changes.touchesRange(this.from, this.to) ? new ActiveSource(this.source, 0 /* Inactive */) : this.map(tr.changes);
-        }
-        map(mapping) {
-            return mapping.empty ? this :
-                new ActiveResult(this.source, this.explicitPos < 0 ? -1 : mapping.mapPos(this.explicitPos), this.result, mapping.mapPos(this.from), mapping.mapPos(this.to, 1));
-        }
-    }
-    function checkValid(validFor, state, from, to) {
-        if (!validFor)
-            return false;
-        let text = state.sliceDoc(from, to);
-        return typeof validFor == "function" ? validFor(text, from, to, state) : ensureAnchor(validFor, true).test(text);
-    }
-    const setActiveEffect = /*@__PURE__*/StateEffect.define({
-        map(sources, mapping) { return sources.map(s => s.map(mapping)); }
-    });
-    const setSelectedEffect = /*@__PURE__*/StateEffect.define();
-    const completionState = /*@__PURE__*/StateField.define({
-        create() { return CompletionState.start(); },
-        update(value, tr) { return value.update(tr); },
-        provide: f => [
-            showTooltip.from(f, val => val.tooltip),
-            EditorView.contentAttributes.from(f, state => state.attrs)
-        ]
-    });
-    function applyCompletion(view, option) {
-        const apply = option.completion.apply || option.completion.label;
-        let result = view.state.field(completionState).active.find(a => a.source == option.source);
-        if (!(result instanceof ActiveResult))
-            return false;
-        if (typeof apply == "string")
-            view.dispatch(Object.assign(Object.assign({}, insertCompletionText(view.state, apply, result.from, result.to)), { annotations: pickedCompletion.of(option.completion) }));
-        else
-            apply(view, option.completion, result.from, result.to);
-        return true;
-    }
-
-    /**
-    Returns a command that moves the completion selection forward or
-    backward by the given amount.
-    */
-    function moveCompletionSelection(forward, by = "option") {
-        return (view) => {
-            let cState = view.state.field(completionState, false);
-            if (!cState || !cState.open || cState.open.disabled ||
-                Date.now() - cState.open.timestamp < view.state.facet(completionConfig).interactionDelay)
-                return false;
-            let step = 1, tooltip;
-            if (by == "page" && (tooltip = getTooltip$1(view, cState.open.tooltip)))
-                step = Math.max(2, Math.floor(tooltip.dom.offsetHeight /
-                    tooltip.dom.querySelector("li").offsetHeight) - 1);
-            let { length } = cState.open.options;
-            let selected = cState.open.selected > -1 ? cState.open.selected + step * (forward ? 1 : -1) : forward ? 0 : length - 1;
-            if (selected < 0)
-                selected = by == "page" ? 0 : length - 1;
-            else if (selected >= length)
-                selected = by == "page" ? length - 1 : 0;
-            view.dispatch({ effects: setSelectedEffect.of(selected) });
-            return true;
-        };
-    }
-    /**
-    Accept the current completion.
-    */
-    const acceptCompletion = (view) => {
-        let cState = view.state.field(completionState, false);
-        if (view.state.readOnly || !cState || !cState.open || cState.open.selected < 0 ||
-            Date.now() - cState.open.timestamp < view.state.facet(completionConfig).interactionDelay)
-            return false;
-        if (!cState.open.disabled)
-            return applyCompletion(view, cState.open.options[cState.open.selected]);
-        return true;
-    };
-    /**
-    Explicitly start autocompletion.
-    */
-    const startCompletion = (view) => {
-        let cState = view.state.field(completionState, false);
-        if (!cState)
-            return false;
-        view.dispatch({ effects: startCompletionEffect.of(true) });
-        return true;
-    };
-    /**
-    Close the currently active completion.
-    */
-    const closeCompletion = (view) => {
-        let cState = view.state.field(completionState, false);
-        if (!cState || !cState.active.some(a => a.state != 0 /* Inactive */))
-            return false;
-        view.dispatch({ effects: closeCompletionEffect.of(null) });
-        return true;
-    };
-    class RunningQuery {
-        constructor(active, context) {
-            this.active = active;
-            this.context = context;
-            this.time = Date.now();
-            this.updates = [];
-            // Note that 'undefined' means 'not done yet', whereas 'null' means
-            // 'query returned null'.
-            this.done = undefined;
-        }
-    }
-    const DebounceTime = 50, MaxUpdateCount = 50, MinAbortTime = 1000;
-    const completionPlugin = /*@__PURE__*/ViewPlugin.fromClass(class {
-        constructor(view) {
-            this.view = view;
-            this.debounceUpdate = -1;
-            this.running = [];
-            this.debounceAccept = -1;
-            this.composing = 0 /* None */;
-            for (let active of view.state.field(completionState).active)
-                if (active.state == 1 /* Pending */)
-                    this.startQuery(active);
-        }
-        update(update) {
-            let cState = update.state.field(completionState);
-            if (!update.selectionSet && !update.docChanged && update.startState.field(completionState) == cState)
-                return;
-            let doesReset = update.transactions.some(tr => {
-                return (tr.selection || tr.docChanged) && !getUserEvent(tr);
-            });
-            for (let i = 0; i < this.running.length; i++) {
-                let query = this.running[i];
-                if (doesReset ||
-                    query.updates.length + update.transactions.length > MaxUpdateCount && Date.now() - query.time > MinAbortTime) {
-                    for (let handler of query.context.abortListeners) {
-                        try {
-                            handler();
-                        }
-                        catch (e) {
-                            logException(this.view.state, e);
-                        }
-                    }
-                    query.context.abortListeners = null;
-                    this.running.splice(i--, 1);
-                }
-                else {
-                    query.updates.push(...update.transactions);
-                }
-            }
-            if (this.debounceUpdate > -1)
-                clearTimeout(this.debounceUpdate);
-            this.debounceUpdate = cState.active.some(a => a.state == 1 /* Pending */ && !this.running.some(q => q.active.source == a.source))
-                ? setTimeout(() => this.startUpdate(), DebounceTime) : -1;
-            if (this.composing != 0 /* None */)
-                for (let tr of update.transactions) {
-                    if (getUserEvent(tr) == "input")
-                        this.composing = 2 /* Changed */;
-                    else if (this.composing == 2 /* Changed */ && tr.selection)
-                        this.composing = 3 /* ChangedAndMoved */;
-                }
-        }
-        startUpdate() {
-            this.debounceUpdate = -1;
-            let { state } = this.view, cState = state.field(completionState);
-            for (let active of cState.active) {
-                if (active.state == 1 /* Pending */ && !this.running.some(r => r.active.source == active.source))
-                    this.startQuery(active);
-            }
-        }
-        startQuery(active) {
-            let { state } = this.view, pos = cur(state);
-            let context = new CompletionContext(state, pos, active.explicitPos == pos);
-            let pending = new RunningQuery(active, context);
-            this.running.push(pending);
-            Promise.resolve(active.source(context)).then(result => {
-                if (!pending.context.aborted) {
-                    pending.done = result || null;
-                    this.scheduleAccept();
-                }
-            }, err => {
-                this.view.dispatch({ effects: closeCompletionEffect.of(null) });
-                logException(this.view.state, err);
-            });
-        }
-        scheduleAccept() {
-            if (this.running.every(q => q.done !== undefined))
-                this.accept();
-            else if (this.debounceAccept < 0)
-                this.debounceAccept = setTimeout(() => this.accept(), DebounceTime);
-        }
-        // For each finished query in this.running, try to create a result
-        // or, if appropriate, restart the query.
-        accept() {
-            var _a;
-            if (this.debounceAccept > -1)
-                clearTimeout(this.debounceAccept);
-            this.debounceAccept = -1;
-            let updated = [];
-            let conf = this.view.state.facet(completionConfig);
-            for (let i = 0; i < this.running.length; i++) {
-                let query = this.running[i];
-                if (query.done === undefined)
-                    continue;
-                this.running.splice(i--, 1);
-                if (query.done) {
-                    let active = new ActiveResult(query.active.source, query.active.explicitPos, query.done, query.done.from, (_a = query.done.to) !== null && _a !== void 0 ? _a : cur(query.updates.length ? query.updates[0].startState : this.view.state));
-                    // Replay the transactions that happened since the start of
-                    // the request and see if that preserves the result
-                    for (let tr of query.updates)
-                        active = active.update(tr, conf);
-                    if (active.hasResult()) {
-                        updated.push(active);
-                        continue;
-                    }
-                }
-                let current = this.view.state.field(completionState).active.find(a => a.source == query.active.source);
-                if (current && current.state == 1 /* Pending */) {
-                    if (query.done == null) {
-                        // Explicitly failed. Should clear the pending status if it
-                        // hasn't been re-set in the meantime.
-                        let active = new ActiveSource(query.active.source, 0 /* Inactive */);
-                        for (let tr of query.updates)
-                            active = active.update(tr, conf);
-                        if (active.state != 1 /* Pending */)
-                            updated.push(active);
-                    }
-                    else {
-                        // Cleared by subsequent transactions. Restart.
-                        this.startQuery(current);
-                    }
-                }
-            }
-            if (updated.length)
-                this.view.dispatch({ effects: setActiveEffect.of(updated) });
-        }
-    }, {
-        eventHandlers: {
-            blur(event) {
-                let state = this.view.state.field(completionState, false);
-                if (state && state.tooltip && this.view.state.facet(completionConfig).closeOnBlur) {
-                    let dialog = state.open && getTooltip$1(this.view, state.open.tooltip);
-                    if (!dialog || !dialog.dom.contains(event.relatedTarget))
-                        this.view.dispatch({ effects: closeCompletionEffect.of(null) });
-                }
-            },
-            compositionstart() {
-                this.composing = 1 /* Started */;
-            },
-            compositionend() {
-                if (this.composing == 3 /* ChangedAndMoved */) {
-                    // Safari fires compositionend events synchronously, possibly
-                    // from inside an update, so dispatch asynchronously to avoid reentrancy
-                    setTimeout(() => this.view.dispatch({ effects: startCompletionEffect.of(false) }), 20);
-                }
-                this.composing = 0 /* None */;
-            }
-        }
-    });
-
-    const baseTheme$1 = /*@__PURE__*/EditorView.baseTheme({
-        ".cm-tooltip.cm-tooltip-autocomplete": {
-            "& > ul": {
-                fontFamily: "monospace",
-                whiteSpace: "nowrap",
-                overflow: "hidden auto",
-                maxWidth_fallback: "700px",
-                maxWidth: "min(700px, 95vw)",
-                minWidth: "250px",
-                maxHeight: "10em",
-                height: "100%",
-                listStyle: "none",
-                margin: 0,
-                padding: 0,
-                "& > li, & > completion-section": {
-                    padding: "1px 3px",
-                    lineHeight: 1.2
-                },
-                "& > li": {
-                    overflowX: "hidden",
-                    textOverflow: "ellipsis",
-                    cursor: "pointer"
-                },
-                "& > completion-section": {
-                    display: "list-item",
-                    borderBottom: "1px solid silver",
-                    paddingLeft: "0.5em",
-                    opacity: 0.7
-                }
-            }
-        },
-        "&light .cm-tooltip-autocomplete ul li[aria-selected]": {
-            background: "#17c",
-            color: "white",
-        },
-        "&light .cm-tooltip-autocomplete-disabled ul li[aria-selected]": {
-            background: "#777",
-        },
-        "&dark .cm-tooltip-autocomplete ul li[aria-selected]": {
-            background: "#347",
-            color: "white",
-        },
-        "&dark .cm-tooltip-autocomplete-disabled ul li[aria-selected]": {
-            background: "#444",
-        },
-        ".cm-completionListIncompleteTop:before, .cm-completionListIncompleteBottom:after": {
-            content: '"···"',
-            opacity: 0.5,
-            display: "block",
-            textAlign: "center"
-        },
-        ".cm-tooltip.cm-completionInfo": {
-            position: "absolute",
-            padding: "3px 9px",
-            width: "max-content",
-            maxWidth: `${400 /* Width */}px`,
-            boxSizing: "border-box"
-        },
-        ".cm-completionInfo.cm-completionInfo-left": { right: "100%" },
-        ".cm-completionInfo.cm-completionInfo-right": { left: "100%" },
-        ".cm-completionInfo.cm-completionInfo-left-narrow": { right: `${30 /* Margin */}px` },
-        ".cm-completionInfo.cm-completionInfo-right-narrow": { left: `${30 /* Margin */}px` },
-        "&light .cm-snippetField": { backgroundColor: "#00000022" },
-        "&dark .cm-snippetField": { backgroundColor: "#ffffff22" },
-        ".cm-snippetFieldPosition": {
-            verticalAlign: "text-top",
-            width: 0,
-            height: "1.15em",
-            display: "inline-block",
-            margin: "0 -0.7px -.7em",
-            borderLeft: "1.4px dotted #888"
-        },
-        ".cm-completionMatchedText": {
-            textDecoration: "underline"
-        },
-        ".cm-completionDetail": {
-            marginLeft: "0.5em",
-            fontStyle: "italic"
-        },
-        ".cm-completionIcon": {
-            fontSize: "90%",
-            width: ".8em",
-            display: "inline-block",
-            textAlign: "center",
-            paddingRight: ".6em",
-            opacity: "0.6",
-            boxSizing: "content-box"
-        },
-        ".cm-completionIcon-function, .cm-completionIcon-method": {
-            "&:after": { content: "'ƒ'" }
-        },
-        ".cm-completionIcon-class": {
-            "&:after": { content: "'○'" }
-        },
-        ".cm-completionIcon-interface": {
-            "&:after": { content: "'◌'" }
-        },
-        ".cm-completionIcon-variable": {
-            "&:after": { content: "'𝑥'" }
-        },
-        ".cm-completionIcon-constant": {
-            "&:after": { content: "'𝐶'" }
-        },
-        ".cm-completionIcon-type": {
-            "&:after": { content: "'𝑡'" }
-        },
-        ".cm-completionIcon-enum": {
-            "&:after": { content: "'∪'" }
-        },
-        ".cm-completionIcon-property": {
-            "&:after": { content: "'□'" }
-        },
-        ".cm-completionIcon-keyword": {
-            "&:after": { content: "'🔑\uFE0E'" } // Disable emoji rendering
-        },
-        ".cm-completionIcon-namespace": {
-            "&:after": { content: "'▢'" }
-        },
-        ".cm-completionIcon-text": {
-            "&:after": { content: "'abc'", fontSize: "50%", verticalAlign: "middle" }
-        }
-    });
-
-    class FieldPos {
-        constructor(field, line, from, to) {
-            this.field = field;
-            this.line = line;
-            this.from = from;
-            this.to = to;
-        }
-    }
-    class FieldRange {
-        constructor(field, from, to) {
-            this.field = field;
-            this.from = from;
-            this.to = to;
-        }
-        map(changes) {
-            let from = changes.mapPos(this.from, -1, MapMode.TrackDel);
-            let to = changes.mapPos(this.to, 1, MapMode.TrackDel);
-            return from == null || to == null ? null : new FieldRange(this.field, from, to);
-        }
-    }
-    class Snippet {
-        constructor(lines, fieldPositions) {
-            this.lines = lines;
-            this.fieldPositions = fieldPositions;
-        }
-        instantiate(state, pos) {
-            let text = [], lineStart = [pos];
-            let lineObj = state.doc.lineAt(pos), baseIndent = /^\s*/.exec(lineObj.text)[0];
-            for (let line of this.lines) {
-                if (text.length) {
-                    let indent = baseIndent, tabs = /^\t*/.exec(line)[0].length;
-                    for (let i = 0; i < tabs; i++)
-                        indent += state.facet(indentUnit);
-                    lineStart.push(pos + indent.length - tabs);
-                    line = indent + line.slice(tabs);
-                }
-                text.push(line);
-                pos += line.length + 1;
-            }
-            let ranges = this.fieldPositions.map(pos => new FieldRange(pos.field, lineStart[pos.line] + pos.from, lineStart[pos.line] + pos.to));
-            return { text, ranges };
-        }
-        static parse(template) {
-            let fields = [];
-            let lines = [], positions = [], m;
-            for (let line of template.split(/\r\n?|\n/)) {
-                while (m = /[#$]\{(?:(\d+)(?::([^}]*))?|([^}]*))\}/.exec(line)) {
-                    let seq = m[1] ? +m[1] : null, name = m[2] || m[3] || "", found = -1;
-                    for (let i = 0; i < fields.length; i++) {
-                        if (seq != null ? fields[i].seq == seq : name ? fields[i].name == name : false)
-                            found = i;
-                    }
-                    if (found < 0) {
-                        let i = 0;
-                        while (i < fields.length && (seq == null || (fields[i].seq != null && fields[i].seq < seq)))
-                            i++;
-                        fields.splice(i, 0, { seq, name });
-                        found = i;
-                        for (let pos of positions)
-                            if (pos.field >= found)
-                                pos.field++;
-                    }
-                    positions.push(new FieldPos(found, lines.length, m.index, m.index + name.length));
-                    line = line.slice(0, m.index) + name + line.slice(m.index + m[0].length);
-                }
-                for (let esc; esc = /\\([{}])/.exec(line);) {
-                    line = line.slice(0, esc.index) + esc[1] + line.slice(esc.index + esc[0].length);
-                    for (let pos of positions)
-                        if (pos.line == lines.length && pos.from > esc.index) {
-                            pos.from--;
-                            pos.to--;
-                        }
-                }
-                lines.push(line);
-            }
-            return new Snippet(lines, positions);
-        }
-    }
-    let fieldMarker = /*@__PURE__*/Decoration.widget({ widget: /*@__PURE__*/new class extends WidgetType {
-            toDOM() {
-                let span = document.createElement("span");
-                span.className = "cm-snippetFieldPosition";
-                return span;
-            }
-            ignoreEvent() { return false; }
-        } });
-    let fieldRange = /*@__PURE__*/Decoration.mark({ class: "cm-snippetField" });
-    class ActiveSnippet {
-        constructor(ranges, active) {
-            this.ranges = ranges;
-            this.active = active;
-            this.deco = Decoration.set(ranges.map(r => (r.from == r.to ? fieldMarker : fieldRange).range(r.from, r.to)));
-        }
-        map(changes) {
-            let ranges = [];
-            for (let r of this.ranges) {
-                let mapped = r.map(changes);
-                if (!mapped)
-                    return null;
-                ranges.push(mapped);
-            }
-            return new ActiveSnippet(ranges, this.active);
-        }
-        selectionInsideField(sel) {
-            return sel.ranges.every(range => this.ranges.some(r => r.field == this.active && r.from <= range.from && r.to >= range.to));
-        }
-    }
-    const setActive = /*@__PURE__*/StateEffect.define({
-        map(value, changes) { return value && value.map(changes); }
-    });
-    const moveToField = /*@__PURE__*/StateEffect.define();
-    const snippetState = /*@__PURE__*/StateField.define({
-        create() { return null; },
-        update(value, tr) {
-            for (let effect of tr.effects) {
-                if (effect.is(setActive))
-                    return effect.value;
-                if (effect.is(moveToField) && value)
-                    return new ActiveSnippet(value.ranges, effect.value);
-            }
-            if (value && tr.docChanged)
-                value = value.map(tr.changes);
-            if (value && tr.selection && !value.selectionInsideField(tr.selection))
-                value = null;
-            return value;
-        },
-        provide: f => EditorView.decorations.from(f, val => val ? val.deco : Decoration.none)
-    });
-    function fieldSelection(ranges, field) {
-        return EditorSelection.create(ranges.filter(r => r.field == field).map(r => EditorSelection.range(r.from, r.to)));
-    }
-    /**
-    Convert a snippet template to a function that can
-    [apply](https://codemirror.net/6/docs/ref/#autocomplete.Completion.apply) it. Snippets are written
-    using syntax like this:
-
-        "for (let ${index} = 0; ${index} < ${end}; ${index}++) {\n\t${}\n}"
-
-    Each `${}` placeholder (you may also use `#{}`) indicates a field
-    that the user can fill in. Its name, if any, will be the default
-    content for the field.
-
-    When the snippet is activated by calling the returned function,
-    the code is inserted at the given position. Newlines in the
-    template are indented by the indentation of the start line, plus
-    one [indent unit](https://codemirror.net/6/docs/ref/#language.indentUnit) per tab character after
-    the newline.
-
-    On activation, (all instances of) the first field are selected.
-    The user can move between fields with Tab and Shift-Tab as long as
-    the fields are active. Moving to the last field or moving the
-    cursor out of the current field deactivates the fields.
-
-    The order of fields defaults to textual order, but you can add
-    numbers to placeholders (`${1}` or `${1:defaultText}`) to provide
-    a custom order.
-
-    To include a literal `{` or `}` in your template, put a backslash
-    in front of it. This will be removed and the brace will not be
-    interpreted as indicating a placeholder.
-    */
-    function snippet(template) {
-        let snippet = Snippet.parse(template);
-        return (editor, completion, from, to) => {
-            let { text, ranges } = snippet.instantiate(editor.state, from);
-            let spec = {
-                changes: { from, to, insert: Text.of(text) },
-                scrollIntoView: true,
-                annotations: completion ? pickedCompletion.of(completion) : undefined
-            };
-            if (ranges.length)
-                spec.selection = fieldSelection(ranges, 0);
-            if (ranges.length > 1) {
-                let active = new ActiveSnippet(ranges, 0);
-                let effects = spec.effects = [setActive.of(active)];
-                if (editor.state.field(snippetState, false) === undefined)
-                    effects.push(StateEffect.appendConfig.of([snippetState, addSnippetKeymap, snippetPointerHandler, baseTheme$1]));
-            }
-            editor.dispatch(editor.state.update(spec));
-        };
-    }
-    function moveField(dir) {
-        return ({ state, dispatch }) => {
-            let active = state.field(snippetState, false);
-            if (!active || dir < 0 && active.active == 0)
-                return false;
-            let next = active.active + dir, last = dir > 0 && !active.ranges.some(r => r.field == next + dir);
-            dispatch(state.update({
-                selection: fieldSelection(active.ranges, next),
-                effects: setActive.of(last ? null : new ActiveSnippet(active.ranges, next))
-            }));
-            return true;
-        };
-    }
-    /**
-    A command that clears the active snippet, if any.
-    */
-    const clearSnippet = ({ state, dispatch }) => {
-        let active = state.field(snippetState, false);
-        if (!active)
-            return false;
-        dispatch(state.update({ effects: setActive.of(null) }));
-        return true;
-    };
-    /**
-    Move to the next snippet field, if available.
-    */
-    const nextSnippetField = /*@__PURE__*/moveField(1);
-    /**
-    Move to the previous snippet field, if available.
-    */
-    const prevSnippetField = /*@__PURE__*/moveField(-1);
-    const defaultSnippetKeymap = [
-        { key: "Tab", run: nextSnippetField, shift: prevSnippetField },
-        { key: "Escape", run: clearSnippet }
-    ];
-    /**
-    A facet that can be used to configure the key bindings used by
-    snippets. The default binds Tab to
-    [`nextSnippetField`](https://codemirror.net/6/docs/ref/#autocomplete.nextSnippetField), Shift-Tab to
-    [`prevSnippetField`](https://codemirror.net/6/docs/ref/#autocomplete.prevSnippetField), and Escape
-    to [`clearSnippet`](https://codemirror.net/6/docs/ref/#autocomplete.clearSnippet).
-    */
-    const snippetKeymap = /*@__PURE__*/Facet.define({
-        combine(maps) { return maps.length ? maps[0] : defaultSnippetKeymap; }
-    });
-    const addSnippetKeymap = /*@__PURE__*/Prec.highest(/*@__PURE__*/keymap.compute([snippetKeymap], state => state.facet(snippetKeymap)));
-    /**
-    Create a completion from a snippet. Returns an object with the
-    properties from `completion`, plus an `apply` function that
-    applies the snippet.
-    */
-    function snippetCompletion(template, completion) {
-        return Object.assign(Object.assign({}, completion), { apply: snippet(template) });
-    }
-    const snippetPointerHandler = /*@__PURE__*/EditorView.domEventHandlers({
-        mousedown(event, view) {
-            let active = view.state.field(snippetState, false), pos;
-            if (!active || (pos = view.posAtCoords({ x: event.clientX, y: event.clientY })) == null)
-                return false;
-            let match = active.ranges.find(r => r.from <= pos && r.to >= pos);
-            if (!match || match.field == active.active)
-                return false;
-            view.dispatch({
-                selection: fieldSelection(active.ranges, match.field),
-                effects: setActive.of(active.ranges.some(r => r.field > match.field) ? new ActiveSnippet(active.ranges, match.field) : null)
-            });
-            return true;
-        }
-    });
-
-    const defaults = {
-        brackets: ["(", "[", "{", "'", '"'],
-        before: ")]}:;>",
-        stringPrefixes: []
-    };
-    const closeBracketEffect = /*@__PURE__*/StateEffect.define({
-        map(value, mapping) {
-            let mapped = mapping.mapPos(value, -1, MapMode.TrackAfter);
-            return mapped == null ? undefined : mapped;
-        }
-    });
-    const closedBracket = /*@__PURE__*/new class extends RangeValue {
-    };
-    closedBracket.startSide = 1;
-    closedBracket.endSide = -1;
-    const bracketState = /*@__PURE__*/StateField.define({
-        create() { return RangeSet.empty; },
-        update(value, tr) {
-            if (tr.selection) {
-                let lineStart = tr.state.doc.lineAt(tr.selection.main.head).from;
-                let prevLineStart = tr.startState.doc.lineAt(tr.startState.selection.main.head).from;
-                if (lineStart != tr.changes.mapPos(prevLineStart, -1))
-                    value = RangeSet.empty;
-            }
-            value = value.map(tr.changes);
-            for (let effect of tr.effects)
-                if (effect.is(closeBracketEffect))
-                    value = value.update({ add: [closedBracket.range(effect.value, effect.value + 1)] });
-            return value;
-        }
-    });
-    /**
-    Extension to enable bracket-closing behavior. When a closeable
-    bracket is typed, its closing bracket is immediately inserted
-    after the cursor. When closing a bracket directly in front of a
-    closing bracket inserted by the extension, the cursor moves over
-    that bracket.
-    */
-    function closeBrackets() {
-        return [inputHandler, bracketState];
-    }
-    const definedClosing = "()[]{}<>";
-    function closing(ch) {
-        for (let i = 0; i < definedClosing.length; i += 2)
-            if (definedClosing.charCodeAt(i) == ch)
-                return definedClosing.charAt(i + 1);
-        return fromCodePoint(ch < 128 ? ch : ch + 1);
-    }
-    function config(state, pos) {
-        return state.languageDataAt("closeBrackets", pos)[0] || defaults;
-    }
-    const android$1 = typeof navigator == "object" && /*@__PURE__*//Android\b/.test(navigator.userAgent);
-    const inputHandler = /*@__PURE__*/EditorView.inputHandler.of((view, from, to, insert) => {
-        if ((android$1 ? view.composing : view.compositionStarted) || view.state.readOnly)
-            return false;
-        let sel = view.state.selection.main;
-        if (insert.length > 2 || insert.length == 2 && codePointSize(codePointAt(insert, 0)) == 1 ||
-            from != sel.from || to != sel.to)
-            return false;
-        let tr = insertBracket(view.state, insert);
-        if (!tr)
-            return false;
-        view.dispatch(tr);
-        return true;
-    });
-    /**
-    Command that implements deleting a pair of matching brackets when
-    the cursor is between them.
-    */
-    const deleteBracketPair = ({ state, dispatch }) => {
-        if (state.readOnly)
-            return false;
-        let conf = config(state, state.selection.main.head);
-        let tokens = conf.brackets || defaults.brackets;
-        let dont = null, changes = state.changeByRange(range => {
-            if (range.empty) {
-                let before = prevChar(state.doc, range.head);
-                for (let token of tokens) {
-                    if (token == before && nextChar(state.doc, range.head) == closing(codePointAt(token, 0)))
-                        return { changes: { from: range.head - token.length, to: range.head + token.length },
-                            range: EditorSelection.cursor(range.head - token.length) };
-                }
-            }
-            return { range: dont = range };
-        });
-        if (!dont)
-            dispatch(state.update(changes, { scrollIntoView: true, userEvent: "delete.backward" }));
-        return !dont;
-    };
-    /**
-    Close-brackets related key bindings. Binds Backspace to
-    [`deleteBracketPair`](https://codemirror.net/6/docs/ref/#autocomplete.deleteBracketPair).
-    */
-    const closeBracketsKeymap = [
-        { key: "Backspace", run: deleteBracketPair }
-    ];
-    /**
-    Implements the extension's behavior on text insertion. If the
-    given string counts as a bracket in the language around the
-    selection, and replacing the selection with it requires custom
-    behavior (inserting a closing version or skipping past a
-    previously-closed bracket), this function returns a transaction
-    representing that custom behavior. (You only need this if you want
-    to programmatically insert brackets—the
-    [`closeBrackets`](https://codemirror.net/6/docs/ref/#autocomplete.closeBrackets) extension will
-    take care of running this for user input.)
-    */
-    function insertBracket(state, bracket) {
-        let conf = config(state, state.selection.main.head);
-        let tokens = conf.brackets || defaults.brackets;
-        for (let tok of tokens) {
-            let closed = closing(codePointAt(tok, 0));
-            if (bracket == tok)
-                return closed == tok ? handleSame(state, tok, tokens.indexOf(tok + tok + tok) > -1, conf)
-                    : handleOpen(state, tok, closed, conf.before || defaults.before);
-            if (bracket == closed && closedBracketAt(state, state.selection.main.from))
-                return handleClose(state, tok, closed);
-        }
-        return null;
-    }
-    function closedBracketAt(state, pos) {
-        let found = false;
-        state.field(bracketState).between(0, state.doc.length, from => {
-            if (from == pos)
-                found = true;
-        });
-        return found;
-    }
-    function nextChar(doc, pos) {
-        let next = doc.sliceString(pos, pos + 2);
-        return next.slice(0, codePointSize(codePointAt(next, 0)));
-    }
-    function prevChar(doc, pos) {
-        let prev = doc.sliceString(pos - 2, pos);
-        return codePointSize(codePointAt(prev, 0)) == prev.length ? prev : prev.slice(1);
-    }
-    function handleOpen(state, open, close, closeBefore) {
-        let dont = null, changes = state.changeByRange(range => {
-            if (!range.empty)
-                return { changes: [{ insert: open, from: range.from }, { insert: close, from: range.to }],
-                    effects: closeBracketEffect.of(range.to + open.length),
-                    range: EditorSelection.range(range.anchor + open.length, range.head + open.length) };
-            let next = nextChar(state.doc, range.head);
-            if (!next || /\s/.test(next) || closeBefore.indexOf(next) > -1)
-                return { changes: { insert: open + close, from: range.head },
-                    effects: closeBracketEffect.of(range.head + open.length),
-                    range: EditorSelection.cursor(range.head + open.length) };
-            return { range: dont = range };
-        });
-        return dont ? null : state.update(changes, {
-            scrollIntoView: true,
-            userEvent: "input.type"
-        });
-    }
-    function handleClose(state, _open, close) {
-        let dont = null, changes = state.changeByRange(range => {
-            if (range.empty && nextChar(state.doc, range.head) == close)
-                return { changes: { from: range.head, to: range.head + close.length, insert: close },
-                    range: EditorSelection.cursor(range.head + close.length) };
-            return dont = { range };
-        });
-        return dont ? null : state.update(changes, {
-            scrollIntoView: true,
-            userEvent: "input.type"
-        });
-    }
-    // Handles cases where the open and close token are the same, and
-    // possibly triple quotes (as in `"""abc"""`-style quoting).
-    function handleSame(state, token, allowTriple, config) {
-        let stringPrefixes = config.stringPrefixes || defaults.stringPrefixes;
-        let dont = null, changes = state.changeByRange(range => {
-            if (!range.empty)
-                return { changes: [{ insert: token, from: range.from }, { insert: token, from: range.to }],
-                    effects: closeBracketEffect.of(range.to + token.length),
-                    range: EditorSelection.range(range.anchor + token.length, range.head + token.length) };
-            let pos = range.head, next = nextChar(state.doc, pos), start;
-            if (next == token) {
-                if (nodeStart(state, pos)) {
-                    return { changes: { insert: token + token, from: pos },
-                        effects: closeBracketEffect.of(pos + token.length),
-                        range: EditorSelection.cursor(pos + token.length) };
-                }
-                else if (closedBracketAt(state, pos)) {
-                    let isTriple = allowTriple && state.sliceDoc(pos, pos + token.length * 3) == token + token + token;
-                    let content = isTriple ? token + token + token : token;
-                    return { changes: { from: pos, to: pos + content.length, insert: content },
-                        range: EditorSelection.cursor(pos + content.length) };
-                }
-            }
-            else if (allowTriple && state.sliceDoc(pos - 2 * token.length, pos) == token + token &&
-                (start = canStartStringAt(state, pos - 2 * token.length, stringPrefixes)) > -1 &&
-                nodeStart(state, start)) {
-                return { changes: { insert: token + token + token + token, from: pos },
-                    effects: closeBracketEffect.of(pos + token.length),
-                    range: EditorSelection.cursor(pos + token.length) };
-            }
-            else if (state.charCategorizer(pos)(next) != CharCategory.Word) {
-                if (canStartStringAt(state, pos, stringPrefixes) > -1 && !probablyInString(state, pos, token, stringPrefixes))
-                    return { changes: { insert: token + token, from: pos },
-                        effects: closeBracketEffect.of(pos + token.length),
-                        range: EditorSelection.cursor(pos + token.length) };
-            }
-            return { range: dont = range };
-        });
-        return dont ? null : state.update(changes, {
-            scrollIntoView: true,
-            userEvent: "input.type"
-        });
-    }
-    function nodeStart(state, pos) {
-        let tree = syntaxTree(state).resolveInner(pos + 1);
-        return tree.parent && tree.from == pos;
-    }
-    function probablyInString(state, pos, quoteToken, prefixes) {
-        let node = syntaxTree(state).resolveInner(pos, -1);
-        let maxPrefix = prefixes.reduce((m, p) => Math.max(m, p.length), 0);
-        for (let i = 0; i < 5; i++) {
-            let start = state.sliceDoc(node.from, Math.min(node.to, node.from + quoteToken.length + maxPrefix));
-            let quotePos = start.indexOf(quoteToken);
-            if (!quotePos || quotePos > -1 && prefixes.indexOf(start.slice(0, quotePos)) > -1) {
-                let first = node.firstChild;
-                while (first && first.from == node.from && first.to - first.from > quoteToken.length + quotePos) {
-                    if (state.sliceDoc(first.to - quoteToken.length, first.to) == quoteToken)
-                        return false;
-                    first = first.firstChild;
-                }
-                return true;
-            }
-            let parent = node.to == pos && node.parent;
-            if (!parent)
-                break;
-            node = parent;
-        }
-        return false;
-    }
-    function canStartStringAt(state, pos, prefixes) {
-        let charCat = state.charCategorizer(pos);
-        if (charCat(state.sliceDoc(pos - 1, pos)) != CharCategory.Word)
-            return pos;
-        for (let prefix of prefixes) {
-            let start = pos - prefix.length;
-            if (state.sliceDoc(start, pos) == prefix && charCat(state.sliceDoc(start - 1, start)) != CharCategory.Word)
-                return start;
-        }
-        return -1;
-    }
-
-    /**
-    Returns an extension that enables autocompletion.
-    */
-    function autocompletion(config = {}) {
-        return [
-            completionState,
-            completionConfig.of(config),
-            completionPlugin,
-            completionKeymapExt,
-            baseTheme$1
-        ];
-    }
-    /**
-    Basic keybindings for autocompletion.
-
-     - Ctrl-Space: [`startCompletion`](https://codemirror.net/6/docs/ref/#autocomplete.startCompletion)
-     - Escape: [`closeCompletion`](https://codemirror.net/6/docs/ref/#autocomplete.closeCompletion)
-     - ArrowDown: [`moveCompletionSelection`](https://codemirror.net/6/docs/ref/#autocomplete.moveCompletionSelection)`(true)`
-     - ArrowUp: [`moveCompletionSelection`](https://codemirror.net/6/docs/ref/#autocomplete.moveCompletionSelection)`(false)`
-     - PageDown: [`moveCompletionSelection`](https://codemirror.net/6/docs/ref/#autocomplete.moveCompletionSelection)`(true, "page")`
-     - PageDown: [`moveCompletionSelection`](https://codemirror.net/6/docs/ref/#autocomplete.moveCompletionSelection)`(true, "page")`
-     - Enter: [`acceptCompletion`](https://codemirror.net/6/docs/ref/#autocomplete.acceptCompletion)
-    */
-    const completionKeymap = [
-        { key: "Ctrl-Space", run: startCompletion },
-        { key: "Escape", run: closeCompletion },
-        { key: "ArrowDown", run: /*@__PURE__*/moveCompletionSelection(true) },
-        { key: "ArrowUp", run: /*@__PURE__*/moveCompletionSelection(false) },
-        { key: "PageDown", run: /*@__PURE__*/moveCompletionSelection(true, "page") },
-        { key: "PageUp", run: /*@__PURE__*/moveCompletionSelection(false, "page") },
-        { key: "Enter", run: acceptCompletion }
-    ];
-    const completionKeymapExt = /*@__PURE__*/Prec.highest(/*@__PURE__*/keymap.computeN([completionConfig], state => state.facet(completionConfig).defaultKeymap ? [completionKeymap] : []));
-
-    class SelectedDiagnostic$1 {
-        constructor(from, to, diagnostic) {
-            this.from = from;
-            this.to = to;
-            this.diagnostic = diagnostic;
-        }
-    }
-    class LintState {
-        constructor(diagnostics, panel, selected) {
-            this.diagnostics = diagnostics;
-            this.panel = panel;
-            this.selected = selected;
-        }
-        static init(diagnostics, panel, state) {
-            // Filter the list of diagnostics for which to create markers
-            let markedDiagnostics = diagnostics;
-            let diagnosticFilter = state.facet(lintConfig).markerFilter;
-            if (diagnosticFilter)
-                markedDiagnostics = diagnosticFilter(markedDiagnostics);
-            let ranges = Decoration.set(markedDiagnostics.map((d) => {
-                // For zero-length ranges or ranges covering only a line break, create a widget
-                return d.from == d.to || (d.from == d.to - 1 && state.doc.lineAt(d.from).to == d.from)
-                    ? Decoration.widget({
-                        widget: new DiagnosticWidget(d),
-                        diagnostic: d
-                    }).range(d.from)
-                    : Decoration.mark({
-                        attributes: { class: "cm-lintRange cm-lintRange-" + d.severity },
-                        diagnostic: d
-                    }).range(d.from, d.to);
-            }), true);
-            return new LintState(ranges, panel, findDiagnostic$1(ranges));
-        }
-    }
-    function findDiagnostic$1(diagnostics, diagnostic = null, after = 0) {
-        let found = null;
-        diagnostics.between(after, 1e9, (from, to, { spec }) => {
-            if (diagnostic && spec.diagnostic != diagnostic)
-                return;
-            found = new SelectedDiagnostic$1(from, to, spec.diagnostic);
-            return false;
-        });
-        return found;
-    }
-    function hideTooltip(tr, tooltip) {
-        let line = tr.startState.doc.lineAt(tooltip.pos);
-        return !!(tr.effects.some(e => e.is(setDiagnosticsEffect)) || tr.changes.touchesRange(line.from, line.to));
-    }
-    function maybeEnableLint(state, effects) {
-        return state.field(lintState$1, false) ? effects : effects.concat(StateEffect.appendConfig.of(lintExtensions));
-    }
-    /**
-    Returns a transaction spec which updates the current set of
-    diagnostics, and enables the lint extension if if wasn't already
-    active.
-    */
-    function setDiagnostics(state, diagnostics) {
-        return {
-            effects: maybeEnableLint(state, [setDiagnosticsEffect.of(diagnostics)])
-        };
-    }
-    /**
-    The state effect that updates the set of active diagnostics. Can
-    be useful when writing an extension that needs to track these.
-    */
-    const setDiagnosticsEffect = /*@__PURE__*/StateEffect.define();
-    const togglePanel = /*@__PURE__*/StateEffect.define();
-    const movePanelSelection = /*@__PURE__*/StateEffect.define();
-    const lintState$1 = /*@__PURE__*/StateField.define({
-        create() {
-            return new LintState(Decoration.none, null, null);
-        },
-        update(value, tr) {
-            if (tr.docChanged) {
-                let mapped = value.diagnostics.map(tr.changes), selected = null;
-                if (value.selected) {
-                    let selPos = tr.changes.mapPos(value.selected.from, 1);
-                    selected = findDiagnostic$1(mapped, value.selected.diagnostic, selPos) || findDiagnostic$1(mapped, null, selPos);
-                }
-                value = new LintState(mapped, value.panel, selected);
-            }
-            for (let effect of tr.effects) {
-                if (effect.is(setDiagnosticsEffect)) {
-                    value = LintState.init(effect.value, value.panel, tr.state);
-                }
-                else if (effect.is(togglePanel)) {
-                    value = new LintState(value.diagnostics, effect.value ? LintPanel.open : null, value.selected);
-                }
-                else if (effect.is(movePanelSelection)) {
-                    value = new LintState(value.diagnostics, value.panel, effect.value);
-                }
-            }
-            return value;
-        },
-        provide: f => [showPanel.from(f, val => val.panel),
-            EditorView.decorations.from(f, s => s.diagnostics)]
-    });
-    const activeMark = /*@__PURE__*/Decoration.mark({ class: "cm-lintRange cm-lintRange-active" });
-    function lintTooltip(view, pos, side) {
-        let { diagnostics } = view.state.field(lintState$1);
-        let found = [], stackStart = 2e8, stackEnd = 0;
-        diagnostics.between(pos - (side < 0 ? 1 : 0), pos + (side > 0 ? 1 : 0), (from, to, { spec }) => {
-            if (pos >= from && pos <= to &&
-                (from == to || ((pos > from || side > 0) && (pos < to || side < 0)))) {
-                found.push(spec.diagnostic);
-                stackStart = Math.min(from, stackStart);
-                stackEnd = Math.max(to, stackEnd);
-            }
-        });
-        let diagnosticFilter = view.state.facet(lintConfig).tooltipFilter;
-        if (diagnosticFilter)
-            found = diagnosticFilter(found);
-        if (!found.length)
-            return null;
-        return {
-            pos: stackStart,
-            end: stackEnd,
-            above: view.state.doc.lineAt(stackStart).to < stackEnd,
-            create() {
-                return { dom: diagnosticsTooltip$1(view, found) };
-            }
-        };
-    }
-    function diagnosticsTooltip$1(view, diagnostics) {
-        return crelt("ul", { class: "cm-tooltip-lint" }, diagnostics.map(d => renderDiagnostic$1(view, d, false)));
-    }
-    /**
-    Command to open and focus the lint panel.
-    */
-    const openLintPanel = (view) => {
-        let field = view.state.field(lintState$1, false);
-        if (!field || !field.panel)
-            view.dispatch({ effects: maybeEnableLint(view.state, [togglePanel.of(true)]) });
-        let panel = getPanel(view, LintPanel.open);
-        if (panel)
-            panel.dom.querySelector(".cm-panel-lint ul").focus();
-        return true;
-    };
-    /**
-    Command to close the lint panel, when open.
-    */
-    const closeLintPanel = (view) => {
-        let field = view.state.field(lintState$1, false);
-        if (!field || !field.panel)
-            return false;
-        view.dispatch({ effects: togglePanel.of(false) });
-        return true;
-    };
-    /**
-    Move the selection to the next diagnostic.
-    */
-    const nextDiagnostic = (view) => {
-        let field = view.state.field(lintState$1, false);
-        if (!field)
-            return false;
-        let sel = view.state.selection.main, next = field.diagnostics.iter(sel.to + 1);
-        if (!next.value) {
-            next = field.diagnostics.iter(0);
-            if (!next.value || next.from == sel.from && next.to == sel.to)
-                return false;
-        }
-        view.dispatch({ selection: { anchor: next.from, head: next.to }, scrollIntoView: true });
-        return true;
-    };
-    /**
-    A set of default key bindings for the lint functionality.
-
-    - Ctrl-Shift-m (Cmd-Shift-m on macOS): [`openLintPanel`](https://codemirror.net/6/docs/ref/#lint.openLintPanel)
-    - F8: [`nextDiagnostic`](https://codemirror.net/6/docs/ref/#lint.nextDiagnostic)
-    */
-    const lintKeymap = [
-        { key: "Mod-Shift-m", run: openLintPanel, preventDefault: true },
-        { key: "F8", run: nextDiagnostic }
-    ];
-    const lintPlugin = /*@__PURE__*/ViewPlugin.fromClass(class {
-        constructor(view) {
-            this.view = view;
-            this.timeout = -1;
-            this.set = true;
-            let { delay } = view.state.facet(lintConfig);
-            this.lintTime = Date.now() + delay;
-            this.run = this.run.bind(this);
-            this.timeout = setTimeout(this.run, delay);
-        }
-        run() {
-            let now = Date.now();
-            if (now < this.lintTime - 10) {
-                setTimeout(this.run, this.lintTime - now);
-            }
-            else {
-                this.set = false;
-                let { state } = this.view, { sources } = state.facet(lintConfig);
-                Promise.all(sources.map(source => Promise.resolve(source(this.view)))).then(annotations => {
-                    let all = annotations.reduce((a, b) => a.concat(b));
-                    if (this.view.state.doc == state.doc)
-                        this.view.dispatch(setDiagnostics(this.view.state, all));
-                }, error => { logException(this.view.state, error); });
-            }
-        }
-        update(update) {
-            let config = update.state.facet(lintConfig);
-            if (update.docChanged || config != update.startState.facet(lintConfig) ||
-                config.needsRefresh && config.needsRefresh(update)) {
-                this.lintTime = Date.now() + config.delay;
-                if (!this.set) {
-                    this.set = true;
-                    this.timeout = setTimeout(this.run, config.delay);
-                }
-            }
-        }
-        force() {
-            if (this.set) {
-                this.lintTime = Date.now();
-                this.run();
-            }
-        }
-        destroy() {
-            clearTimeout(this.timeout);
-        }
-    });
-    const lintConfig = /*@__PURE__*/Facet.define({
-        combine(input) {
-            return Object.assign({ sources: input.map(i => i.source) }, combineConfig(input.map(i => i.config), {
-                delay: 750,
-                markerFilter: null,
-                tooltipFilter: null,
-                needsRefresh: null
-            }, {
-                needsRefresh: (a, b) => !a ? b : !b ? a : u => a(u) || b(u)
-            }));
-        }
-    });
-    /**
-    Given a diagnostic source, this function returns an extension that
-    enables linting with that source. It will be called whenever the
-    editor is idle (after its content changed).
-    */
-    function linter(source, config = {}) {
-        return [
-            lintConfig.of({ source, config }),
-            lintPlugin,
-            lintExtensions
-        ];
-    }
-    function assignKeys$1(actions) {
-        let assigned = [];
-        if (actions)
-            actions: for (let { name } of actions) {
-                for (let i = 0; i < name.length; i++) {
-                    let ch = name[i];
-                    if (/[a-zA-Z]/.test(ch) && !assigned.some(c => c.toLowerCase() == ch.toLowerCase())) {
-                        assigned.push(ch);
-                        continue actions;
-                    }
-                }
-                assigned.push("");
-            }
-        return assigned;
-    }
-    function renderDiagnostic$1(view, diagnostic, inPanel) {
-        var _a;
-        let keys = inPanel ? assignKeys$1(diagnostic.actions) : [];
-        return crelt("li", { class: "cm-diagnostic cm-diagnostic-" + diagnostic.severity }, crelt("span", { class: "cm-diagnosticText" }, diagnostic.renderMessage ? diagnostic.renderMessage() : diagnostic.message), (_a = diagnostic.actions) === null || _a === void 0 ? void 0 : _a.map((action, i) => {
-            let fired = false, click = (e) => {
-                e.preventDefault();
-                if (fired)
-                    return;
-                fired = true;
-                let found = findDiagnostic$1(view.state.field(lintState$1).diagnostics, diagnostic);
-                if (found)
-                    action.apply(view, found.from, found.to);
-            };
-            let { name } = action, keyIndex = keys[i] ? name.indexOf(keys[i]) : -1;
-            let nameElt = keyIndex < 0 ? name : [name.slice(0, keyIndex),
-                crelt("u", name.slice(keyIndex, keyIndex + 1)),
-                name.slice(keyIndex + 1)];
-            return crelt("button", {
-                type: "button",
-                class: "cm-diagnosticAction",
-                onclick: click,
-                onmousedown: click,
-                "aria-label": ` Action: ${name}${keyIndex < 0 ? "" : ` (access key "${keys[i]})"`}.`
-            }, nameElt);
-        }), diagnostic.source && crelt("div", { class: "cm-diagnosticSource" }, diagnostic.source));
-    }
-    class DiagnosticWidget extends WidgetType {
-        constructor(diagnostic) {
-            super();
-            this.diagnostic = diagnostic;
-        }
-        eq(other) { return other.diagnostic == this.diagnostic; }
-        toDOM() {
-            return crelt("span", { class: "cm-lintPoint cm-lintPoint-" + this.diagnostic.severity });
-        }
-    }
-    class PanelItem {
-        constructor(view, diagnostic) {
-            this.diagnostic = diagnostic;
-            this.id = "item_" + Math.floor(Math.random() * 0xffffffff).toString(16);
-            this.dom = renderDiagnostic$1(view, diagnostic, true);
-            this.dom.id = this.id;
-            this.dom.setAttribute("role", "option");
-        }
-    }
-    class LintPanel {
-        constructor(view) {
-            this.view = view;
-            this.items = [];
-            let onkeydown = (event) => {
-                if (event.keyCode == 27) { // Escape
-                    closeLintPanel(this.view);
-                    this.view.focus();
-                }
-                else if (event.keyCode == 38 || event.keyCode == 33) { // ArrowUp, PageUp
-                    this.moveSelection((this.selectedIndex - 1 + this.items.length) % this.items.length);
-                }
-                else if (event.keyCode == 40 || event.keyCode == 34) { // ArrowDown, PageDown
-                    this.moveSelection((this.selectedIndex + 1) % this.items.length);
-                }
-                else if (event.keyCode == 36) { // Home
-                    this.moveSelection(0);
-                }
-                else if (event.keyCode == 35) { // End
-                    this.moveSelection(this.items.length - 1);
-                }
-                else if (event.keyCode == 13) { // Enter
-                    this.view.focus();
-                }
-                else if (event.keyCode >= 65 && event.keyCode <= 90 && this.selectedIndex >= 0) { // A-Z
-                    let { diagnostic } = this.items[this.selectedIndex], keys = assignKeys$1(diagnostic.actions);
-                    for (let i = 0; i < keys.length; i++)
-                        if (keys[i].toUpperCase().charCodeAt(0) == event.keyCode) {
-                            let found = findDiagnostic$1(this.view.state.field(lintState$1).diagnostics, diagnostic);
-                            if (found)
-                                diagnostic.actions[i].apply(view, found.from, found.to);
-                        }
-                }
-                else {
-                    return;
-                }
-                event.preventDefault();
-            };
-            let onclick = (event) => {
-                for (let i = 0; i < this.items.length; i++) {
-                    if (this.items[i].dom.contains(event.target))
-                        this.moveSelection(i);
-                }
-            };
-            this.list = crelt("ul", {
-                tabIndex: 0,
-                role: "listbox",
-                "aria-label": this.view.state.phrase("Diagnostics"),
-                onkeydown,
-                onclick
-            });
-            this.dom = crelt("div", { class: "cm-panel-lint" }, this.list, crelt("button", {
-                type: "button",
-                name: "close",
-                "aria-label": this.view.state.phrase("close"),
-                onclick: () => closeLintPanel(this.view)
-            }, "×"));
-            this.update();
-        }
-        get selectedIndex() {
-            let selected = this.view.state.field(lintState$1).selected;
-            if (!selected)
-                return -1;
-            for (let i = 0; i < this.items.length; i++)
-                if (this.items[i].diagnostic == selected.diagnostic)
-                    return i;
-            return -1;
-        }
-        update() {
-            let { diagnostics, selected } = this.view.state.field(lintState$1);
-            let i = 0, needsSync = false, newSelectedItem = null;
-            diagnostics.between(0, this.view.state.doc.length, (_start, _end, { spec }) => {
-                let found = -1, item;
-                for (let j = i; j < this.items.length; j++)
-                    if (this.items[j].diagnostic == spec.diagnostic) {
-                        found = j;
-                        break;
-                    }
-                if (found < 0) {
-                    item = new PanelItem(this.view, spec.diagnostic);
-                    this.items.splice(i, 0, item);
-                    needsSync = true;
-                }
-                else {
-                    item = this.items[found];
-                    if (found > i) {
-                        this.items.splice(i, found - i);
-                        needsSync = true;
-                    }
-                }
-                if (selected && item.diagnostic == selected.diagnostic) {
-                    if (!item.dom.hasAttribute("aria-selected")) {
-                        item.dom.setAttribute("aria-selected", "true");
-                        newSelectedItem = item;
-                    }
-                }
-                else if (item.dom.hasAttribute("aria-selected")) {
-                    item.dom.removeAttribute("aria-selected");
-                }
-                i++;
-            });
-            while (i < this.items.length && !(this.items.length == 1 && this.items[0].diagnostic.from < 0)) {
-                needsSync = true;
-                this.items.pop();
-            }
-            if (this.items.length == 0) {
-                this.items.push(new PanelItem(this.view, {
-                    from: -1, to: -1,
-                    severity: "info",
-                    message: this.view.state.phrase("No diagnostics")
-                }));
-                needsSync = true;
-            }
-            if (newSelectedItem) {
-                this.list.setAttribute("aria-activedescendant", newSelectedItem.id);
-                this.view.requestMeasure({
-                    key: this,
-                    read: () => ({ sel: newSelectedItem.dom.getBoundingClientRect(), panel: this.list.getBoundingClientRect() }),
-                    write: ({ sel, panel }) => {
-                        if (sel.top < panel.top)
-                            this.list.scrollTop -= panel.top - sel.top;
-                        else if (sel.bottom > panel.bottom)
-                            this.list.scrollTop += sel.bottom - panel.bottom;
-                    }
-                });
-            }
-            else if (this.selectedIndex < 0) {
-                this.list.removeAttribute("aria-activedescendant");
-            }
-            if (needsSync)
-                this.sync();
-        }
-        sync() {
-            let domPos = this.list.firstChild;
-            function rm() {
-                let prev = domPos;
-                domPos = prev.nextSibling;
-                prev.remove();
-            }
-            for (let item of this.items) {
-                if (item.dom.parentNode == this.list) {
-                    while (domPos != item.dom)
-                        rm();
-                    domPos = item.dom.nextSibling;
-                }
-                else {
-                    this.list.insertBefore(item.dom, domPos);
-                }
-            }
-            while (domPos)
-                rm();
-        }
-        moveSelection(selectedIndex) {
-            if (this.selectedIndex < 0)
-                return;
-            let field = this.view.state.field(lintState$1);
-            let selection = findDiagnostic$1(field.diagnostics, this.items[selectedIndex].diagnostic);
-            if (!selection)
-                return;
-            this.view.dispatch({
-                selection: { anchor: selection.from, head: selection.to },
-                scrollIntoView: true,
-                effects: movePanelSelection.of(selection)
-            });
-        }
-        static open(view) { return new LintPanel(view); }
-    }
-    function svg(content, attrs = `viewBox="0 0 40 40"`) {
-        return `url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" ${attrs}>${encodeURIComponent(content)}</svg>')`;
-    }
-    function underline(color) {
-        return svg(`<path d="m0 2.5 l2 -1.5 l1 0 l2 1.5 l1 0" stroke="${color}" fill="none" stroke-width=".7"/>`, `width="6" height="3"`);
-    }
-    const baseTheme = /*@__PURE__*/EditorView.baseTheme({
-        ".cm-diagnostic": {
-            padding: "3px 6px 3px 8px",
-            marginLeft: "-1px",
-            display: "block",
-            whiteSpace: "pre-wrap"
-        },
-        ".cm-diagnostic-error": { borderLeft: "5px solid #d11" },
-        ".cm-diagnostic-warning": { borderLeft: "5px solid orange" },
-        ".cm-diagnostic-info": { borderLeft: "5px solid #999" },
-        ".cm-diagnosticAction": {
-            font: "inherit",
-            border: "none",
-            padding: "2px 4px",
-            backgroundColor: "#444",
-            color: "white",
-            borderRadius: "3px",
-            marginLeft: "8px",
-            cursor: "pointer"
-        },
-        ".cm-diagnosticSource": {
-            fontSize: "70%",
-            opacity: .7
-        },
-        ".cm-lintRange": {
-            backgroundPosition: "left bottom",
-            backgroundRepeat: "repeat-x",
-            paddingBottom: "0.7px",
-        },
-        ".cm-lintRange-error": { backgroundImage: /*@__PURE__*/underline("#d11") },
-        ".cm-lintRange-warning": { backgroundImage: /*@__PURE__*/underline("orange") },
-        ".cm-lintRange-info": { backgroundImage: /*@__PURE__*/underline("#999") },
-        ".cm-lintRange-active": { backgroundColor: "#ffdd9980" },
-        ".cm-tooltip-lint": {
-            padding: 0,
-            margin: 0
-        },
-        ".cm-lintPoint": {
-            position: "relative",
-            "&:after": {
-                content: '""',
-                position: "absolute",
-                bottom: 0,
-                left: "-2px",
-                borderLeft: "3px solid transparent",
-                borderRight: "3px solid transparent",
-                borderBottom: "4px solid #d11"
-            }
-        },
-        ".cm-lintPoint-warning": {
-            "&:after": { borderBottomColor: "orange" }
-        },
-        ".cm-lintPoint-info": {
-            "&:after": { borderBottomColor: "#999" }
-        },
-        ".cm-panel.cm-panel-lint": {
-            position: "relative",
-            "& ul": {
-                maxHeight: "100px",
-                overflowY: "auto",
-                "& [aria-selected]": {
-                    backgroundColor: "#ddd",
-                    "& u": { textDecoration: "underline" }
-                },
-                "&:focus [aria-selected]": {
-                    background_fallback: "#bdf",
-                    backgroundColor: "Highlight",
-                    color_fallback: "white",
-                    color: "HighlightText"
-                },
-                "& u": { textDecoration: "none" },
-                padding: 0,
-                margin: 0
-            },
-            "& [name=close]": {
-                position: "absolute",
-                top: "0",
-                right: "2px",
-                background: "inherit",
-                border: "none",
-                font: "inherit",
-                padding: 0,
-                margin: 0
-            }
-        }
-    });
-    class LintGutterMarker extends GutterMarker {
-        constructor(diagnostics) {
-            super();
-            this.diagnostics = diagnostics;
-            this.severity = diagnostics.reduce((max, d) => {
-                let s = d.severity;
-                return s == "error" || s == "warning" && max == "info" ? s : max;
-            }, "info");
-        }
-        toDOM(view) {
-            let elt = document.createElement("div");
-            elt.className = "cm-lint-marker cm-lint-marker-" + this.severity;
-            let diagnostics = this.diagnostics;
-            let diagnosticsFilter = view.state.facet(lintGutterConfig).tooltipFilter;
-            if (diagnosticsFilter)
-                diagnostics = diagnosticsFilter(diagnostics);
-            if (diagnostics.length)
-                elt.onmouseover = () => gutterMarkerMouseOver(view, elt, diagnostics);
-            return elt;
-        }
-    }
-    function trackHoverOn(view, marker) {
-        let mousemove = (event) => {
-            let rect = marker.getBoundingClientRect();
-            if (event.clientX > rect.left - 10 /* Margin */ && event.clientX < rect.right + 10 /* Margin */ &&
-                event.clientY > rect.top - 10 /* Margin */ && event.clientY < rect.bottom + 10 /* Margin */)
-                return;
-            for (let target = event.target; target; target = target.parentNode) {
-                if (target.nodeType == 1 && target.classList.contains("cm-tooltip-lint"))
-                    return;
-            }
-            window.removeEventListener("mousemove", mousemove);
-            if (view.state.field(lintGutterTooltip))
-                view.dispatch({ effects: setLintGutterTooltip.of(null) });
-        };
-        window.addEventListener("mousemove", mousemove);
-    }
-    function gutterMarkerMouseOver(view, marker, diagnostics) {
-        function hovered() {
-            let line = view.elementAtHeight(marker.getBoundingClientRect().top + 5 - view.documentTop);
-            const linePos = view.coordsAtPos(line.from);
-            if (linePos) {
-                view.dispatch({ effects: setLintGutterTooltip.of({
-                        pos: line.from,
-                        above: false,
-                        create() {
-                            return {
-                                dom: diagnosticsTooltip$1(view, diagnostics),
-                                getCoords: () => marker.getBoundingClientRect()
-                            };
-                        }
-                    }) });
-            }
-            marker.onmouseout = marker.onmousemove = null;
-            trackHoverOn(view, marker);
-        }
-        let { hoverTime } = view.state.facet(lintGutterConfig);
-        let hoverTimeout = setTimeout(hovered, hoverTime);
-        marker.onmouseout = () => {
-            clearTimeout(hoverTimeout);
-            marker.onmouseout = marker.onmousemove = null;
-        };
-        marker.onmousemove = () => {
-            clearTimeout(hoverTimeout);
-            hoverTimeout = setTimeout(hovered, hoverTime);
-        };
-    }
-    function markersForDiagnostics(doc, diagnostics) {
-        let byLine = Object.create(null);
-        for (let diagnostic of diagnostics) {
-            let line = doc.lineAt(diagnostic.from);
-            (byLine[line.from] || (byLine[line.from] = [])).push(diagnostic);
-        }
-        let markers = [];
-        for (let line in byLine) {
-            markers.push(new LintGutterMarker(byLine[line]).range(+line));
-        }
-        return RangeSet.of(markers, true);
-    }
-    const lintGutterExtension = /*@__PURE__*/gutter({
-        class: "cm-gutter-lint",
-        markers: view => view.state.field(lintGutterMarkers),
-    });
-    const lintGutterMarkers = /*@__PURE__*/StateField.define({
-        create() {
-            return RangeSet.empty;
-        },
-        update(markers, tr) {
-            markers = markers.map(tr.changes);
-            let diagnosticFilter = tr.state.facet(lintGutterConfig).markerFilter;
-            for (let effect of tr.effects) {
-                if (effect.is(setDiagnosticsEffect)) {
-                    let diagnostics = effect.value;
-                    if (diagnosticFilter)
-                        diagnostics = diagnosticFilter(diagnostics || []);
-                    markers = markersForDiagnostics(tr.state.doc, diagnostics.slice(0));
-                }
-            }
-            return markers;
-        }
-    });
-    const setLintGutterTooltip = /*@__PURE__*/StateEffect.define();
-    const lintGutterTooltip = /*@__PURE__*/StateField.define({
-        create() { return null; },
-        update(tooltip, tr) {
-            if (tooltip && tr.docChanged)
-                tooltip = hideTooltip(tr, tooltip) ? null : Object.assign(Object.assign({}, tooltip), { pos: tr.changes.mapPos(tooltip.pos) });
-            return tr.effects.reduce((t, e) => e.is(setLintGutterTooltip) ? e.value : t, tooltip);
-        },
-        provide: field => showTooltip.from(field)
-    });
-    const lintGutterTheme = /*@__PURE__*/EditorView.baseTheme({
-        ".cm-gutter-lint": {
-            width: "1.4em",
-            "& .cm-gutterElement": {
-                padding: ".2em"
-            }
-        },
-        ".cm-lint-marker": {
-            width: "1em",
-            height: "1em"
-        },
-        ".cm-lint-marker-info": {
-            content: /*@__PURE__*/svg(`<path fill="#aaf" stroke="#77e" stroke-width="6" stroke-linejoin="round" d="M5 5L35 5L35 35L5 35Z"/>`)
-        },
-        ".cm-lint-marker-warning": {
-            content: /*@__PURE__*/svg(`<path fill="#fe8" stroke="#fd7" stroke-width="6" stroke-linejoin="round" d="M20 6L37 35L3 35Z"/>`),
-        },
-        ".cm-lint-marker-error": {
-            content: /*@__PURE__*/svg(`<circle cx="20" cy="20" r="15" fill="#f87" stroke="#f43" stroke-width="6"/>`)
-        },
-    });
-    const lintExtensions = [
-        lintState$1,
-        /*@__PURE__*/EditorView.decorations.compute([lintState$1], state => {
-            let { selected, panel } = state.field(lintState$1);
-            return !selected || !panel || selected.from == selected.to ? Decoration.none : Decoration.set([
-                activeMark.range(selected.from, selected.to)
-            ]);
-        }),
-        /*@__PURE__*/hoverTooltip(lintTooltip, { hideOn: hideTooltip }),
-        baseTheme
-    ];
-    const lintGutterConfig = /*@__PURE__*/Facet.define({
-        combine(configs) {
-            return combineConfig(configs, {
-                hoverTime: 300 /* Time */,
-                markerFilter: null,
-                tooltipFilter: null
-            });
-        }
-    });
-    /**
-    Returns an extension that installs a gutter showing markers for
-    each line that has diagnostics, which can be hovered over to see
-    the diagnostics.
-    */
-    function lintGutter(config = {}) {
-        return [lintGutterConfig.of(config), lintGutterMarkers, lintGutterExtension, lintGutterTheme, lintGutterTooltip];
-    }
-    /**
-    Iterate over the marked diagnostics for the given editor state,
-    calling `f` for each of them. Note that, if the document changed
-    since the diagnostics were created, the `Diagnostic` object will
-    hold the original outdated position, whereas the `to` and `from`
-    arguments hold the diagnostic's current position.
-    */
-    function forEachDiagnostic(state, f) {
-        let lState = state.field(lintState$1, false);
-        if (lState && lState.diagnostics.size)
-            for (let iter = RangeSet.iter([lState.diagnostics]); iter.value; iter.next())
-                f(iter.value.spec.diagnostic, iter.from, iter.to);
-    }
-
-    // (The superfluous function calls around the list of extensions work
-    // around current limitations in tree-shaking software.)
-    /**
-    This is an extension value that just pulls together a number of
-    extensions that you might want in a basic editor. It is meant as a
-    convenient helper to quickly set up CodeMirror without installing
-    and importing a lot of separate packages.
-
-    Specifically, it includes...
-
-     - [the default command bindings](https://codemirror.net/6/docs/ref/#commands.defaultKeymap)
-     - [line numbers](https://codemirror.net/6/docs/ref/#view.lineNumbers)
-     - [special character highlighting](https://codemirror.net/6/docs/ref/#view.highlightSpecialChars)
-     - [the undo history](https://codemirror.net/6/docs/ref/#commands.history)
-     - [a fold gutter](https://codemirror.net/6/docs/ref/#language.foldGutter)
-     - [custom selection drawing](https://codemirror.net/6/docs/ref/#view.drawSelection)
-     - [drop cursor](https://codemirror.net/6/docs/ref/#view.dropCursor)
-     - [multiple selections](https://codemirror.net/6/docs/ref/#state.EditorState^allowMultipleSelections)
-     - [reindentation on input](https://codemirror.net/6/docs/ref/#language.indentOnInput)
-     - [the default highlight style](https://codemirror.net/6/docs/ref/#language.defaultHighlightStyle) (as fallback)
-     - [bracket matching](https://codemirror.net/6/docs/ref/#language.bracketMatching)
-     - [bracket closing](https://codemirror.net/6/docs/ref/#autocomplete.closeBrackets)
-     - [autocompletion](https://codemirror.net/6/docs/ref/#autocomplete.autocompletion)
-     - [rectangular selection](https://codemirror.net/6/docs/ref/#view.rectangularSelection) and [crosshair cursor](https://codemirror.net/6/docs/ref/#view.crosshairCursor)
-     - [active line highlighting](https://codemirror.net/6/docs/ref/#view.highlightActiveLine)
-     - [active line gutter highlighting](https://codemirror.net/6/docs/ref/#view.highlightActiveLineGutter)
-     - [selection match highlighting](https://codemirror.net/6/docs/ref/#search.highlightSelectionMatches)
-     - [search](https://codemirror.net/6/docs/ref/#search.searchKeymap)
-     - [linting](https://codemirror.net/6/docs/ref/#lint.lintKeymap)
-
-    (You'll probably want to add some language package to your setup
-    too.)
-
-    This extension does not allow customization. The idea is that,
-    once you decide you want to configure your editor more precisely,
-    you take this package's source (which is just a bunch of imports
-    and an array literal), copy it into your own code, and adjust it
-    as desired.
-    */
-    const basicSetup = /*@__PURE__*/(() => [
-        lineNumbers(),
-        highlightActiveLineGutter(),
-        highlightSpecialChars(),
-        history(),
-        foldGutter(),
-        drawSelection(),
-        dropCursor(),
-        EditorState.allowMultipleSelections.of(true),
-        indentOnInput(),
-        syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
-        bracketMatching(),
-        closeBrackets(),
-        autocompletion(),
-        rectangularSelection(),
-        crosshairCursor(),
-        highlightActiveLine(),
-        highlightSelectionMatches(),
-        keymap.of([
-            ...closeBracketsKeymap,
-            ...defaultKeymap,
-            ...searchKeymap,
-            ...historyKeymap,
-            ...foldKeymap,
-            ...completionKeymap,
-            ...lintKeymap
-        ])
-    ])();
 
     /// A parse stack. These are used internally by the parser to track
     /// parsing progress. They also provide some properties and methods
@@ -27356,7 +26105,7 @@
         return { from, to, options, validFor: token };
     }
     function htmlCompletionFor(schema, context) {
-        let { state, pos } = context, around = syntaxTree(state).resolveInner(pos), tree = around.resolve(pos, -1);
+        let { state, pos } = context, tree = syntaxTree(state).resolveInner(pos, -1), around = tree.resolve(pos);
         for (let scan = pos, before; around == tree && (before = tree.childBefore(scan));) {
             let last = before.lastChild;
             if (!last || !last.type.isError || last.from < last.to)
@@ -27654,7 +26403,9 @@
         'Translated version': () => `Showing the AI translated content.`,
         'Switch to original': () => `switch to original.`,
         'Switch to translated': () => `switch to AI translated.`,
+        Need: () => `Need`,
         Finish: () => `Finish`,
+        'Expand options _': (Number) => `Expand ${Number} option` + (Number > 1 ? 's' : ''),
         'Expand messages _': (Number) => `Expand ${Number} message` + (Number > 1 ? 's' : ''),
         FullText: () => `Read more`,
         Acknowledgement: () => 'Acknowledgement',
@@ -27827,7 +26578,9 @@
         'Translated version': () => `正在显示 AI 翻译的内容。`,
         'Switch to original': () => `显示原文。`,
         'Switch to translated': () => `显示 AI 翻译的内容。`,
+        Need: () => `需求`,
         Finish: () => `完成`,
+        'Expand options _': (Number) => `展开 ${Number} 个选项`,
         'Expand messages _': (Number) => `展开 ${Number} 条消息`,
         FullText: () => `阅读全文`,
         Acknowledgement: () => '致谢',
@@ -28473,11 +27226,227 @@
         return undefined;
     };
 
+    /** PreprocessContext: master context from preprocessing */
+    class PreprocessContext {
+        constructor() {
+            /** PluralBreeds: Breeds in the model. */
+            this.PluralBreeds = new Map();
+            /** SingularBreeds: Singular breeds in the model. */
+            this.SingularBreeds = new Map();
+            /** SingularToPlurals: Singular-to-plural mappings in the model. */
+            this.SingularToPlurals = new Map();
+            /** PluralToSingulars: Plural-to-singular mappings in the model. */
+            this.PluralToSingulars = new Map();
+            /** SpecialReporters: Reporter-to-plural mappings in the model. */
+            this.SpecialReporters = new Map();
+            /** BreedTypes: Breed types in the model. */
+            this.BreedTypes = new Map();
+            /** BreedVars: Breed variables in the model. */
+            this.BreedVars = new Map();
+            /** BreedVarToPlurals: Breed variable-plural mappings in the model. */
+            this.BreedVarToPlurals = new Map();
+            /** Commands: Commands in the model with number of arguments. */
+            this.Commands = new Map();
+            /** Reporters: Reporters in the model with number of arguments. */
+            this.Reporters = new Map();
+            /** CommandsOrigin: Commands in the model with editor ID. */
+            this.CommandsOrigin = new Map();
+            /** ReportersOrigin: Reporters in the model with editor ID. */
+            this.ReportersOrigin = new Map();
+        }
+        /** Clear: Clear the context. */
+        Clear() {
+            this.PluralBreeds.clear();
+            this.SingularBreeds.clear();
+            this.BreedTypes.clear();
+            this.BreedVars.clear();
+            this.BreedVarToPlurals.clear();
+            this.Commands.clear();
+            this.Reporters.clear();
+            this.CommandsOrigin.clear();
+            this.ReportersOrigin.clear();
+            this.SpecialReporters.clear();
+            return this;
+        }
+        /** GetBreedContext: Get the context for a breed. */
+        GetBreedContext(Name, IsVariable) {
+            var Type = this.BreedTypes.get(Name);
+            if (typeof Type === 'undefined')
+                return new AgentContexts('O---'); // Default to observer
+            if (Type == BreedType$1.DirectedLink || Type == BreedType$1.UndirectedLink) {
+                return new AgentContexts('---L');
+            }
+            else if (Type == BreedType$1.Patch) {
+                if (IsVariable) {
+                    return new AgentContexts('-TP-');
+                }
+                else {
+                    return new AgentContexts('--P-');
+                }
+            }
+            else {
+                return new AgentContexts('-T--');
+            }
+        }
+        /** GetBreedVariableContexts: Get the context for a breed variable. */
+        GetBreedVariableContexts(Name) {
+            if (this.BreedVarToPlurals.has(Name))
+                return this.GetBreedContext(this.BreedVarToPlurals.get(Name), true);
+        }
+        /** GetReporterBreed: Get the breed for a reporter. */
+        GetReporterBreed(Name) {
+            // Build the cache
+            if (this.SpecialReporters.size == 0) {
+                for (let [Plural, Type] of this.BreedTypes) {
+                    switch (Type) {
+                        case BreedType$1.Turtle:
+                            this.SpecialReporters.set(Plural, Plural);
+                            this.SpecialReporters.set(Plural + '-at', Plural);
+                            this.SpecialReporters.set(Plural + '-here', Plural);
+                            this.SpecialReporters.set(Plural + '-on', Plural);
+                            break;
+                        case BreedType$1.Patch:
+                            this.SpecialReporters.set('patch-at', Plural);
+                            this.SpecialReporters.set('patch-here', Plural);
+                            this.SpecialReporters.set('patch-ahead', Plural);
+                            this.SpecialReporters.set('patch-at-heading-and-distance', Plural);
+                            this.SpecialReporters.set('patch-left-and-ahead', Plural);
+                            this.SpecialReporters.set('patch-right-and-ahead', Plural);
+                            this.SpecialReporters.set('neighbors', Plural);
+                            this.SpecialReporters.set('neighbors4', Plural);
+                            break;
+                        case BreedType$1.UndirectedLink:
+                        case BreedType$1.DirectedLink:
+                            var Singular = this.PluralToSingulars.get(Plural);
+                            this.SpecialReporters.set('link-at', Plural);
+                            this.SpecialReporters.set('out-' + Singular + '-to', Plural);
+                            this.SpecialReporters.set('in-' + Singular + '-from', Plural);
+                            this.SpecialReporters.set('my-' + Plural, Plural);
+                            this.SpecialReporters.set('my-in-' + Plural, Plural);
+                            this.SpecialReporters.set('my-out-' + Plural, Plural);
+                            this.SpecialReporters.set(Singular + '-with', Plural);
+                            // Turtles
+                            this.SpecialReporters.set('out-' + Singular + '-neighbors', 'turtles');
+                            this.SpecialReporters.set('in-' + Singular + '-neighbors', 'turtles');
+                            this.SpecialReporters.set(Singular + '-neighbors', 'turtles');
+                            break;
+                    }
+                }
+                // Find the reporter
+                return this.SpecialReporters.get(Name);
+            }
+        }
+    }
+    /** LintPreprocessContext: master context from statenetlogo */
+    class LintContext {
+        constructor() {
+            /** Extensions: Extensions in the code. */
+            this.Extensions = new Map();
+            /** Globals: Globals in the code. */
+            this.Globals = new Map();
+            /** WidgetGlobals: Globals from the widgets. */
+            this.WidgetGlobals = new Map();
+            /** Breeds: Breeds in the code. */
+            this.Breeds = new Map();
+            /** Procedures: Procedures in the code. */
+            this.Procedures = new Map();
+        }
+        /** Clear: Clear the context. */
+        Clear() {
+            this.Extensions.clear();
+            this.Globals.clear();
+            this.WidgetGlobals.clear();
+            this.Breeds.clear();
+            this.Procedures.clear();
+            return this;
+        }
+        /** GetBreedNames: Get names related to breeds. */
+        GetBreedNames() {
+            var breedNames = [];
+            for (let breed of this.Breeds.values()) {
+                breedNames.push(breed.Singular);
+                breedNames.push(breed.Plural);
+            }
+            return breedNames;
+        }
+        /** GetPluralBreedNames: Get plural names related to breeds. */
+        GetPluralBreedNames() {
+            var breedNames = [];
+            for (let breed of this.Breeds.values()) {
+                breedNames.push(breed.Plural);
+            }
+            return breedNames;
+        }
+        /** GetBreedVariables: Get variable names related to breeds. */
+        GetBreedVariables() {
+            var breedNames = [];
+            for (let breed of this.Breeds.values()) {
+                breedNames = breedNames.concat(breed.Variables);
+            }
+            return breedNames;
+        }
+        /** GetBreeds: Get list of breeds. */
+        GetBreeds() {
+            var breedList = [];
+            for (let breed of this.Breeds.values()) {
+                breedList.push(breed);
+            }
+            return breedList;
+        }
+        /** GetBreedFromVariable: Find the breed which defines a certain variable. */
+        GetBreedFromVariable(varName) {
+            for (let breed of this.Breeds.values()) {
+                if (breed.Variables.includes(varName))
+                    return breed.Plural;
+            }
+            return null;
+        }
+        /** GetBreedFromProcedure: Get breed name from breed procedure. */
+        GetBreedFromProcedure(term) {
+            let breed = '';
+            for (let b of this.GetBreedNames()) {
+                if (term.includes(b) && b.length > breed.length) {
+                    breed = b;
+                }
+            }
+            return breed;
+        }
+        /** GetProcedureFromVariable: Find the procedure that defines a certain variable. */
+        GetProcedureFromVariable(varName, from, to) {
+            for (let proc of this.Procedures.values()) {
+                if (proc.PositionEnd < from || proc.PositionStart > to)
+                    continue;
+                // Check the argument list in a procedure
+                if (proc.Arguments.includes(varName))
+                    return proc.Name;
+                // Check the local variable list in a procedure
+                for (let localVar of proc.Variables) {
+                    if (localVar.Name == varName && localVar.CreationPos <= to)
+                        return proc.Name;
+                }
+                // Check the anonymous arguments in a procedure
+                for (let anonProc of proc.AnonymousProcedures) {
+                    if (anonProc.PositionEnd > from || anonProc.PositionStart < to)
+                        continue;
+                    if (anonProc.Arguments.includes(varName))
+                        return '{anonymous},' + proc.Name;
+                    for (let localVar of anonProc.Variables) {
+                        if (localVar.Name == varName && localVar.CreationPos <= to)
+                            return '{anonymous},' + proc.Name;
+                    }
+                }
+            }
+            return null;
+        }
+    }
+
     let primitives$5 = PrimitiveManager;
     /** StateNetLogo: The second-pass editor state for the NetLogo Language. */
     class StateNetLogo {
         constructor() {
             // #region "Information"
+            /** Preprocess: Preprocess context from all editors in the first pass. */
+            this.Preprocess = new PreprocessContext();
             /** Extensions: Extensions in the code. */
             this.Extensions = [];
             /** Globals: Globals in the code. */
@@ -28502,13 +27471,20 @@
             this.ContextErrors = [];
             /** EditorID: The id of the editor. */
             this.EditorID = 0;
-            this.Context = 'observer';
+            /** Context: The context of the editor. */
+            this.Context = '';
             // #endregion
         }
-        // #endregion
-        SetContext(context) {
-            this.Context = context;
+        /** SetContext: Set the context of the editor. */
+        SetContext(Context) {
+            if (this.Context !== Context) {
+                this.Context = Context;
+                return true;
+            }
+            else
+                return false;
         }
+        // #endregion
         // #region "Version Control"
         /** SetDirty: Make the state dirty. */
         SetDirty() {
@@ -28519,13 +27495,10 @@
             return this.IsDirty;
         }
         // #endregion
-        setID(id) {
-            this.EditorID = id;
-        }
         // #region "Parsing"
         /** ParseState: Parse the state from an editor state. */
         ParseState(State) {
-            var _a;
+            var _a, _b, _c;
             if (!this.IsDirty)
                 return this;
             // Clear some global states to avoid contamination
@@ -28537,6 +27510,7 @@
             this.Breeds.set('turtle', new Breed('turtle', 'turtles', [], BreedType$1.Turtle));
             this.Breeds.set('patch', new Breed('patch', 'patches', [], BreedType$1.Patch));
             this.Breeds.set('link', new Breed('link', 'links', [], BreedType$1.UndirectedLink));
+            // Cache for breed variables
             let tempBreedVars = new Map();
             this.IsDirty = false;
             // Get the cursor
@@ -28548,7 +27522,7 @@
                 case 'Embedded':
                     this.RecognizedMode = 'Command';
                     break;
-                case 'OnelineReporter' :
+                case 'OnelineReporter':
                     this.RecognizedMode = 'Reporter';
                     break;
                 case 'Normal':
@@ -28558,6 +27532,7 @@
                     this.RecognizedMode = 'Unknown';
                     break;
             }
+            // Parse the state
             if (this.RecognizedMode == 'Model') {
                 if (!Cursor.firstChild())
                     return this;
@@ -28612,9 +27587,9 @@
                                 found = true;
                             }
                         }
-                        if (!found) {
+                        // If no breed is found, temporarily put it in the cache
+                        if (!found)
                             tempBreedVars.set(breedName, breedVars);
-                        }
                     }
                     // get procedures
                     else if (Cursor.node.name == 'Procedure') {
@@ -28625,13 +27600,19 @@
                         return this;
                 }
             }
-            else if (this.RecognizedMode == 'Command') {
-                let procedure = this.gatherEmbeddedProcedure(Cursor.node, State);
-                this.Procedures.set(procedure.Name, procedure);
-            }
-            else if (this.RecognizedMode == 'Reporter') {
-                let procedure = this.gatherOnelineProcedure(Cursor.node, State);
-                this.Procedures.set(procedure.Name, procedure);
+            else {
+                // Collect information of one-line things
+                if (this.RecognizedMode == 'Command') {
+                    let procedure = this.gatherEmbeddedProcedure(Cursor.node, State);
+                    this.Procedures.set(procedure.Name, procedure);
+                }
+                else if (this.RecognizedMode == 'Reporter') {
+                    let procedure = this.gatherOnelineProcedure(Cursor.node, State);
+                    this.Procedures.set(procedure.Name, procedure);
+                }
+                // Handle the context of one-line things
+                let context = this.Preprocess.GetBreedContext(this.Context, false);
+                this.combineContext((_c = (_b = syntaxTree(State).cursor().node.firstChild) === null || _b === void 0 ? void 0 : _b.firstChild) !== null && _c !== void 0 ? _c : syntaxTree(State).cursor().node, State, context, new AgentContexts());
             }
             return this;
         }
@@ -28689,16 +27670,16 @@
             let newContext = context;
             node.getChildren('ProcedureContent').map((node2) => {
                 node2.getChildren('CommandStatement').map((node3) => {
-                    [priorContext, newContext] = this.getNewContext(node3, priorContext, state, newContext);
+                    [priorContext, newContext] = this.combineContext(node3, state, priorContext, newContext);
                 });
             });
             return priorContext;
         }
-        getNewContext(node3, priorContext, state, newContext) {
-            var _a;
-            let cursor = node3.cursor();
+        /** combineContext: Identify context of a block by combining with the previous context. */
+        combineContext(node, state, priorContext, newContext) {
+            var _a, _b;
+            let cursor = node.cursor();
             let child = cursor.firstChild();
-            this.ContextErrors.length;
             while (child) {
                 if ((cursor.node.name.includes('Command') || cursor.node.name.includes('Reporter')) &&
                     !cursor.node.name.includes('Commands') &&
@@ -28734,9 +27715,7 @@
                             context = new AgentContexts('---L');
                         }
                         else {
-                            for (let breed of this.Breeds.values())
-                                if (breed.Variables.includes(name))
-                                    context = this.getBreedContext(breed, true);
+                            context = (_b = this.Preprocess.GetBreedVariableContexts(name)) !== null && _b !== void 0 ? _b : context;
                         }
                         newContext = combineContexts(context, priorContext);
                         if (!noContext(newContext)) {
@@ -28798,7 +27777,7 @@
         }
         /** getPrimitive: Gather information about the primitive whose argument is a code block. */
         getPrimitive(node, state) {
-            var _a, _b, _c, _d, _e;
+            var _a, _b, _c, _d, _e, _f;
             let prim = {
                 name: '',
                 type: '',
@@ -28824,24 +27803,21 @@
                         prim.type = cursor.node.name;
                     }
                     else if (cursor.node.name == 'Arg' && ask) {
-                        let temp_breed = this.identifyBreed(cursor.node, state, [...state.field(stateExtension).Breeds.values()]);
-                        if (temp_breed != '') {
-                            prim.breed = temp_breed;
-                        }
+                        prim.breed = (_c = this.identifyBreed(cursor.node, state)) !== null && _c !== void 0 ? _c : prim.breed;
                         ask = false;
                     }
                 }
             }
             if (prim.type.includes('Special')) {
                 prim.isSpecial = true;
-                prim.breed = (_c = getBreedName(prim.name).breed) !== null && _c !== void 0 ? _c : '';
+                prim.breed = (_d = getBreedName(prim.name).breed) !== null && _d !== void 0 ? _d : '';
             }
             if (prim.breed != '') {
                 prim.context = new AgentContexts('null');
                 if (prim.breed != '') {
                     for (let b of this.Breeds.values()) {
                         if (prim.breed.toLowerCase() == b.Singular || prim.breed.toLowerCase() == b.Plural) {
-                            prim.context = this.getBreedContext(b);
+                            prim.context = this.Preprocess.GetBreedContext(b.Plural, false);
                             break;
                         }
                     }
@@ -28849,90 +27825,39 @@
             }
             else {
                 let primitive = primitives$5.GetNamedPrimitive(prim.name);
-                prim.context = (_d = primitive === null || primitive === void 0 ? void 0 : primitive.BlockContext) !== null && _d !== void 0 ? _d : new AgentContexts('null');
-                prim.inheritParentContext = (_e = primitive === null || primitive === void 0 ? void 0 : primitive.InheritParentContext) !== null && _e !== void 0 ? _e : false;
+                prim.context = (_e = primitive === null || primitive === void 0 ? void 0 : primitive.BlockContext) !== null && _e !== void 0 ? _e : new AgentContexts('null');
+                prim.inheritParentContext = (_f = primitive === null || primitive === void 0 ? void 0 : primitive.InheritParentContext) !== null && _f !== void 0 ? _f : false;
             }
             if (noContext(prim.context))
                 Log('No available context: ' + prim.name);
             return prim;
         }
-        identifyBreed(Node, state, breeds) {
-            let plurals = breeds.map((b) => b.Plural);
-            let singulars = breeds.map((b) => b.Singular);
-            let str = state.sliceDoc(Node.from, Node.to).toLowerCase().trim();
-            let breed = '';
-            if (plurals.includes(str)) {
+        /** identifyBreed: Identify the breed context of a given node. */
+        identifyBreed(Node, State) {
+            let str = getCodeName(State, Node);
+            if (this.Preprocess.PluralBreeds.has(str))
                 return str;
-            }
-            for (let b of breeds) {
-                let reporters = [];
-                if (b.BreedType == BreedType$1.Turtle) {
-                    reporters.push(b.Plural + '-at');
-                    reporters.push(b.Plural + '-here');
-                    reporters.push(b.Plural + '-on');
-                }
-                else if (b.BreedType == BreedType$1.Patch) {
-                    reporters.push(b.Singular + '-at');
-                    reporters.push(b.Singular + '-here');
-                    reporters.push(b.Singular + '-ahead');
-                    reporters.push(b.Singular + '-at-heading-and-distance');
-                    reporters.push(b.Singular + '-left-and-ahead');
-                    reporters.push(b.Singular + '-right-and-ahead');
-                    reporters.push('neighbors');
-                    reporters.push('neighbors4');
-                    if (reporters.includes(str.split(' ')[0].trim())) {
-                        return b.Plural;
-                    }
-                }
-                else {
-                    reporters.push('out-' + b.Singular + '-to');
-                    reporters.push('in-' + b.Singular + '-from');
-                    reporters.push('my-' + b.Plural);
-                    reporters.push('my-in-' + b.Plural);
-                    reporters.push('my-out-' + b.Plural);
-                    reporters.push(b.Singular + '-with');
-                    if (reporters.includes(str.split(' ')[0].trim())) {
-                        return b.Plural;
-                    }
-                    reporters = [];
-                    reporters.push('out-' + b.Singular + '-neighbors');
-                    reporters.push('in-' + b.Singular + '-neighbors');
-                    reporters.push(b.Singular + '-neighbors');
-                    if (reporters.includes(str.split(' ')[0].trim())) {
-                        return 'turtles';
-                    }
-                }
-            }
+            // If we find a special name, return it
+            var breed = this.Preprocess.GetReporterBreed(str.split(' ')[0].trim());
+            if (breed)
+                return breed;
+            // If we find a breed name, return it
             Node.cursor().iterate((noderef) => {
                 if (breed != '')
                     return false;
-                let str = state.sliceDoc(noderef.from, noderef.to).toLowerCase().trim();
-                if (str.startsWith('[')) {
+                let str = getCodeName(State, noderef);
+                if (str.startsWith('['))
+                    return false;
+                if (this.Preprocess.PluralBreeds.has(str)) {
+                    breed = str;
                     return false;
                 }
-                if (plurals.includes(str) || singulars.includes(str)) {
-                    breed = str;
+                else if (this.Preprocess.SingularBreeds.has(str)) {
+                    breed = this.Preprocess.SingularToPlurals.get(str);
                     return false;
                 }
             });
             return breed;
-        }
-        /** getBreedContext: Get the context for a given breed. */
-        getBreedContext(breed, isVar = false) {
-            if (breed.BreedType == BreedType$1.DirectedLink || breed.BreedType == BreedType$1.UndirectedLink) {
-                return new AgentContexts('---L');
-            }
-            else if (breed.Singular == 'patch') {
-                if (isVar) {
-                    return new AgentContexts('-TP-');
-                }
-                else {
-                    return new AgentContexts('--P-');
-                }
-            }
-            else {
-                return new AgentContexts('-T--');
-            }
         }
         /** searchAnonProcedure: Look for nested anonymous procedures within a node and procedure. */
         gatherAnonProcedures(node, State, procedure) {
@@ -29073,32 +27998,31 @@
             this.PluralBreeds = [];
             /** SingularBreeds: Breeds in the model. */
             this.SingularBreeds = [];
+            /** SingularBreeds: Breed types in the model. */
+            this.BreedTypes = [];
             /** BreedVars: Breed variables in the model. */
-            this.BreedVars = [];
+            this.BreedVars = new Map();
             /** Commands: Commands in the model. */
             this.Commands = new Map();
             /** Reporters: Reporters in the model. */
             this.Reporters = new Map();
-            /** Context: The shared preprocess context. */
-            this.Context = null;
             /** Editor: The editor for the state. */
             this.Editor = null;
         }
         /** ParseState: Parse the state from an editor state. */
         ParseState(State) {
-            this.PluralBreeds = [];
-            this.SingularBreeds = [];
             this.Commands.clear();
             this.Reporters.clear();
-            let doc = State.doc.toString();
-            // Breeds
+            this.BreedVars.clear();
+            // Only leave the global variables
+            let doc = State.doc.toString().toLowerCase();
             let globals = doc.replace(/(^|\n)([^;\n]+[ ]+)?to\s+[\s\S]*\s+end/gi, '');
+            // Breeds
             let breeds = globals.matchAll(/(^|\n)([^;\n]+[ ]+)?(directed-link-|undirected-link-)?breed\s*\[\s*([^\s]+)\s+([^\s]+)\s*\]/g);
-            let processedBreeds = this.processBreeds(breeds);
-            this.SingularBreeds = processedBreeds[0];
-            this.PluralBreeds = processedBreeds[1];
-            let breedVars = globals.matchAll(/[^\s]+-own\s*\[([^\]]+)/g);
-            this.BreedVars = this.processBreedVars(breedVars);
+            this.processBreeds(breeds);
+            // Breed variables
+            let breedVars = globals.matchAll(/([^\s]+)-own\s*\[([^\]]+)/g);
+            this.processBreedVars(breedVars);
             // Commands
             let commands = doc.matchAll(/(^|\n)([^;\n]+[ ]+)?to\s+([^\s\[;]+)(\s*\[([^\];]*)\])?/g);
             this.Commands = this.processProcedures(commands);
@@ -29108,27 +28032,24 @@
             return this;
         }
         /** SetEditor: Set the editor for the state. */
-        SetEditor(editor) {
-            this.Editor = editor;
+        SetEditor(Editor) {
+            this.Editor = Editor;
         }
         /** processBreedVars: Parse the code for breed variables. */
         processBreedVars(matches) {
-            let vars = [];
             for (var m of matches) {
-                let match = m[1];
-                match = match.replace(/;[^\n]*\n/g, '');
-                match = match.replace(/\n/g, ' ');
-                match = match.toLowerCase();
-                vars = vars.concat(match.split(' ').filter((v) => v != '' && v != '\n'));
+                let variables = m[2];
+                variables = variables.replace(/;[^\n]*\n/g, '');
+                variables = variables.replace(/\n/g, ' ');
+                this.BreedVars.set(m[1], variables.split(' ').filter((v) => v != '' && v != '\n'));
             }
-            return vars;
         }
         /** processProcedures: Parse the code for procedure names. */
         processProcedures(procedures) {
             let matches = new Map();
             for (var match of procedures) {
                 if (!match[2] || match[2].split('"').length % 2 != 0) {
-                    const name = match[3].toLowerCase();
+                    const name = match[3];
                     const args = match[5];
                     matches.set(name, args == null ? 0 : [...args.matchAll(/([^\s])+/g)].length);
                 }
@@ -29137,15 +28058,19 @@
         }
         /** processBreeds: Parse the code for breed names. */
         processBreeds(breeds) {
-            let singularmatches = ['patch', 'turtle', 'link'];
-            let pluralmatches = ['patches', 'turtles', 'links'];
-            let count = 3;
+            this.SingularBreeds = ['patch', 'turtle', 'link'];
+            this.PluralBreeds = ['patches', 'turtles', 'links'];
+            this.BreedTypes = [BreedType$1.Patch, BreedType$1.Turtle, BreedType$1.UndirectedLink];
             for (var match of breeds) {
-                pluralmatches[count] = match[4];
-                singularmatches[count] = match[5];
-                count++;
+                var Type = BreedType$1.Turtle;
+                if (match[3] == 'directed-link-')
+                    Type = BreedType$1.DirectedLink;
+                if (match[3] == 'undirected-link-')
+                    Type = BreedType$1.UndirectedLink;
+                this.BreedTypes.push(Type);
+                this.PluralBreeds.push(match[4]);
+                this.SingularBreeds.push(match[5]);
             }
-            return [singularmatches, pluralmatches];
         }
     }
     /** StateExtension: Extension for managing the editor state.  */
@@ -30184,7 +29109,7 @@
                 }
                 offset++;
             }
-            if (seenBracket && [...GetContext().PluralBreeds.keys()].includes(nextToken)) {
+            if (seenBracket && [...GetContext().PluralBreeds.keys()].includes(nextToken.toLowerCase())) {
                 input.acceptToken(BreedStr);
             }
             else {
@@ -30271,34 +29196,35 @@
     function matchBreed(token) {
         let tag = 0;
         let parseContext = GetContext();
-        let pluralBreedNames = parseContext.PluralBreeds;
-        let singularBreedNames = parseContext.SingularBreeds;
+        // Check breed variables
         let breedVars = parseContext.BreedVars;
-        if (breedVars.has(token.toLowerCase())) {
+        if (breedVars.has(token)) {
             tag = Identifier;
             return tag;
         }
+        // Check breed special reporters
+        let pluralBreedNames = parseContext.PluralBreeds;
+        let singularBreedNames = parseContext.SingularBreeds;
         let foundMatch = false;
         let matchedBreed = '';
         let isSingular = false;
         for (let [b] of pluralBreedNames) {
-            if (token.toLowerCase().includes(b.toLowerCase()) && b.length > matchedBreed.length) {
+            if (token.includes(b) && b.length > matchedBreed.length) {
                 foundMatch = true;
                 matchedBreed = b;
                 isSingular = false;
             }
         }
         for (let [b] of singularBreedNames) {
-            if (token.toLowerCase().includes(b.toLowerCase()) && b.length > matchedBreed.length) {
+            if (token.includes(b) && b.length > matchedBreed.length) {
                 foundMatch = true;
                 matchedBreed = b;
                 isSingular = true;
             }
         }
         // console.log(token,matchedBreed,breedNames)
-        if (!foundMatch) {
+        if (!foundMatch)
             return tag;
-        }
         if (singularBreedNames.has(token)) {
             tag = SpecialReporter;
         }
@@ -31003,139 +29929,6 @@
         }
     }
 
-    /** PreprocessContext: master context from preprocessing */
-    class PreprocessContext {
-        constructor() {
-            /** PluralBreeds: Breeds in the model. */
-            this.PluralBreeds = new Map();
-            /** SingularBreeds: Singular breeds in the model. */
-            this.SingularBreeds = new Map();
-            /** BreedVars: Breed variables in the model. */
-            this.BreedVars = new Map();
-            /** Commands: Commands in the model with number of arguments. */
-            this.Commands = new Map();
-            /** Reporters: Reporters in the model with number of arguments. */
-            this.Reporters = new Map();
-            /** CommandsOrigin: Commands in the model with editor ID. */
-            this.CommandsOrigin = new Map();
-            /** ReportersOrigin: Reporters in the model with editor ID. */
-            this.ReportersOrigin = new Map();
-        }
-        /** Clear: Clear the context. */
-        Clear() {
-            this.PluralBreeds.clear();
-            this.SingularBreeds.clear();
-            this.BreedVars.clear();
-            this.Commands.clear();
-            this.Reporters.clear();
-            this.CommandsOrigin.clear();
-            this.ReportersOrigin.clear();
-            return this;
-        }
-    }
-    /** LintPreprocessContext: master context from statenetlogo */
-    class LintContext {
-        constructor() {
-            /** Extensions: Extensions in the code. */
-            this.Extensions = new Map();
-            /** Globals: Globals in the code. */
-            this.Globals = new Map();
-            /** WidgetGlobals: Globals from the widgets. */
-            this.WidgetGlobals = new Map();
-            /** Breeds: Breeds in the code. */
-            this.Breeds = new Map();
-            /** Procedures: Procedures in the code. */
-            this.Procedures = new Map();
-        }
-        /** Clear: Clear the context. */
-        Clear() {
-            this.Extensions.clear();
-            this.Globals.clear();
-            this.WidgetGlobals.clear();
-            this.Breeds.clear();
-            this.Procedures.clear();
-            return this;
-        }
-        /** GetBreedNames: Get names related to breeds. */
-        GetBreedNames() {
-            var breedNames = [];
-            for (let breed of this.Breeds.values()) {
-                breedNames.push(breed.Singular);
-                breedNames.push(breed.Plural);
-            }
-            return breedNames;
-        }
-        /** GetPluralBreedNames: Get plural names related to breeds. */
-        GetPluralBreedNames() {
-            var breedNames = [];
-            for (let breed of this.Breeds.values()) {
-                breedNames.push(breed.Plural);
-            }
-            return breedNames;
-        }
-        /** GetBreedVariables: Get variable names related to breeds. */
-        GetBreedVariables() {
-            var breedNames = [];
-            for (let breed of this.Breeds.values()) {
-                breedNames = breedNames.concat(breed.Variables);
-            }
-            return breedNames;
-        }
-        /** GetBreeds: Get list of breeds. */
-        GetBreeds() {
-            var breedList = [];
-            for (let breed of this.Breeds.values()) {
-                breedList.push(breed);
-            }
-            return breedList;
-        }
-        /** GetBreedFromVariable: Find the breed which defines a certain variable. */
-        GetBreedFromVariable(varName) {
-            for (let breed of this.Breeds.values()) {
-                if (breed.Variables.includes(varName))
-                    return breed.Plural;
-            }
-            return null;
-        }
-        /** GetBreedFromProcedure: Get breed name from breed procedure. */
-        GetBreedFromProcedure(term) {
-            let breed = '';
-            for (let b of this.GetBreedNames()) {
-                if (term.includes(b) && b.length > breed.length) {
-                    breed = b;
-                }
-            }
-            return breed;
-        }
-        /** GetProcedureFromVariable: Find the procedure that defines a certain variable. */
-        GetProcedureFromVariable(varName, from, to) {
-            for (let proc of this.Procedures.values()) {
-                if (proc.PositionEnd < from || proc.PositionStart > to)
-                    continue;
-                // Check the argument list in a procedure
-                if (proc.Arguments.includes(varName))
-                    return proc.Name;
-                // Check the local variable list in a procedure
-                for (let localVar of proc.Variables) {
-                    if (localVar.Name == varName && localVar.CreationPos <= to)
-                        return proc.Name;
-                }
-                // Check the anonymous arguments in a procedure
-                for (let anonProc of proc.AnonymousProcedures) {
-                    if (anonProc.PositionEnd > from || anonProc.PositionStart < to)
-                        continue;
-                    if (anonProc.Arguments.includes(varName))
-                        return '{anonymous},' + proc.Name;
-                    for (let localVar of anonProc.Variables) {
-                        if (localVar.Name == varName && localVar.CreationPos <= to)
-                            return '{anonymous},' + proc.Name;
-                    }
-                }
-            }
-            return null;
-        }
-    }
-
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     /** NetLogoLanguage: The NetLogo language. */
     const NetLogoLanguage = LRLanguage.define({
@@ -31295,19 +30088,20 @@
         }
     }
     function delimitedStrategy(context) {
-        var _a, _b, _c, _d;
+        var _a, _b, _c, _d, _e;
         // console.log(context.node.name, context.node.firstChild?.name);
         let after = context.textAfter, space = after.match(/^\s*/)[0].length;
-        let closing = '[\n', align = ((_a = context.node.firstChild) === null || _a === void 0 ? void 0 : _a.name) != 'Arg', units = 1;
+        let closing = '[\n', align = ((_a = context.node.firstChild) === null || _a === void 0 ? void 0 : _a.name) != 'Arg' && ((_b = context.node.firstChild) === null || _b === void 0 ? void 0 : _b.name) != 'LineComment', units = 1;
         let next = after.slice(space, space + 2);
         let closed = (next == closing || next == '[');
-        console.log("'" + after.slice(space, space + 2) + "'", closing.length);
+        // console.log("'" + after.slice(space, space + 2) + "'", closing.length);
         let aligned = align ? bracketedAligned(context) : null;
         // console.log(aligned, closed, context.baseIndent);
-        if (((_d = (_c = (_b = context.node.parent) === null || _b === void 0 ? void 0 : _b.parent) === null || _c === void 0 ? void 0 : _c.parent) === null || _d === void 0 ? void 0 : _d.name) == 'CommandStatement') {
-            // console.log('HERE', context.continue());
+        if (((_e = (_d = (_c = context.node.parent) === null || _c === void 0 ? void 0 : _c.parent) === null || _d === void 0 ? void 0 : _d.parent) === null || _e === void 0 ? void 0 : _e.name) == 'CommandStatement') {
             return context.continue();
         }
+        if (after.slice(space, space + 1) == ';')
+            return context.baseIndent;
         if (aligned)
             return closed ? context.column(aligned.from) : context.column(aligned.to) + 1;
         return context.baseIndent + (closed ? 0 : context.unit * units);
@@ -31338,7 +30132,7 @@
         var Context = ParseContext.get();
         if (Context == null)
             return EmptyContext;
-        Context.Context = (_a = Context.Context) !== null && _a !== void 0 ? _a : Context.state.field(preprocessStateExtension).Context;
+        Context.Context = (_a = Context.Context) !== null && _a !== void 0 ? _a : Context.state.field(preprocessStateExtension).Editor.PreprocessContext;
         return Context.Context;
     }
 
@@ -32247,21 +31041,8 @@
 
     /** ContextLinter: Checks if procedures and code blocks have a valid context. */
     const ContextLinter = (view, preprocessContext, lintContext) => {
-        var _a, _b;
         const diagnostics = [];
-        // for (let p of lintContext.Procedures.values()) {
-        //   diagnostics.push(...checkProcedureContents(p, lintContext));
-        // }
         let stateNetLogo = view.state.field(stateExtension);
-        if (stateNetLogo.Mode == 'Oneline' || stateNetLogo.Mode == 'OnelineReporter') {
-            let context = new AgentContexts('O---');
-            for (var b of lintContext.Breeds.values()) {
-                if (b.Plural == stateNetLogo.Context) {
-                    context = stateNetLogo.getBreedContext(b);
-                }
-            }
-            stateNetLogo.getNewContext((_b = (_a = syntaxTree(view.state).cursor().node.firstChild) === null || _a === void 0 ? void 0 : _a.firstChild) !== null && _b !== void 0 ? _b : syntaxTree(view.state).cursor().node, context, view.state, new AgentContexts());
-        }
         for (let c of stateNetLogo.ContextErrors) {
             diagnostics.push(getDiagnostic(view, { from: c.From, to: c.To }, 'Invalid context _', 'error', contextToString(c.PriorContext), contextToString(c.ConflictingContext), c.Primitive));
         }
@@ -32356,6 +31137,1195 @@
             };
         });
     };
+
+    const basicNormalize = typeof String.prototype.normalize == "function"
+        ? x => x.normalize("NFKD") : x => x;
+    /**
+    A search cursor provides an iterator over text matches in a
+    document.
+    */
+    class SearchCursor {
+        /**
+        Create a text cursor. The query is the search string, `from` to
+        `to` provides the region to search.
+        
+        When `normalize` is given, it will be called, on both the query
+        string and the content it is matched against, before comparing.
+        You can, for example, create a case-insensitive search by
+        passing `s => s.toLowerCase()`.
+        
+        Text is always normalized with
+        [`.normalize("NFKD")`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/normalize)
+        (when supported).
+        */
+        constructor(text, query, from = 0, to = text.length, normalize, test) {
+            this.test = test;
+            /**
+            The current match (only holds a meaningful value after
+            [`next`](https://codemirror.net/6/docs/ref/#search.SearchCursor.next) has been called and when
+            `done` is false).
+            */
+            this.value = { from: 0, to: 0 };
+            /**
+            Whether the end of the iterated region has been reached.
+            */
+            this.done = false;
+            this.matches = [];
+            this.buffer = "";
+            this.bufferPos = 0;
+            this.iter = text.iterRange(from, to);
+            this.bufferStart = from;
+            this.normalize = normalize ? x => normalize(basicNormalize(x)) : basicNormalize;
+            this.query = this.normalize(query);
+        }
+        peek() {
+            if (this.bufferPos == this.buffer.length) {
+                this.bufferStart += this.buffer.length;
+                this.iter.next();
+                if (this.iter.done)
+                    return -1;
+                this.bufferPos = 0;
+                this.buffer = this.iter.value;
+            }
+            return codePointAt(this.buffer, this.bufferPos);
+        }
+        /**
+        Look for the next match. Updates the iterator's
+        [`value`](https://codemirror.net/6/docs/ref/#search.SearchCursor.value) and
+        [`done`](https://codemirror.net/6/docs/ref/#search.SearchCursor.done) properties. Should be called
+        at least once before using the cursor.
+        */
+        next() {
+            while (this.matches.length)
+                this.matches.pop();
+            return this.nextOverlapping();
+        }
+        /**
+        The `next` method will ignore matches that partially overlap a
+        previous match. This method behaves like `next`, but includes
+        such matches.
+        */
+        nextOverlapping() {
+            for (;;) {
+                let next = this.peek();
+                if (next < 0) {
+                    this.done = true;
+                    return this;
+                }
+                let str = fromCodePoint(next), start = this.bufferStart + this.bufferPos;
+                this.bufferPos += codePointSize(next);
+                let norm = this.normalize(str);
+                for (let i = 0, pos = start;; i++) {
+                    let code = norm.charCodeAt(i);
+                    let match = this.match(code, pos);
+                    if (match) {
+                        this.value = match;
+                        return this;
+                    }
+                    if (i == norm.length - 1)
+                        break;
+                    if (pos == start && i < str.length && str.charCodeAt(i) == code)
+                        pos++;
+                }
+            }
+        }
+        match(code, pos) {
+            let match = null;
+            for (let i = 0; i < this.matches.length; i += 2) {
+                let index = this.matches[i], keep = false;
+                if (this.query.charCodeAt(index) == code) {
+                    if (index == this.query.length - 1) {
+                        match = { from: this.matches[i + 1], to: pos + 1 };
+                    }
+                    else {
+                        this.matches[i]++;
+                        keep = true;
+                    }
+                }
+                if (!keep) {
+                    this.matches.splice(i, 2);
+                    i -= 2;
+                }
+            }
+            if (this.query.charCodeAt(0) == code) {
+                if (this.query.length == 1)
+                    match = { from: pos, to: pos + 1 };
+                else
+                    this.matches.push(1, pos);
+            }
+            if (match && this.test && !this.test(match.from, match.to, this.buffer, this.bufferPos))
+                match = null;
+            return match;
+        }
+    }
+    if (typeof Symbol != "undefined")
+        SearchCursor.prototype[Symbol.iterator] = function () { return this; };
+
+    const empty = { from: -1, to: -1, match: /*@__PURE__*//.*/.exec("") };
+    const baseFlags = "gm" + (/x/.unicode == null ? "" : "u");
+    /**
+    This class is similar to [`SearchCursor`](https://codemirror.net/6/docs/ref/#search.SearchCursor)
+    but searches for a regular expression pattern instead of a plain
+    string.
+    */
+    class RegExpCursor {
+        /**
+        Create a cursor that will search the given range in the given
+        document. `query` should be the raw pattern (as you'd pass it to
+        `new RegExp`).
+        */
+        constructor(text, query, options, from = 0, to = text.length) {
+            this.text = text;
+            this.to = to;
+            this.curLine = "";
+            /**
+            Set to `true` when the cursor has reached the end of the search
+            range.
+            */
+            this.done = false;
+            /**
+            Will contain an object with the extent of the match and the
+            match object when [`next`](https://codemirror.net/6/docs/ref/#search.RegExpCursor.next)
+            sucessfully finds a match.
+            */
+            this.value = empty;
+            if (/\\[sWDnr]|\n|\r|\[\^/.test(query))
+                return new MultilineRegExpCursor(text, query, options, from, to);
+            this.re = new RegExp(query, baseFlags + ((options === null || options === void 0 ? void 0 : options.ignoreCase) ? "i" : ""));
+            this.test = options === null || options === void 0 ? void 0 : options.test;
+            this.iter = text.iter();
+            let startLine = text.lineAt(from);
+            this.curLineStart = startLine.from;
+            this.matchPos = toCharEnd(text, from);
+            this.getLine(this.curLineStart);
+        }
+        getLine(skip) {
+            this.iter.next(skip);
+            if (this.iter.lineBreak) {
+                this.curLine = "";
+            }
+            else {
+                this.curLine = this.iter.value;
+                if (this.curLineStart + this.curLine.length > this.to)
+                    this.curLine = this.curLine.slice(0, this.to - this.curLineStart);
+                this.iter.next();
+            }
+        }
+        nextLine() {
+            this.curLineStart = this.curLineStart + this.curLine.length + 1;
+            if (this.curLineStart > this.to)
+                this.curLine = "";
+            else
+                this.getLine(0);
+        }
+        /**
+        Move to the next match, if there is one.
+        */
+        next() {
+            for (let off = this.matchPos - this.curLineStart;;) {
+                this.re.lastIndex = off;
+                let match = this.matchPos <= this.to && this.re.exec(this.curLine);
+                if (match) {
+                    let from = this.curLineStart + match.index, to = from + match[0].length;
+                    this.matchPos = toCharEnd(this.text, to + (from == to ? 1 : 0));
+                    if (from == this.curLineStart + this.curLine.length)
+                        this.nextLine();
+                    if ((from < to || from > this.value.to) && (!this.test || this.test(from, to, match))) {
+                        this.value = { from, to, match };
+                        return this;
+                    }
+                    off = this.matchPos - this.curLineStart;
+                }
+                else if (this.curLineStart + this.curLine.length < this.to) {
+                    this.nextLine();
+                    off = 0;
+                }
+                else {
+                    this.done = true;
+                    return this;
+                }
+            }
+        }
+    }
+    const flattened = /*@__PURE__*/new WeakMap();
+    // Reusable (partially) flattened document strings
+    class FlattenedDoc {
+        constructor(from, text) {
+            this.from = from;
+            this.text = text;
+        }
+        get to() { return this.from + this.text.length; }
+        static get(doc, from, to) {
+            let cached = flattened.get(doc);
+            if (!cached || cached.from >= to || cached.to <= from) {
+                let flat = new FlattenedDoc(from, doc.sliceString(from, to));
+                flattened.set(doc, flat);
+                return flat;
+            }
+            if (cached.from == from && cached.to == to)
+                return cached;
+            let { text, from: cachedFrom } = cached;
+            if (cachedFrom > from) {
+                text = doc.sliceString(from, cachedFrom) + text;
+                cachedFrom = from;
+            }
+            if (cached.to < to)
+                text += doc.sliceString(cached.to, to);
+            flattened.set(doc, new FlattenedDoc(cachedFrom, text));
+            return new FlattenedDoc(from, text.slice(from - cachedFrom, to - cachedFrom));
+        }
+    }
+    class MultilineRegExpCursor {
+        constructor(text, query, options, from, to) {
+            this.text = text;
+            this.to = to;
+            this.done = false;
+            this.value = empty;
+            this.matchPos = toCharEnd(text, from);
+            this.re = new RegExp(query, baseFlags + ((options === null || options === void 0 ? void 0 : options.ignoreCase) ? "i" : ""));
+            this.test = options === null || options === void 0 ? void 0 : options.test;
+            this.flat = FlattenedDoc.get(text, from, this.chunkEnd(from + 5000 /* Base */));
+        }
+        chunkEnd(pos) {
+            return pos >= this.to ? this.to : this.text.lineAt(pos).to;
+        }
+        next() {
+            for (;;) {
+                let off = this.re.lastIndex = this.matchPos - this.flat.from;
+                let match = this.re.exec(this.flat.text);
+                // Skip empty matches directly after the last match
+                if (match && !match[0] && match.index == off) {
+                    this.re.lastIndex = off + 1;
+                    match = this.re.exec(this.flat.text);
+                }
+                if (match) {
+                    let from = this.flat.from + match.index, to = from + match[0].length;
+                    // If a match goes almost to the end of a noncomplete chunk, try
+                    // again, since it'll likely be able to match more
+                    if ((this.flat.to >= this.to || match.index + match[0].length <= this.flat.text.length - 10) &&
+                        (!this.test || this.test(from, to, match))) {
+                        this.value = { from, to, match };
+                        this.matchPos = toCharEnd(this.text, to + (from == to ? 1 : 0));
+                        return this;
+                    }
+                }
+                if (this.flat.to == this.to) {
+                    this.done = true;
+                    return this;
+                }
+                // Grow the flattened doc
+                this.flat = FlattenedDoc.get(this.text, this.flat.from, this.chunkEnd(this.flat.from + this.flat.text.length * 2));
+            }
+        }
+    }
+    if (typeof Symbol != "undefined") {
+        RegExpCursor.prototype[Symbol.iterator] = MultilineRegExpCursor.prototype[Symbol.iterator] =
+            function () { return this; };
+    }
+    function validRegExp(source) {
+        try {
+            new RegExp(source, baseFlags);
+            return true;
+        }
+        catch (_a) {
+            return false;
+        }
+    }
+    function toCharEnd(text, pos) {
+        if (pos >= text.length)
+            return pos;
+        let line = text.lineAt(pos), next;
+        while (pos < line.to && (next = line.text.charCodeAt(pos - line.from)) >= 0xDC00 && next < 0xE000)
+            pos++;
+        return pos;
+    }
+
+    function createLineDialog(view) {
+        let input = crelt("input", { class: "cm-textfield", name: "line" });
+        let dom = crelt("form", {
+            class: "cm-gotoLine",
+            onkeydown: (event) => {
+                if (event.keyCode == 27) { // Escape
+                    event.preventDefault();
+                    view.dispatch({ effects: dialogEffect.of(false) });
+                    view.focus();
+                }
+                else if (event.keyCode == 13) { // Enter
+                    event.preventDefault();
+                    go();
+                }
+            },
+            onsubmit: (event) => {
+                event.preventDefault();
+                go();
+            }
+        }, crelt("label", view.state.phrase("Go to line"), ": ", input), " ", crelt("button", { class: "cm-button", type: "submit" }, view.state.phrase("go")));
+        function go() {
+            let match = /^([+-])?(\d+)?(:\d+)?(%)?$/.exec(input.value);
+            if (!match)
+                return;
+            let { state } = view, startLine = state.doc.lineAt(state.selection.main.head);
+            let [, sign, ln, cl, percent] = match;
+            let col = cl ? +cl.slice(1) : 0;
+            let line = ln ? +ln : startLine.number;
+            if (ln && percent) {
+                let pc = line / 100;
+                if (sign)
+                    pc = pc * (sign == "-" ? -1 : 1) + (startLine.number / state.doc.lines);
+                line = Math.round(state.doc.lines * pc);
+            }
+            else if (ln && sign) {
+                line = line * (sign == "-" ? -1 : 1) + startLine.number;
+            }
+            let docLine = state.doc.line(Math.max(1, Math.min(state.doc.lines, line)));
+            view.dispatch({
+                effects: dialogEffect.of(false),
+                selection: EditorSelection.cursor(docLine.from + Math.max(0, Math.min(col, docLine.length))),
+                scrollIntoView: true
+            });
+            view.focus();
+        }
+        return { dom };
+    }
+    const dialogEffect = /*@__PURE__*/StateEffect.define();
+    const dialogField = /*@__PURE__*/StateField.define({
+        create() { return true; },
+        update(value, tr) {
+            for (let e of tr.effects)
+                if (e.is(dialogEffect))
+                    value = e.value;
+            return value;
+        },
+        provide: f => showPanel.from(f, val => val ? createLineDialog : null)
+    });
+    /**
+    Command that shows a dialog asking the user for a line number, and
+    when a valid position is provided, moves the cursor to that line.
+
+    Supports line numbers, relative line offsets prefixed with `+` or
+    `-`, document percentages suffixed with `%`, and an optional
+    column position by adding `:` and a second number after the line
+    number.
+    */
+    const gotoLine = view => {
+        let panel = getPanel(view, createLineDialog);
+        if (!panel) {
+            let effects = [dialogEffect.of(true)];
+            if (view.state.field(dialogField, false) == null)
+                effects.push(StateEffect.appendConfig.of([dialogField, baseTheme$1]));
+            view.dispatch({ effects });
+            panel = getPanel(view, createLineDialog);
+        }
+        if (panel)
+            panel.dom.querySelector("input").focus();
+        return true;
+    };
+    const baseTheme$1 = /*@__PURE__*/EditorView.baseTheme({
+        ".cm-panel.cm-gotoLine": {
+            padding: "2px 6px 4px",
+            "& label": { fontSize: "80%" }
+        }
+    });
+
+    const defaultHighlightOptions = {
+        highlightWordAroundCursor: false,
+        minSelectionLength: 1,
+        maxMatches: 100,
+        wholeWords: false
+    };
+    const highlightConfig = /*@__PURE__*/Facet.define({
+        combine(options) {
+            return combineConfig(options, defaultHighlightOptions, {
+                highlightWordAroundCursor: (a, b) => a || b,
+                minSelectionLength: Math.min,
+                maxMatches: Math.min
+            });
+        }
+    });
+    /**
+    This extension highlights text that matches the selection. It uses
+    the `"cm-selectionMatch"` class for the highlighting. When
+    `highlightWordAroundCursor` is enabled, the word at the cursor
+    itself will be highlighted with `"cm-selectionMatch-main"`.
+    */
+    function highlightSelectionMatches(options) {
+        let ext = [defaultTheme, matchHighlighter];
+        if (options)
+            ext.push(highlightConfig.of(options));
+        return ext;
+    }
+    const matchDeco = /*@__PURE__*/Decoration.mark({ class: "cm-selectionMatch" });
+    const mainMatchDeco = /*@__PURE__*/Decoration.mark({ class: "cm-selectionMatch cm-selectionMatch-main" });
+    // Whether the characters directly outside the given positions are non-word characters
+    function insideWordBoundaries(check, state, from, to) {
+        return (from == 0 || check(state.sliceDoc(from - 1, from)) != CharCategory.Word) &&
+            (to == state.doc.length || check(state.sliceDoc(to, to + 1)) != CharCategory.Word);
+    }
+    // Whether the characters directly at the given positions are word characters
+    function insideWord(check, state, from, to) {
+        return check(state.sliceDoc(from, from + 1)) == CharCategory.Word
+            && check(state.sliceDoc(to - 1, to)) == CharCategory.Word;
+    }
+    const matchHighlighter = /*@__PURE__*/ViewPlugin.fromClass(class {
+        constructor(view) {
+            this.decorations = this.getDeco(view);
+        }
+        update(update) {
+            if (update.selectionSet || update.docChanged || update.viewportChanged)
+                this.decorations = this.getDeco(update.view);
+        }
+        getDeco(view) {
+            let conf = view.state.facet(highlightConfig);
+            let { state } = view, sel = state.selection;
+            if (sel.ranges.length > 1)
+                return Decoration.none;
+            let range = sel.main, query, check = null;
+            if (range.empty) {
+                if (!conf.highlightWordAroundCursor)
+                    return Decoration.none;
+                let word = state.wordAt(range.head);
+                if (!word)
+                    return Decoration.none;
+                check = state.charCategorizer(range.head);
+                query = state.sliceDoc(word.from, word.to);
+            }
+            else {
+                let len = range.to - range.from;
+                if (len < conf.minSelectionLength || len > 200)
+                    return Decoration.none;
+                if (conf.wholeWords) {
+                    query = state.sliceDoc(range.from, range.to); // TODO: allow and include leading/trailing space?
+                    check = state.charCategorizer(range.head);
+                    if (!(insideWordBoundaries(check, state, range.from, range.to)
+                        && insideWord(check, state, range.from, range.to)))
+                        return Decoration.none;
+                }
+                else {
+                    query = state.sliceDoc(range.from, range.to).trim();
+                    if (!query)
+                        return Decoration.none;
+                }
+            }
+            let deco = [];
+            for (let part of view.visibleRanges) {
+                let cursor = new SearchCursor(state.doc, query, part.from, part.to);
+                while (!cursor.next().done) {
+                    let { from, to } = cursor.value;
+                    if (!check || insideWordBoundaries(check, state, from, to)) {
+                        if (range.empty && from <= range.from && to >= range.to)
+                            deco.push(mainMatchDeco.range(from, to));
+                        else if (from >= range.to || to <= range.from)
+                            deco.push(matchDeco.range(from, to));
+                        if (deco.length > conf.maxMatches)
+                            return Decoration.none;
+                    }
+                }
+            }
+            return Decoration.set(deco);
+        }
+    }, {
+        decorations: v => v.decorations
+    });
+    const defaultTheme = /*@__PURE__*/EditorView.baseTheme({
+        ".cm-selectionMatch": { backgroundColor: "#99ff7780" },
+        ".cm-searchMatch .cm-selectionMatch": { backgroundColor: "transparent" }
+    });
+    // Select the words around the cursors.
+    const selectWord = ({ state, dispatch }) => {
+        let { selection } = state;
+        let newSel = EditorSelection.create(selection.ranges.map(range => state.wordAt(range.head) || EditorSelection.cursor(range.head)), selection.mainIndex);
+        if (newSel.eq(selection))
+            return false;
+        dispatch(state.update({ selection: newSel }));
+        return true;
+    };
+    // Find next occurrence of query relative to last cursor. Wrap around
+    // the document if there are no more matches.
+    function findNextOccurrence(state, query) {
+        let { main, ranges } = state.selection;
+        let word = state.wordAt(main.head), fullWord = word && word.from == main.from && word.to == main.to;
+        for (let cycled = false, cursor = new SearchCursor(state.doc, query, ranges[ranges.length - 1].to);;) {
+            cursor.next();
+            if (cursor.done) {
+                if (cycled)
+                    return null;
+                cursor = new SearchCursor(state.doc, query, 0, Math.max(0, ranges[ranges.length - 1].from - 1));
+                cycled = true;
+            }
+            else {
+                if (cycled && ranges.some(r => r.from == cursor.value.from))
+                    continue;
+                if (fullWord) {
+                    let word = state.wordAt(cursor.value.from);
+                    if (!word || word.from != cursor.value.from || word.to != cursor.value.to)
+                        continue;
+                }
+                return cursor.value;
+            }
+        }
+    }
+    /**
+    Select next occurrence of the current selection. Expand selection
+    to the surrounding word when the selection is empty.
+    */
+    const selectNextOccurrence = ({ state, dispatch }) => {
+        let { ranges } = state.selection;
+        if (ranges.some(sel => sel.from === sel.to))
+            return selectWord({ state, dispatch });
+        let searchedText = state.sliceDoc(ranges[0].from, ranges[0].to);
+        if (state.selection.ranges.some(r => state.sliceDoc(r.from, r.to) != searchedText))
+            return false;
+        let range = findNextOccurrence(state, searchedText);
+        if (!range)
+            return false;
+        dispatch(state.update({
+            selection: state.selection.addRange(EditorSelection.range(range.from, range.to), false),
+            effects: EditorView.scrollIntoView(range.to)
+        }));
+        return true;
+    };
+
+    const searchConfigFacet = /*@__PURE__*/Facet.define({
+        combine(configs) {
+            return combineConfig(configs, {
+                top: false,
+                caseSensitive: false,
+                literal: false,
+                regexp: false,
+                wholeWord: false,
+                createPanel: view => new SearchPanel(view),
+                scrollToMatch: range => EditorView.scrollIntoView(range)
+            });
+        }
+    });
+    /**
+    A search query. Part of the editor's search state.
+    */
+    class SearchQuery {
+        /**
+        Create a query object.
+        */
+        constructor(config) {
+            this.search = config.search;
+            this.caseSensitive = !!config.caseSensitive;
+            this.literal = !!config.literal;
+            this.regexp = !!config.regexp;
+            this.replace = config.replace || "";
+            this.valid = !!this.search && (!this.regexp || validRegExp(this.search));
+            this.unquoted = this.unquote(this.search);
+            this.wholeWord = !!config.wholeWord;
+        }
+        /**
+        @internal
+        */
+        unquote(text) {
+            return this.literal ? text :
+                text.replace(/\\([nrt\\])/g, (_, ch) => ch == "n" ? "\n" : ch == "r" ? "\r" : ch == "t" ? "\t" : "\\");
+        }
+        /**
+        Compare this query to another query.
+        */
+        eq(other) {
+            return this.search == other.search && this.replace == other.replace &&
+                this.caseSensitive == other.caseSensitive && this.regexp == other.regexp &&
+                this.wholeWord == other.wholeWord;
+        }
+        /**
+        @internal
+        */
+        create() {
+            return this.regexp ? new RegExpQuery(this) : new StringQuery(this);
+        }
+        /**
+        Get a search cursor for this query, searching through the given
+        range in the given state.
+        */
+        getCursor(state, from = 0, to) {
+            let st = state.doc ? state : EditorState.create({ doc: state });
+            if (to == null)
+                to = st.doc.length;
+            return this.regexp ? regexpCursor(this, st, from, to) : stringCursor(this, st, from, to);
+        }
+    }
+    class QueryType {
+        constructor(spec) {
+            this.spec = spec;
+        }
+    }
+    function stringCursor(spec, state, from, to) {
+        return new SearchCursor(state.doc, spec.unquoted, from, to, spec.caseSensitive ? undefined : x => x.toLowerCase(), spec.wholeWord ? stringWordTest(state.doc, state.charCategorizer(state.selection.main.head)) : undefined);
+    }
+    function stringWordTest(doc, categorizer) {
+        return (from, to, buf, bufPos) => {
+            if (bufPos > from || bufPos + buf.length < to) {
+                bufPos = Math.max(0, from - 2);
+                buf = doc.sliceString(bufPos, Math.min(doc.length, to + 2));
+            }
+            return (categorizer(charBefore(buf, from - bufPos)) != CharCategory.Word ||
+                categorizer(charAfter(buf, from - bufPos)) != CharCategory.Word) &&
+                (categorizer(charAfter(buf, to - bufPos)) != CharCategory.Word ||
+                    categorizer(charBefore(buf, to - bufPos)) != CharCategory.Word);
+        };
+    }
+    class StringQuery extends QueryType {
+        constructor(spec) {
+            super(spec);
+        }
+        nextMatch(state, curFrom, curTo) {
+            let cursor = stringCursor(this.spec, state, curTo, state.doc.length).nextOverlapping();
+            if (cursor.done)
+                cursor = stringCursor(this.spec, state, 0, curFrom).nextOverlapping();
+            return cursor.done ? null : cursor.value;
+        }
+        // Searching in reverse is, rather than implementing an inverted search
+        // cursor, done by scanning chunk after chunk forward.
+        prevMatchInRange(state, from, to) {
+            for (let pos = to;;) {
+                let start = Math.max(from, pos - 10000 /* ChunkSize */ - this.spec.unquoted.length);
+                let cursor = stringCursor(this.spec, state, start, pos), range = null;
+                while (!cursor.nextOverlapping().done)
+                    range = cursor.value;
+                if (range)
+                    return range;
+                if (start == from)
+                    return null;
+                pos -= 10000 /* ChunkSize */;
+            }
+        }
+        prevMatch(state, curFrom, curTo) {
+            return this.prevMatchInRange(state, 0, curFrom) ||
+                this.prevMatchInRange(state, curTo, state.doc.length);
+        }
+        getReplacement(_result) { return this.spec.unquote(this.spec.replace); }
+        matchAll(state, limit) {
+            let cursor = stringCursor(this.spec, state, 0, state.doc.length), ranges = [];
+            while (!cursor.next().done) {
+                if (ranges.length >= limit)
+                    return null;
+                ranges.push(cursor.value);
+            }
+            return ranges;
+        }
+        highlight(state, from, to, add) {
+            let cursor = stringCursor(this.spec, state, Math.max(0, from - this.spec.unquoted.length), Math.min(to + this.spec.unquoted.length, state.doc.length));
+            while (!cursor.next().done)
+                add(cursor.value.from, cursor.value.to);
+        }
+    }
+    function regexpCursor(spec, state, from, to) {
+        return new RegExpCursor(state.doc, spec.search, {
+            ignoreCase: !spec.caseSensitive,
+            test: spec.wholeWord ? regexpWordTest(state.charCategorizer(state.selection.main.head)) : undefined
+        }, from, to);
+    }
+    function charBefore(str, index) {
+        return str.slice(findClusterBreak(str, index, false), index);
+    }
+    function charAfter(str, index) {
+        return str.slice(index, findClusterBreak(str, index));
+    }
+    function regexpWordTest(categorizer) {
+        return (_from, _to, match) => !match[0].length ||
+            (categorizer(charBefore(match.input, match.index)) != CharCategory.Word ||
+                categorizer(charAfter(match.input, match.index)) != CharCategory.Word) &&
+                (categorizer(charAfter(match.input, match.index + match[0].length)) != CharCategory.Word ||
+                    categorizer(charBefore(match.input, match.index + match[0].length)) != CharCategory.Word);
+    }
+    class RegExpQuery extends QueryType {
+        nextMatch(state, curFrom, curTo) {
+            let cursor = regexpCursor(this.spec, state, curTo, state.doc.length).next();
+            if (cursor.done)
+                cursor = regexpCursor(this.spec, state, 0, curFrom).next();
+            return cursor.done ? null : cursor.value;
+        }
+        prevMatchInRange(state, from, to) {
+            for (let size = 1;; size++) {
+                let start = Math.max(from, to - size * 10000 /* ChunkSize */);
+                let cursor = regexpCursor(this.spec, state, start, to), range = null;
+                while (!cursor.next().done)
+                    range = cursor.value;
+                if (range && (start == from || range.from > start + 10))
+                    return range;
+                if (start == from)
+                    return null;
+            }
+        }
+        prevMatch(state, curFrom, curTo) {
+            return this.prevMatchInRange(state, 0, curFrom) ||
+                this.prevMatchInRange(state, curTo, state.doc.length);
+        }
+        getReplacement(result) {
+            return this.spec.unquote(this.spec.replace.replace(/\$([$&\d+])/g, (m, i) => i == "$" ? "$"
+                : i == "&" ? result.match[0]
+                    : i != "0" && +i < result.match.length ? result.match[i]
+                        : m));
+        }
+        matchAll(state, limit) {
+            let cursor = regexpCursor(this.spec, state, 0, state.doc.length), ranges = [];
+            while (!cursor.next().done) {
+                if (ranges.length >= limit)
+                    return null;
+                ranges.push(cursor.value);
+            }
+            return ranges;
+        }
+        highlight(state, from, to, add) {
+            let cursor = regexpCursor(this.spec, state, Math.max(0, from - 250 /* HighlightMargin */), Math.min(to + 250 /* HighlightMargin */, state.doc.length));
+            while (!cursor.next().done)
+                add(cursor.value.from, cursor.value.to);
+        }
+    }
+    /**
+    A state effect that updates the current search query. Note that
+    this only has an effect if the search state has been initialized
+    (by including [`search`](https://codemirror.net/6/docs/ref/#search.search) in your configuration or
+    by running [`openSearchPanel`](https://codemirror.net/6/docs/ref/#search.openSearchPanel) at least
+    once).
+    */
+    const setSearchQuery = /*@__PURE__*/StateEffect.define();
+    const togglePanel = /*@__PURE__*/StateEffect.define();
+    const searchState = /*@__PURE__*/StateField.define({
+        create(state) {
+            return new SearchState(defaultQuery(state).create(), null);
+        },
+        update(value, tr) {
+            for (let effect of tr.effects) {
+                if (effect.is(setSearchQuery))
+                    value = new SearchState(effect.value.create(), value.panel);
+                else if (effect.is(togglePanel))
+                    value = new SearchState(value.query, effect.value ? createSearchPanel : null);
+            }
+            return value;
+        },
+        provide: f => showPanel.from(f, val => val.panel)
+    });
+    class SearchState {
+        constructor(query, panel) {
+            this.query = query;
+            this.panel = panel;
+        }
+    }
+    const matchMark = /*@__PURE__*/Decoration.mark({ class: "cm-searchMatch" }), selectedMatchMark = /*@__PURE__*/Decoration.mark({ class: "cm-searchMatch cm-searchMatch-selected" });
+    const searchHighlighter = /*@__PURE__*/ViewPlugin.fromClass(class {
+        constructor(view) {
+            this.view = view;
+            this.decorations = this.highlight(view.state.field(searchState));
+        }
+        update(update) {
+            let state = update.state.field(searchState);
+            if (state != update.startState.field(searchState) || update.docChanged || update.selectionSet || update.viewportChanged)
+                this.decorations = this.highlight(state);
+        }
+        highlight({ query, panel }) {
+            if (!panel || !query.spec.valid)
+                return Decoration.none;
+            let { view } = this;
+            let builder = new RangeSetBuilder();
+            for (let i = 0, ranges = view.visibleRanges, l = ranges.length; i < l; i++) {
+                let { from, to } = ranges[i];
+                while (i < l - 1 && to > ranges[i + 1].from - 2 * 250 /* HighlightMargin */)
+                    to = ranges[++i].to;
+                query.highlight(view.state, from, to, (from, to) => {
+                    let selected = view.state.selection.ranges.some(r => r.from == from && r.to == to);
+                    builder.add(from, to, selected ? selectedMatchMark : matchMark);
+                });
+            }
+            return builder.finish();
+        }
+    }, {
+        decorations: v => v.decorations
+    });
+    function searchCommand(f) {
+        return view => {
+            let state = view.state.field(searchState, false);
+            return state && state.query.spec.valid ? f(view, state) : openSearchPanel(view);
+        };
+    }
+    /**
+    Open the search panel if it isn't already open, and move the
+    selection to the first match after the current main selection.
+    Will wrap around to the start of the document when it reaches the
+    end.
+    */
+    const findNext = /*@__PURE__*/searchCommand((view, { query }) => {
+        let { to } = view.state.selection.main;
+        let next = query.nextMatch(view.state, to, to);
+        if (!next)
+            return false;
+        let selection = EditorSelection.single(next.from, next.to);
+        let config = view.state.facet(searchConfigFacet);
+        view.dispatch({
+            selection,
+            effects: [announceMatch(view, next), config.scrollToMatch(selection.main, view)],
+            userEvent: "select.search"
+        });
+        selectSearchInput(view);
+        return true;
+    });
+    /**
+    Move the selection to the previous instance of the search query,
+    before the current main selection. Will wrap past the start
+    of the document to start searching at the end again.
+    */
+    const findPrevious = /*@__PURE__*/searchCommand((view, { query }) => {
+        let { state } = view, { from } = state.selection.main;
+        let prev = query.prevMatch(state, from, from);
+        if (!prev)
+            return false;
+        let selection = EditorSelection.single(prev.from, prev.to);
+        let config = view.state.facet(searchConfigFacet);
+        view.dispatch({
+            selection,
+            effects: [announceMatch(view, prev), config.scrollToMatch(selection.main, view)],
+            userEvent: "select.search"
+        });
+        selectSearchInput(view);
+        return true;
+    });
+    /**
+    Select all instances of the search query.
+    */
+    const selectMatches = /*@__PURE__*/searchCommand((view, { query }) => {
+        let ranges = query.matchAll(view.state, 1000);
+        if (!ranges || !ranges.length)
+            return false;
+        view.dispatch({
+            selection: EditorSelection.create(ranges.map(r => EditorSelection.range(r.from, r.to))),
+            userEvent: "select.search.matches"
+        });
+        return true;
+    });
+    /**
+    Select all instances of the currently selected text.
+    */
+    const selectSelectionMatches = ({ state, dispatch }) => {
+        let sel = state.selection;
+        if (sel.ranges.length > 1 || sel.main.empty)
+            return false;
+        let { from, to } = sel.main;
+        let ranges = [], main = 0;
+        for (let cur = new SearchCursor(state.doc, state.sliceDoc(from, to)); !cur.next().done;) {
+            if (ranges.length > 1000)
+                return false;
+            if (cur.value.from == from)
+                main = ranges.length;
+            ranges.push(EditorSelection.range(cur.value.from, cur.value.to));
+        }
+        dispatch(state.update({
+            selection: EditorSelection.create(ranges, main),
+            userEvent: "select.search.matches"
+        }));
+        return true;
+    };
+    /**
+    Replace the current match of the search query.
+    */
+    const replaceNext = /*@__PURE__*/searchCommand((view, { query }) => {
+        let { state } = view, { from, to } = state.selection.main;
+        if (state.readOnly)
+            return false;
+        let next = query.nextMatch(state, from, from);
+        if (!next)
+            return false;
+        let changes = [], selection, replacement;
+        let effects = [];
+        if (next.from == from && next.to == to) {
+            replacement = state.toText(query.getReplacement(next));
+            changes.push({ from: next.from, to: next.to, insert: replacement });
+            next = query.nextMatch(state, next.from, next.to);
+            effects.push(EditorView.announce.of(state.phrase("replaced match on line $", state.doc.lineAt(from).number) + "."));
+        }
+        if (next) {
+            let off = changes.length == 0 || changes[0].from >= next.to ? 0 : next.to - next.from - replacement.length;
+            selection = EditorSelection.single(next.from - off, next.to - off);
+            effects.push(announceMatch(view, next));
+            effects.push(state.facet(searchConfigFacet).scrollToMatch(selection.main, view));
+        }
+        view.dispatch({
+            changes, selection, effects,
+            userEvent: "input.replace"
+        });
+        return true;
+    });
+    /**
+    Replace all instances of the search query with the given
+    replacement.
+    */
+    const replaceAll = /*@__PURE__*/searchCommand((view, { query }) => {
+        if (view.state.readOnly)
+            return false;
+        let changes = query.matchAll(view.state, 1e9).map(match => {
+            let { from, to } = match;
+            return { from, to, insert: query.getReplacement(match) };
+        });
+        if (!changes.length)
+            return false;
+        let announceText = view.state.phrase("replaced $ matches", changes.length) + ".";
+        view.dispatch({
+            changes,
+            effects: EditorView.announce.of(announceText),
+            userEvent: "input.replace.all"
+        });
+        return true;
+    });
+    function createSearchPanel(view) {
+        return view.state.facet(searchConfigFacet).createPanel(view);
+    }
+    function defaultQuery(state, fallback) {
+        var _a, _b, _c, _d, _e;
+        let sel = state.selection.main;
+        let selText = sel.empty || sel.to > sel.from + 100 ? "" : state.sliceDoc(sel.from, sel.to);
+        if (fallback && !selText)
+            return fallback;
+        let config = state.facet(searchConfigFacet);
+        return new SearchQuery({
+            search: ((_a = fallback === null || fallback === void 0 ? void 0 : fallback.literal) !== null && _a !== void 0 ? _a : config.literal) ? selText : selText.replace(/\n/g, "\\n"),
+            caseSensitive: (_b = fallback === null || fallback === void 0 ? void 0 : fallback.caseSensitive) !== null && _b !== void 0 ? _b : config.caseSensitive,
+            literal: (_c = fallback === null || fallback === void 0 ? void 0 : fallback.literal) !== null && _c !== void 0 ? _c : config.literal,
+            regexp: (_d = fallback === null || fallback === void 0 ? void 0 : fallback.regexp) !== null && _d !== void 0 ? _d : config.regexp,
+            wholeWord: (_e = fallback === null || fallback === void 0 ? void 0 : fallback.wholeWord) !== null && _e !== void 0 ? _e : config.wholeWord
+        });
+    }
+    function getSearchInput(view) {
+        let panel = getPanel(view, createSearchPanel);
+        return panel && panel.dom.querySelector("[main-field]");
+    }
+    function selectSearchInput(view) {
+        let input = getSearchInput(view);
+        if (input && input == view.root.activeElement)
+            input.select();
+    }
+    /**
+    Make sure the search panel is open and focused.
+    */
+    const openSearchPanel = view => {
+        let state = view.state.field(searchState, false);
+        if (state && state.panel) {
+            let searchInput = getSearchInput(view);
+            if (searchInput && searchInput != view.root.activeElement) {
+                let query = defaultQuery(view.state, state.query.spec);
+                if (query.valid)
+                    view.dispatch({ effects: setSearchQuery.of(query) });
+                searchInput.focus();
+                searchInput.select();
+            }
+        }
+        else {
+            view.dispatch({ effects: [
+                    togglePanel.of(true),
+                    state ? setSearchQuery.of(defaultQuery(view.state, state.query.spec)) : StateEffect.appendConfig.of(searchExtensions)
+                ] });
+        }
+        return true;
+    };
+    /**
+    Close the search panel.
+    */
+    const closeSearchPanel = view => {
+        let state = view.state.field(searchState, false);
+        if (!state || !state.panel)
+            return false;
+        let panel = getPanel(view, createSearchPanel);
+        if (panel && panel.dom.contains(view.root.activeElement))
+            view.focus();
+        view.dispatch({ effects: togglePanel.of(false) });
+        return true;
+    };
+    /**
+    Default search-related key bindings.
+
+     - Mod-f: [`openSearchPanel`](https://codemirror.net/6/docs/ref/#search.openSearchPanel)
+     - F3, Mod-g: [`findNext`](https://codemirror.net/6/docs/ref/#search.findNext)
+     - Shift-F3, Shift-Mod-g: [`findPrevious`](https://codemirror.net/6/docs/ref/#search.findPrevious)
+     - Alt-g: [`gotoLine`](https://codemirror.net/6/docs/ref/#search.gotoLine)
+     - Mod-d: [`selectNextOccurrence`](https://codemirror.net/6/docs/ref/#search.selectNextOccurrence)
+    */
+    const searchKeymap = [
+        { key: "Mod-f", run: openSearchPanel, scope: "editor search-panel" },
+        { key: "F3", run: findNext, shift: findPrevious, scope: "editor search-panel", preventDefault: true },
+        { key: "Mod-g", run: findNext, shift: findPrevious, scope: "editor search-panel", preventDefault: true },
+        { key: "Escape", run: closeSearchPanel, scope: "editor search-panel" },
+        { key: "Mod-Shift-l", run: selectSelectionMatches },
+        { key: "Alt-g", run: gotoLine },
+        { key: "Mod-d", run: selectNextOccurrence, preventDefault: true },
+    ];
+    class SearchPanel {
+        constructor(view) {
+            this.view = view;
+            let query = this.query = view.state.field(searchState).query.spec;
+            this.commit = this.commit.bind(this);
+            this.searchField = crelt("input", {
+                value: query.search,
+                placeholder: phrase(view, "Find"),
+                "aria-label": phrase(view, "Find"),
+                class: "cm-textfield",
+                name: "search",
+                form: "",
+                "main-field": "true",
+                onchange: this.commit,
+                onkeyup: this.commit
+            });
+            this.replaceField = crelt("input", {
+                value: query.replace,
+                placeholder: phrase(view, "Replace"),
+                "aria-label": phrase(view, "Replace"),
+                class: "cm-textfield",
+                name: "replace",
+                form: "",
+                onchange: this.commit,
+                onkeyup: this.commit
+            });
+            this.caseField = crelt("input", {
+                type: "checkbox",
+                name: "case",
+                form: "",
+                checked: query.caseSensitive,
+                onchange: this.commit
+            });
+            this.reField = crelt("input", {
+                type: "checkbox",
+                name: "re",
+                form: "",
+                checked: query.regexp,
+                onchange: this.commit
+            });
+            this.wordField = crelt("input", {
+                type: "checkbox",
+                name: "word",
+                form: "",
+                checked: query.wholeWord,
+                onchange: this.commit
+            });
+            function button(name, onclick, content) {
+                return crelt("button", { class: "cm-button", name, onclick, type: "button" }, content);
+            }
+            this.dom = crelt("div", { onkeydown: (e) => this.keydown(e), class: "cm-search" }, [
+                this.searchField,
+                button("next", () => findNext(view), [phrase(view, "next")]),
+                button("prev", () => findPrevious(view), [phrase(view, "previous")]),
+                button("select", () => selectMatches(view), [phrase(view, "all")]),
+                crelt("label", null, [this.caseField, phrase(view, "match case")]),
+                crelt("label", null, [this.reField, phrase(view, "regexp")]),
+                crelt("label", null, [this.wordField, phrase(view, "by word")]),
+                ...view.state.readOnly ? [] : [
+                    crelt("br"),
+                    this.replaceField,
+                    button("replace", () => replaceNext(view), [phrase(view, "replace")]),
+                    button("replaceAll", () => replaceAll(view), [phrase(view, "replace all")])
+                ],
+                crelt("button", {
+                    name: "close",
+                    onclick: () => closeSearchPanel(view),
+                    "aria-label": phrase(view, "close"),
+                    type: "button"
+                }, ["×"])
+            ]);
+        }
+        commit() {
+            let query = new SearchQuery({
+                search: this.searchField.value,
+                caseSensitive: this.caseField.checked,
+                regexp: this.reField.checked,
+                wholeWord: this.wordField.checked,
+                replace: this.replaceField.value,
+            });
+            if (!query.eq(this.query)) {
+                this.query = query;
+                this.view.dispatch({ effects: setSearchQuery.of(query) });
+            }
+        }
+        keydown(e) {
+            if (runScopeHandlers(this.view, e, "search-panel")) {
+                e.preventDefault();
+            }
+            else if (e.keyCode == 13 && e.target == this.searchField) {
+                e.preventDefault();
+                (e.shiftKey ? findPrevious : findNext)(this.view);
+            }
+            else if (e.keyCode == 13 && e.target == this.replaceField) {
+                e.preventDefault();
+                replaceNext(this.view);
+            }
+        }
+        update(update) {
+            for (let tr of update.transactions)
+                for (let effect of tr.effects) {
+                    if (effect.is(setSearchQuery) && !effect.value.eq(this.query))
+                        this.setQuery(effect.value);
+                }
+        }
+        setQuery(query) {
+            this.query = query;
+            this.searchField.value = query.search;
+            this.replaceField.value = query.replace;
+            this.caseField.checked = query.caseSensitive;
+            this.reField.checked = query.regexp;
+            this.wordField.checked = query.wholeWord;
+        }
+        mount() {
+            this.searchField.select();
+        }
+        get pos() { return 80; }
+        get top() { return this.view.state.facet(searchConfigFacet).top; }
+    }
+    function phrase(view, phrase) { return view.state.phrase(phrase); }
+    const AnnounceMargin = 30;
+    const Break = /[\s\.,:;?!]/;
+    function announceMatch(view, { from, to }) {
+        let line = view.state.doc.lineAt(from), lineEnd = view.state.doc.lineAt(to).to;
+        let start = Math.max(line.from, from - AnnounceMargin), end = Math.min(lineEnd, to + AnnounceMargin);
+        let text = view.state.sliceDoc(start, end);
+        if (start != line.from) {
+            for (let i = 0; i < AnnounceMargin; i++)
+                if (!Break.test(text[i + 1]) && Break.test(text[i])) {
+                    text = text.slice(i);
+                    break;
+                }
+        }
+        if (end != lineEnd) {
+            for (let i = text.length - 1; i > text.length - AnnounceMargin; i--)
+                if (!Break.test(text[i - 1]) && Break.test(text[i])) {
+                    text = text.slice(0, i);
+                    break;
+                }
+        }
+        return EditorView.announce.of(`${view.state.phrase("current match")}. ${text} ${view.state.phrase("on line")} ${line.number}.`);
+    }
+    const baseTheme = /*@__PURE__*/EditorView.baseTheme({
+        ".cm-panel.cm-search": {
+            padding: "2px 6px 4px",
+            position: "relative",
+            "& [name=close]": {
+                position: "absolute",
+                top: "0",
+                right: "4px",
+                backgroundColor: "inherit",
+                border: "none",
+                font: "inherit",
+                padding: 0,
+                margin: 0
+            },
+            "& input, & button, & label": {
+                margin: ".2em .6em .2em 0"
+            },
+            "& input[type=checkbox]": {
+                marginRight: ".2em"
+            },
+            "& label": {
+                fontSize: "80%",
+                whiteSpace: "pre"
+            }
+        },
+        "&light .cm-searchMatch": { backgroundColor: "#ffff0054" },
+        "&dark .cm-searchMatch": { backgroundColor: "#00ffff8a" },
+        "&light .cm-searchMatch-selected": { backgroundColor: "#ff6a0054" },
+        "&dark .cm-searchMatch-selected": { backgroundColor: "#ff00ff8a" }
+    });
+    const searchExtensions = [
+        searchState,
+        /*@__PURE__*/Prec.lowest(searchHighlighter),
+        baseTheme
+    ];
 
     /** EditingFeatures: The editing features of the editor. */
     class EditingFeatures {
@@ -32595,7 +32565,9 @@
         let doc = view.state.doc.toString();
         // eliminate extra spacing
         Editor.ForceParse();
+        console.log('1', doc);
         let new_doc = removeSpacing(syntaxTree(view.state), doc);
+        console.log('2', new_doc);
         view.dispatch({ changes: { from: 0, to: doc.length, insert: new_doc } });
         // parse it again
         Editor.ForceParse();
@@ -32604,7 +32576,9 @@
         view.dispatch({
             changes: addSpacing(view, 0, new_doc.length, Editor.LineWidth),
         });
+        console.log('3', view.state.doc.toString());
         new_doc = finalSpacing(view.state.doc.toString());
+        console.log('4', new_doc);
         view.dispatch({ changes: { from: 0, to: view.state.doc.toString().length, insert: new_doc } });
         // doc = view.state.doc.toString();
         Editor.ForceParse();
@@ -32689,7 +32663,9 @@
         new_doc = new_doc.replace(/\n\n+/g, '\n\n');
         new_doc = new_doc.replace(/ +/g, ' ');
         new_doc = new_doc.replace(/^\s+/g, '');
-        new_doc = new_doc.replace(/[ ]*\n[ ]*\[[ ]*\n/g, ' [\n');
+        console.log(new_doc);
+        new_doc = new_doc.replace(/(\n[^;\n]+)\n[ ]*\[[ ]*\n/g, '$1 [\n');
+        console.log(new_doc);
         new_doc = new_doc.replace(/(\n+)(\n\nto[ -])/g, '$2');
         new_doc = new_doc.replace(/(\n+)(\n\n[\w-]+-own)/g, '$2');
         new_doc = new_doc.replace(/[ ]+$/, '');
@@ -32798,6 +32774,7 @@
                             //   console.log(startPos,lastPos,cursor.from,cursor.to)
                             // }
                             if (cursor.node.name == 'LineComment') {
+                                removeFrom = cursor.to + 1;
                                 continue;
                             }
                             if (removeFrom > cursor.from) {
@@ -32812,7 +32789,7 @@
                                 // );
                                 if (doc.substring(lastPos, cursor.from).includes('\n') &&
                                     doc.substring(startPos, cursor.to).replace(/\s+/g, ' ').length < lineWidth) {
-                                    // console.log("2")
+                                    console.log('here', doc.substring(cursor.from, cursor.to));
                                     changes.push({
                                         from: removeFrom,
                                         to: cursor.from,
@@ -33259,8 +33236,11 @@
     function FixBreed(node, state, breeds) {
         let singular = node.getChild('BreedSingular');
         let plural = node.getChild('BreedPlural');
-        let invalid_sing = ['turtle', 'link', 'patch', ...breeds].includes(state.sliceDoc(singular === null || singular === void 0 ? void 0 : singular.from, singular === null || singular === void 0 ? void 0 : singular.to).toLowerCase());
+        let invalid_sing = ['turtle', 'link', 'patch', ...breeds].includes(state.sliceDoc(singular === null || singular === void 0 ? void 0 : singular.from, singular === null || singular === void 0 ? void 0 : singular.to).toLowerCase()) ||
+            state.sliceDoc(singular === null || singular === void 0 ? void 0 : singular.from, singular === null || singular === void 0 ? void 0 : singular.to).toLowerCase() ==
+                state.sliceDoc(plural === null || plural === void 0 ? void 0 : plural.from, plural === null || plural === void 0 ? void 0 : plural.to).toLowerCase();
         let invalid_plur = ['turtles', 'links', 'patches', ...breeds].includes(state.sliceDoc(plural === null || plural === void 0 ? void 0 : plural.from, plural === null || plural === void 0 ? void 0 : plural.to).toLowerCase());
+        console.log(singular, plural, invalid_sing, invalid_plur);
         if (singular && plural && invalid_sing && invalid_plur) {
             return {
                 from: node.from,
@@ -33430,7 +33410,74 @@
         }
     }
 
-    /** GalapagosEditor: The editor component for NetLogo Web / Turtle Universe. */
+    // (The superfluous function calls around the list of extensions work
+    // around current limitations in tree-shaking software.)
+    /**
+    This is an extension value that just pulls together a number of
+    extensions that you might want in a basic editor. It is meant as a
+    convenient helper to quickly set up CodeMirror without installing
+    and importing a lot of separate packages.
+
+    Specifically, it includes...
+
+     - [the default command bindings](https://codemirror.net/6/docs/ref/#commands.defaultKeymap)
+     - [line numbers](https://codemirror.net/6/docs/ref/#view.lineNumbers)
+     - [special character highlighting](https://codemirror.net/6/docs/ref/#view.highlightSpecialChars)
+     - [the undo history](https://codemirror.net/6/docs/ref/#commands.history)
+     - [a fold gutter](https://codemirror.net/6/docs/ref/#language.foldGutter)
+     - [custom selection drawing](https://codemirror.net/6/docs/ref/#view.drawSelection)
+     - [drop cursor](https://codemirror.net/6/docs/ref/#view.dropCursor)
+     - [multiple selections](https://codemirror.net/6/docs/ref/#state.EditorState^allowMultipleSelections)
+     - [reindentation on input](https://codemirror.net/6/docs/ref/#language.indentOnInput)
+     - [the default highlight style](https://codemirror.net/6/docs/ref/#language.defaultHighlightStyle) (as fallback)
+     - [bracket matching](https://codemirror.net/6/docs/ref/#language.bracketMatching)
+     - [bracket closing](https://codemirror.net/6/docs/ref/#autocomplete.closeBrackets)
+     - [autocompletion](https://codemirror.net/6/docs/ref/#autocomplete.autocompletion)
+     - [rectangular selection](https://codemirror.net/6/docs/ref/#view.rectangularSelection) and [crosshair cursor](https://codemirror.net/6/docs/ref/#view.crosshairCursor)
+     - [active line highlighting](https://codemirror.net/6/docs/ref/#view.highlightActiveLine)
+     - [active line gutter highlighting](https://codemirror.net/6/docs/ref/#view.highlightActiveLineGutter)
+     - [selection match highlighting](https://codemirror.net/6/docs/ref/#search.highlightSelectionMatches)
+     - [search](https://codemirror.net/6/docs/ref/#search.searchKeymap)
+     - [linting](https://codemirror.net/6/docs/ref/#lint.lintKeymap)
+
+    (You'll probably want to add some language package to your setup
+    too.)
+
+    This extension does not allow customization. The idea is that,
+    once you decide you want to configure your editor more precisely,
+    you take this package's source (which is just a bunch of imports
+    and an array literal), copy it into your own code, and adjust it
+    as desired.
+    */
+    const basicSetup = /*@__PURE__*/(() => [
+        lineNumbers(),
+        highlightActiveLineGutter(),
+        highlightSpecialChars(),
+        history(),
+        foldGutter(),
+        drawSelection(),
+        dropCursor(),
+        EditorState.allowMultipleSelections.of(true),
+        indentOnInput(),
+        syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+        bracketMatching(),
+        closeBrackets(),
+        autocompletion(),
+        rectangularSelection(),
+        crosshairCursor(),
+        highlightActiveLine(),
+        highlightSelectionMatches(),
+        keymap.of([
+            ...closeBracketsKeymap,
+            ...defaultKeymap,
+            ...searchKeymap,
+            ...historyKeymap,
+            ...foldKeymap,
+            ...completionKeymap,
+            ...lintKeymap
+        ])
+    ])();
+
     class GalapagosEditor {
         /** Constructor: Create an editor instance. */
         constructor(Parent, Options) {
@@ -33488,13 +33535,11 @@
                     this.Language = NetLogo(this);
                     Extensions.push(preprocessStateExtension);
                     Extensions.push(stateExtension);
+                    Extensions.push(buildToolTips(this));
                     Dictionary.ClickHandler = (_a = Dictionary.ClickHandler) !== null && _a !== void 0 ? _a : Options.OnDictionaryClick;
                     this.Linters = netlogoLinters.map((linter) => buildLinter(linter, this));
                     // Special case: One-line mode
-                    if (!this.Options.OneLine) {
-                        Extensions.push(buildToolTips(this));
-                    }
-                    else {
+                    if (this.Options.OneLine) {
                         Extensions.unshift(Prec.highest(keymap.of([{ key: 'Enter', run: () => true }])));
                         Extensions.unshift(Prec.highest(keymap.of([{ key: 'Tab', run: acceptCompletion }])));
                     }
@@ -33541,10 +33586,10 @@
                 extensions: Extensions,
                 parent: Parent,
             });
-            this.GetPreprocessState().Context = this.PreprocessContext;
             this.GetPreprocessState().SetEditor(this);
             this.Options.ParseMode = (_b = this.Options.ParseMode) !== null && _b !== void 0 ? _b : ParseMode.Normal;
-            this.GetState().Mode = this.Options.ParseMode;
+            this.GetState(false).Mode = this.Options.ParseMode;
+            this.GetState(false).Preprocess = this.PreprocessContext;
             // Create features
             this.Editing = new EditingFeatures(this);
             this.Selection = new SelectionFeatures(this);
@@ -33595,19 +33640,19 @@
             this.Children.push(Child);
             Child.ID = this.Children.length;
             Child.ParentEditor = this;
-            Child.CodeMirror.state.field(stateExtension).setID(Child.ID);
+            Child.CodeMirror.state.field(stateExtension).EditorID = Child.ID;
             // Generative editors are sort of independent
             if (Child.Options.ParseMode !== ParseMode.Generative) {
                 Child.LintContext = this.LintContext;
                 Child.PreprocessContext = this.PreprocessContext;
-                Child.GetPreprocessState().Context = this.PreprocessContext;
+                Child.GetState(false).Preprocess = this.PreprocessContext;
             }
         }
         /** SyncContext: Sync the context of the child editor. */
         SyncContext(Child) {
             Child.LintContext = this.LintContext;
             Child.PreprocessContext = this.PreprocessContext;
-            Child.GetPreprocessState().Context = this.PreprocessContext;
+            Child.GetState(false).Preprocess = this.PreprocessContext;
         }
         /** Blur: Make the editor lose the focus (if any). */
         Blur() {
@@ -33708,10 +33753,10 @@
                 }
             });
         }
+        /** SetContext: Set the context of the editor for one-line modes. */
         SetContext(context) {
             if ((this.Options.ParseMode == ParseMode.Oneline || this.Options.ParseMode == ParseMode.OnelineReporter) &&
-                context != 'observer') {
-                this.CodeMirror.state.field(stateExtension).SetContext(context);
+                this.GetState(false).SetContext(context)) {
                 this.ForceParse();
                 this.ForceLint();
             }
@@ -33735,13 +33780,13 @@
         /** GetChildren: Get the logical children of the editor. */
         GetChildren() {
             // For the generative mode, it takes the context from its parent but does not contribute to it
-            if (this.Options.ParseMode == ParseMode.Generative)
-                return [this];
-            if (this.Options.ParseMode == ParseMode.Normal)
-                return [...this.Children, this];
-            else {
-                return [this];
+            if (this.Options.ParseMode == ParseMode.Generative) {
+                if (this.ParentEditor)
+                    return [this, this.ParentEditor];
             }
+            else if (this.Options.ParseMode == ParseMode.Normal)
+                return [...this.Children, this];
+            return [this];
         }
         /** UpdateContext: Try to update the context of this editor. */
         UpdateContext() {
@@ -33779,17 +33824,19 @@
                 }
                 for (var [name, breed] of state.Breeds) {
                     breed.EditorID = child.ID;
-                    if (mainLint.Breeds.has(name)) {
-                        var variables = mainLint.Breeds.get(name).Variables;
+                    var current = mainLint.Breeds.get(name);
+                    if (!current) {
+                        // Here, we make a copy to avoid contamination
+                        current = new Breed(breed.Singular, breed.Plural, [...breed.Variables], breed.BreedType);
+                        mainLint.Breeds.set(name, current);
+                    }
+                    else {
+                        var variables = current.Variables;
                         breed.Variables.forEach((variable) => {
                             if (!variables.includes(variable))
                                 variables.push(variable);
                         });
                     }
-                    else {
-                        mainLint.Breeds.set(name, breed);
-                    }
-                    //}
                 }
             }
             this.RefreshContexts();
@@ -33824,12 +33871,22 @@
             for (var child of this.GetChildren()) {
                 if (child.Options.ParseMode == ParseMode.Normal || child == this) {
                     let preprocess = child.CodeMirror.state.field(preprocessStateExtension);
-                    for (var p of preprocess.PluralBreeds)
-                        mainPreprocess.PluralBreeds.set(p, child.ID);
-                    for (var p of preprocess.SingularBreeds)
-                        mainPreprocess.SingularBreeds.set(p, child.ID);
-                    for (var p of preprocess.BreedVars)
-                        mainPreprocess.BreedVars.set(p, child.ID);
+                    for (var I = 0; I < preprocess.PluralBreeds.length; I++) {
+                        var Plural = preprocess.PluralBreeds[I];
+                        var Singular = preprocess.SingularBreeds[I];
+                        var Type = preprocess.BreedTypes[I];
+                        mainPreprocess.PluralBreeds.set(Plural, child.ID);
+                        mainPreprocess.SingularBreeds.set(Singular, child.ID);
+                        mainPreprocess.PluralToSingulars.set(Plural, Singular);
+                        mainPreprocess.SingularToPlurals.set(Singular, Plural);
+                        mainPreprocess.BreedTypes.set(Plural, Type);
+                    }
+                    for (var [p, vars] of preprocess.BreedVars) {
+                        for (var variable of vars) {
+                            mainPreprocess.BreedVars.set(variable, child.ID);
+                            mainPreprocess.BreedVarToPlurals.set(variable, p);
+                        }
+                    }
                     for (var [p, num_args] of preprocess.Commands) {
                         mainPreprocess.Commands.set(p, num_args);
                         mainPreprocess.CommandsOrigin.set(p, child.ID);
@@ -33876,9 +33933,10 @@
         // #region "Event Handling"
         /** onUpdate: Handle the Update event. */
         onUpdate(update) {
-            if (this.Options.OnUpdate != null) {
+            if (update.docChanged)
+                this.SetCompilerErrors([]);
+            if (this.Options.OnUpdate != null)
                 this.Options.OnUpdate(update.docChanged, update);
-            }
             if (update.focusChanged) {
                 if (this.CodeMirror.hasFocus) {
                     if (this.Options.OnFocused != null)
@@ -33974,7 +34032,7 @@
                     // Special handling for ServerErrors
                     if (Section.Type == ChatResponseType.ServerError && Section.Field !== "Irrecoverable") {
                         if (Section.Field == "Temperature")
-                            Record.Temperature = (_a = Record.Temperature) !== null && _a !== void 0 ? _a : 0 + 0.2;
+                            Record.Temperature = (_a = Record.Temperature) !== null && _a !== void 0 ? _a : 0 + 0.4;
                         Section.Parsed = SendRequest;
                     }
                     CurrentRenderer.SetFinalized();
@@ -36496,18 +36554,18 @@
         }
         /** RenderInternal: Render the UI element. */
         RenderInternal() {
-            var _a, _b, _c;
+            var _a, _b, _c, _d, _e;
             var Parameter = this.GetData();
             // Render the question
             this.Question.text((_a = Parameter.Question) !== null && _a !== void 0 ? _a : `${Localized.Get("Argument")} ${Parameter.Name}`);
             // Sync the input
-            if (typeof Parameter.Value) {
-                this.Input.val(Parameter.Value);
+            if (Parameter.Known == "true") {
+                this.Input.val((_c = (_b = Parameter.Examples) === null || _b === void 0 ? void 0 : _b[0]) !== null && _c !== void 0 ? _c : "");
             }
             else {
                 this.Input.val("");
             }
-            this.Input.attr("placeholder", (_c = (_b = Parameter.Examples) === null || _b === void 0 ? void 0 : _b[0]) !== null && _c !== void 0 ? _c : "");
+            this.Input.attr("placeholder", (_e = (_d = Parameter.Examples) === null || _d === void 0 ? void 0 : _d[0]) !== null && _e !== void 0 ? _e : "");
             // Render the examples
             this.Examples.empty();
             if (!Parameter.Examples || Parameter.Examples.length == 0)
@@ -36575,7 +36633,7 @@
                     Link.addClass("chosen");
                 });
             }
-            else {
+            else if (Parameters) {
                 this.ContentContainer.empty();
                 // When not finalized, render the questions
                 for (var Parameter of Parameters) {
@@ -36599,12 +36657,14 @@
             var Record = this.GetRecord();
             if (!Manager.RequestOption(Record.Response.Options[0], Record))
                 return;
-            // Build the messages
+            // Build the server message
+            var Need = (_b = (_a = Record.Response.Sections.find(Section => Section.Field == "Need")) === null || _a === void 0 ? void 0 : _a.Content) !== null && _b !== void 0 ? _b : "Unknown";
             var Message = JSON.stringify({
-                Need: (_b = (_a = Record.Response.Sections.find(Section => Section.Field == "Need")) === null || _a === void 0 ? void 0 : _a.Content) !== null && _b !== void 0 ? _b : "Unknown",
+                Need: Need,
                 Details: Composed
             });
-            var Friendly = `${Localized.Get("Summary of request")}`;
+            // Build the friendly message
+            var Friendly = `*${Localized.Get("Need")}*: ${Need}`;
             for (var Parameter in Composed) {
                 Friendly += `\n- ${Parameter}: ${Composed[Parameter]}`;
             }
@@ -36612,8 +36672,7 @@
         }
         /** GetChooser: Return the section chooser for this renderer. */
         static GetChooser() {
-            return (Record, Section) => Section.Field == "Parameters" && Section.Parsed && Array.isArray(Section.Parsed) && Section.Parsed.length > 0 &&
-                Section.Parsed[0].Name && Section.Parsed[0].Question ? new CodeIdeationRenderer() : undefined;
+            return (Record, Section) => { var _a; return Section.Field == "Parameters" && ((_a = Section.Content) === null || _a === void 0 ? void 0 : _a.startsWith("[")) ? new CodeIdeationRenderer() : undefined; };
         }
     }
 
@@ -36635,7 +36694,7 @@
     /** ChangeTopic: Generate a template change topic option. */
     function ChangeTopic(Label) {
         return {
-            Label: Label !== null && Label !== void 0 ? Label : "Let's change a topic",
+            Label: Label !== null && Label !== void 0 ? Label : "Let's change the topic",
             Operation: "Generic",
             Style: "leave",
             AskInput: true,
@@ -36643,6 +36702,22 @@
             CodeInContext: false,
             TextInContext: false,
             Inheritance: ContextInheritance.Drop
+        };
+    }
+    /** FollowUp: Generate a template follow-up option. */
+    function FollowUp(Label) {
+        return {
+            Label: Label !== null && Label !== void 0 ? Label : "Can I ask a followup question?",
+            Style: "followup",
+            AskInput: true,
+            Inheritance: ContextInheritance.InheritRecursive
+        };
+    }
+    /** EnterCode: Enter the code editor. */
+    function EnterCode(Label) {
+        return {
+            Label: Label !== null && Label !== void 0 ? Label : "Let's work on the code!",
+            Style: "editor"
         };
     }
     /** ExplainCode: Explain the code. */
@@ -36722,6 +36797,7 @@
             this.Tab.Editor.EditorTabs[0].Galapagos.AddChild(this.Editor);
             // Create the toolbar
             var Toolbar = $(`<div class="toolbar"></div>`).appendTo(this.Container);
+            this.FinishButton = $(`<div class="button finish">${Localized.Get("Finish")}</div>`).on("click", () => this.Return()).appendTo(Toolbar);
             this.PlayButton = $(`<div class="button run">${Localized.Get("RunCode")}</div>`).on("click", () => this.Play()).appendTo(Toolbar);
             this.AskButton = $(`<div class="button ask">${Localized.Get("AskCode")}</div>`).hide().on("click", () => this.Ask()).appendTo(Toolbar);
             this.AddToCodeButton = $(`<div class="button addtocode">${Localized.Get("AddCode")}</div>`).on("click", () => this.AddToCode()).appendTo(Toolbar);
@@ -36730,7 +36806,6 @@
             this.PreviousButton = $(`<div class="button prev">&lt;</div>`).on("click", () => this.ShowPrevious()).appendTo(History);
             this.HistoryDisplay = $(`<div class="label">0 / 0</div>`).appendTo(History);
             this.NextButton = $(`<div class="button next">&gt;</div>`).on("click", () => this.ShowNext()).appendTo(History);
-            this.FinishButton = $(`<div class="button finish">${Localized.Get("Finish")}</div>`).on("click", () => this.Return()).appendTo(Toolbar);
             CodeDisplay.Instance = this;
         }
         /** Show: Show the section. */
@@ -37080,15 +37155,17 @@
             var _a, _b, _c;
             var Section = this.GetData();
             if (this.Finalized && Section.Content) {
+                if (Section.Content.startsWith("NetLogo\n"))
+                    Section.Content = Section.Content.substring(8);
                 // Fix the code
                 var Parent = (_a = this.GetRecord().Context) === null || _a === void 0 ? void 0 : _a.CodeSnippet;
                 var ParentSnapshot = NetLogoUtils.BuildSnapshot(Parent);
                 Section.Content = NetLogoUtils.FixGeneratedCode(Section.Content, ParentSnapshot);
                 this.Code = Section.Content;
                 // Render the code
-                this.ContentContainer = $(`<code></code>`).replaceAll(this.ContentContainer)
-                    .on("click", () => EnterCode.bind(this)()).addClass("enterable");
+                this.ContentContainer = $(`<code></code>`).replaceAll(this.ContentContainer).addClass("enterable");
                 NetLogoUtils.AnnotateCode(this.ContentContainer, this.Code);
+                BindCode.bind(this)(this.ContentContainer);
             }
             else {
                 this.Code = (_c = (_b = Section.Content) === null || _b === void 0 ? void 0 : _b.trim()) !== null && _c !== void 0 ? _c : "";
@@ -37096,12 +37173,27 @@
             }
         }
     }
-    /** EnterCode: Enter the code mode. */
-    function EnterCode() {
-        var Subthread = this.Parent.Parent;
-        OutputDisplay.Instance.ActivateSubthread(Subthread);
-        CodeDisplay.Instance.SetContext(this.GetRecord(), Subthread);
-        CodeDisplay.Instance.Show();
+    /** BindCode: Allows a code snippet to go into the full window. */
+    function BindCode(Container) {
+        var Section = this.GetData();
+        // Bind the code
+        var Enter = () => {
+            var Subthread = this.Parent.Parent;
+            OutputDisplay.Instance.ActivateSubthread(Subthread);
+            CodeDisplay.Instance.SetContext(this.GetRecord(), Subthread);
+            CodeDisplay.Instance.Show();
+        };
+        // Technically, there should be only 1 enterable per section at this time
+        if (Container.filter(".enterable").each((I, Element) => {
+            if (!Section.Edited)
+                Section.Edited = Element.innerText.trim();
+        }).on("click", Enter).length == 0)
+            return Container;
+        // Pseudo option
+        var Parent = this.Parent;
+        if (Parent.GetData().Response.Options.findIndex(Option => Option.Style == "editor") === -1)
+            this.ShowPseudoOption(EnterCode(), (Option) => Enter());
+        return Container;
     }
 
     /** CompileErrorRenderer: A block that displays the a compile error section. */
@@ -37295,14 +37387,12 @@
                     for (var Multiline of Multilines) {
                         $(Multiline).text(NetLogoUtils.FixGeneratedCode($(Multiline).text(), ParentSnapshot));
                     }
-                    if (Multilines.length === 1) {
+                    if (Multilines.length === 1)
                         Multilines.addClass("enterable");
-                        Section.Edited = Multilines.text();
-                    }
                 }
                 // Actions for the code snippets
                 Codes.filter(":not(.enterable)").addClass("copyable").on("click", function () { CopyCode($(this).data("code")); });
-                Codes.filter(".enterable").on("click", () => EnterCode.bind(this)());
+                BindCode.bind(this)(Codes);
                 // Annotate the code snippets
                 NetLogoUtils.AnnotateCodes(Codes);
             }
@@ -37357,7 +37447,15 @@
         RenderInternal() {
             var _a, _b, _c;
             var Option = this.GetData();
-            this.Container.removeClass().addClass((_b = (_a = this.GetData().Style) === null || _a === void 0 ? void 0 : _a.toLowerCase()) !== null && _b !== void 0 ? _b : "generated").children("a")
+            var Record = this.Parent;
+            // Get the class
+            var Class = (_b = (_a = this.GetData().Style) === null || _a === void 0 ? void 0 : _a.toLowerCase()) !== null && _b !== void 0 ? _b : "generated";
+            var Classes = Class.split(" ");
+            if (!Classes.includes("leave") && !Classes.includes("editor") &&
+                Record.GetData().Response.Sections.findIndex(Section => Section.Type == ChatResponseType.Code) !== -1)
+                Classes.push("editor-only");
+            // Render the label
+            this.Container.removeClass().addClass(Classes).children("a")
                 .html(MarkdownToHTML((_c = Option.LocalizedLabel) !== null && _c !== void 0 ? _c : Option.Label).replace("<p>", "").replace("</p>", ""));
         }
         /** ClickHandler: The handler for the click event. */
@@ -37651,19 +37749,9 @@
             this.Subthread = Subthread;
             if (Subthread) {
                 Subthread.Container.addClass("activated");
-                Subthread.Children[Subthread.Children.length - 1].ActivateSelf("activated");
-                this.ScrollToElement(Subthread.Container);
-                // If expanding, enter the last code section
-                if (Expanding) {
-                    for (var I = Subthread.Children.length - 1; I >= 0; I--) {
-                        var Child = Subthread.Children[I];
-                        var Code = Child.Children.find(Current => Current instanceof CodeSectionRenderer);
-                        if (Code != null) {
-                            EnterCode.bind(Code)();
-                            break;
-                        }
-                    }
-                }
+                var LastRecord = Subthread.Children[Subthread.Children.length - 1];
+                LastRecord.ActivateSelf("activated");
+                this.ScrollToElement(LastRecord.Container);
             }
             else {
                 this.Tab.Codes.Hide();
@@ -37780,6 +37868,7 @@
                 this.PrintOutput(Status, Message);
                 this.RestartBatch();
                 if (Status !== "Help" && ChatManager.Available) {
+                    this.RenderOptions([FollowUp()]);
                     this.RenderOptions([ExplainCode()]);
                     this.RenderOptions([ChangeTopic()]);
                 }
@@ -38368,8 +38457,6 @@
                 OnUpdate: (Changed, Update) => {
                     if (Changed && !this.IgnoreUpdate)
                         TurtleEditor.Call({ Type: "CodeChanged" });
-                    if (Changed)
-                        this.Galapagos.SetCompilerErrors([]);
                 },
                 OnDictionaryClick: (Text) => this.Editor.CommandTab.ExplainPrimitive(Text),
                 OnExplain: (Diagnostic, Context) => this.Editor.CommandTab.ExplainDiagnostic({

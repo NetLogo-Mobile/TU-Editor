@@ -1,4 +1,4 @@
-import { EditorView } from 'codemirror';
+import { EditorView } from '@codemirror/view';
 import { GalapagosEditor } from 'src/editor';
 /** prettify: Change selection to fit formatting standards. */
 export declare const prettify: (view: EditorView, from?: number | null, to?: number | null) => number;

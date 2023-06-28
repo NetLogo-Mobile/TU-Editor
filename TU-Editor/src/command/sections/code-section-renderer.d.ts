@@ -1,3 +1,5 @@
+/// <reference types="jquery" />
+/// <reference types="jquery" />
 import { SectionRenderer } from "./section-renderer";
 /** CodeSectionRenderer: A block that displays the a code response section. */
 export declare class CodeSectionRenderer extends SectionRenderer {
@@ -8,5 +10,5 @@ export declare class CodeSectionRenderer extends SectionRenderer {
     /** RenderInternal: Render the UI element. */
     protected RenderInternal(): void;
 }
-/** EnterCode: Enter the code mode. */
-export declare function EnterCode(this: SectionRenderer): void;
+/** BindCode: Allows a code snippet to go into the full window. */
+export declare function BindCode(this: SectionRenderer, Container: JQuery<HTMLElement>): JQuery<HTMLElement>;

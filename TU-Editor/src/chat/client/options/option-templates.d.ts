@@ -8,12 +8,12 @@ export declare function NewTopic(Input: string, Label?: string): ChatResponseOpt
 export declare function FollowUp(Label?: string): ChatResponseOption;
 /** Clarify: Generate a template clarification option. */
 export declare function Clarify(Label?: string): ChatResponseOption;
-/** EditCode: Generate a template edit code option. */
-export declare function EditCode(Label?: string): ChatResponseOption;
 /** ExampleCode: Ask for an example code. */
 export declare function ExampleCode(Label?: string): ChatResponseOption;
 /** WriteCodeWithPlan: Write a code snippet based on the plan. */
 export declare function WriteCodeWithPlan(AskMore: boolean): ChatResponseOption;
+/** EnterCode: Enter the code editor. */
+export declare function EnterCode(Label?: string): ChatResponseOption;
 /** AskCode: Ask a question about the code. */
 export declare function AskCode(Label?: string, Style?: string, CodeOnly?: boolean): ChatResponseOption;
 /** FixCode: Fix the current code snippet. */

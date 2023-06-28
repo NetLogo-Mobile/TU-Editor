@@ -22,10 +22,8 @@ export interface CodeParameter {
     Name: string;
     /** Question: The question displayed for the user. */
     Question?: string;
-    /** Provided: Is the value provided for the parameter. */
-    Provided?: boolean;
-    /** Value: The provided value for the parameter. */
-    Value?: string;
+    /** Known: Is the value known for the parameter. */
+    Known?: "true" | "false";
     /** Examples: The examples for the parameter. */
     Examples?: string[];
 }

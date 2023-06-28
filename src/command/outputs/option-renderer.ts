@@ -1,6 +1,7 @@
 import { Localized } from "../../../../CodeMirror-NetLogo/src/editor";
 import { ChatManager } from "../../chat/chat-manager";
 import { ChatResponseOption } from "../../chat/client/chat-option";
+import { ChatResponseType } from "../../chat/client/chat-response";
 import { MarkdownToHTML } from "../../utils/element";
 import { RecordRenderer } from "./record-renderer";
 import { UIRendererOf } from "./ui-renderer";
@@ -24,7 +25,15 @@ export class OptionRenderer extends UIRendererOf<ChatResponseOption> {
     /** RenderInternal: Render the UI element. */
     protected RenderInternal(): void {
         var Option = this.GetData();
-        this.Container.removeClass().addClass(this.GetData().Style?.toLowerCase() ?? "generated").children("a")
+        var Record = this.Parent! as RecordRenderer;
+        // Get the class
+        var Class = this.GetData().Style?.toLowerCase() ?? "generated";
+        var Classes = Class.split(" ");
+        if (!Classes.includes("leave") && !Classes.includes("editor") && 
+            Record.GetData().Response.Sections.findIndex(Section => Section.Type == ChatResponseType.Code) !== -1)
+            Classes.push("editor-only");
+        // Render the label
+        this.Container.removeClass().addClass(Classes).children("a")
             .html(MarkdownToHTML(Option.LocalizedLabel ?? Option.Label).replace("<p>", "").replace("</p>", ""));
     }
     /** ClickHandler: The handler for the click event. */

@@ -4,7 +4,7 @@ import { CopyCode } from "../../utils/misc";
 import { NetLogoUtils } from "../../utils/netlogo";
 import { OutputDisplay } from "../displays/output";
 import { UIRendererOf } from "../outputs/ui-renderer";
-import { EnterCode } from "./code-section-renderer";
+import { BindCode } from "./code-section-renderer";
 import { SectionRenderer } from "./section-renderer";
 
 /** TextSectionRenderer: A block that displays the a text response section. */
@@ -47,14 +47,11 @@ export class TextSectionRenderer extends SectionRenderer {
                 for (var Multiline of Multilines) {
                     $(Multiline).text(NetLogoUtils.FixGeneratedCode($(Multiline).text(), ParentSnapshot));
                 }
-                if (Multilines.length === 1) {
-                    Multilines.addClass("enterable");
-                    Section.Edited = Multilines.text();
-                }
+                if (Multilines.length === 1) Multilines.addClass("enterable");
             }
             // Actions for the code snippets
             Codes.filter(":not(.enterable)").addClass("copyable").on("click", function() { CopyCode($(this).data("code")!); });
-            Codes.filter(".enterable").on("click", () => EnterCode.bind(this)());
+            BindCode.bind(this)(Codes);
             // Annotate the code snippets
             NetLogoUtils.AnnotateCodes(Codes);
         }

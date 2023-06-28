@@ -4,7 +4,7 @@ import { DiagnosticType } from "../languages/netlogo-context";
 /** ChangeTopic: Generate a template change topic option. */
 export function ChangeTopic(Label?: string): ChatResponseOption {
     return {
-        Label: Label ?? "Let's change a topic",
+        Label: Label ?? "Let's change the topic",
         Operation: "Generic",
         Style: "leave",
         AskInput: true,
@@ -51,18 +51,6 @@ export function Clarify(Label?: string): ChatResponseOption {
     }
 }
 
-/** EditCode: Generate a template edit code option. */
-export function EditCode(Label?: string): ChatResponseOption {
-    return {
-        Label: Label ?? "Can you edit the code?",
-        Style: "followup",
-        Operation: "EditCode",
-        AskInput: true,
-        TextInContext: false,
-        Inheritance: ContextInheritance.CurrentOnly
-    }
-}
-
 /** ExampleCode: Ask for an example code. */
 export function ExampleCode(Label?: string): ChatResponseOption {
     return {
@@ -86,9 +74,17 @@ export function WriteCodeWithPlan(AskMore: boolean): ChatResponseOption {
         Operation: "CodeCompose",
         SubOperation: "Planned",
         AskInput: AskMore,
-        Inheritance: ContextInheritance.CurrentOnly,
+        Inheritance: ContextInheritance.InheritRecursive,
         TextInContext: true,
         InputInContext: true
+    }
+}
+
+/** EnterCode: Enter the code editor. */
+export function EnterCode(Label?: string): ChatResponseOption {
+    return {
+        Label: Label ?? "Let's work on the code!",
+        Style: "editor"
     }
 }
 

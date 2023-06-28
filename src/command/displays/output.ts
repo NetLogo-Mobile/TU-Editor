@@ -12,7 +12,6 @@ import { RuntimeError } from "../../../../CodeMirror-NetLogo/src/lang/linters/ru
 import { NetLogoUtils } from "../../utils/netlogo";
 import { DiagnosticType } from "../../chat/client/languages/netlogo-context";
 import { GenerateObjectID } from "../../utils/misc";
-import { CodeSectionRenderer, EnterCode } from "../sections/code-section-renderer";
 import { ChangeTopic, ExplainCode, FollowUp } from "../../chat/client/options/option-templates";
 
 /** OutputDisplay: Display the output section. */
@@ -80,19 +79,9 @@ export class OutputDisplay extends Display {
 		this.Subthread = Subthread;
 		if (Subthread) {
 			Subthread.Container.addClass("activated");
-			Subthread.Children[Subthread.Children.length - 1].ActivateSelf("activated");
-			this.ScrollToElement(Subthread.Container);
-			// If expanding, enter the last code section
-			if (Expanding) {
-				for (var I = Subthread.Children.length - 1; I >= 0; I--) {
-					var Child = Subthread.Children[I] as RecordRenderer;
-					var Code = Child.Children.find(Current => Current instanceof CodeSectionRenderer) as CodeSectionRenderer;
-					if (Code != null) {
-						EnterCode.bind(Code)();
-						break;
-					}
-				}
-			}
+			var LastRecord = Subthread.Children[Subthread.Children.length - 1];
+			LastRecord.ActivateSelf("activated");
+			this.ScrollToElement(LastRecord.Container);
 		} else {
 			this.Tab.Codes.Hide();
 		}

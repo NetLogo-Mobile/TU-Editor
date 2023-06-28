@@ -44,7 +44,6 @@ export class EditorTab extends Tab {
 			OnUpdate: (Changed: boolean, Update: any) => {
 				if (Changed && !this.IgnoreUpdate)
 					TurtleEditor.Call({ Type: "CodeChanged" });
-				if (Changed) this.Galapagos.SetCompilerErrors([]);
 			},
 			OnDictionaryClick: (Text: string) => this.Editor.CommandTab.ExplainPrimitive(Text),
 			OnExplain: (Diagnostic, Context) => this.Editor.CommandTab.ExplainDiagnostic({

@@ -14,6 +14,7 @@ import { RuntimeError } from "../../../CodeMirror-NetLogo/src/lang/linters/runti
 import { ChangeTopic } from "../chat/client/options/option-templates";
 import { NetLogoUtils } from "../utils/netlogo";
 import { Diagnostic } from "../chat/client/languages/netlogo-context";
+import { Toast } from "../utils/dialog";
 
 declare const { bodyScrollLock, EditorDictionary }: any;
 
@@ -97,7 +98,11 @@ export class CommandTab extends Tab {
 			ParseMode: ParseMode.Oneline,
 			Placeholder: this.Placeholder.get(0),
 			OnKeyUp: (Event: any) => this.InputKeyHandler(Event),
-			OnDictionaryClick: (Text: any) => this.ExplainPrimitive(Text)
+			OnDictionaryClick: (Text: any) => this.ExplainPrimitive(Text),
+			OnExplain: (Diagnostic, Context) => this.Editor.CommandTab.ExplainDiagnostic({
+				Message: NetLogoUtils.PostprocessLintMessage(Diagnostic.message),
+				Code: this.Galapagos.GetCodeSlice(Diagnostic.from, Diagnostic.to)
+			}, Context, true)
 		});
 		// Send button
 		this.SendButton = $(`<div class="command-send"><div class="dot-stretching"></div></div>`).on("click", () => {
@@ -274,6 +279,10 @@ export class CommandTab extends Tab {
 	}
 	/** ExplainDiagnostic: Explain the diagnostic. */
 	public ExplainDiagnostic(Diagnostic: Diagnostic, Context: string, NewThread: boolean) {
+		if (!ChatManager.Available) {
+			Toast("warning", Localized.Get("Feature not supported"));
+			return;
+		}
 		if (!this.Visible) this.Show();
 		this.ChatManager.SendRequest({
 			Input: JSON.stringify(Diagnostic),

@@ -605,14 +605,15 @@
 	display: none;
 }
 
-.command-output.code-enabled .record.code-output .section.code {
-	display: none;
-}
-
 .command-output.code-enabled .record.code-hidden:not(.activated) {
 	display: none;
 }
 
+.command-output.code-enabled .record.code-output:not(.activated) ul.options .editor {
+	display: block;
+}
+
+.command-output.code-enabled .record.code-output .section.code,
 .command-output.code-enabled .record.code-hidden .section.code {
 	display: none;
 }

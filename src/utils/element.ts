@@ -108,7 +108,7 @@ export function PostprocessHTML(Editor: TurtleEditor, Source: JQuery<HTMLElement
         if (Href.indexOf(Delimiter) !== -1) {
             var Fields = Href.split(Delimiter);
             var Scheme = Fields[0];
-            var Target = Fields[1];
+            var Target = Fields.slice(1).join(Delimiter);
             if (Target.startsWith("//")) Target = Target.slice(2);
             if (["observer", "turtles", "patches", "links", "help"].indexOf(Scheme) !== -1) {
                 // Handle commands

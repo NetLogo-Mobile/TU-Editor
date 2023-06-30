@@ -89,12 +89,20 @@ export class FullTextDisplay extends Display {
 		// Render the acknowledgement
 		this.Acknowledgement.html(MarkdownToHTML(Knowledge.Acknowledgement));
 		// Render the see-also list
-		this.SeeAlso.empty();
-		for (var Primitive in Knowledge.SeeAlso) {
-			var Link = Knowledge.SeeAlso[Primitive];
-			$(`<li><a href="${Link}">${Primitive}</a></li>`).appendTo(this.SeeAlso)
+		var SeeAlso = Knowledge.SeeAlso && Object.keys(Knowledge.SeeAlso.length).length > 0
+		if (SeeAlso) {
+			this.SeeAlso.show();
+			this.SeeAlso.prev().show();
+			this.SeeAlso.empty();
+			for (var Primitive in Knowledge.SeeAlso) {
+				var Link = Knowledge.SeeAlso[Primitive];
+				$(`<li><a href="${Link}">${Primitive}</a></li>`).appendTo(this.SeeAlso)
+			}
+			PostprocessHTML(this.Tab.Editor, this.SeeAlso);
+		} else {
+			this.SeeAlso.hide();
+			this.SeeAlso.prev().hide();
 		}
-		PostprocessHTML(this.Tab.Editor, this.SeeAlso);
 	}
 	/** ShowOriginal: Show the original version of the full-text help. */
 	public ShowOriginal() {

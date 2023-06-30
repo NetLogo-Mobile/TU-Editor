@@ -26409,7 +26409,7 @@
         'Expand messages _': (Number) => `Expand ${Number} message` + (Number > 1 ? 's' : ''),
         FullText: () => `Read more`,
         Acknowledgement: () => 'Acknowledgement',
-        SeeAlso: () => `See also`,
+        SeeAlso: () => `See Also`,
         OK: () => `OK`,
         Cancel: () => `Cancel`,
         'Run command': () => `Run command`,
@@ -26430,6 +26430,7 @@
         'Talk to the computer in NetLogo or natural languages': () => `Talk to the computer in NetLogo or natural languages`,
         'Press enter to execute again': () => `Press Enter will execute the code again.`,
         'Copied to clipboard': () => 'The item has been copied to clipboard.',
+        'Feature not supported': () => 'The feature is not supported yet. Stay tuned!',
         // Chat and execution messages
         'Connection to server failed _': (Error) => `Sorry, the connection to our server failed. Code ${Error}.`,
         'Summary of request': () => `Below is a summary of my request: `,
@@ -26592,6 +26593,7 @@
         'Execute the procedure': () => `开始执行这段程序`,
         'Press enter to execute again': () => `按回车键可以再次执行。`,
         'Copied to clipboard': () => `内容已复制到剪贴板。`,
+        'Feature not supported': () => '此功能尚未推出，敬请期待！',
         // Chat and execution messages
         'Connection to server failed _': (Error) => `抱歉，和服务器的连接中断了。代码 ${Error}。`,
         'Summary of request': () => `简单总结我的请求的要点：`,
@@ -32491,6 +32493,7 @@
         /** SelectAll: Select all text in the editor. */
         SelectAll() {
             selectAll(this.CodeMirror);
+            this.CodeMirror.focus();
         }
         /** Select: Select and scroll to a given range in the editor. */
         Select(Start, End) {
@@ -32501,6 +32504,7 @@
                 selection: { anchor: Start, head: End },
                 scrollIntoView: true,
             });
+            this.CodeMirror.focus();
         }
         /** GetSelection: Returns an object of the start and end of
          *  a selection in the editor. */
@@ -32529,6 +32533,12 @@
         /** RefreshCursor: Refresh the cursor position. */
         RefreshCursor() {
             this.SetCursorPosition(this.GetCursorPosition());
+        }
+        // #endregion
+        // #region "Highlighting Changes"
+        /** HighlightChanges: Highlight the changes in the editor. */
+        HighlightChanges(PreviousVersion) {
+            this.Galapagos.GetCode();
         }
     }
 
@@ -36080,7 +36090,7 @@
             if (Href.indexOf(Delimiter) !== -1) {
                 var Fields = Href.split(Delimiter);
                 var Scheme = Fields[0];
-                var Target = Fields[1];
+                var Target = Fields.slice(1).join(Delimiter);
                 if (Target.startsWith("//"))
                     Target = Target.slice(2);
                 if (["observer", "turtles", "patches", "links", "help"].indexOf(Scheme) !== -1) {
@@ -36206,6 +36216,8 @@
         }
         /** FixGeneratedCode: Fix some generated code. */
         static FixGeneratedCode(Content, Parent) {
+            if (Content.startsWith("NetLogo\n"))
+                Content = Content.substring(8);
             // Remove the trailing semicolon
             if (Content.endsWith(';'))
                 Content = Content.slice(0, -1);
@@ -36334,12 +36346,21 @@
             // Render the acknowledgement
             this.Acknowledgement.html(MarkdownToHTML(Knowledge.Acknowledgement));
             // Render the see-also list
-            this.SeeAlso.empty();
-            for (var Primitive in Knowledge.SeeAlso) {
-                var Link = Knowledge.SeeAlso[Primitive];
-                $(`<li><a href="${Link}">${Primitive}</a></li>`).appendTo(this.SeeAlso);
+            var SeeAlso = Knowledge.SeeAlso && Object.keys(Knowledge.SeeAlso.length).length > 0;
+            if (SeeAlso) {
+                this.SeeAlso.show();
+                this.SeeAlso.prev().show();
+                this.SeeAlso.empty();
+                for (var Primitive in Knowledge.SeeAlso) {
+                    var Link = Knowledge.SeeAlso[Primitive];
+                    $(`<li><a href="${Link}">${Primitive}</a></li>`).appendTo(this.SeeAlso);
+                }
+                PostprocessHTML(this.Tab.Editor, this.SeeAlso);
             }
-            PostprocessHTML(this.Tab.Editor, this.SeeAlso);
+            else {
+                this.SeeAlso.hide();
+                this.SeeAlso.prev().hide();
+            }
         }
         /** ShowOriginal: Show the original version of the full-text help. */
         ShowOriginal() {
@@ -36643,7 +36664,7 @@
         }
         /** SubmitParameters: Submit the parameters to the server. */
         SubmitParameters() {
-            var _a, _b;
+            var _a, _b, _c, _d;
             // Compose the input
             var Composed = {};
             this.Children.forEach(Renderer => {
@@ -36655,10 +36676,13 @@
             // Request the virtual option
             var Manager = ChatManager.Instance;
             var Record = this.GetRecord();
+            // Get the complexity
+            var Complexity = parseInt((_b = (_a = Record.Response.Sections.find(Section => Section.Field == "Complexity")) === null || _a === void 0 ? void 0 : _a.Content) !== null && _b !== void 0 ? _b : "4");
+            Record.Response.Options[0].Operation = Complexity >= 5 ? "Plan" : "CodeCompose";
             if (!Manager.RequestOption(Record.Response.Options[0], Record))
                 return;
             // Build the server message
-            var Need = (_b = (_a = Record.Response.Sections.find(Section => Section.Field == "Need")) === null || _a === void 0 ? void 0 : _a.Content) !== null && _b !== void 0 ? _b : "Unknown";
+            var Need = (_d = (_c = Record.Response.Sections.find(Section => Section.Field == "Need")) === null || _c === void 0 ? void 0 : _c.Content) !== null && _d !== void 0 ? _d : "Unknown";
             var Message = JSON.stringify({
                 Need: Need,
                 Details: Composed
@@ -37155,8 +37179,6 @@
             var _a, _b, _c;
             var Section = this.GetData();
             if (this.Finalized && Section.Content) {
-                if (Section.Content.startsWith("NetLogo\n"))
-                    Section.Content = Section.Content.substring(8);
                 // Fix the code
                 var Parent = (_a = this.GetRecord().Context) === null || _a === void 0 ? void 0 : _a.CodeSnippet;
                 var ParentSnapshot = NetLogoUtils.BuildSnapshot(Parent);
@@ -37176,12 +37198,14 @@
     /** BindCode: Allows a code snippet to go into the full window. */
     function BindCode(Container) {
         var Section = this.GetData();
+        var Parent = this.Parent;
         // Bind the code
         var Enter = () => {
             var Subthread = this.Parent.Parent;
             OutputDisplay.Instance.ActivateSubthread(Subthread);
             CodeDisplay.Instance.SetContext(this.GetRecord(), Subthread);
             CodeDisplay.Instance.Show();
+            Parent.Container.find("li.editor").addClass("chosen");
         };
         // Technically, there should be only 1 enterable per section at this time
         if (Container.filter(".enterable").each((I, Element) => {
@@ -37190,7 +37214,6 @@
         }).on("click", Enter).length == 0)
             return Container;
         // Pseudo option
-        var Parent = this.Parent;
         if (Parent.GetData().Response.Options.findIndex(Option => Option.Style == "editor") === -1)
             this.ShowPseudoOption(EnterCode(), (Option) => Enter());
         return Container;
@@ -38079,7 +38102,11 @@
                 ParseMode: ParseMode.Oneline,
                 Placeholder: this.Placeholder.get(0),
                 OnKeyUp: (Event) => this.InputKeyHandler(Event),
-                OnDictionaryClick: (Text) => this.ExplainPrimitive(Text)
+                OnDictionaryClick: (Text) => this.ExplainPrimitive(Text),
+                OnExplain: (Diagnostic, Context) => this.Editor.CommandTab.ExplainDiagnostic({
+                    Message: NetLogoUtils.PostprocessLintMessage(Diagnostic.message),
+                    Code: this.Galapagos.GetCodeSlice(Diagnostic.from, Diagnostic.to)
+                }, Context, true)
             });
             // Send button
             this.SendButton = $(`<div class="command-send"><div class="dot-stretching"></div></div>`).on("click", () => {
@@ -38259,6 +38286,10 @@
         /** ExplainDiagnostic: Explain the diagnostic. */
         ExplainDiagnostic(Diagnostic, Context, NewThread) {
             var _a, _b;
+            if (!ChatManager.Available) {
+                Toast("warning", Localized.Get("Feature not supported"));
+                return;
+            }
             if (!this.Visible)
                 this.Show();
             this.ChatManager.SendRequest({

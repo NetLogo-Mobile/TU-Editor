@@ -39,7 +39,8 @@ export class TextSectionRenderer extends SectionRenderer {
         if (this.Finalized) {
             // Find all code snippets
             var Codes = this.ContentContainer.find("code");
-            var Multilines = Codes.filter((_, Element) => $(Element).text().indexOf("\n") !== -1);
+            var Multilines = Codes.filter((_, Element) => 
+                Element.parentElement?.childNodes.length === 1 && $(Element).text().indexOf("\n") !== -1);
             // Fix the multi-line code
             if (Multilines.length > 0) {
                 var Parent = this.GetRecord().Context?.CodeSnippet;

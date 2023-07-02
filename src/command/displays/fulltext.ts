@@ -89,7 +89,7 @@ export class FullTextDisplay extends Display {
 		// Render the acknowledgement
 		this.Acknowledgement.html(MarkdownToHTML(Knowledge.Acknowledgement));
 		// Render the see-also list
-		var SeeAlso = Knowledge.SeeAlso && Object.keys(Knowledge.SeeAlso.length).length > 0
+		var SeeAlso = Knowledge.SeeAlso && Object.keys(Knowledge.SeeAlso).length > 0
 		if (SeeAlso) {
 			this.SeeAlso.show();
 			this.SeeAlso.prev().show();

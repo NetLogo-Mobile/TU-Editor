@@ -57,7 +57,7 @@ export class CodeIdeationRenderer extends JSONSectionRenderer<CodeParameter[]> {
         var Record = this.GetRecord();
         // Get the complexity
         var Complexity = parseInt(Record.Response.Sections.find(Section => Section.Field == "Complexity")?.Content ?? "4");
-        Record.Response.Options[0].Operation = Complexity >= 5 ? "Plan" : "CodeCompose";
+        Record.Response.Options[0].Operation = Complexity >= 4 ? "Plan" : "CodeCompose";
         if (!Manager.RequestOption(Record.Response.Options[0], Record)) return;
         // Build the server message
         var Need = Record.Response.Sections.find(Section => Section.Field == "Need")?.Content ?? "Unknown";

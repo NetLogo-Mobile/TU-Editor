@@ -618,26 +618,26 @@
 	display: block;
 }
 
+.command-output.code-enabled .record.code-output .section.code {
+	display: none;
+}
+
 .command-output .record:not(.activated) .section:not(.first).code,
-.command-output.code-enabled .record.code-output .section.code,
 .command-output.code-enabled .record.code-hidden .section.code {
 	display: block;
 }
 
 .command-output .record:not(.activated) .section:not(.first).code code,
-.command-output.code-enabled .record.code-output .section.code code,
 .command-output.code-enabled .record.code-hidden .section.code code {
 	min-height: 1.5rem;
 }
 
 .command-output .record:not(.activated) .section:not(.first).code code span,
-.command-output.code-enabled .record.code-output .section.code code span,
 .command-output.code-enabled .record.code-hidden .section.code code span {
 	display: none;
 }
 
 .command-output .record:not(.activated) .section:not(.first).code code span.placeholder,
-.command-output.code-enabled .record.code-output .section.code code span.placeholder,
 .command-output.code-enabled .record.code-hidden .section.code code span.placeholder {
 	display: block;
 }

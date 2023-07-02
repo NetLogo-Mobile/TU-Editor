@@ -26394,6 +26394,7 @@
         FixCode: () => `Fix`,
         AskCode: () => `Ask`,
         AddCode: () => `Add to Code`,
+        CopyCode: () => `Copy Code`,
         'Trying to add the code': () => `Trying to add the code to the project...`,
         PreviousVersion: () => `Back`,
         NextVersion: () => `Next`,
@@ -26407,6 +26408,7 @@
         Finish: () => `Finish`,
         'Expand options _': (Number) => `Expand ${Number} option` + (Number > 1 ? 's' : ''),
         'Expand messages _': (Number) => `Expand ${Number} message` + (Number > 1 ? 's' : ''),
+        'Code placeholder _': (Number) => `Click to work on ${Number} ${Number > 1 ? 'lines' : 'line'} of code`,
         FullText: () => `Read more`,
         Acknowledgement: () => 'Acknowledgement',
         SeeAlso: () => `See Also`,
@@ -26570,6 +26572,7 @@
         FixCode: () => `修复`,
         AskCode: () => `提问`,
         AddCode: () => `放入作品`,
+        CopyCode: () => `复制代码`,
         'Trying to add the code': () => `尝试将代码放入作品……`,
         PreviousVersion: () => `后退`,
         NextVersion: () => `前进`,
@@ -26583,6 +26586,7 @@
         Finish: () => `完成`,
         'Expand options _': (Number) => `展开 ${Number} 个选项`,
         'Expand messages _': (Number) => `展开 ${Number} 条消息`,
+        'Code placeholder _': (Number) => `点击编辑 ${Number} 行代码`,
         FullText: () => `阅读全文`,
         Acknowledgement: () => '致谢',
         SeeAlso: () => `参见`,
@@ -33561,8 +33565,8 @@
             Extensions.push(this.Language);
             // DOM handlers
             Extensions.push(EditorView.domEventHandlers({
-                keydown: Options.OnKeyDown,
-                keyup: Options.OnKeyUp,
+                keydown: (Event) => { var _a; return (_a = Options.OnKeyDown) === null || _a === void 0 ? void 0 : _a.call(Options, Event, this); },
+                keyup: (Event) => { var _a; return (_a = Options.OnKeyUp) === null || _a === void 0 ? void 0 : _a.call(Options, Event, this); },
             }));
             // One-line mode
             if (this.Options.OneLine) {
@@ -36184,24 +36188,26 @@
     /** NetLogoUtils: Utilities for the NetLogo language. */
     class NetLogoUtils {
         /** AnnotateCodes: Annotate some code elements. */
-        static AnnotateCodes(Targets) {
+        static AnnotateCodes(Targets, Prettify = true) {
             Targets.each(function () {
-                NetLogoUtils.AnnotateCode($(this));
+                NetLogoUtils.AnnotateCode($(this), undefined, Prettify);
             });
         }
         /** AnnotateCode: Annotate a code element. */
-        static AnnotateCode(Target, Content) {
+        static AnnotateCode(Target, Content, Prettify = true) {
             Content = Content ? Content : Target.text();
             var [Element, Code] = NetLogoUtils.HighlightCode(Content);
             Target.empty().append($(Element)).data("code", Code);
+            return Code;
         }
         /** HighlightCode: Highlight a code snippet. */
-        static HighlightCode(Content) {
+        static HighlightCode(Content, Prettify = true) {
             this.SharedEditor.SetCode(Content.trim());
             // Prettify it if it contains a newline
-            if (Content.indexOf("\n") !== -1) {
+            if (Prettify && Content.indexOf("\n") !== -1) {
                 this.SharedEditor.Semantics.PrettifyAll();
-                this.SharedEditor.SetCode(this.SharedEditor.GetCode().trim());
+                Content = this.SharedEditor.GetCode().trim();
+                this.SharedEditor.SetCode(Content);
             }
             // Highlight it
             var Element = this.SharedEditor.Semantics.Highlight();
@@ -36618,7 +36624,7 @@
             }
             this.Container.removeClass("error");
             // Return the output
-            return [Parameter.Name, Value.toString()];
+            return [Parameter.Question, Value.toString()];
         }
     }
 
@@ -36690,7 +36696,7 @@
             // Build the friendly message
             var Friendly = `*${Localized.Get("Need")}*: ${Need}`;
             for (var Parameter in Composed) {
-                Friendly += `\n- ${Parameter}: ${Composed[Parameter]}`;
+                Friendly += `\n- ${Parameter} **${Composed[Parameter]}**`;
             }
             Manager.SendMessage(Message, Friendly);
         }
@@ -36824,7 +36830,7 @@
             this.FinishButton = $(`<div class="button finish">${Localized.Get("Finish")}</div>`).on("click", () => this.Return()).appendTo(Toolbar);
             this.PlayButton = $(`<div class="button run">${Localized.Get("RunCode")}</div>`).on("click", () => this.Play()).appendTo(Toolbar);
             this.AskButton = $(`<div class="button ask">${Localized.Get("AskCode")}</div>`).hide().on("click", () => this.Ask()).appendTo(Toolbar);
-            this.AddToCodeButton = $(`<div class="button addtocode">${Localized.Get("AddCode")}</div>`).on("click", () => this.AddToCode()).appendTo(Toolbar);
+            this.AddToCodeButton = $(`<div class="button addtocode">${Localized.Get("CopyCode")}</div>`).on("click", () => this.AddToCode()).appendTo(Toolbar);
             // Create the history
             var History = $(`<div class="history"></div>`).appendTo(Toolbar);
             this.PreviousButton = $(`<div class="button prev">&lt;</div>`).on("click", () => this.ShowPrevious()).appendTo(History);
@@ -36870,6 +36876,7 @@
             // Set the code
             this.Editor.SetCode(((_b = (_a = Section.Edited) !== null && _a !== void 0 ? _a : Section.Content) !== null && _b !== void 0 ? _b : "").trim());
             this.Editor.ForceParse();
+            this.Editor.Selection.SetCursorPosition(0);
             this.Record = Record;
             // Hide previous records
             var NeedHiding = this.CurrentIndex !== 0;
@@ -37188,6 +37195,7 @@
                 this.ContentContainer = $(`<code></code>`).replaceAll(this.ContentContainer).addClass("enterable");
                 NetLogoUtils.AnnotateCode(this.ContentContainer, this.Code);
                 BindCode.bind(this)(this.ContentContainer);
+                $(`<span></span>`).addClass("placeholder").text(Localized.Get("Code placeholder _", this.Code.split("\n").length)).appendTo(this.ContentContainer);
             }
             else {
                 this.Code = (_c = (_b = Section.Content) === null || _b === void 0 ? void 0 : _b.trim()) !== null && _c !== void 0 ? _c : "";
@@ -37205,12 +37213,14 @@
             OutputDisplay.Instance.ActivateSubthread(Subthread);
             CodeDisplay.Instance.SetContext(this.GetRecord(), Subthread);
             CodeDisplay.Instance.Show();
+            OutputDisplay.Instance.ScrollToElement(Parent.Container);
             Parent.Container.find("li.editor").addClass("chosen");
         };
         // Technically, there should be only 1 enterable per section at this time
         if (Container.filter(".enterable").each((I, Element) => {
+            var _a, _b;
             if (!Section.Edited)
-                Section.Edited = Element.innerText.trim();
+                Section.Edited = (_b = (_a = $(Element).children("span:eq(0)").get(0)) === null || _a === void 0 ? void 0 : _a.innerText) === null || _b === void 0 ? void 0 : _b.trim();
         }).on("click", Enter).length == 0)
             return Container;
         // Pseudo option
@@ -37688,7 +37698,14 @@
         }
         /** RenderInternal: Render the UI element. */
         RenderInternal() {
+            var _a, _b, _c;
             this.ExpandButton.toggleClass("hidden", this.Children.length == 0 || (this.Children.length == 1 && this.Children[0].Children.length <= 2));
+            if (this.Children.length === 1) {
+                this.ExpandButton.find("a").text(Localized.Get("Expand options _", (_c = (_b = (_a = this.Children[0].GetData().Response) === null || _a === void 0 ? void 0 : _a.Options) === null || _b === void 0 ? void 0 : _b.length) !== null && _c !== void 0 ? _c : 0) + " ↓");
+            }
+            else {
+                this.ExpandButton.find("a").text(Localized.Get("Expand messages _", this.Children.length) + " ↓");
+            }
         }
         /** AddRecord: Add a record to the subthread. */
         AddRecord(Record) {
@@ -37698,8 +37715,6 @@
             this.AddChild(Renderer, false);
             Renderer.SetData(Record);
             Renderer.ActivateSelf("activated");
-            // Update the expand button.
-            this.ExpandButton.find("a").text(Localized.Get("Expand messages _", this.Children.length) + " ↓");
             return Renderer;
         }
     }
@@ -38358,7 +38373,7 @@
                     Procedure: Procedure.Name,
                     IsTemporary: IsTemporary,
                     Arguments: Procedure.Arguments.map((Argument) => {
-                        return { Name: Argument, };
+                        return { Name: Argument, Question: Argument, };
                     })
                 };
                 this.Outputs.RenderRequest(Localized.Get("Trying to run the procedure _", Procedure.Name));

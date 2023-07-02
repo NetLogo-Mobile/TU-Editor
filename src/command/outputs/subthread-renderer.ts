@@ -24,6 +24,12 @@ export class SubthreadRenderer extends UIRendererOf<ChatSubthread> {
     protected RenderInternal(): void {
         this.ExpandButton.toggleClass("hidden", 
             this.Children.length == 0 || (this.Children.length == 1 && this.Children[0].Children.length <= 2));
+        if (this.Children.length === 1) {
+            this.ExpandButton.find("a").text(Localized.Get("Expand options _",
+                (this.Children[0] as RecordRenderer).GetData().Response?.Options?.length ?? 0) + " ↓");
+        } else {
+            this.ExpandButton.find("a").text(Localized.Get("Expand messages _", this.Children.length) + " ↓");
+        }
     }
     /** AddRecord: Add a record to the subthread. */
     public AddRecord(Record: ChatRecord): RecordRenderer {
@@ -33,8 +39,6 @@ export class SubthreadRenderer extends UIRendererOf<ChatSubthread> {
         this.AddChild(Renderer, false);
         Renderer.SetData(Record);
         Renderer.ActivateSelf("activated");
-        // Update the expand button.
-        this.ExpandButton.find("a").text(Localized.Get("Expand messages _", this.Children.length) + " ↓");
         return Renderer;
     }
 }

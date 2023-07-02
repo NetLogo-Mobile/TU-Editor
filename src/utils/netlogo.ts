@@ -8,24 +8,26 @@ export class NetLogoUtils {
 	/** SharedEditor: The shared editor. */
 	public static SharedEditor: GalapagosEditor;
 	/** AnnotateCodes: Annotate some code elements. */
-	public static AnnotateCodes(Targets: JQuery<HTMLElement>) {
+	public static AnnotateCodes(Targets: JQuery<HTMLElement>, Prettify: boolean = true) {
         Targets.each(function() {
-            NetLogoUtils.AnnotateCode($(this));
+            NetLogoUtils.AnnotateCode($(this), undefined, Prettify);
         });
 	}
 	/** AnnotateCode: Annotate a code element. */
-	public static AnnotateCode(Target: JQuery<HTMLElement>, Content?: string) {
+	public static AnnotateCode(Target: JQuery<HTMLElement>, Content?: string, Prettify: boolean = true): string {
         Content = Content ? Content : Target.text();
 		var [Element, Code] = NetLogoUtils.HighlightCode(Content);
         Target.empty().append($(Element)).data("code", Code);
+		return Code;
 	}
 	/** HighlightCode: Highlight a code snippet. */
-	public static HighlightCode(Content: string): [HTMLElement, string] {
+	public static HighlightCode(Content: string, Prettify: boolean = true): [HTMLElement, string] {
         this.SharedEditor.SetCode(Content.trim());
 		// Prettify it if it contains a newline
-		if (Content.indexOf("\n") !== -1) {
+		if (Prettify && Content.indexOf("\n") !== -1) {
         	this.SharedEditor.Semantics.PrettifyAll();
-       		this.SharedEditor.SetCode(this.SharedEditor.GetCode().trim());
+			Content = this.SharedEditor.GetCode().trim();
+       		this.SharedEditor.SetCode(Content);
 		}
 		// Highlight it
         var Element = this.SharedEditor.Semantics.Highlight();

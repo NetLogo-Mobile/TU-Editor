@@ -57,7 +57,7 @@ export class ParameterRenderer extends UIRendererOf<CodeParameter> {
         }
         this.Container.removeClass("error");
         // Return the output
-        return [Parameter.Name, Value.toString()];
+        return [Parameter.Question, Value.toString()];
     }
 }
 
@@ -66,7 +66,7 @@ export interface CodeParameter {
     /** Name: The name of the parameter. */
     Name: string;
     /** Question: The question displayed for the user. */
-    Question?: string;
+    Question: string;
     /** Known: Is the value known for the parameter. */
     Known?: "true" | "false";
     /** Examples: The examples for the parameter. */

@@ -1,3 +1,4 @@
+import { Localized } from "../../../../CodeMirror-NetLogo/src/editor";
 import { EnterCode } from "../../chat/client/options/option-templates";
 import { NetLogoUtils } from "../../utils/netlogo";
 import { CodeDisplay } from "../displays/code";
@@ -28,6 +29,7 @@ export class CodeSectionRenderer extends SectionRenderer {
             this.ContentContainer = $(`<code></code>`).replaceAll(this.ContentContainer).addClass("enterable");
             NetLogoUtils.AnnotateCode(this.ContentContainer, this.Code);
             BindCode.bind(this)(this.ContentContainer);
+            $(`<span></span>`).addClass("placeholder").text(Localized.Get("Code placeholder _", this.Code.split("\n").length)).appendTo(this.ContentContainer);
         } else {
             this.Code = Section.Content?.trim() ?? "";
             this.ContentContainer = $(`<pre></pre>`).replaceAll(this.ContentContainer).text(this.Code);
@@ -49,7 +51,7 @@ export function BindCode(this: SectionRenderer, Container: JQuery<HTMLElement>):
     };
     // Technically, there should be only 1 enterable per section at this time
     if (Container.filter(".enterable").each((I, Element) => {
-        if (!Section.Edited) Section.Edited = Element.innerText.trim();
+        if (!Section.Edited) Section.Edited = $(Element).children("span:eq(0)").get(0)?.innerText?.trim();
     }).on("click", Enter).length == 0) return Container;
     // Pseudo option
     if (Parent.GetData().Response.Options.findIndex(Option => Option.Style == "editor") === -1)

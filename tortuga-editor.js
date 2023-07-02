@@ -36346,7 +36346,7 @@
             // Render the acknowledgement
             this.Acknowledgement.html(MarkdownToHTML(Knowledge.Acknowledgement));
             // Render the see-also list
-            var SeeAlso = Knowledge.SeeAlso && Object.keys(Knowledge.SeeAlso.length).length > 0;
+            var SeeAlso = Knowledge.SeeAlso && Object.keys(Knowledge.SeeAlso).length > 0;
             if (SeeAlso) {
                 this.SeeAlso.show();
                 this.SeeAlso.prev().show();
@@ -36678,7 +36678,7 @@
             var Record = this.GetRecord();
             // Get the complexity
             var Complexity = parseInt((_b = (_a = Record.Response.Sections.find(Section => Section.Field == "Complexity")) === null || _a === void 0 ? void 0 : _a.Content) !== null && _b !== void 0 ? _b : "4");
-            Record.Response.Options[0].Operation = Complexity >= 5 ? "Plan" : "CodeCompose";
+            Record.Response.Options[0].Operation = Complexity >= 4 ? "Plan" : "CodeCompose";
             if (!Manager.RequestOption(Record.Response.Options[0], Record))
                 return;
             // Build the server message
@@ -37402,7 +37402,7 @@
             if (this.Finalized) {
                 // Find all code snippets
                 var Codes = this.ContentContainer.find("code");
-                var Multilines = Codes.filter((_, Element) => $(Element).text().indexOf("\n") !== -1);
+                var Multilines = Codes.filter((_, Element) => { var _a; return ((_a = Element.parentElement) === null || _a === void 0 ? void 0 : _a.childNodes.length) === 1 && $(Element).text().indexOf("\n") !== -1; });
                 // Fix the multi-line code
                 if (Multilines.length > 0) {
                     var Parent = (_b = this.GetRecord().Context) === null || _b === void 0 ? void 0 : _b.CodeSnippet;

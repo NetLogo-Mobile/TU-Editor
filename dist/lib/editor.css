@@ -44,6 +44,7 @@ code {
 }
 
 .cm-editor .cm-tooltip.cm-tooltip-autocomplete>ul {
+	overflow-y: scroll;
 	max-height: 11.4rem;
 }
 

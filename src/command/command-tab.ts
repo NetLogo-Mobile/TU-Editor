@@ -350,7 +350,7 @@ export class CommandTab extends Tab {
 				Procedure: Procedure.Name,
 				IsTemporary: IsTemporary,
 				Arguments: Procedure.Arguments.map((Argument) => {
-					return { Name: Argument, };
+					return { Name: Argument, Question: Argument, };
 				})
 			};
 			this.Outputs.RenderRequest(

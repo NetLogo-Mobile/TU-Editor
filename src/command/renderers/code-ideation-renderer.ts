@@ -66,7 +66,7 @@ export class CodeIdeationRenderer extends JSONSectionRenderer<CodeParameter[]> {
             Details: Composed
         });
         // Build the friendly message
-        var Friendly = `**${Localized.Get("Need")}**: ${Need}`;
+        var Friendly = `*${Localized.Get("Need")}*: ${Need}`;
         for (var Parameter in Composed) {
             Friendly += `\n- ${Parameter} **${Composed[Parameter]}**`;
         }

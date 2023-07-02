@@ -47,6 +47,7 @@ export function BindCode(this: SectionRenderer, Container: JQuery<HTMLElement>):
         OutputDisplay.Instance.ActivateSubthread(Subthread);
         CodeDisplay.Instance.SetContext(this.GetRecord(), Subthread);
         CodeDisplay.Instance.Show();
+        OutputDisplay.Instance.ScrollToElement(Parent.Container);
         Parent.Container.find("li.editor").addClass("chosen");
     };
     // Technically, there should be only 1 enterable per section at this time

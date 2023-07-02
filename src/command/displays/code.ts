@@ -118,6 +118,7 @@ export class CodeDisplay extends Display {
 		// Set the code
 		this.Editor.SetCode((Section.Edited ?? Section.Content ?? "").trim());
 		this.Editor.ForceParse();
+		this.Editor.Selection.SetCursorPosition(0);
 		this.Record = Record;
 		// Hide previous records
         var NeedHiding = this.CurrentIndex !== 0;

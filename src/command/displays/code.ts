@@ -59,7 +59,7 @@ export class CodeDisplay extends Display {
 		this.FinishButton = $(`<div class="button finish">${Localized.Get("Finish")}</div>`).on("click", () => this.Return()).appendTo(Toolbar);
 		this.PlayButton = $(`<div class="button run">${Localized.Get("RunCode")}</div>`).on("click", () => this.Play()).appendTo(Toolbar);
 		this.AskButton = $(`<div class="button ask">${Localized.Get("AskCode")}</div>`).hide().on("click", () => this.Ask()).appendTo(Toolbar);
-		this.AddToCodeButton = $(`<div class="button addtocode">${Localized.Get("AddCode")}</div>`).on("click", () => this.AddToCode()).appendTo(Toolbar);
+		this.AddToCodeButton = $(`<div class="button addtocode">${Localized.Get("CopyCode")}</div>`).on("click", () => this.AddToCode()).appendTo(Toolbar);
 		// Create the history
 		var History = $(`<div class="history"></div>`).appendTo(Toolbar);
 		this.PreviousButton = $(`<div class="button prev">&lt;</div>`).on("click", () => this.ShowPrevious()).appendTo(History);

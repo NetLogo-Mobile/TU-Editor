@@ -175,6 +175,7 @@ export class CommandTab extends Tab {
 	/** SendCommand: Send command to either execute or as a chat message. */
 	public async SendCommand(Objective: string, Content: string) {
 		Content = Content?.trim() ?? "";
+		var LowerContent = Content.toLowerCase();
 		// Chatable or not
 		var Chatable = ChatManager.Available;
 		// Special: set domain
@@ -182,7 +183,7 @@ export class CommandTab extends Tab {
 			TurtleEditor.SetChatBackend(Content.substring(7).trim());
 			this.Reset();
 			return;
-		} else if (!Chatable && Content.toLowerCase() == "chatlogo") {
+		} else if (!Chatable && LowerContent == "chatlogo") {
 			TurtleEditor.SetChatBackend("https://chatlogo-us.turtlesim.com/");
 			this.Reset();
 			return;
@@ -213,7 +214,7 @@ export class CommandTab extends Tab {
 			}
 		}
 		// Help pseudo-command
-		if (Content.toLowerCase() == "help" || Content.toLowerCase().startsWith("help ")) {
+		if (LowerContent.startsWith("help") && LowerContent.split(" ").length <= 3) {
 			Execute(Objective, Content, false);
 			return;
 		}

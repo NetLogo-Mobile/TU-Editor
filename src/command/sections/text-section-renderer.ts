@@ -52,9 +52,9 @@ export class TextSectionRenderer extends SectionRenderer {
             }
             // Actions for the code snippets
             Codes.filter(":not(.enterable)").addClass("copyable").on("click", function() { CopyCode($(this).data("code")!); });
-            BindCode.bind(this)(Codes);
             // Annotate the code snippets
             NetLogoUtils.AnnotateCodes(Codes);
+            BindCode.bind(this)(Codes);
         }
         // Remove the section if it's empty
         if (Content == "" && (Section.Options?.length ?? 0) == 0 && this.Finalized)

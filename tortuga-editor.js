@@ -26404,7 +26404,7 @@
         '~CustomCommand': (Name) => `A user-defined command. `,
         // Chat and AI assistant
         ClickHere: () => 'Click here',
-        Reconnect: () => `Reconnect`,
+        Reconnect: () => `Try it again`,
         RunCode: () => `Run`,
         'Trying to run the code': () => `Trying to run the code...`,
         'Trying to run the procedure _': (Name) => `Trying to run the procedure \`${Name}\`...`,
@@ -26584,7 +26584,7 @@
         'Type NetLogo command here': () => '在这里输入 NetLogo 命令',
         'Talk to the computer in NetLogo or natural languages': () => `用 NetLogo 或自然语言写代码`,
         // Chat and AI interface
-        Reconnect: () => `重新连接`,
+        Reconnect: () => `再试一次`,
         RunCode: () => `运行`,
         'Trying to run the code': () => `尝试运行代码……`,
         'Trying to run the procedure _': (Name) => `尝试运行子程序 \`${Name}\`……`,
@@ -27199,9 +27199,8 @@
     catch (error) { }
 
     /** Global: Global object. */
-    const Global = typeof globalThis === 'undefined' ? window : globalThis;
     /** Log: Log to console if debug is enabled. */
-    const Log = Global.GalapagosSilent ? console.log : () => { };
+    const Log = console.log ; //Global.GalapagosSilent ? console.log : () => {};
     /**
      * String.prototype.trimStart() polyfill
      * Adapted from polyfill.io
@@ -29060,13 +29059,118 @@
       SpecialCommandCreateTurtle = 86,
       SpecialCommandCreateLink = 87;
 
+    /** breedStatementRules: Rules for matching breed statements. */
+    // For Ruth: You might want to merge the "BreedLocation" into those rules and then refactor relevant procedures into this file.
+    const breedStatementRules = [
+        {
+            Match: /^(.*?)-own$/,
+            Singular: false,
+            Tag: Own,
+            Type: undefined,
+            Position: 0,
+        },
+        {
+            Match: /^(.*?)-(at|here|on)$/,
+            Singular: false,
+            Tag: SpecialReporter,
+            Type: BreedType$1.Turtle,
+            Position: 0,
+        },
+        {
+            Match: /^in-(.*?)-from$/,
+            Singular: true,
+            Tag: SpecialReporter,
+            Type: BreedType$1.UndirectedLink,
+        },
+        {
+            Match: /^out-(.*?)-to$/,
+            Singular: true,
+            Tag: SpecialReporter,
+            Type: BreedType$1.UndirectedLink,
+        },
+        {
+            Match: /^(?:out|in)-(.*?)-(neighbor\?|neighbors)$/,
+            Singular: true,
+            Tag: SpecialReporter,
+            Type: BreedType$1.UndirectedLink,
+        },
+        {
+            Match: /^(?:my-in|my-out|my)-(.*?)$/,
+            Singular: false,
+            Tag: SpecialReporter,
+            Type: BreedType$1.UndirectedLink,
+        },
+        {
+            Match: /^is-(.*?)\?$/,
+            Singular: true,
+            Tag: SpecialReporter,
+            Type: undefined,
+        },
+        {
+            Match: /^create-(.*?)-(?:to|from|with)$/,
+            Singular: undefined,
+            Tag: SpecialCommand,
+            Type: BreedType$1.UndirectedLink,
+        },
+        {
+            Match: /^(.*?)-(with|neighbor\?|neighbors)$/,
+            Singular: true,
+            Tag: SpecialReporter,
+            Type: BreedType$1.UndirectedLink,
+        },
+        {
+            Match: /^(?:hatch|sprout|create-ordered|create)-(.*?)$/,
+            Singular: false,
+            Tag: SpecialCommand,
+            Type: BreedType$1.Turtle,
+        },
+    ];
+    /** matchBreed: Check if the token is a breed reporter/command/variable. */
+    function matchBreed(token) {
+        let parseContext = GetContext();
+        // Check breed variables
+        let breedVars = parseContext.BreedVars;
+        if (breedVars.has(token))
+            return { tag: Identifier, valid: false };
+        if (parseContext.SingularBreeds.has(token))
+            return { tag: SpecialReporter, valid: true };
+        // Check breed statements
+        for (let rule of breedStatementRules) {
+            let match = token.match(rule.Match);
+            if (match) {
+                var name = match[1];
+                var type = -1;
+                var typeConstrained = rule.Type !== undefined;
+                var singular = rule.Singular !== undefined ? rule.Singular : parseContext.SingularBreeds.has(name);
+                if (singular) {
+                    if (!parseContext.SingularBreeds.has(name))
+                        return { tag: 0, valid: false };
+                    if (typeConstrained)
+                        type = parseContext.BreedTypes.get(parseContext.SingularToPlurals.get(name));
+                }
+                else {
+                    if (!parseContext.PluralBreeds.has(name))
+                        return { tag: 0, valid: false };
+                    if (typeConstrained)
+                        type = parseContext.BreedTypes.get(name);
+                }
+                if (type == BreedType$1.DirectedLink)
+                    type = BreedType$1.UndirectedLink;
+                if (typeConstrained && type !== rule.Type)
+                    return { tag: 0, valid: false };
+                return { tag: rule.Tag, valid: true };
+            }
+        }
+        return { tag: 0, valid: false };
+    }
+
     let primitives$4 = PrimitiveManager;
     // Keyword tokenizer
     const keyword = new ExternalTokenizer((input, stack) => {
         let token = '';
         // Find until the token is complete
         while (isValidKeyword(input.next)) {
-            token += String.fromCharCode(input.next).toLowerCase();
+            token += String.fromCharCode(input.next);
             input.advance();
         }
         if (token == '')
@@ -29241,77 +29345,7 @@
             // a-z
             (ch >= 97 && ch <= 122));
     }
-    // JC: Two issues with this approach: first, CJK breed names won't work; second, you can potentially do /\w+-(own|at|here)/ without doing many times
-    // checks if token is a breed command/reporter. For some reason 'or' didn't work here, so they're all separate
-    // Another issue: what if one breed is called sheep, the other sheep-sheep? I would recommend to rewrite into regex with capture groups.
-    // Such as: ^(.*?)-own$ and then check if the first capture group is a breed name.
-    function matchBreed(token) {
-        let tag = 0;
-        let parseContext = GetContext();
-        // Check breed variables
-        let breedVars = parseContext.BreedVars;
-        if (breedVars.has(token)) {
-            tag = Identifier;
-            return { tag: tag, valid: false };
-        }
-        // Check breed special reporters
-        let pluralBreedNames = parseContext.PluralBreeds;
-        let singularBreedNames = parseContext.SingularBreeds;
-        let foundMatch = false;
-        let matchedBreed = '';
-        let isSingular = false;
-        for (let [b] of pluralBreedNames) {
-            if (token.includes(b) && b.length > matchedBreed.length) {
-                foundMatch = true;
-                matchedBreed = b;
-                isSingular = false;
-            }
-        }
-        for (let [b] of singularBreedNames) {
-            if (token.includes(b) && b.length > matchedBreed.length) {
-                foundMatch = true;
-                matchedBreed = b;
-                isSingular = true;
-            }
-        }
-        // console.log(token,matchedBreed,breedNames)
-        if (singularBreedNames.has(token)) {
-            tag = SpecialReporter;
-        }
-        else if (token.match(new RegExp(`^[^\s]+-own$`, 'i')) && !isSingular) {
-            tag = Own;
-        }
-        else if (token.match(new RegExp(`^[^\s]+-(at|here|on)$`, 'i')) && !isSingular) {
-            tag = SpecialReporter;
-        }
-        else if (token.match(new RegExp(`^[^\s]+-(with|neighbor\\?|neighbors)$`, 'i')) && isSingular) {
-            tag = SpecialReporter;
-        }
-        else if (token.match(new RegExp(`^(my-in|my-out)-[^\s]+$`, 'i')) && !isSingular) {
-            tag = SpecialReporter;
-        }
-        else if (token.match(new RegExp(`^(hatch|sprout|create|create-ordered)-[^\s]+$`, 'i')) && !isSingular) {
-            tag = SpecialCommand;
-        }
-        else if (token.match(new RegExp(`^is-[^\s]+\\?$`, 'i')) && isSingular) {
-            tag = SpecialReporter;
-        }
-        else if (token.match(new RegExp(`^in-[^\s]+-from$`, 'i')) && isSingular) {
-            tag = SpecialReporter;
-        }
-        else if (token.match(new RegExp(`^(in|out)-[^\s]+-(neighbor\\?|neighbors)$`, 'i')) && isSingular) {
-            tag = SpecialReporter;
-        }
-        else if (token.match(new RegExp(`^out-[^\s]+-to$`, 'i')) && isSingular) {
-            tag = SpecialReporter;
-        }
-        else if (token.match(new RegExp(`^create-[^\s]+-(to|from|with)$`, 'i'))) {
-            tag = SpecialCommand;
-        }
-        if (!foundMatch)
-            return { tag: tag, valid: false };
-        return { tag: tag, valid: true };
-    }
+    /** matchCustomProcedure: Check if the token is a custom procedure. */
     function matchCustomProcedure(token) {
         let parseContext = GetContext();
         if (parseContext.Commands.has(token))
@@ -29783,7 +29817,10 @@
             }
             addBreedAction(diagnostic, breedinfo.isLink ? BreedType$1.UndirectedLink : BreedType$1.Turtle, plural, singular);
             diagnostics.push(diagnostic);
+            return true;
         }
+        else
+            return false;
     }
 
     /** AutoCompletion: Auto completion service for a NetLogo model. */
@@ -30228,14 +30265,14 @@
                         parent = parent.parent;
                     }
                 }
-                // check if it is deprecated ?
+                // check if it is incorrect ,
                 if (value === ',') {
                     diagnostics.push(getDiagnostic(view, noderef, 'Incorrect usage of ,'));
                     return;
                 }
                 // check if the identifier looks like a breed procedure (e.g. "create-___")
                 let result = checkBreedLike(value);
-                if (!result.found) {
+                if (!result.found || !checkBreed(diagnostics, context, view, node)) {
                     if (UnrecognizedSuggestions.hasOwnProperty(value)) {
                         diagnostics.push(getDiagnostic(view, noderef, 'Unrecognized identifier with replacement _', 'error', value, UnrecognizedSuggestions[value]));
                     }
@@ -30243,16 +30280,17 @@
                         diagnostics.push(getDiagnostic(view, noderef, 'Unrecognized identifier _'));
                     }
                 }
-                else {
-                    checkBreed(diagnostics, context, view, node);
-                }
             }
         });
         return diagnostics;
     };
     /** UnrecognizedSuggestions: Suggestions for unrecognized identifiers. */
     const UnrecognizedSuggestions = {
-        else: 'if-else',
+        else: 'ifelse',
+        'create-patch': 'ask patch 0 0',
+        'create-patches': 'ask patches',
+        'create-link': 'create-link-with',
+        'create-links': 'create-links-with',
         'set-patch-color': 'set pcolor',
     };
 
@@ -33098,11 +33136,126 @@
         let commentsStart = null;
         let commentFrom = null;
         let procedureStart = null;
+        let first = { Globals: null, Extensions: null };
         let reserved = GetReserved(Editor.LintContext);
         let breeds = [];
         let globals = [];
         let extensions = [];
         let reservedVars = [...turtleVars, ...patchVars, ...linkVars, ...constants];
+        var checkForMisplaced = (node) => {
+            if (node.name == 'Procedure' && procedureStart == null) {
+                procedureStart = node.from;
+            }
+            else if (node.name == 'Globals' || node.name == 'Extensions') {
+                if (first[node.name] == null) {
+                    if (procedureStart != null && procedureStart < node.from) {
+                        // console.log('Moving ' + node.name + ' to ' + procedureStart);
+                        changes.push({
+                            from: 0,
+                            to: 0,
+                            insert: AddComments(state.sliceDoc(node.from, node.to), comments) + '\n\n',
+                        });
+                        changes.push({
+                            from: commentsStart !== null && commentsStart !== void 0 ? commentsStart : node.from,
+                            to: node.to,
+                            insert: '',
+                        });
+                        first[node.name] = AddComments(state.sliceDoc(node.from, node.to), comments).length - 1;
+                        comments = [];
+                        commentFrom = null;
+                        commentsStart = null;
+                        return;
+                    }
+                    else {
+                        first[node.name] = node.to - 1;
+                    }
+                }
+                else {
+                    let to_add = state
+                        .sliceDoc(node.from, node.to)
+                        .replace(/globals\s*\[/i, '')
+                        .replace(/extensions\s*\[/i, '')
+                        .replace(/\]/, '');
+                    let index = first[node.name];
+                    // console.log('combining statements');
+                    if (index) {
+                        changes.push({
+                            from: index,
+                            to: index,
+                            insert: ' ' + to_add,
+                        });
+                        changes.push({
+                            from: commentsStart !== null && commentsStart !== void 0 ? commentsStart : node.from,
+                            to: node.to,
+                            insert: '',
+                        });
+                        comments = [];
+                        commentFrom = null;
+                        commentsStart = null;
+                        return;
+                    }
+                }
+            }
+            else if (procedureStart != null &&
+                (node.name == 'BreedsOwn' ||
+                    (node.name == 'Misplaced' && node.node.resolveInner(node.from, 1).name == 'BreedToken'))) {
+                // console.log('Moving ' + node.name + ' to ' + procedureStart);
+                changes.push({
+                    from: 0,
+                    to: 0,
+                    insert: AddComments(state.sliceDoc(node.from, node.to), comments) + '\n\n',
+                });
+                changes.push({
+                    from: commentsStart !== null && commentsStart !== void 0 ? commentsStart : node.from,
+                    to: node.to,
+                    insert: '',
+                });
+                comments = [];
+                commentFrom = null;
+                commentsStart = null;
+                return;
+            }
+            if (node.name == 'LineComment') {
+                // take only the one preceding comment
+                comments = [state.sliceDoc(node.from, node.to)];
+                commentsStart = node.from;
+                // take all immediately preceding comments
+                // comments.push(state.sliceDoc(node.from, node.to));
+                // commentsStart = commentsStart ?? node.from;
+            }
+            else if (comments.length > 0 && !commentFrom) {
+                // Record the position of what comes immediately after the comments
+                // (this is in case of nesting, so we don't lose the comments)
+                commentFrom = node.from;
+            }
+            else if (comments.length > 0 && commentFrom && node.from > commentFrom) {
+                // Discard the comment info when we move on to the next statement
+                comments = [];
+                commentFrom = null;
+                commentsStart = null;
+            }
+        };
+        //do some re-ordering at the top level
+        let cursor = syntaxTree(state).cursor();
+        cursor.firstChild();
+        if (cursor.node.name == 'Normal') {
+            if (cursor.firstChild()) {
+                checkForMisplaced(cursor.node);
+                // console.log(cursor.node.name, changes);
+                while (cursor.nextSibling()) {
+                    checkForMisplaced(cursor.node);
+                    // console.log(cursor.node.name, changes);
+                }
+            }
+        }
+        Editor.Operations.ChangeCode(changes);
+        Editor.ForceParse();
+        state = Editor.CodeMirror.state;
+        changes = [];
+        procedureStart = null;
+        comments = [];
+        commentFrom = null;
+        commentsStart = null;
         // Go over the syntax tree
         syntaxTree(state)
             .cursor()
@@ -33206,7 +33359,7 @@
                 let change = FixBreed(noderef.node, state, breeds);
                 if (change != null) {
                     changes.push({
-                        from: commentsStart !== null && commentsStart !== void 0 ? commentsStart : change.from,
+                        from: change.from,
                         to: change.to,
                         insert: change.insert,
                     });
@@ -33285,7 +33438,12 @@
                 }
             }
             else if (noderef.name == 'Procedure' && noderef.node.getChildren('ProcedureContent').length == 0) {
-                changes.push({ from: noderef.from, to: noderef.to, insert: '' });
+                let child = noderef.node.getChild('ProcedureName');
+                let name = state.sliceDoc(child === null || child === void 0 ? void 0 : child.from, child === null || child === void 0 ? void 0 : child.to).toLowerCase();
+                let matches = state.doc.toString().match(new RegExp(name, 'gi'));
+                if (matches && matches.length == 1) {
+                    changes.push({ from: noderef.from, to: noderef.to, insert: '' });
+                }
             }
             else if (noderef.name == 'ProcedureName') {
                 let name = state.sliceDoc(noderef.from, noderef.to).toLowerCase();
@@ -33349,7 +33507,7 @@
             state.sliceDoc(singular === null || singular === void 0 ? void 0 : singular.from, singular === null || singular === void 0 ? void 0 : singular.to).toLowerCase() ==
                 state.sliceDoc(plural === null || plural === void 0 ? void 0 : plural.from, plural === null || plural === void 0 ? void 0 : plural.to).toLowerCase();
         let invalid_plur = ['turtles', 'links', 'patches', ...breeds].includes(state.sliceDoc(plural === null || plural === void 0 ? void 0 : plural.from, plural === null || plural === void 0 ? void 0 : plural.to).toLowerCase());
-        console.log(singular, plural, invalid_sing, invalid_plur);
+        // console.log("BREED FIXING",singular, plural, invalid_sing, invalid_plur);
         if (singular && plural && invalid_sing && invalid_plur) {
             return {
                 from: node.from,
@@ -37171,9 +37329,9 @@
         /** AddToCode: Add the code to the main editor. */
         AddToCode() {
             // this.Tab.Outputs.RenderRequest(Localized.Get("Trying to add the code"), this.Record).GetData().Transparent = true;
-            this.TryTo(() => {
-                CopyCode(this.Editor.GetCode());
-            });
+            // this.TryTo(() => {
+            CopyCode(this.Editor.GetCode());
+            // });
         }
         /** Ask: Try to ask about the code. */
         Ask() {

@@ -308,9 +308,9 @@ export class CodeDisplay extends Display {
 	/** AddToCode: Add the code to the main editor. */
 	public AddToCode() {
 		// this.Tab.Outputs.RenderRequest(Localized.Get("Trying to add the code"), this.Record).GetData().Transparent = true;
-		this.TryTo(() => {
-			CopyCode(this.Editor.GetCode());
-		});
+		// this.TryTo(() => {
+		CopyCode(this.Editor.GetCode());
+		// });
 	}
 	/** Ask: Try to ask about the code. */
 	public Ask() {

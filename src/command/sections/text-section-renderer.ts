@@ -46,7 +46,7 @@ export class TextSectionRenderer extends SectionRenderer {
                 var Parent = this.GetRecord().Context?.CodeSnippet;
                 var ParentSnapshot = NetLogoUtils.BuildSnapshot(Parent);
                 for (var Multiline of Multilines) {
-                    $(Multiline).text(NetLogoUtils.FixGeneratedCode($(Multiline).text(), ParentSnapshot));
+                    FixMultiline($(Multiline));
                 }
                 if (Multilines.length === 1) Multilines.addClass("enterable");
             }
@@ -59,5 +59,11 @@ export class TextSectionRenderer extends SectionRenderer {
         // Remove the section if it's empty
         if (Content == "" && (Section.Options?.length ?? 0) == 0 && this.Finalized)
             this.Container.remove();
+        // Fix a multiline code block
+        function FixMultiline(Current: JQuery<HTMLElement>) {
+            NetLogoUtils.FixGeneratedCode(Current.text(), ParentSnapshot).then(Result => {
+                Current.text(Result);
+            });
+        }
     }
 }

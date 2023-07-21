@@ -40,7 +40,7 @@ export class NetLogoUtils {
 		return this.SharedEditor.Semantics.BuildSnapshot();
 	}
 	/** FixGeneratedCode: Fix some generated code. */
-	public static FixGeneratedCode(Content: string, Parent?: CodeSnapshot): string {
+	public static FixGeneratedCode(Content: string, Parent?: CodeSnapshot): Promise<string> {
 		if (Content.startsWith("NetLogo\n"))
 			Content = Content.substring(8);
 		// Remove the trailing semicolon

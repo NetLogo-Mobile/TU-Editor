@@ -116,7 +116,11 @@ export class EditorTab extends Tab {
 		Features[Localized.Get("Undo")] = () => this.Galapagos.Editing.Undo();
 		Features[Localized.Get("Redo")] = () => this.Galapagos.Editing.Redo();
 		Features[Localized.Get("JumpToLine")] = () => this.Galapagos.Editing.ShowJumpTo();
-		Features[Localized.Get("Prettify")] = () => this.Galapagos.Semantics.PrettifyOrAll();
+		Features[Localized.Get("Prettify")] = () => {
+			// var Before = this.Galapagos.GetCode();
+			this.Galapagos.Semantics.PrettifyOrAll();
+			// this.Galapagos.Selection.HighlightChanges(Before);
+		};
 		Features[Localized.Get("ResetCode")] = () => this.ResetCode();
 		for (var Feature in Features) {
 			$(`<li>${Feature}</li>`).attr("Tag", Feature).appendTo(List).click(function() {
@@ -134,15 +138,15 @@ export class EditorTab extends Tab {
 		} else {
 			var Dialog = $("#Dialog-Procedures")
 			var List = Dialog.children("ul").empty();
+			var Galapagos = this.Galapagos;
 			Dialog.children("h4").text(Localized.Get("JumpToProcedure"));
-			var Handler = () => {
-				this.Galapagos.Selection.Select(parseInt($(this).attr("start")!), parseInt($(this).attr("end")!));
-				($ as any).modal.close();
-			};
 			for (var Procedure in Procedures) {
 				$(`<li>${Procedure}</li>`).appendTo(List)
 					.attr("start", Procedures[Procedure][0])
-					.attr("end", Procedures[Procedure][1]).click(Handler);
+					.attr("end", Procedures[Procedure][1]).on("click", function() {
+						Galapagos.Selection.Select(parseInt($(this).attr("start")!), parseInt($(this).attr("end")!));
+						($ as any).modal.close();
+					});
 			}
             (Dialog as any).modal({});
 		}

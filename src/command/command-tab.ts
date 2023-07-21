@@ -194,7 +194,7 @@ export class CommandTab extends Tab {
 			this.ExecuteInput(Objective, Content, Temporary);
 		};
 		// Check if it is a command
-		if (!Chatable || Objective != "chat" && !/^[\d\.]+$/.test(Content)) {
+		if (!Chatable || Objective != "chat" || /^[\d\.]+$/.test(Content)) {
 			// Parse the code
 			this.Galapagos.ForceParse();
 			let Diagnostics = await this.Galapagos.ForceLintAsync();

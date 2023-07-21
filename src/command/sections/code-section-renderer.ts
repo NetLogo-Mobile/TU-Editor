@@ -23,13 +23,15 @@ export class CodeSectionRenderer extends SectionRenderer {
             // Fix the code
             var Parent = this.GetRecord().Context?.CodeSnippet;
             var ParentSnapshot = NetLogoUtils.BuildSnapshot(Parent);
-            Section.Content = NetLogoUtils.FixGeneratedCode(Section.Content, ParentSnapshot);
-            this.Code = Section.Content;
-            // Render the code
-            this.ContentContainer = $(`<code></code>`).replaceAll(this.ContentContainer).addClass("enterable");
-            NetLogoUtils.AnnotateCode(this.ContentContainer, this.Code);
-            BindCode.bind(this)(this.ContentContainer);
-            $(`<span></span>`).addClass("placeholder").text(Localized.Get("Code placeholder _", this.Code.split("\n").length)).appendTo(this.ContentContainer);
+            NetLogoUtils.FixGeneratedCode(Section.Content, ParentSnapshot).then(Result => {
+                Section.Content = Result;
+                this.Code = Section.Content;
+                // Render the code
+                this.ContentContainer = $(`<code></code>`).replaceAll(this.ContentContainer).addClass("enterable");
+                NetLogoUtils.AnnotateCode(this.ContentContainer, this.Code);
+                BindCode.bind(this)(this.ContentContainer);
+                $(`<span></span>`).addClass("placeholder").text(Localized.Get("Code placeholder _", this.Code.split("\n").length)).appendTo(this.ContentContainer);
+            });
         } else {
             this.Code = Section.Content?.trim() ?? "";
             this.ContentContainer = $(`<pre></pre>`).replaceAll(this.ContentContainer).text(this.Code);

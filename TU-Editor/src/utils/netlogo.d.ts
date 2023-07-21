@@ -17,7 +17,7 @@ export declare class NetLogoUtils {
     /** BuildSnapshot: Build a code snapshot. */
     static BuildSnapshot(Content?: string): CodeSnapshot | undefined;
     /** FixGeneratedCode: Fix some generated code. */
-    static FixGeneratedCode(Content: string, Parent?: CodeSnapshot): string;
+    static FixGeneratedCode(Content: string, Parent?: CodeSnapshot): Promise<string>;
     /** PostprocessLintMessage: Postprocess a lint message. */
     static PostprocessLintMessage(Message: string): string;
     /** ErrorToDiagnostic: Convert a runtime error to a diagnostic. */

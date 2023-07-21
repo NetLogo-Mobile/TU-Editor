@@ -372,7 +372,7 @@
     /**
     The data structure for documents. @nonabstract
     */
-    class Text {
+    class Text$1 {
         /**
         Get the line description around the given position.
         */
@@ -398,7 +398,7 @@
             if (text.length)
                 text.decompose(0, text.length, parts, 1 /* Open.From */ | 2 /* Open.To */);
             this.decompose(to, this.length, parts, 1 /* Open.From */);
-            return TextNode.from(parts, this.length - (to - from) + text.length);
+            return TextNode$1.from(parts, this.length - (to - from) + text.length);
         }
         /**
         Append another document to this one.
@@ -412,7 +412,7 @@
         slice(from, to = this.length) {
             let parts = [];
             this.decompose(from, to, parts, 0);
-            return TextNode.from(parts, to - from);
+            return TextNode$1.from(parts, to - from);
         }
         /**
         Test whether this text is equal to another instance.
@@ -423,7 +423,7 @@
             if (other.length != this.length || other.lines != this.lines)
                 return false;
             let start = this.scanIdentical(other, 1), end = this.length - this.scanIdentical(other, -1);
-            let a = new RawTextCursor(this), b = new RawTextCursor(other);
+            let a = new RawTextCursor$1(this), b = new RawTextCursor$1(other);
             for (let skip = start, pos = start;;) {
                 a.next(skip);
                 b.next(skip);
@@ -440,12 +440,12 @@
         from end to start. This will return lines and the breaks between
         them as separate strings.
         */
-        iter(dir = 1) { return new RawTextCursor(this, dir); }
+        iter(dir = 1) { return new RawTextCursor$1(this, dir); }
         /**
         Iterate over a range of the text. When `from` > `to`, the
         iterator will run in reverse.
         */
-        iterRange(from, to = this.length) { return new PartialTextCursor(this, from, to); }
+        iterRange(from, to = this.length) { return new PartialTextCursor$1(this, from, to); }
         /**
         Return a cursor that iterates over the given range of lines,
         _without_ returning the line breaks between, and yielding empty
@@ -464,7 +464,7 @@
                 let start = this.line(from).from;
                 inner = this.iterRange(start, Math.max(start, to == this.lines + 1 ? this.length : to <= 1 ? 0 : this.line(to - 1).to));
             }
-            return new LineCursor(inner);
+            return new LineCursor$1(inner);
         }
         /**
         Return the document as a string, using newline characters to
@@ -491,15 +491,15 @@
             if (text.length == 0)
                 throw new RangeError("A document must have at least one line");
             if (text.length == 1 && !text[0])
-                return Text.empty;
-            return text.length <= 32 /* Tree.Branch */ ? new TextLeaf(text) : TextNode.from(TextLeaf.split(text, []));
+                return Text$1.empty;
+            return text.length <= 32 /* Tree.Branch */ ? new TextLeaf$1(text) : TextNode$1.from(TextLeaf$1.split(text, []));
         }
     }
     // Leaves store an array of line strings. There are always line breaks
     // between these strings. Leaves are limited in size and have to be
     // contained in TextNode instances for bigger documents.
-    class TextLeaf extends Text {
-        constructor(text, length = textLength(text)) {
+    class TextLeaf$1 extends Text$1 {
+        constructor(text, length = textLength$1(text)) {
             super();
             this.text = text;
             this.length = length;
@@ -510,23 +510,23 @@
             for (let i = 0;; i++) {
                 let string = this.text[i], end = offset + string.length;
                 if ((isLine ? line : end) >= target)
-                    return new Line(offset, end, line, string);
+                    return new Line$1(offset, end, line, string);
                 offset = end + 1;
                 line++;
             }
         }
         decompose(from, to, target, open) {
             let text = from <= 0 && to >= this.length ? this
-                : new TextLeaf(sliceText(this.text, from, to), Math.min(to, this.length) - Math.max(0, from));
+                : new TextLeaf$1(sliceText$1(this.text, from, to), Math.min(to, this.length) - Math.max(0, from));
             if (open & 1 /* Open.From */) {
                 let prev = target.pop();
-                let joined = appendText(text.text, prev.text.slice(), 0, text.length);
+                let joined = appendText$1(text.text, prev.text.slice(), 0, text.length);
                 if (joined.length <= 32 /* Tree.Branch */) {
-                    target.push(new TextLeaf(joined, prev.length + text.length));
+                    target.push(new TextLeaf$1(joined, prev.length + text.length));
                 }
                 else {
                     let mid = joined.length >> 1;
-                    target.push(new TextLeaf(joined.slice(0, mid)), new TextLeaf(joined.slice(mid)));
+                    target.push(new TextLeaf$1(joined.slice(0, mid)), new TextLeaf$1(joined.slice(mid)));
                 }
             }
             else {
@@ -534,13 +534,13 @@
             }
         }
         replace(from, to, text) {
-            if (!(text instanceof TextLeaf))
+            if (!(text instanceof TextLeaf$1))
                 return super.replace(from, to, text);
-            let lines = appendText(this.text, appendText(text.text, sliceText(this.text, 0, from)), to);
+            let lines = appendText$1(this.text, appendText$1(text.text, sliceText$1(this.text, 0, from)), to);
             let newLen = this.length + text.length - (to - from);
             if (lines.length <= 32 /* Tree.Branch */)
-                return new TextLeaf(lines, newLen);
-            return TextNode.from(TextLeaf.split(lines, []), newLen);
+                return new TextLeaf$1(lines, newLen);
+            return TextNode$1.from(TextLeaf$1.split(lines, []), newLen);
         }
         sliceString(from, to = this.length, lineSep = "\n") {
             let result = "";
@@ -565,13 +565,13 @@
                 part.push(line);
                 len += line.length + 1;
                 if (part.length == 32 /* Tree.Branch */) {
-                    target.push(new TextLeaf(part, len));
+                    target.push(new TextLeaf$1(part, len));
                     part = [];
                     len = -1;
                 }
             }
             if (len > -1)
-                target.push(new TextLeaf(part, len));
+                target.push(new TextLeaf$1(part, len));
             return target;
         }
     }
@@ -579,7 +579,7 @@
     // number of other nodes or leaves, taking care to balance themselves
     // on changes. There are implied line breaks _between_ the children of
     // a node (but not before the first or after the last child).
-    class TextNode extends Text {
+    class TextNode$1 extends Text$1 {
         constructor(children, length) {
             super();
             this.children = children;
@@ -624,7 +624,7 @@
                             updated.lines > (totalLines >> (5 /* Tree.BranchShift */ + 1))) {
                             let copy = this.children.slice();
                             copy[i] = updated;
-                            return new TextNode(copy, this.length - (to - from) + text.length);
+                            return new TextNode$1(copy, this.length - (to - from) + text.length);
                         }
                         return super.replace(pos, end, updated);
                     }
@@ -649,7 +649,7 @@
                 child.flatten(target);
         }
         scanIdentical(other, dir) {
-            if (!(other instanceof TextNode))
+            if (!(other instanceof TextNode$1))
                 return 0;
             let length = 0;
             let [iA, iB, eA, eB] = dir > 0 ? [0, 0, this.children.length, other.children.length]
@@ -671,13 +671,13 @@
                 let flat = [];
                 for (let ch of children)
                     ch.flatten(flat);
-                return new TextLeaf(flat, length);
+                return new TextLeaf$1(flat, length);
             }
             let chunk = Math.max(32 /* Tree.Branch */, lines >> 5 /* Tree.BranchShift */), maxChunk = chunk << 1, minChunk = chunk >> 1;
             let chunked = [], currentLines = 0, currentLen = -1, currentChunk = [];
             function add(child) {
                 let last;
-                if (child.lines > maxChunk && child instanceof TextNode) {
+                if (child.lines > maxChunk && child instanceof TextNode$1) {
                     for (let node of child.children)
                         add(node);
                 }
@@ -685,12 +685,12 @@
                     flush();
                     chunked.push(child);
                 }
-                else if (child instanceof TextLeaf && currentLines &&
-                    (last = currentChunk[currentChunk.length - 1]) instanceof TextLeaf &&
+                else if (child instanceof TextLeaf$1 && currentLines &&
+                    (last = currentChunk[currentChunk.length - 1]) instanceof TextLeaf$1 &&
                     child.lines + last.lines <= 32 /* Tree.Branch */) {
                     currentLines += child.lines;
                     currentLen += child.length + 1;
-                    currentChunk[currentChunk.length - 1] = new TextLeaf(last.text.concat(child.text), last.length + 1 + child.length);
+                    currentChunk[currentChunk.length - 1] = new TextLeaf$1(last.text.concat(child.text), last.length + 1 + child.length);
                 }
                 else {
                     if (currentLines + child.lines > chunk)
@@ -703,24 +703,24 @@
             function flush() {
                 if (currentLines == 0)
                     return;
-                chunked.push(currentChunk.length == 1 ? currentChunk[0] : TextNode.from(currentChunk, currentLen));
+                chunked.push(currentChunk.length == 1 ? currentChunk[0] : TextNode$1.from(currentChunk, currentLen));
                 currentLen = -1;
                 currentLines = currentChunk.length = 0;
             }
             for (let child of children)
                 add(child);
             flush();
-            return chunked.length == 1 ? chunked[0] : new TextNode(chunked, length);
+            return chunked.length == 1 ? chunked[0] : new TextNode$1(chunked, length);
         }
     }
-    Text.empty = /*@__PURE__*/new TextLeaf([""], 0);
-    function textLength(text) {
+    Text$1.empty = /*@__PURE__*/new TextLeaf$1([""], 0);
+    function textLength$1(text) {
         let length = -1;
         for (let line of text)
             length += line.length + 1;
         return length;
     }
-    function appendText(text, target, from = 0, to = 1e9) {
+    function appendText$1(text, target, from = 0, to = 1e9) {
         for (let pos = 0, i = 0, first = true; i < text.length && pos <= to; i++) {
             let line = text[i], end = pos + line.length;
             if (end >= from) {
@@ -739,24 +739,24 @@
         }
         return target;
     }
-    function sliceText(text, from, to) {
-        return appendText(text, [""], from, to);
+    function sliceText$1(text, from, to) {
+        return appendText$1(text, [""], from, to);
     }
-    class RawTextCursor {
+    class RawTextCursor$1 {
         constructor(text, dir = 1) {
             this.dir = dir;
             this.done = false;
             this.lineBreak = false;
             this.value = "";
             this.nodes = [text];
-            this.offsets = [dir > 0 ? 1 : (text instanceof TextLeaf ? text.text.length : text.children.length) << 1];
+            this.offsets = [dir > 0 ? 1 : (text instanceof TextLeaf$1 ? text.text.length : text.children.length) << 1];
         }
         nextInner(skip, dir) {
             this.done = this.lineBreak = false;
             for (;;) {
                 let last = this.nodes.length - 1;
                 let top = this.nodes[last], offsetValue = this.offsets[last], offset = offsetValue >> 1;
-                let size = top instanceof TextLeaf ? top.text.length : top.children.length;
+                let size = top instanceof TextLeaf$1 ? top.text.length : top.children.length;
                 if (offset == (dir > 0 ? size : 0)) {
                     if (last == 0) {
                         this.done = true;
@@ -777,7 +777,7 @@
                     }
                     skip--;
                 }
-                else if (top instanceof TextLeaf) {
+                else if (top instanceof TextLeaf$1) {
                     // Move to the next string
                     let next = top.text[offset + (dir < 0 ? -1 : 0)];
                     this.offsets[last] += dir;
@@ -797,7 +797,7 @@
                         if (dir < 0)
                             this.offsets[last]--;
                         this.nodes.push(next);
-                        this.offsets.push(dir > 0 ? 1 : (next instanceof TextLeaf ? next.text.length : next.children.length) << 1);
+                        this.offsets.push(dir > 0 ? 1 : (next instanceof TextLeaf$1 ? next.text.length : next.children.length) << 1);
                     }
                 }
             }
@@ -810,11 +810,11 @@
             return this.nextInner(skip, this.dir);
         }
     }
-    class PartialTextCursor {
+    class PartialTextCursor$1 {
         constructor(text, start, end) {
             this.value = "";
             this.done = false;
-            this.cursor = new RawTextCursor(text, start > end ? -1 : 1);
+            this.cursor = new RawTextCursor$1(text, start > end ? -1 : 1);
             this.pos = start > end ? text.length : 0;
             this.from = Math.min(start, end);
             this.to = Math.max(start, end);
@@ -845,7 +845,7 @@
         }
         get lineBreak() { return this.cursor.lineBreak && this.value != ""; }
     }
-    class LineCursor {
+    class LineCursor$1 {
         constructor(inner) {
             this.inner = inner;
             this.afterBreak = true;
@@ -876,15 +876,15 @@
         get lineBreak() { return false; }
     }
     if (typeof Symbol != "undefined") {
-        Text.prototype[Symbol.iterator] = function () { return this.iter(); };
-        RawTextCursor.prototype[Symbol.iterator] = PartialTextCursor.prototype[Symbol.iterator] =
-            LineCursor.prototype[Symbol.iterator] = function () { return this; };
+        Text$1.prototype[Symbol.iterator] = function () { return this.iter(); };
+        RawTextCursor$1.prototype[Symbol.iterator] = PartialTextCursor$1.prototype[Symbol.iterator] =
+            LineCursor$1.prototype[Symbol.iterator] = function () { return this; };
     }
     /**
     This type describes a line in the document. It is created
     on-demand when lines are [queried](https://codemirror.net/6/docs/ref/#state.Text.lineAt).
     */
-    class Line {
+    class Line$1 {
         /**
         @internal
         */
@@ -923,14 +923,14 @@
     // Each pair of elements represents a range, as an offet from the
     // previous range and a length. Numbers are in base-36, with the empty
     // string being a shorthand for 1.
-    let extend = /*@__PURE__*/"lc,34,7n,7,7b,19,,,,2,,2,,,20,b,1c,l,g,,2t,7,2,6,2,2,,4,z,,u,r,2j,b,1m,9,9,,o,4,,9,,3,,5,17,3,3b,f,,w,1j,,,,4,8,4,,3,7,a,2,t,,1m,,,,2,4,8,,9,,a,2,q,,2,2,1l,,4,2,4,2,2,3,3,,u,2,3,,b,2,1l,,4,5,,2,4,,k,2,m,6,,,1m,,,2,,4,8,,7,3,a,2,u,,1n,,,,c,,9,,14,,3,,1l,3,5,3,,4,7,2,b,2,t,,1m,,2,,2,,3,,5,2,7,2,b,2,s,2,1l,2,,,2,4,8,,9,,a,2,t,,20,,4,,2,3,,,8,,29,,2,7,c,8,2q,,2,9,b,6,22,2,r,,,,,,1j,e,,5,,2,5,b,,10,9,,2u,4,,6,,2,2,2,p,2,4,3,g,4,d,,2,2,6,,f,,jj,3,qa,3,t,3,t,2,u,2,1s,2,,7,8,,2,b,9,,19,3,3b,2,y,,3a,3,4,2,9,,6,3,63,2,2,,1m,,,7,,,,,2,8,6,a,2,,1c,h,1r,4,1c,7,,,5,,14,9,c,2,w,4,2,2,,3,1k,,,2,3,,,3,1m,8,2,2,48,3,,d,,7,4,,6,,3,2,5i,1m,,5,ek,,5f,x,2da,3,3x,,2o,w,fe,6,2x,2,n9w,4,,a,w,2,28,2,7k,,3,,4,,p,2,5,,47,2,q,i,d,,12,8,p,b,1a,3,1c,,2,4,2,2,13,,1v,6,2,2,2,2,c,,8,,1b,,1f,,,3,2,2,5,2,,,16,2,8,,6m,,2,,4,,fn4,,kh,g,g,g,a6,2,gt,,6a,,45,5,1ae,3,,2,5,4,14,3,4,,4l,2,fx,4,ar,2,49,b,4w,,1i,f,1k,3,1d,4,2,2,1x,3,10,5,,8,1q,,c,2,1g,9,a,4,2,,2n,3,2,,,2,6,,4g,,3,8,l,2,1l,2,,,,,m,,e,7,3,5,5f,8,2,3,,,n,,29,,2,6,,,2,,,2,,2,6j,,2,4,6,2,,2,r,2,2d,8,2,,,2,2y,,,,2,6,,,2t,3,2,4,,5,77,9,,2,6t,,a,2,,,4,,40,4,2,2,4,,w,a,14,6,2,4,8,,9,6,2,3,1a,d,,2,ba,7,,6,,,2a,m,2,7,,2,,2,3e,6,3,,,2,,7,,,20,2,3,,,,9n,2,f0b,5,1n,7,t4,,1r,4,29,,f5k,2,43q,,,3,4,5,8,8,2,7,u,4,44,3,1iz,1j,4,1e,8,,e,,m,5,,f,11s,7,,h,2,7,,2,,5,79,7,c5,4,15s,7,31,7,240,5,gx7k,2o,3k,6o".split(",").map(s => s ? parseInt(s, 36) : 1);
+    let extend$1 = /*@__PURE__*/"lc,34,7n,7,7b,19,,,,2,,2,,,20,b,1c,l,g,,2t,7,2,6,2,2,,4,z,,u,r,2j,b,1m,9,9,,o,4,,9,,3,,5,17,3,3b,f,,w,1j,,,,4,8,4,,3,7,a,2,t,,1m,,,,2,4,8,,9,,a,2,q,,2,2,1l,,4,2,4,2,2,3,3,,u,2,3,,b,2,1l,,4,5,,2,4,,k,2,m,6,,,1m,,,2,,4,8,,7,3,a,2,u,,1n,,,,c,,9,,14,,3,,1l,3,5,3,,4,7,2,b,2,t,,1m,,2,,2,,3,,5,2,7,2,b,2,s,2,1l,2,,,2,4,8,,9,,a,2,t,,20,,4,,2,3,,,8,,29,,2,7,c,8,2q,,2,9,b,6,22,2,r,,,,,,1j,e,,5,,2,5,b,,10,9,,2u,4,,6,,2,2,2,p,2,4,3,g,4,d,,2,2,6,,f,,jj,3,qa,3,t,3,t,2,u,2,1s,2,,7,8,,2,b,9,,19,3,3b,2,y,,3a,3,4,2,9,,6,3,63,2,2,,1m,,,7,,,,,2,8,6,a,2,,1c,h,1r,4,1c,7,,,5,,14,9,c,2,w,4,2,2,,3,1k,,,2,3,,,3,1m,8,2,2,48,3,,d,,7,4,,6,,3,2,5i,1m,,5,ek,,5f,x,2da,3,3x,,2o,w,fe,6,2x,2,n9w,4,,a,w,2,28,2,7k,,3,,4,,p,2,5,,47,2,q,i,d,,12,8,p,b,1a,3,1c,,2,4,2,2,13,,1v,6,2,2,2,2,c,,8,,1b,,1f,,,3,2,2,5,2,,,16,2,8,,6m,,2,,4,,fn4,,kh,g,g,g,a6,2,gt,,6a,,45,5,1ae,3,,2,5,4,14,3,4,,4l,2,fx,4,ar,2,49,b,4w,,1i,f,1k,3,1d,4,2,2,1x,3,10,5,,8,1q,,c,2,1g,9,a,4,2,,2n,3,2,,,2,6,,4g,,3,8,l,2,1l,2,,,,,m,,e,7,3,5,5f,8,2,3,,,n,,29,,2,6,,,2,,,2,,2,6j,,2,4,6,2,,2,r,2,2d,8,2,,,2,2y,,,,2,6,,,2t,3,2,4,,5,77,9,,2,6t,,a,2,,,4,,40,4,2,2,4,,w,a,14,6,2,4,8,,9,6,2,3,1a,d,,2,ba,7,,6,,,2a,m,2,7,,2,,2,3e,6,3,,,2,,7,,,20,2,3,,,,9n,2,f0b,5,1n,7,t4,,1r,4,29,,f5k,2,43q,,,3,4,5,8,8,2,7,u,4,44,3,1iz,1j,4,1e,8,,e,,m,5,,f,11s,7,,h,2,7,,2,,5,79,7,c5,4,15s,7,31,7,240,5,gx7k,2o,3k,6o".split(",").map(s => s ? parseInt(s, 36) : 1);
     // Convert offsets into absolute values
-    for (let i = 1; i < extend.length; i++)
-        extend[i] += extend[i - 1];
+    for (let i = 1; i < extend$1.length; i++)
+        extend$1[i] += extend$1[i - 1];
     function isExtendingChar(code) {
-        for (let i = 1; i < extend.length; i += 2)
-            if (extend[i] > code)
-                return extend[i - 1] <= code;
+        for (let i = 1; i < extend$1.length; i += 2)
+            if (extend$1[i] > code)
+                return extend$1[i - 1] <= code;
         return false;
     }
     function isRegionalIndicator(code) {
@@ -1256,8 +1256,8 @@
                     sections[i + 1] = len;
                     let index = i >> 1;
                     while (inserted.length < index)
-                        inserted.push(Text.empty);
-                    inserted.push(len ? doc.slice(pos, pos + len) : Text.empty);
+                        inserted.push(Text$1.empty);
+                    inserted.push(len ? doc.slice(pos, pos + len) : Text$1.empty);
                 }
                 pos += len;
             }
@@ -1384,7 +1384,7 @@
                     let { from, to = from, insert } = spec;
                     if (from > to || from < 0 || to > length)
                         throw new RangeError(`Invalid change range ${from} to ${to} (in doc of length ${length})`);
-                    let insText = !insert ? Text.empty : typeof insert == "string" ? Text.of(insert.split(lineSep || DefaultSplit)) : insert;
+                    let insText = !insert ? Text$1.empty : typeof insert == "string" ? Text$1.of(insert.split(lineSep || DefaultSplit)) : insert;
                     let insLen = insText.length;
                     if (from == to && insLen == 0)
                         return;
@@ -1428,8 +1428,8 @@
                 }
                 else {
                     while (inserted.length < i)
-                        inserted.push(Text.empty);
-                    inserted[i] = Text.of(part.slice(1));
+                        inserted.push(Text$1.empty);
+                    inserted[i] = Text$1.of(part.slice(1));
                     sections.push(part[0], inserted[i].length);
                 }
             }
@@ -1466,7 +1466,7 @@
         }
         else {
             while (values.length < index)
-                values.push(Text.empty);
+                values.push(Text$1.empty);
             values.push(value);
         }
     }
@@ -1479,7 +1479,7 @@
                 posB += len;
             }
             else {
-                let endA = posA, endB = posB, text = Text.empty;
+                let endA = posA, endB = posB, text = Text$1.empty;
                 for (;;) {
                     endA += len;
                     endB += ins;
@@ -1632,11 +1632,11 @@
         get len2() { return this.ins < 0 ? this.len : this.ins; }
         get text() {
             let { inserted } = this.set, index = (this.i - 2) >> 1;
-            return index >= inserted.length ? Text.empty : inserted[index];
+            return index >= inserted.length ? Text$1.empty : inserted[index];
         }
         textBit(len) {
             let { inserted } = this.set, index = (this.i - 2) >> 1;
-            return index >= inserted.length && !len ? Text.empty
+            return index >= inserted.length && !len ? Text$1.empty
                 : inserted[index].slice(this.off, len == null ? undefined : this.off + len);
         }
         forward(len) {
@@ -3062,7 +3062,7 @@
         [`Text`](https://codemirror.net/6/docs/ref/#state.Text) instance from the given string.
         */
         toText(string) {
-            return Text.of(string.split(this.facet(EditorState.lineSeparator) || DefaultSplit));
+            return Text$1.of(string.split(this.facet(EditorState.lineSeparator) || DefaultSplit));
         }
         /**
         Return the given range of the document as a string.
@@ -3129,8 +3129,8 @@
         */
         static create(config = {}) {
             let configuration = Configuration.resolve(config.extensions || [], new Map);
-            let doc = config.doc instanceof Text ? config.doc
-                : Text.of((config.doc || "").split(configuration.staticFacet(EditorState.lineSeparator) || DefaultSplit));
+            let doc = config.doc instanceof Text$1 ? config.doc
+                : Text$1.of((config.doc || "").split(configuration.staticFacet(EditorState.lineSeparator) || DefaultSplit));
             let selection = !config.selection ? EditorSelection.single(0)
                 : config.selection instanceof EditorSelection ? config.selection
                     : EditorSelection.single(config.selection.anchor, config.selection.head);
@@ -4629,13 +4629,15 @@
     }
     function scrollRectIntoView(dom, rect, side, x, y, xMargin, yMargin, ltr) {
         let doc = dom.ownerDocument, win = doc.defaultView || window;
-        for (let cur = dom; cur;) {
+        for (let cur = dom, stop = false; cur && !stop;) {
             if (cur.nodeType == 1) { // Element
                 let bounding, top = cur == doc.body;
                 if (top) {
                     bounding = windowRect(win);
                 }
                 else {
+                    if (/^(fixed|sticky)$/.test(getComputedStyle(cur).position))
+                        stop = true;
                     if (cur.scrollHeight <= cur.clientHeight && cur.scrollWidth <= cur.clientWidth) {
                         cur = cur.assignedSlot || cur.parentNode;
                         continue;
@@ -4867,7 +4869,7 @@
         constructor() {
             this.parent = null;
             this.dom = null;
-            this.dirty = 2 /* Node */;
+            this.flags = 2 /* NodeDirty */;
         }
         get overrideDOMText() { return null; }
         get posAtStart() {
@@ -4889,18 +4891,18 @@
             return this.posBefore(view) + view.length;
         }
         sync(view, track) {
-            if (this.dirty & 2 /* Node */) {
+            if (this.flags & 2 /* NodeDirty */) {
                 let parent = this.dom;
                 let prev = null, next;
                 for (let child of this.children) {
-                    if (child.dirty) {
-                        if (!child.dom && (next = prev ? prev.nextSibling : parent.firstChild) && next != view.docView.compositionNode) {
+                    if (child.flags & 7 /* Dirty */) {
+                        if (!child.dom && (next = prev ? prev.nextSibling : parent.firstChild)) {
                             let contentView = ContentView.get(next);
                             if (!contentView || !contentView.parent && contentView.canReuseDOM(child))
                                 child.reuseDOM(next);
                         }
                         child.sync(view, track);
-                        child.dirty = 0 /* Not */;
+                        child.flags &= ~7 /* Dirty */;
                     }
                     next = prev ? prev.nextSibling : parent.firstChild;
                     if (track && !track.written && track.node == parent && next != child.dom)
@@ -4920,11 +4922,11 @@
                 while (next)
                     next = rm$1(next);
             }
-            else if (this.dirty & 1 /* Child */) {
+            else if (this.flags & 1 /* ChildDirty */) {
                 for (let child of this.children)
-                    if (child.dirty) {
+                    if (child.flags & 7 /* Dirty */) {
                         child.sync(view, track);
-                        child.dirty = 0 /* Not */;
+                        child.flags &= ~7 /* Dirty */;
                     }
             }
         }
@@ -4989,23 +4991,23 @@
                 endDOM: toI < this.children.length && toI >= 0 ? this.children[toI].dom : null };
         }
         markDirty(andParent = false) {
-            this.dirty |= 2 /* Node */;
+            this.flags |= 2 /* NodeDirty */;
             this.markParentsDirty(andParent);
         }
         markParentsDirty(childList) {
             for (let parent = this.parent; parent; parent = parent.parent) {
                 if (childList)
-                    parent.dirty |= 2 /* Node */;
-                if (parent.dirty & 1 /* Child */)
+                    parent.flags |= 2 /* NodeDirty */;
+                if (parent.flags & 1 /* ChildDirty */)
                     return;
-                parent.dirty |= 1 /* Child */;
+                parent.flags |= 1 /* ChildDirty */;
                 childList = false;
             }
         }
         setParent(parent) {
             if (this.parent != parent) {
                 this.parent = parent;
-                if (this.dirty)
+                if (this.flags & 7 /* Dirty */)
                     this.markParentsDirty(true);
             }
         }
@@ -5056,7 +5058,9 @@
             return false;
         }
         become(other) { return false; }
-        canReuseDOM(other) { return other.constructor == this.constructor; }
+        canReuseDOM(other) {
+            return other.constructor == this.constructor && !((this.flags | other.flags) & 8 /* Composition */);
+        }
         // When this is a zero-length view with a side, this should return a
         // number <= 0 to indicate it is before its position, or a
         // number > 0 when after its position.
@@ -5180,6 +5184,113 @@
         replaceRange(parent, fromI, fromOff, toI, toOff, insert, 0, openStart, openEnd);
     }
 
+    const LineBreakPlaceholder = "\uffff";
+    class DOMReader {
+        constructor(points, state) {
+            this.points = points;
+            this.text = "";
+            this.lineSeparator = state.facet(EditorState.lineSeparator);
+        }
+        append(text) {
+            this.text += text;
+        }
+        lineBreak() {
+            this.text += LineBreakPlaceholder;
+        }
+        readRange(start, end) {
+            if (!start)
+                return this;
+            let parent = start.parentNode;
+            for (let cur = start;;) {
+                this.findPointBefore(parent, cur);
+                let oldLen = this.text.length;
+                this.readNode(cur);
+                let next = cur.nextSibling;
+                if (next == end)
+                    break;
+                let view = ContentView.get(cur), nextView = ContentView.get(next);
+                if (view && nextView ? view.breakAfter :
+                    (view ? view.breakAfter : isBlockElement(cur)) ||
+                        (isBlockElement(next) && (cur.nodeName != "BR" || cur.cmIgnore) && this.text.length > oldLen))
+                    this.lineBreak();
+                cur = next;
+            }
+            this.findPointBefore(parent, end);
+            return this;
+        }
+        readTextNode(node) {
+            let text = node.nodeValue;
+            for (let point of this.points)
+                if (point.node == node)
+                    point.pos = this.text.length + Math.min(point.offset, text.length);
+            for (let off = 0, re = this.lineSeparator ? null : /\r\n?|\n/g;;) {
+                let nextBreak = -1, breakSize = 1, m;
+                if (this.lineSeparator) {
+                    nextBreak = text.indexOf(this.lineSeparator, off);
+                    breakSize = this.lineSeparator.length;
+                }
+                else if (m = re.exec(text)) {
+                    nextBreak = m.index;
+                    breakSize = m[0].length;
+                }
+                this.append(text.slice(off, nextBreak < 0 ? text.length : nextBreak));
+                if (nextBreak < 0)
+                    break;
+                this.lineBreak();
+                if (breakSize > 1)
+                    for (let point of this.points)
+                        if (point.node == node && point.pos > this.text.length)
+                            point.pos -= breakSize - 1;
+                off = nextBreak + breakSize;
+            }
+        }
+        readNode(node) {
+            if (node.cmIgnore)
+                return;
+            let view = ContentView.get(node);
+            let fromView = view && view.overrideDOMText;
+            if (fromView != null) {
+                this.findPointInside(node, fromView.length);
+                for (let i = fromView.iter(); !i.next().done;) {
+                    if (i.lineBreak)
+                        this.lineBreak();
+                    else
+                        this.append(i.value);
+                }
+            }
+            else if (node.nodeType == 3) {
+                this.readTextNode(node);
+            }
+            else if (node.nodeName == "BR") {
+                if (node.nextSibling)
+                    this.lineBreak();
+            }
+            else if (node.nodeType == 1) {
+                this.readRange(node.firstChild, null);
+            }
+        }
+        findPointBefore(node, next) {
+            for (let point of this.points)
+                if (point.node == node && node.childNodes[point.offset] == next)
+                    point.pos = this.text.length;
+        }
+        findPointInside(node, maxLen) {
+            for (let point of this.points)
+                if (node.nodeType == 3 ? point.node == node : node.contains(point.node))
+                    point.pos = this.text.length + Math.min(maxLen, point.offset);
+        }
+    }
+    function isBlockElement(node) {
+        return node.nodeType == 1 && /^(DIV|P|LI|UL|OL|BLOCKQUOTE|DD|DT|H\d|SECTION|PRE)$/.test(node.nodeName);
+    }
+    class DOMPoint {
+        constructor(node, offset) {
+            this.node = node;
+            this.offset = offset;
+            this.pos = -1;
+        }
+    }
+
     let nav = typeof navigator != "undefined" ? navigator : { userAgent: "", vendor: "", platform: "" };
     let doc = typeof document != "undefined" ? document : { documentElement: { style: {} } };
     const ie_edge = /*@__PURE__*//Edge\/(\d+)/.exec(nav.userAgent);
@@ -5233,7 +5344,10 @@
                 this.createDOM(dom);
         }
         merge(from, to, source) {
-            if (source && (!(source instanceof TextView) || this.length - (to - from) + source.length > MaxJoinLen))
+            if ((this.flags & 8 /* Composition */) ||
+                source && (!(source instanceof TextView) ||
+                    this.length - (to - from) + source.length > MaxJoinLen ||
+                    (source.flags & 8 /* Composition */)))
                 return false;
             this.text = this.text.slice(0, from) + (source ? source.text : "") + this.text.slice(to);
             this.markDirty();
@@ -5243,6 +5357,7 @@
             let result = new TextView(this.text.slice(from));
             this.text = this.text.slice(0, from);
             this.markDirty();
+            result.flags |= this.flags & 8 /* Composition */;
             return result;
         }
         localPosFromDOM(node, offset) {
@@ -5274,16 +5389,19 @@
                     dom.setAttribute(name, this.mark.attrs[name]);
             return dom;
         }
+        canReuseDOM(other) {
+            return super.canReuseDOM(other) && !((this.flags | other.flags) & 8 /* Composition */);
+        }
         reuseDOM(node) {
             if (node.nodeName == this.mark.tagName.toUpperCase()) {
                 this.setDOM(node);
-                this.dirty |= 4 /* Attrs */ | 2 /* Node */;
+                this.flags |= 4 /* AttrsDirty */ | 2 /* NodeDirty */;
             }
         }
         sync(view, track) {
             if (!this.dom)
                 this.setDOM(this.setAttrs(document.createElement(this.mark.tagName)));
-            else if (this.dirty & 4 /* Attrs */)
+            else if (this.flags & 4 /* AttrsDirty */)
                 this.setAttrs(this.dom);
             super.sync(view, track);
         }
@@ -5362,7 +5480,7 @@
             this.prevWidget = null;
         }
         static create(widget, length, side) {
-            return new (widget.customView || WidgetView)(widget, length, side);
+            return new WidgetView(widget, length, side);
         }
         split(from) {
             let result = WidgetView.create(this.widget, this.length - from, this.side);
@@ -5403,12 +5521,12 @@
         ignoreEvent(event) { return this.widget.ignoreEvent(event); }
         get overrideDOMText() {
             if (this.length == 0)
-                return Text.empty;
+                return Text$1.empty;
             let top = this;
             while (top.parent)
                 top = top.parent;
             let { view } = top, text = view && view.state.doc, start = this.posAtStart;
-            return text ? text.slice(start, start + this.length) : Text.empty;
+            return text ? text.slice(start, start + this.length) : Text$1.empty;
         }
         domAtPos(pos) {
             return (this.length ? pos == 0 : this.side > 0)
@@ -5438,129 +5556,6 @@
             super.destroy();
             if (this.dom)
                 this.widget.destroy(this.dom);
-        }
-    }
-    class CompositionView extends WidgetView {
-        domAtPos(pos) {
-            let { topView, text } = this.widget;
-            if (!topView)
-                return new DOMPos(text, Math.min(pos, text.nodeValue.length));
-            return scanCompositionTree(pos, 0, topView, text, this.length - topView.length, (v, p) => v.domAtPos(p), (text, p) => new DOMPos(text, Math.min(p, text.nodeValue.length)));
-        }
-        sync() { this.setDOM(this.widget.toDOM()); }
-        localPosFromDOM(node, offset) {
-            let { topView, text } = this.widget;
-            if (!topView)
-                return Math.min(offset, this.length);
-            return posFromDOMInCompositionTree(node, offset, topView, text, this.length - topView.length);
-        }
-        ignoreMutation() { return false; }
-        get overrideDOMText() { return null; }
-        coordsAt(pos, side) {
-            let { topView, text } = this.widget;
-            if (!topView)
-                return textCoords(text, pos, side);
-            return scanCompositionTree(pos, side, topView, text, this.length - topView.length, (v, pos, side) => v.coordsAt(pos, side), (text, pos, side) => textCoords(text, pos, side));
-        }
-        destroy() {
-            var _a;
-            super.destroy();
-            (_a = this.widget.topView) === null || _a === void 0 ? void 0 : _a.destroy();
-        }
-        get isEditable() { return true; }
-        canReuseDOM() { return true; }
-    }
-    // Uses the old structure of a chunk of content view frozen for
-    // composition to try and find a reasonable DOM location for the given
-    // offset.
-    function scanCompositionTree(pos, side, view, text, dLen, enterView, fromText) {
-        if (view instanceof MarkView) {
-            for (let child = view.dom.firstChild; child; child = child.nextSibling) {
-                let desc = ContentView.get(child);
-                if (!desc) {
-                    let inner = scanCompositionNode(pos, side, child, fromText);
-                    if (typeof inner != "number")
-                        return inner;
-                    pos = inner;
-                }
-                else {
-                    let hasComp = contains(child, text);
-                    let len = desc.length + (hasComp ? dLen : 0);
-                    if (pos < len || pos == len && desc.getSide() <= 0)
-                        return hasComp ? scanCompositionTree(pos, side, desc, text, dLen, enterView, fromText) : enterView(desc, pos, side);
-                    pos -= len;
-                }
-            }
-            return enterView(view, view.length, -1);
-        }
-        else if (view.dom == text) {
-            return fromText(text, pos, side);
-        }
-        else {
-            return enterView(view, pos, side);
-        }
-    }
-    function scanCompositionNode(pos, side, node, fromText) {
-        if (node.nodeType == 3) {
-            let len = node.nodeValue.length;
-            if (pos <= len)
-                return fromText(node, pos, side);
-            pos -= len;
-        }
-        else if (node.nodeType == 1 && node.contentEditable != "false") {
-            for (let child = node.firstChild; child; child = child.nextSibling) {
-                let inner = scanCompositionNode(pos, side, child, fromText);
-                if (typeof inner != "number")
-                    return inner;
-                pos = inner;
-            }
-        }
-        return pos;
-    }
-    function posFromDOMInCompositionTree(node, offset, view, text, dLen) {
-        if (view instanceof MarkView) {
-            let pos = 0;
-            for (let child = view.dom.firstChild; child; child = child.nextSibling) {
-                let childView = ContentView.get(child);
-                if (childView) {
-                    let hasComp = contains(child, text);
-                    if (contains(child, node))
-                        return pos + (hasComp ? posFromDOMInCompositionTree(node, offset, childView, text, dLen)
-                            : childView.localPosFromDOM(node, offset));
-                    pos += childView.length + (hasComp ? dLen : 0);
-                }
-                else {
-                    let inner = posFromDOMInOpaqueNode(node, offset, child);
-                    if (inner.result != null)
-                        return pos + inner.result;
-                    pos += inner.size;
-                }
-            }
-        }
-        else if (view.dom == text) {
-            return Math.min(offset, text.nodeValue.length);
-        }
-        return view.localPosFromDOM(node, offset);
-    }
-    function posFromDOMInOpaqueNode(node, offset, target) {
-        if (target.nodeType == 3) {
-            return node == target ? { result: offset } : { size: target.nodeValue.length };
-        }
-        else if (target.nodeType == 1 && target.contentEditable != "false") {
-            let pos = 0;
-            for (let child = target.firstChild, i = 0;; child = child.nextSibling, i++) {
-                if (node == target && i == offset)
-                    return { result: pos };
-                if (!child)
-                    return { size: pos };
-                let inner = posFromDOMInOpaqueNode(node, offset, child);
-                if (inner.result != null)
-                    return { result: offset + inner.result };
-                pos += inner.size;
-            }
-        }
-        else {
-            return target.contains(node) ? { result: 0 } : { size: 0 };
         }
     }
     // These are drawn around uneditable widgets to avoid a number of
@@ -5593,7 +5588,7 @@
             return this.dom.getBoundingClientRect();
         }
         get overrideDOMText() {
-            return Text.empty;
+            return Text$1.empty;
         }
         get isHidden() { return true; }
     }
@@ -5682,16 +5677,20 @@
         }
         return target;
     }
-    function attrsEq(a, b) {
+    const noAttrs = /*@__PURE__*/Object.create(null);
+    function attrsEq(a, b, ignore) {
         if (a == b)
             return true;
-        if (!a || !b)
-            return false;
+        if (!a)
+            a = noAttrs;
+        if (!b)
+            b = noAttrs;
         let keysA = Object.keys(a), keysB = Object.keys(b);
-        if (keysA.length != keysB.length)
+        if (keysA.length - (ignore && keysA.indexOf(ignore) > -1 ? 1 : 0) !=
+            keysB.length - (ignore && keysB.indexOf(ignore) > -1 ? 1 : 0))
             return false;
         for (let key of keysA) {
-            if (keysB.indexOf(key) == -1 || a[key] !== b[key])
+            if (key != ignore && (keysB.indexOf(key) == -1 || a[key] !== b[key]))
                 return false;
         }
         return true;
@@ -5707,6 +5706,14 @@
                 if (!(prev && prev[name] == attrs[name]))
                     dom.setAttribute(changed = name, attrs[name]);
         return !!changed;
+    }
+    function getAttrs$2(dom) {
+        let attrs = Object.create(null);
+        for (let i = 0; i < dom.attributes.length; i++) {
+            let attr = dom.attributes[i];
+            attrs[attr.name] = attr.value;
+        }
+        return attrs;
     }
 
     /**
@@ -5769,10 +5776,6 @@
         directly at that position.
         */
         coordsAt(dom, pos, side) { return null; }
-        /**
-        @internal
-        */
-        get customView() { return null; }
         /**
         @internal
         */
@@ -5913,11 +5916,12 @@
             this.attrs = spec.attributes || null;
         }
         eq(other) {
+            var _a, _b;
             return this == other ||
                 other instanceof MarkDecoration &&
                     this.tagName == other.tagName &&
-                    this.class == other.class &&
-                    attrsEq(this.attrs, other.attrs);
+                    (this.class || ((_a = this.attrs) === null || _a === void 0 ? void 0 : _a.class)) == (other.class || ((_b = other.attrs) === null || _b === void 0 ? void 0 : _b.class)) &&
+                    attrsEq(this.attrs, other.attrs, "class");
         }
         range(from, to = from) {
             if (from >= to)
@@ -6069,7 +6073,7 @@
         reuseDOM(node) {
             if (node.nodeName == "DIV") {
                 this.setDOM(node);
-                this.dirty |= 4 /* Attrs */ | 2 /* Node */;
+                this.flags |= 4 /* AttrsDirty */ | 2 /* NodeDirty */;
             }
         }
         sync(view, track) {
@@ -6079,7 +6083,7 @@
                 this.dom.className = "cm-line";
                 this.prevAttrs = this.attrs ? null : undefined;
             }
-            else if (this.dirty & 4 /* Attrs */) {
+            else if (this.flags & 4 /* AttrsDirty */) {
                 clearAttributes(this.dom);
                 this.dom.className = "cm-line";
                 this.prevAttrs = this.attrs ? null : undefined;
@@ -6186,7 +6190,7 @@
             }
         }
         get overrideDOMText() {
-            return this.parent ? this.parent.view.state.doc.slice(this.posAtStart, this.posAtEnd) : Text.empty;
+            return this.parent ? this.parent.view.state.doc.slice(this.posAtStart, this.posAtEnd) : Text$1.empty;
         }
         domBoundsAround() { return null; }
         become(other) {
@@ -7019,121 +7023,14 @@
         return EditorSelection.cursor(nextIndex + line.from, forward ? -1 : 1, span.level);
     }
 
-    const LineBreakPlaceholder = "\uffff";
-    class DOMReader {
-        constructor(points, state) {
-            this.points = points;
-            this.text = "";
-            this.lineSeparator = state.facet(EditorState.lineSeparator);
-        }
-        append(text) {
-            this.text += text;
-        }
-        lineBreak() {
-            this.text += LineBreakPlaceholder;
-        }
-        readRange(start, end) {
-            if (!start)
-                return this;
-            let parent = start.parentNode;
-            for (let cur = start;;) {
-                this.findPointBefore(parent, cur);
-                let oldLen = this.text.length;
-                this.readNode(cur);
-                let next = cur.nextSibling;
-                if (next == end)
-                    break;
-                let view = ContentView.get(cur), nextView = ContentView.get(next);
-                if (view && nextView ? view.breakAfter :
-                    (view ? view.breakAfter : isBlockElement(cur)) ||
-                        (isBlockElement(next) && (cur.nodeName != "BR" || cur.cmIgnore) && this.text.length > oldLen))
-                    this.lineBreak();
-                cur = next;
-            }
-            this.findPointBefore(parent, end);
-            return this;
-        }
-        readTextNode(node) {
-            let text = node.nodeValue;
-            for (let point of this.points)
-                if (point.node == node)
-                    point.pos = this.text.length + Math.min(point.offset, text.length);
-            for (let off = 0, re = this.lineSeparator ? null : /\r\n?|\n/g;;) {
-                let nextBreak = -1, breakSize = 1, m;
-                if (this.lineSeparator) {
-                    nextBreak = text.indexOf(this.lineSeparator, off);
-                    breakSize = this.lineSeparator.length;
-                }
-                else if (m = re.exec(text)) {
-                    nextBreak = m.index;
-                    breakSize = m[0].length;
-                }
-                this.append(text.slice(off, nextBreak < 0 ? text.length : nextBreak));
-                if (nextBreak < 0)
-                    break;
-                this.lineBreak();
-                if (breakSize > 1)
-                    for (let point of this.points)
-                        if (point.node == node && point.pos > this.text.length)
-                            point.pos -= breakSize - 1;
-                off = nextBreak + breakSize;
-            }
-        }
-        readNode(node) {
-            if (node.cmIgnore)
-                return;
-            let view = ContentView.get(node);
-            let fromView = view && view.overrideDOMText;
-            if (fromView != null) {
-                this.findPointInside(node, fromView.length);
-                for (let i = fromView.iter(); !i.next().done;) {
-                    if (i.lineBreak)
-                        this.lineBreak();
-                    else
-                        this.append(i.value);
-                }
-            }
-            else if (node.nodeType == 3) {
-                this.readTextNode(node);
-            }
-            else if (node.nodeName == "BR") {
-                if (node.nextSibling)
-                    this.lineBreak();
-            }
-            else if (node.nodeType == 1) {
-                this.readRange(node.firstChild, null);
-            }
-        }
-        findPointBefore(node, next) {
-            for (let point of this.points)
-                if (point.node == node && node.childNodes[point.offset] == next)
-                    point.pos = this.text.length;
-        }
-        findPointInside(node, maxLen) {
-            for (let point of this.points)
-                if (node.nodeType == 3 ? point.node == node : node.contains(point.node))
-                    point.pos = this.text.length + Math.min(maxLen, point.offset);
-        }
-    }
-    function isBlockElement(node) {
-        return node.nodeType == 1 && /^(DIV|P|LI|UL|OL|BLOCKQUOTE|DD|DT|H\d|SECTION|PRE)$/.test(node.nodeName);
-    }
-    class DOMPoint {
-        constructor(node, offset) {
-            this.node = node;
-            this.offset = offset;
-            this.pos = -1;
-        }
-    }
-
     class DocView extends ContentView {
         constructor(view) {
             super();
             this.view = view;
-            this.compositionDeco = Decoration.none;
-            this.compositionNode = null;
             this.decorations = [];
             this.dynamicDecorationMap = [];
+            this.hasComposition = null;
+            this.markedForComposition = new Set;
             // Track a minimum width for the editor. When measuring sizes in
             // measureVisibleLineHeights, this is updated to point at the width
             // of a given element and its extent in the document. When a change
@@ -7156,7 +7053,7 @@
             this.children = [new LineView];
             this.children[0].setParent(this);
             this.updateDeco();
-            this.updateInner([new ChangedRange(0, 0, 0, view.state.doc.length)], 0);
+            this.updateInner([new ChangedRange(0, 0, 0, view.state.doc.length)], 0, null);
         }
         get length() { return this.view.state.doc.length; }
         // Update the document view to a given state.
@@ -7171,24 +7068,30 @@
                     this.minWidthTo = update.changes.mapPos(this.minWidthTo, 1);
                 }
             }
-            ({ deco: this.compositionDeco, node: this.compositionNode } =
-                this.view.inputState.composing < 0 ? noComp : computeCompositionDeco(this.view, update.changes));
+            let composition = this.view.inputState.composing < 0 ? null : findCompositionRange(this.view, update.changes);
+            if (this.hasComposition) {
+                this.markedForComposition.clear();
+                let { from, to } = this.hasComposition;
+                changedRanges = new ChangedRange(from, to, update.changes.mapPos(from, -1), update.changes.mapPos(to, 1))
+                    .addToSet(changedRanges.slice());
+            }
+            this.hasComposition = composition ? { from: composition.range.fromB, to: composition.range.toB } : null;
             // When the DOM nodes around the selection are moved to another
             // parent, Chrome sometimes reports a different selection through
             // getSelection than the one that it actually shows to the user.
             // This forces a selection update when lines are joined to work
             // around that. Issue #54
-            if ((browser.ie || browser.chrome) && !this.compositionDeco.size && update &&
+            if ((browser.ie || browser.chrome) && !composition && update &&
                 update.state.doc.lines != update.startState.doc.lines)
                 this.forceSelection = true;
             let prevDeco = this.decorations, deco = this.updateDeco();
             let decoDiff = findChangedDeco(prevDeco, deco, update.changes);
             changedRanges = ChangedRange.extendWithRanges(changedRanges, decoDiff);
-            if (this.dirty == 0 /* Not */ && changedRanges.length == 0) {
+            if (!(this.flags & 7 /* Dirty */) && changedRanges.length == 0) {
                 return false;
             }
             else {
-                this.updateInner(changedRanges, update.startState.doc.length);
+                this.updateInner(changedRanges, update.startState.doc.length, composition);
                 if (update.transactions.length)
                     this.lastUpdate = Date.now();
                 return true;
@@ -7196,9 +7099,9 @@
         }
         // Used by update and the constructor do perform the actual DOM
         // update
-        updateInner(changes, oldLength) {
+        updateInner(changes, oldLength, composition) {
             this.view.viewState.mustMeasureContent = true;
-            this.updateChildren(changes, oldLength);
+            this.updateChildren(changes, oldLength, composition);
             let { observer } = this.view;
             observer.ignore(() => {
                 // Lock the height during redrawing, since Chrome sometimes
@@ -7213,11 +7116,12 @@
                 // to detect that situation.
                 let track = browser.chrome || browser.ios ? { node: observer.selectionRange.focusNode, written: false } : undefined;
                 this.sync(this.view, track);
-                this.dirty = 0 /* Not */;
+                this.flags &= ~7 /* Dirty */;
                 if (track && (track.written || observer.selectionRange.focusNode != track.node))
                     this.forceSelection = true;
                 this.dom.style.height = "";
             });
+            this.markedForComposition.forEach(cView => cView.flags &= ~8 /* Composition */);
             let gaps = [];
             if (this.view.viewport.from || this.view.viewport.to < this.view.state.doc.length)
                 for (let child of this.children)
@@ -7225,17 +7129,73 @@
                         gaps.push(child.dom);
             observer.updateGaps(gaps);
         }
-        updateChildren(changes, oldLength) {
+        updateChildren(changes, oldLength, composition) {
+            let ranges = composition ? composition.range.addToSet(changes.slice()) : changes;
             let cursor = this.childCursor(oldLength);
-            for (let i = changes.length - 1;; i--) {
-                let next = i >= 0 ? changes[i] : null;
+            for (let i = ranges.length - 1;; i--) {
+                let next = i >= 0 ? ranges[i] : null;
                 if (!next)
                     break;
-                let { fromA, toA, fromB, toB } = next;
-                let { content, breakAtStart, openStart, openEnd } = ContentBuilder.build(this.view.state.doc, fromB, toB, this.decorations, this.dynamicDecorationMap);
+                let { fromA, toA, fromB, toB } = next, content, breakAtStart, openStart, openEnd;
+                if (composition && composition.range.fromB < toB && composition.range.toB > fromB) {
+                    let before = ContentBuilder.build(this.view.state.doc, fromB, composition.range.fromB, this.decorations, this.dynamicDecorationMap);
+                    let after = ContentBuilder.build(this.view.state.doc, composition.range.toB, toB, this.decorations, this.dynamicDecorationMap);
+                    breakAtStart = before.breakAtStart;
+                    openStart = before.openStart;
+                    openEnd = after.openEnd;
+                    let compLine = this.compositionView(composition);
+                    if (after.breakAtStart) {
+                        compLine.breakAfter = 1;
+                    }
+                    else if (after.content.length &&
+                        compLine.merge(compLine.length, compLine.length, after.content[0], false, after.openStart, 0)) {
+                        compLine.breakAfter = after.content[0].breakAfter;
+                        after.content.shift();
+                    }
+                    if (before.content.length &&
+                        compLine.merge(0, 0, before.content[before.content.length - 1], true, 0, before.openEnd)) {
+                        before.content.pop();
+                    }
+                    content = before.content.concat(compLine).concat(after.content);
+                }
+                else {
+                    ({ content, breakAtStart, openStart, openEnd } =
+                        ContentBuilder.build(this.view.state.doc, fromB, toB, this.decorations, this.dynamicDecorationMap));
+                }
                 let { i: toI, off: toOff } = cursor.findPos(toA, 1);
                 let { i: fromI, off: fromOff } = cursor.findPos(fromA, -1);
                 replaceRange(this, fromI, fromOff, toI, toOff, content, breakAtStart, openStart, openEnd);
+            }
+            if (composition)
+                this.fixCompositionDOM(composition);
+        }
+        compositionView(composition) {
+            let cur = new TextView(composition.text.nodeValue);
+            cur.flags |= 8 /* Composition */;
+            for (let { deco } of composition.marks)
+                cur = new MarkView(deco, [cur], cur.length);
+            let line = new LineView;
+            line.append(cur, 0);
+            return line;
+        }
+        fixCompositionDOM(composition) {
+            let fix = (dom, cView) => {
+                cView.flags |= 8 /* Composition */;
+                this.markedForComposition.add(cView);
+                let prev = ContentView.get(dom);
+                if (prev != cView) {
+                    if (prev)
+                        prev.dom = null;
+                    cView.setDOM(dom);
+                }
+            };
+            let pos = this.childPos(composition.range.fromB, 1);
+            let cView = this.children[pos.i];
+            fix(composition.line, cView);
+            for (let i = composition.marks.length - 1; i >= -1; i--) {
+                pos = cView.childPos(pos.off, 1);
+                cView = cView.children[pos.i];
+                fix(i >= 0 ? composition.marks[i].node : composition.text, cView);
             }
         }
         // Sync the DOM selection to this.state.selection
@@ -7255,7 +7215,7 @@
             let head = main.empty ? anchor : this.domAtPos(main.head);
             // Always reset on Firefox when next to an uneditable node to
             // avoid invisible cursor bugs (#111)
-            if (browser.gecko && main.empty && !this.compositionDeco.size && betweenUneditable(anchor)) {
+            if (browser.gecko && main.empty && !this.hasComposition && betweenUneditable(anchor)) {
                 let dummy = document.createTextNode("");
                 this.view.observer.ignore(() => anchor.node.insertBefore(dummy, anchor.node.childNodes[anchor.offset] || null));
                 anchor = head = new DOMPos(dummy, 0);
@@ -7327,7 +7287,7 @@
             this.impreciseHead = head.precise ? null : new DOMPos(domSel.focusNode, domSel.focusOffset);
         }
         enforceCursorAssoc() {
-            if (this.compositionDeco.size)
+            if (this.hasComposition)
                 return;
             let { view } = this, cursor = view.state.selection.main;
             let sel = getSelection(view.root);
@@ -7437,6 +7397,7 @@
             let dummy = document.createElement("div"), lineHeight, charWidth, textHeight;
             dummy.className = "cm-line";
             dummy.style.width = "99999px";
+            dummy.style.position = "absolute";
             dummy.textContent = "abc def ghi jkl mno pqr stu";
             this.view.observer.ignore(() => {
                 this.dom.appendChild(dummy);
@@ -7486,7 +7447,6 @@
                 this.dynamicDecorationMap[i] = false;
             return this.decorations = [
                 ...allDeco,
-                this.compositionDeco,
                 this.computeBlockGapDeco(),
                 this.view.viewState.lineGapDeco
             ];
@@ -7529,83 +7489,86 @@
         }
         get estimatedHeight() { return this.height; }
     }
-    function compositionSurroundingNode(view) {
+    function findCompositionNode(view) {
         let sel = view.observer.selectionRange;
         let textNode = sel.focusNode && nearbyTextNode(sel.focusNode, sel.focusOffset, 0);
         if (!textNode)
             return null;
-        let cView = view.docView.nearest(textNode);
-        if (!cView)
-            return null;
-        if (cView instanceof LineView) {
-            let topNode = textNode;
-            while (topNode.parentNode != cView.dom)
-                topNode = topNode.parentNode;
-            let prev = topNode.previousSibling;
-            while (prev && !ContentView.get(prev))
-                prev = prev.previousSibling;
-            let pos = prev ? ContentView.get(prev).posAtEnd : cView.posAtStart;
-            return { from: pos, to: pos, node: topNode, text: textNode };
+        let cView = ContentView.get(textNode);
+        let from, to;
+        if (cView instanceof TextView) {
+            from = cView.posAtStart;
+            to = from + cView.length;
         }
         else {
-            for (;;) {
-                let { parent } = cView;
-                if (!parent)
+            up: for (let offset = 0, node = textNode;;) {
+                for (let sibling = node.previousSibling, cView; sibling; sibling = sibling.previousSibling) {
+                    if (cView = ContentView.get(sibling)) {
+                        from = to = cView.posAtEnd + offset;
+                        break up;
+                    }
+                    let reader = new DOMReader([], view.state);
+                    reader.readNode(sibling);
+                    if (reader.text.indexOf(LineBreakPlaceholder) > -1)
+                        return null;
+                    offset += reader.text.length;
+                }
+                node = node.parentNode;
+                if (!node)
                     return null;
-                if (parent instanceof LineView)
+                let parentView = ContentView.get(node);
+                if (parentView) {
+                    from = to = parentView.posAtStart + offset;
                     break;
-                cView = parent;
+                }
             }
-            let from = cView.posAtStart;
-            return { from, to: from + cView.length, node: cView.dom, text: textNode };
         }
+        return { from, to, node: textNode };
     }
-    const noComp = { deco: Decoration.none, node: null };
-    function computeCompositionDeco(view, changes) {
-        let surrounding = compositionSurroundingNode(view);
-        if (!surrounding)
-            return noComp;
-        let { from, to, node, text: textNode } = surrounding;
-        let newFrom = changes.mapPos(from, 1), newTo = Math.max(newFrom, changes.mapPos(to, -1));
-        let { state } = view, reader = new DOMReader([], state);
-        if (node.nodeType == 3)
-            reader.readTextNode(node);
-        else
-            reader.readRange(node.firstChild, null);
-        let { text } = reader;
-        if (text.indexOf(LineBreakPlaceholder) > -1)
-            return noComp; // Don't try to preserve multi-line compositions
-        if (newTo - newFrom < text.length) {
-            if (state.doc.sliceString(newFrom, Math.min(state.doc.length, newFrom + text.length)) == text)
-                newTo = newFrom + text.length;
-            else if (state.doc.sliceString(Math.max(0, newTo - text.length), newTo) == text)
-                newFrom = newTo - text.length;
+    function findCompositionRange(view, changes) {
+        let found = findCompositionNode(view);
+        if (!found)
+            return null;
+        let { from: fromA, to: toA, node: textNode } = found;
+        let fromB = changes.mapPos(fromA, -1), toB = changes.mapPos(toA, 1);
+        let text = textNode.nodeValue;
+        // Don't try to preserve multi-line compositions
+        if (/[\n\r]/.test(text))
+            return null;
+        if (toB - fromB != text.length) {
+            // If there is a length mismatch, see if mapping non-inclusively helps
+            let fromB2 = changes.mapPos(fromA, 1), toB2 = changes.mapPos(toA, -1);
+            if (toB2 - fromB2 == text.length)
+                fromB = fromB2, toB = toB2;
+            // See if we can find an instance of the text at either side
+            else if (view.state.doc.sliceString(toB - text.length, toB) == text)
+                fromB = toB - text.length;
+            else if (view.state.doc.sliceString(fromB, fromB + text.length) == text)
+                toB = fromB + text.length;
+            // Not found
             else
-                return noComp;
+                return null;
         }
-        else if (state.doc.sliceString(newFrom, newTo) != text) {
-            return noComp;
+        let { main } = view.state.selection;
+        if (view.state.doc.sliceString(fromB, toB) != text || fromB > main.head || toB < main.head)
+            return null;
+        let marks = [];
+        let range = new ChangedRange(fromA, toA, fromB, toB);
+        for (let parent = textNode.parentNode;; parent = parent.parentNode) {
+            let parentView = ContentView.get(parent);
+            if (parentView instanceof MarkView)
+                marks.push({ node: parent, deco: parentView.mark });
+            else if (parentView instanceof LineView || parent.nodeName == "DIV" && parent.parentNode == view.contentDOM)
+                return { range, text: textNode, marks, line: parent };
+            else if (parent != view.contentDOM)
+                marks.push({ node: parent, deco: new MarkDecoration({
+                        inclusive: true,
+                        attributes: getAttrs$2(parent),
+                        tagName: parent.tagName.toLowerCase()
+                    }) });
+            else
+                return null;
         }
-        let topView = ContentView.get(node);
-        if (topView instanceof CompositionView)
-            topView = topView.widget.topView;
-        else if (topView)
-            topView.parent = null;
-        let deco = Decoration.set(Decoration.replace({ widget: new CompositionWidget(node, textNode, topView), inclusive: true })
-            .range(newFrom, newTo));
-        return { deco, node };
-    }
-    class CompositionWidget extends WidgetType {
-        constructor(top, text, topView) {
-            super();
-            this.top = top;
-            this.text = text;
-            this.topView = topView;
-        }
-        eq(other) { return this.top == other.top && this.text == other.text; }
-        toDOM() { return this.top; }
-        ignoreEvent() { return false; }
-        get customView() { return CompositionView; }
     }
     function nearbyTextNode(startNode, startOffset, side) {
         if (side <= 0)
@@ -8266,9 +8229,13 @@
     function dragScrollSpeed(dist) {
         return Math.max(0, dist) * 0.7 + 8;
     }
+    function dist(a, b) {
+        return Math.max(Math.abs(a.clientX - b.clientX), Math.abs(a.clientY - b.clientY));
+    }
     class MouseSelection {
         constructor(view, startEvent, style, mustSelect) {
             this.view = view;
+            this.startEvent = startEvent;
             this.style = style;
             this.mustSelect = mustSelect;
             this.scrollSpeed = { x: 0, y: 0 };
@@ -8295,7 +8262,7 @@
             var _a;
             if (event.buttons == 0)
                 return this.destroy();
-            if (this.dragging !== false)
+            if (this.dragging || this.dragging == null && dist(this.startEvent, event) < 10)
                 return;
             this.select(this.lastEvent = event);
             let sx = 0, sy = 0;
@@ -8374,7 +8341,7 @@
         select(event) {
             let { view } = this, selection = this.skipAtoms(this.style.get(event, this.extend, this.multiple));
             if (this.mustSelect || !selection.eq(view.state.selection) ||
-                selection.main.assoc != view.state.selection.main.assoc)
+                selection.main.assoc != view.state.selection.main.assoc && this.dragging === false)
                 this.view.dispatch({
                     selection,
                     userEvent: "select.pointer"
@@ -8793,7 +8760,7 @@
             // Otherwise, make sure that, if no changes come in soon, the
             // composition view is cleared.
             setTimeout(() => {
-                if (view.inputState.composing < 0 && view.docView.compositionDeco.size)
+                if (view.inputState.composing < 0 && view.docView.hasComposition)
                     view.update([]);
             }, 50);
         }
@@ -8833,7 +8800,7 @@
     class HeightOracle {
         constructor(lineWrapping) {
             this.lineWrapping = lineWrapping;
-            this.doc = Text.empty;
+            this.doc = Text$1.empty;
             this.heightSamples = {};
             this.lineHeight = 14; // The height of an entire line (line-height)
             this.charWidth = 7;
@@ -9663,7 +9630,7 @@
             let guessWrapping = state.facet(contentAttributes).some(v => typeof v != "function" && v.class == "cm-lineWrapping");
             this.heightOracle = new HeightOracle(guessWrapping);
             this.stateDeco = state.facet(decorations).filter(d => typeof d != "function");
-            this.heightMap = HeightMap.empty().applyChanges(this.stateDeco, Text.empty, this.heightOracle.setDoc(state.doc), [new ChangedRange(0, 0, 0, state.doc.length)]);
+            this.heightMap = HeightMap.empty().applyChanges(this.stateDeco, Text$1.empty, this.heightOracle.setDoc(state.doc), [new ChangedRange(0, 0, 0, state.doc.length)]);
             this.viewport = this.getViewport(0, null);
             this.updateViewportLines();
             this.updateForViewport();
@@ -9795,7 +9762,7 @@
                 oracle.heightChanged = false;
                 for (let vp of this.viewports) {
                     let heights = vp.from == this.viewport.from ? lineHeights : view.docView.measureVisibleLineHeights(vp);
-                    this.heightMap = (refresh ? HeightMap.empty().applyChanges(this.stateDeco, Text.empty, this.heightOracle, [new ChangedRange(0, 0, 0, view.state.doc.length)]) : this.heightMap).updateHeight(oracle, 0, refresh, new MeasuredHeights(vp.from, heights));
+                    this.heightMap = (refresh ? HeightMap.empty().applyChanges(this.stateDeco, Text$1.empty, this.heightOracle, [new ChangedRange(0, 0, 0, view.state.doc.length)]) : this.heightMap).updateHeight(oracle, 0, refresh, new MeasuredHeights(vp.from, heights));
                 }
                 if (oracle.heightChanged)
                     result |= 2 /* Height */;
@@ -10429,7 +10396,7 @@
                     diff.toB == diff.from + 2 && domChange.text.slice(diff.from, diff.toB) == LineBreakPlaceholder + LineBreakPlaceholder)
                     diff.toB--;
                 change = { from: from + diff.from, to: from + diff.toA,
-                    insert: Text.of(domChange.text.slice(diff.from, diff.toB).split(LineBreakPlaceholder)) };
+                    insert: Text$1.of(domChange.text.slice(diff.from, diff.toB).split(LineBreakPlaceholder)) };
             }
         }
         else if (newSel && (!view.hasFocus && view.state.facet(editable) || newSel.main.eq(sel))) {
@@ -10458,7 +10425,7 @@
             // and transform it into a regular space insert.
             if (newSel && change.insert.length == 2)
                 newSel = EditorSelection.single(newSel.main.anchor - 1, newSel.main.head - 1);
-            change = { from: sel.from, to: sel.to, insert: Text.of([" "]) };
+            change = { from: sel.from, to: sel.to, insert: Text$1.of([" "]) };
         }
         else if (browser.chrome && change && change.from == change.to && change.from == sel.head &&
             change.insert.toString() == "\n " && view.lineWrapping) {
@@ -10467,7 +10434,7 @@
             // bogus new line to be created in CodeMirror (#968)
             if (newSel)
                 newSel = EditorSelection.single(newSel.main.anchor - 1, newSel.main.head - 1);
-            change = { from: sel.from, to: sel.to, insert: Text.of([" "]) };
+            change = { from: sel.from, to: sel.to, insert: Text$1.of([" "]) };
         }
         if (change) {
             let startState = view.state;
@@ -10509,7 +10476,7 @@
                 if (startState.selection.ranges.length > 1 && view.inputState.composing >= 0 &&
                     change.to <= sel.to && change.to >= sel.to - 10) {
                     let replaced = view.state.sliceDoc(change.from, change.to);
-                    let compositionRange = compositionSurroundingNode(view) || view.state.doc.lineAt(sel.head);
+                    let composition = findCompositionNode(view) || view.state.doc.lineAt(sel.head);
                     let offset = sel.to - change.to, size = sel.to - sel.from;
                     tr = startState.changeByRange(range => {
                         if (range.from == sel.from && range.to == sel.to)
@@ -10520,7 +10487,7 @@
                             // changes in the same node work without aborting
                             // composition, so cursors in the composition range are
                             // ignored.
-                            compositionRange && range.to >= compositionRange.from && range.from <= compositionRange.to)
+                            composition && range.to >= composition.from && range.from <= composition.to)
                             return { range };
                         let rangeChanges = startState.changes({ from, to, insert: change.insert }), selOff = range.to - sel.to;
                         return {
@@ -10981,7 +10948,7 @@
                 return null;
             cView.markDirty(rec.type == "attributes");
             if (rec.type == "attributes")
-                cView.dirty |= 4 /* Attrs */;
+                cView.flags |= 4 /* AttrsDirty */;
             if (rec.type == "childList") {
                 let childBefore = findChild(cView, rec.previousSibling || rec.target.previousSibling, -1);
                 let childAfter = findChild(cView, rec.nextSibling || rec.target.nextSibling, 1);
@@ -12155,7 +12122,7 @@
             else if (current != is)
                 throw new Error("Key binding " + name + " is used both as a regular binding and as a multi-stroke prefix");
         };
-        let add = (scope, key, command, preventDefault) => {
+        let add = (scope, key, command, preventDefault, stopPropagation) => {
             var _a, _b;
             let scopeObj = bound[scope] || (bound[scope] = Object.create(null));
             let parts = key.split(/ (?!$)/).map(k => normalizeKeyName(k, platform));
@@ -12165,6 +12132,7 @@
                 if (!scopeObj[prefix])
                     scopeObj[prefix] = {
                         preventDefault: true,
+                        stopPropagation: false,
                         run: [(view) => {
                                 let ourObj = storedPrefix = { view, prefix, scope };
                                 setTimeout(() => { if (storedPrefix == ourObj)
@@ -12175,11 +12143,17 @@
             }
             let full = parts.join(" ");
             checkPrefix(full, false);
-            let binding = scopeObj[full] || (scopeObj[full] = { preventDefault: false, run: ((_b = (_a = scopeObj._any) === null || _a === void 0 ? void 0 : _a.run) === null || _b === void 0 ? void 0 : _b.slice()) || [] });
+            let binding = scopeObj[full] || (scopeObj[full] = {
+                preventDefault: false,
+                stopPropagation: false,
+                run: ((_b = (_a = scopeObj._any) === null || _a === void 0 ? void 0 : _a.run) === null || _b === void 0 ? void 0 : _b.slice()) || []
+            });
             if (command)
                 binding.run.push(command);
             if (preventDefault)
                 binding.preventDefault = true;
+            if (stopPropagation)
+                binding.stopPropagation = true;
         };
         for (let b of bindings) {
             let scopes = b.scope ? b.scope.split(" ") : ["editor"];
@@ -12187,7 +12161,7 @@
                 for (let scope of scopes) {
                     let scopeObj = bound[scope] || (bound[scope] = Object.create(null));
                     if (!scopeObj._any)
-                        scopeObj._any = { preventDefault: false, run: [] };
+                        scopeObj._any = { preventDefault: false, stopPropagation: false, run: [] };
                     for (let key in scopeObj)
                         scopeObj[key].run.push(b.any);
                 }
@@ -12195,9 +12169,9 @@
             if (!name)
                 continue;
             for (let scope of scopes) {
-                add(scope, name, b.run, b.preventDefault);
+                add(scope, name, b.run, b.preventDefault, b.stopPropagation);
                 if (b.shift)
-                    add(scope, "Shift-" + name, b.shift, b.preventDefault);
+                    add(scope, "Shift-" + name, b.shift, b.preventDefault, b.stopPropagation);
             }
         }
         return bound;
@@ -12205,11 +12179,13 @@
     function runHandlers(map, event, view, scope) {
         let name = keyName(event);
         let charCode = codePointAt(name, 0), isChar = codePointSize(charCode) == name.length && name != " ";
-        let prefix = "", fallthrough = false;
+        let prefix = "", handled = false, prevented = false, stopPropagation = false;
         if (storedPrefix && storedPrefix.view == view && storedPrefix.scope == scope) {
             prefix = storedPrefix.prefix + " ";
-            if (fallthrough = modifierCodes.indexOf(event.keyCode) < 0)
+            if (modifierCodes.indexOf(event.keyCode) < 0) {
+                prevented = true;
                 storedPrefix = null;
+            }
         }
         let ran = new Set;
         let runFor = (binding) => {
@@ -12217,36 +12193,49 @@
                 for (let cmd of binding.run)
                     if (!ran.has(cmd)) {
                         ran.add(cmd);
-                        if (cmd(view, event))
+                        if (cmd(view, event)) {
+                            if (binding.stopPropagation)
+                                stopPropagation = true;
                             return true;
+                        }
                     }
-                if (binding.preventDefault)
-                    fallthrough = true;
+                if (binding.preventDefault) {
+                    if (binding.stopPropagation)
+                        stopPropagation = true;
+                    prevented = true;
+                }
             }
             return false;
         };
         let scopeObj = map[scope], baseName, shiftName;
         if (scopeObj) {
-            if (runFor(scopeObj[prefix + modifiers(name, event, !isChar)]))
-                return true;
-            if (isChar && (event.altKey || event.metaKey || event.ctrlKey) &&
+            if (runFor(scopeObj[prefix + modifiers(name, event, !isChar)])) {
+                handled = true;
+            }
+            else if (isChar && (event.altKey || event.metaKey || event.ctrlKey) &&
                 // Ctrl-Alt may be used for AltGr on Windows
                 !(browser.windows && event.ctrlKey && event.altKey) &&
                 (baseName = base[event.keyCode]) && baseName != name) {
-                if (runFor(scopeObj[prefix + modifiers(baseName, event, true)]))
-                    return true;
+                if (runFor(scopeObj[prefix + modifiers(baseName, event, true)])) {
+                    handled = true;
+                }
                 else if (event.shiftKey && (shiftName = shift[event.keyCode]) != name && shiftName != baseName &&
-                    runFor(scopeObj[prefix + modifiers(shiftName, event, false)]))
-                    return true;
+                    runFor(scopeObj[prefix + modifiers(shiftName, event, false)])) {
+                    handled = true;
+                }
             }
-            else if (isChar && event.shiftKey) {
-                if (runFor(scopeObj[prefix + modifiers(name, event, true)]))
-                    return true;
+            else if (isChar && event.shiftKey &&
+                runFor(scopeObj[prefix + modifiers(name, event, true)])) {
+                handled = true;
             }
-            if (runFor(scopeObj._any))
-                return true;
+            if (!handled && runFor(scopeObj._any))
+                handled = true;
         }
-        return fallthrough;
+        if (prevented)
+            handled = true;
+        if (handled && stopPropagation)
+            event.stopPropagation();
+        return handled;
     }
 
     /**
@@ -13006,7 +12995,9 @@
         return ViewPlugin.fromClass(class {
             constructor(view) {
                 this.view = view;
-                this.placeholder = Decoration.set([Decoration.widget({ widget: new Placeholder(content), side: 1 }).range(0)]);
+                this.placeholder = content
+                    ? Decoration.set([Decoration.widget({ widget: new Placeholder(content), side: 1 }).range(0)])
+                    : Decoration.none;
             }
             get decorations() { return this.view.state.doc.length ? Decoration.none : this.placeholder; }
         }, { decorations: v => v.decorations });
@@ -19004,6 +18995,8 @@
             this.any = [];
             this.precise = [];
             this.byWord = [];
+            this.score = 0;
+            this.matched = [];
             for (let p = 0; p < pattern.length;) {
                 let char = codePointAt(pattern, p), size = codePointSize(char);
                 this.chars.push(char);
@@ -19013,18 +19006,23 @@
             }
             this.astral = pattern.length != this.chars.length;
         }
+        ret(score, matched) {
+            this.score = score;
+            this.matched = matched;
+            return true;
+        }
         // Matches a given word (completion) against the pattern (input).
-        // Will return null for no match, and otherwise an array that starts
-        // with the match score, followed by any number of `from, to` pairs
-        // indicating the matched parts of `word`.
+        // Will return a boolean indicating whether there was a match and,
+        // on success, set `this.score` to the score, `this.matched` to an
+        // array of `from, to` pairs indicating the matched parts of `word`.
         //
         // The score is a number that is more negative the worse the match
         // is. See `Penalty` above.
         match(word) {
             if (this.pattern.length == 0)
-                return [-100 /* NotFull */];
+                return this.ret(-100 /* NotFull */, []);
             if (word.length < this.pattern.length)
-                return null;
+                return false;
             let { chars, folded, any, precise, byWord } = this;
             // For single-character queries, only match when they occur right
             // at the start
@@ -19035,12 +19033,12 @@
                 else if (first == folded[0])
                     score += -200 /* CaseFold */;
                 else
-                    return null;
-                return [score, 0, firstSize];
+                    return false;
+                return this.ret(score, [0, firstSize]);
             }
             let direct = word.indexOf(this.pattern);
             if (direct == 0)
-                return [word.length == this.pattern.length ? 0 : -100 /* NotFull */, 0, this.pattern.length];
+                return this.ret(word.length == this.pattern.length ? 0 : -100 /* NotFull */, [0, this.pattern.length]);
             let len = chars.length, anyTo = 0;
             if (direct < 0) {
                 for (let i = 0, e = Math.min(word.length, 200); i < e && anyTo < len;) {
@@ -19051,7 +19049,7 @@
                 }
                 // No match, exit immediately
                 if (anyTo < len)
-                    return null;
+                    return false;
             }
             // This tracks the extent of the precise (non-folded, not
             // necessarily adjacent) match
@@ -19096,28 +19094,29 @@
             if (byWordTo == len && byWord[0] == 0 && wordAdjacent)
                 return this.result(-100 /* ByWord */ + (byWordFolded ? -200 /* CaseFold */ : 0), byWord, word);
             if (adjacentTo == len && adjacentStart == 0)
-                return [-200 /* CaseFold */ - word.length + (adjacentEnd == word.length ? 0 : -100 /* NotFull */), 0, adjacentEnd];
+                return this.ret(-200 /* CaseFold */ - word.length + (adjacentEnd == word.length ? 0 : -100 /* NotFull */), [0, adjacentEnd]);
             if (direct > -1)
-                return [-700 /* NotStart */ - word.length, direct, direct + this.pattern.length];
+                return this.ret(-700 /* NotStart */ - word.length, [direct, direct + this.pattern.length]);
             if (adjacentTo == len)
-                return [-200 /* CaseFold */ + -700 /* NotStart */ - word.length, adjacentStart, adjacentEnd];
+                return this.ret(-200 /* CaseFold */ + -700 /* NotStart */ - word.length, [adjacentStart, adjacentEnd]);
             if (byWordTo == len)
                 return this.result(-100 /* ByWord */ + (byWordFolded ? -200 /* CaseFold */ : 0) + -700 /* NotStart */ +
                     (wordAdjacent ? 0 : -1100 /* Gap */), byWord, word);
-            return chars.length == 2 ? null : this.result((any[0] ? -700 /* NotStart */ : 0) + -200 /* CaseFold */ + -1100 /* Gap */, any, word);
+            return chars.length == 2 ? false
+                : this.result((any[0] ? -700 /* NotStart */ : 0) + -200 /* CaseFold */ + -1100 /* Gap */, any, word);
         }
         result(score, positions, word) {
-            let result = [score - word.length], i = 1;
+            let result = [], i = 0;
             for (let pos of positions) {
                 let to = pos + (this.astral ? codePointSize(codePointAt(word, pos)) : 1);
-                if (i > 1 && result[i - 1] == pos)
+                if (i && result[i - 1] == pos)
                     result[i - 1] = to;
                 else {
                     result[i++] = pos;
                     result[i++] = to;
                 }
             }
-            return result;
+            return this.ret(score - word.length, result);
         }
     }
 
@@ -19200,8 +19199,8 @@
             render(completion, _s, match) {
                 let labelElt = document.createElement("span");
                 labelElt.className = "cm-completionLabel";
-                let { label } = completion, off = 0;
-                for (let j = 1; j < match.length;) {
+                let label = completion.displayLabel || completion.label, off = 0;
+                for (let j = 0; j < match.length;) {
                     let from = match[j++], to = match[j++];
                     if (from > off)
                         labelElt.appendChild(document.createTextNode(label.slice(off, from)));
@@ -19499,21 +19498,18 @@
         };
         for (let a of active)
             if (a.hasResult()) {
+                let getMatch = a.result.getMatch;
                 if (a.result.filter === false) {
-                    let getMatch = a.result.getMatch;
                     for (let option of a.result.options) {
-                        let match = [1e9 - options.length];
-                        if (getMatch)
-                            for (let n of getMatch(option))
-                                match.push(n);
-                        addOption(new Option(option, a.source, match, match[0]));
+                        addOption(new Option(option, a.source, getMatch ? getMatch(option) : [], 1e9 - options.length));
                     }
                 }
                 else {
-                    let matcher = new FuzzyMatcher(state.sliceDoc(a.from, a.to)), match;
+                    let matcher = new FuzzyMatcher(state.sliceDoc(a.from, a.to));
                     for (let option of a.result.options)
-                        if (match = matcher.match(option.label)) {
-                            addOption(new Option(option, a.source, match, match[0] + (option.boost || 0)));
+                        if (matcher.match(option.label)) {
+                            let matched = !option.displayLabel ? matcher.matched : getMatch ? getMatch(option, matcher.matched) : [];
+                            addOption(new Option(option, a.source, matched, matcher.score + (option.boost || 0)));
                         }
                 }
             }
@@ -20253,7 +20249,7 @@
         return (editor, completion, from, to) => {
             let { text, ranges } = snippet.instantiate(editor.state, from);
             let spec = {
-                changes: { from, to, insert: Text.of(text) },
+                changes: { from, to, insert: Text$1.of(text) },
                 scrollIntoView: true,
                 annotations: completion ? pickedCompletion.of(completion) : undefined
             };
@@ -22396,7 +22392,7 @@
         if (state.readOnly)
             return false;
         let changes = state.changeByRange(range => {
-            return { changes: { from: range.from, to: range.to, insert: Text.of(["", ""]) },
+            return { changes: { from: range.from, to: range.to, insert: Text$1.of(["", ""]) },
                 range: EditorSelection.cursor(range.from) };
         });
         dispatch(state.update(changes, { scrollIntoView: true, userEvent: "input" }));
@@ -22561,7 +22557,7 @@
                 let insert = ["", indentString(state, indent)];
                 if (explode)
                     insert.push(indentString(state, cx.lineIndent(line.from, -1)));
-                return { changes: { from, to, insert: Text.of(insert) },
+                return { changes: { from, to, insert: Text$1.of(insert) },
                     range: EditorSelection.cursor(from + 1 + insert[1].length) };
             });
             dispatch(state.update(changes, { scrollIntoView: true, userEvent: "input" }));
@@ -24781,7 +24777,7 @@
       propSources: [htmlHighlighting],
       skippedNodes: [0],
       repeatNodeCount: 9,
-      tokenData: "#%g!aR!YOX$qXY,QYZ,QZ[$q[]&X]^,Q^p$qpq,Qqr-_rs4ysv-_vw5iwxJ^x}-_}!OKP!O!P-_!P!Q$q!Q![-_![!]!!O!]!^-_!^!_!&W!_!`#$o!`!a&X!a!c-_!c!}!!O!}#R-_#R#S!!O#S#T3V#T#o!!O#o#s-_#s$f$q$f%W-_%W%o!!O%o%p-_%p&a!!O&a&b-_&b1p!!O1p4U-_4U4d!!O4d4e-_4e$IS!!O$IS$I`-_$I`$Ib!!O$Ib$Kh-_$Kh%#t!!O%#t&/x-_&/x&Et!!O&Et&FV-_&FV;'S!!O;'S;:j!&Q;:j;=`4s<%l?&r-_?&r?Ah!!O?Ah?BY$q?BY?Mn!!O?MnO$q!Z$|c`PkW!a`!cpOX$qXZ&XZ[$q[^&X^p$qpq&Xqr$qrs&}sv$qvw+Pwx(tx!^$q!^!_*V!_!a&X!a#S$q#S#T&X#T;'S$q;'S;=`+z<%lO$q!R&bX`P!a`!cpOr&Xrs&}sv&Xwx(tx!^&X!^!_*V!_;'S&X;'S;=`*y<%lO&Xq'UV`P!cpOv&}wx'kx!^&}!^!_(V!_;'S&};'S;=`(n<%lO&}P'pT`POv'kw!^'k!_;'S'k;'S;=`(P<%lO'kP(SP;=`<%l'kp([S!cpOv(Vx;'S(V;'S;=`(h<%lO(Vp(kP;=`<%l(Vq(qP;=`<%l&}a({W`P!a`Or(trs'ksv(tw!^(t!^!_)e!_;'S(t;'S;=`*P<%lO(t`)jT!a`Or)esv)ew;'S)e;'S;=`)y<%lO)e`)|P;=`<%l)ea*SP;=`<%l(t!Q*^V!a`!cpOr*Vrs(Vsv*Vwx)ex;'S*V;'S;=`*s<%lO*V!Q*vP;=`<%l*V!R*|P;=`<%l&XW+UYkWOX+PZ[+P^p+Pqr+Psw+Px!^+P!a#S+P#T;'S+P;'S;=`+t<%lO+PW+wP;=`<%l+P!Z+}P;=`<%l$q!a,]``P!a`!cp!^^OX&XXY,QYZ,QZ]&X]^,Q^p&Xpq,Qqr&Xrs&}sv&Xwx(tx!^&X!^!_*V!_;'S&X;'S;=`*y<%lO&X!_-ljhS`PkW!a`!cpOX$qXZ&XZ[$q[^&X^p$qpq&Xqr-_rs&}sv-_vw/^wx(tx!P-_!P!Q$q!Q!^-_!^!_1n!_!a&X!a#S-_#S#T3V#T#s-_#s$f$q$f;'S-_;'S;=`4s<%l?Ah-_?Ah?BY$q?BY?Mn-_?MnO$q[/echSkWOX+PZ[+P^p+Pqr/^sw/^x!P/^!P!Q+P!Q!^/^!^!_0p!a#S/^#S#T0p#T#s/^#s$f+P$f;'S/^;'S;=`1h<%l?Ah/^?Ah?BY+P?BY?Mn/^?MnO+PS0uXhSqr0psw0px!P0p!Q!_0p!a#s0p$f;'S0p;'S;=`1b<%l?Ah0p?BY?Mn0pS1eP;=`<%l0p[1kP;=`<%l/^!U1wbhS!a`!cpOq*Vqr1nrs(Vsv1nvw0pwx)ex!P1n!P!Q*V!Q!_1n!_!a*V!a#s1n#s$f*V$f;'S1n;'S;=`3P<%l?Ah1n?Ah?BY*V?BY?Mn1n?MnO*V!U3SP;=`<%l1n!V3bchS`P!a`!cpOq&Xqr3Vrs&}sv3Vvw0pwx(tx!P3V!P!Q&X!Q!^3V!^!_1n!_!a&X!a#s3V#s$f&X$f;'S3V;'S;=`4m<%l?Ah3V?Ah?BY&X?BY?Mn3V?MnO&X!V4pP;=`<%l3V!_4vP;=`<%l-_!Z5SV!`h`P!cpOv&}wx'kx!^&}!^!_(V!_;'S&};'S;=`(n<%lO&}!_5rjhSkWc!ROX7dXZ8qZ[7d[^8q^p7dqr:crs8qst@Ttw:cwx8qx!P:c!P!Q7d!Q!]:c!]!^/^!^!_=p!_!a8q!a#S:c#S#T=p#T#s:c#s$f7d$f;'S:c;'S;=`?}<%l?Ah:c?Ah?BY7d?BY?Mn:c?MnO7d!Z7ibkWOX7dXZ8qZ[7d[^8q^p7dqr7drs8qst+Ptw7dwx8qx!]7d!]!^9f!^!a8q!a#S7d#S#T8q#T;'S7d;'S;=`:]<%lO7d!R8tVOp8qqs8qt!]8q!]!^9Z!^;'S8q;'S;=`9`<%lO8q!R9`Oa!R!R9cP;=`<%l8q!Z9mYkWa!ROX+PZ[+P^p+Pqr+Psw+Px!^+P!a#S+P#T;'S+P;'S;=`+t<%lO+P!Z:`P;=`<%l7d!_:jjhSkWOX7dXZ8qZ[7d[^8q^p7dqr:crs8qst/^tw:cwx8qx!P:c!P!Q7d!Q!]:c!]!^<[!^!_=p!_!a8q!a#S:c#S#T=p#T#s:c#s$f7d$f;'S:c;'S;=`?}<%l?Ah:c?Ah?BY7d?BY?Mn:c?MnO7d!_<echSkWa!ROX+PZ[+P^p+Pqr/^sw/^x!P/^!P!Q+P!Q!^/^!^!_0p!a#S/^#S#T0p#T#s/^#s$f+P$f;'S/^;'S;=`1h<%l?Ah/^?Ah?BY+P?BY?Mn/^?MnO+P!V=udhSOp8qqr=prs8qst0ptw=pwx8qx!P=p!P!Q8q!Q!]=p!]!^?T!^!_=p!_!a8q!a#s=p#s$f8q$f;'S=p;'S;=`?w<%l?Ah=p?Ah?BY8q?BY?Mn=p?MnO8q!V?[XhSa!Rqr0psw0px!P0p!Q!_0p!a#s0p$f;'S0p;'S;=`1b<%l?Ah0p?BY?Mn0p!V?zP;=`<%l=p!_@QP;=`<%l:c!_@[ihSkWOXAyXZCTZ[Ay[^CT^pAyqrDrrsCTswDrwxCTx!PDr!P!QAy!Q!]Dr!]!^/^!^!_G|!_!aCT!a#SDr#S#TG|#T#sDr#s$fAy$f;'SDr;'S;=`JW<%l?AhDr?Ah?BYAy?BY?MnDr?MnOAy!ZBOakWOXAyXZCTZ[Ay[^CT^pAyqrAyrsCTswAywxCTx!]Ay!]!^Cu!^!aCT!a#SAy#S#TCT#T;'SAy;'S;=`Dl<%lOAy!RCWUOpCTq!]CT!]!^Cj!^;'SCT;'S;=`Co<%lOCT!RCoOb!R!RCrP;=`<%lCT!ZC|YkWb!ROX+PZ[+P^p+Pqr+Psw+Px!^+P!a#S+P#T;'S+P;'S;=`+t<%lO+P!ZDoP;=`<%lAy!_DyihSkWOXAyXZCTZ[Ay[^CT^pAyqrDrrsCTswDrwxCTx!PDr!P!QAy!Q!]Dr!]!^Fh!^!_G|!_!aCT!a#SDr#S#TG|#T#sDr#s$fAy$f;'SDr;'S;=`JW<%l?AhDr?Ah?BYAy?BY?MnDr?MnOAy!_FqchSkWb!ROX+PZ[+P^p+Pqr/^sw/^x!P/^!P!Q+P!Q!^/^!^!_0p!a#S/^#S#T0p#T#s/^#s$f+P$f;'S/^;'S;=`1h<%l?Ah/^?Ah?BY+P?BY?Mn/^?MnO+P!VHRchSOpCTqrG|rsCTswG|wxCTx!PG|!P!QCT!Q!]G|!]!^I^!^!_G|!_!aCT!a#sG|#s$fCT$f;'SG|;'S;=`JQ<%l?AhG|?Ah?BYCT?BY?MnG|?MnOCT!VIeXhSb!Rqr0psw0px!P0p!Q!_0p!a#s0p$f;'S0p;'S;=`1b<%l?Ah0p?BY?Mn0p!VJTP;=`<%lG|!_JZP;=`<%lDr!ZJgW!bx`P!a`Or(trs'ksv(tw!^(t!^!_)e!_;'S(t;'S;=`*P<%lO(t!aK^lhS`PkW!a`!cpOX$qXZ&XZ[$q[^&X^p$qpq&Xqr-_rs&}sv-_vw/^wx(tx}-_}!OMU!O!P-_!P!Q$q!Q!^-_!^!_1n!_!a&X!a#S-_#S#T3V#T#s-_#s$f$q$f;'S-_;'S;=`4s<%l?Ah-_?Ah?BY$q?BY?Mn-_?MnO$q!aMckhS`PkW!a`!cpOX$qXZ&XZ[$q[^&X^p$qpq&Xqr-_rs&}sv-_vw/^wx(tx!P-_!P!Q$q!Q!^-_!^!_1n!_!`&X!`!a! W!a#S-_#S#T3V#T#s-_#s$f$q$f;'S-_;'S;=`4s<%l?Ah-_?Ah?BY$q?BY?Mn-_?MnO$q!T! cX`P!a`!cp!eQOr&Xrs&}sv&Xwx(tx!^&X!^!_*V!_;'S&X;'S;=`*y<%lO&X!a!!_!ZhSfQ`PkW!a`!cpOX$qXZ&XZ[$q[^&X^p$qpq&Xqr-_rs&}sv-_vw/^wx(tx}-_}!O!!O!O!P!!O!P!Q$q!Q![!!O![!]!!O!]!^-_!^!_1n!_!a&X!a!c-_!c!}!!O!}#R-_#R#S!!O#S#T3V#T#o!!O#o#s-_#s$f$q$f$}-_$}%O!!O%O%W-_%W%o!!O%o%p-_%p&a!!O&a&b-_&b1p!!O1p4U!!O4U4d!!O4d4e-_4e$IS!!O$IS$I`-_$I`$Ib!!O$Ib$Je-_$Je$Jg!!O$Jg$Kh-_$Kh%#t!!O%#t&/x-_&/x&Et!!O&Et&FV-_&FV;'S!!O;'S;:j!&Q;:j;=`4s<%l?&r-_?&r?Ah!!O?Ah?BY$q?BY?Mn!!O?MnO$q!a!&TP;=`<%l!!O!V!&achS!a`!cpOq*Vqr!'lrs(Vsv1nvw0pwx)ex!P1n!P!Q*V!Q!_1n!_!a*V!a!b!Ey!b#s1n#s$f*V$f;'S1n;'S;=`3P<%l?Ah1n?Ah?BY*V?BY?Mn1n?MnO*V!V!'uhhS!a`!cpOq*Vqr1nrs(Vsv1nvw0pwx)ex}1n}!O!)a!O!P1n!P!Q*V!Q!_1n!_!a*V!a!f1n!f!g!,]!g#W1n#W#X!<y#X#s1n#s$f*V$f;'S1n;'S;=`3P<%l?Ah1n?Ah?BY*V?BY?Mn1n?MnO*V!V!)jdhS!a`!cpOq*Vqr1nrs(Vsv1nvw0pwx)ex}1n}!O!*x!O!P1n!P!Q*V!Q!_1n!_!a*V!a#s1n#s$f*V$f;'S1n;'S;=`3P<%l?Ah1n?Ah?BY*V?BY?Mn1n?MnO*V!V!+TbhS!a`!cp!dPOq*Vqr1nrs(Vsv1nvw0pwx)ex!P1n!P!Q*V!Q!_1n!_!a*V!a#s1n#s$f*V$f;'S1n;'S;=`3P<%l?Ah1n?Ah?BY*V?BY?Mn1n?MnO*V!V!,fdhS!a`!cpOq*Vqr1nrs(Vsv1nvw0pwx)ex!P1n!P!Q*V!Q!_1n!_!a*V!a!q1n!q!r!-t!r#s1n#s$f*V$f;'S1n;'S;=`3P<%l?Ah1n?Ah?BY*V?BY?Mn1n?MnO*V!V!-}dhS!a`!cpOq*Vqr1nrs(Vsv1nvw0pwx)ex!P1n!P!Q*V!Q!_1n!_!a*V!a!e1n!e!f!/]!f#s1n#s$f*V$f;'S1n;'S;=`3P<%l?Ah1n?Ah?BY*V?BY?Mn1n?MnO*V!V!/fdhS!a`!cpOq*Vqr1nrs(Vsv1nvw0pwx)ex!P1n!P!Q*V!Q!_1n!_!a*V!a!v1n!v!w!0t!w#s1n#s$f*V$f;'S1n;'S;=`3P<%l?Ah1n?Ah?BY*V?BY?Mn1n?MnO*V!V!0}dhS!a`!cpOq*Vqr1nrs(Vsv1nvw0pwx)ex!P1n!P!Q*V!Q!_1n!_!a*V!a!{1n!{!|!2]!|#s1n#s$f*V$f;'S1n;'S;=`3P<%l?Ah1n?Ah?BY*V?BY?Mn1n?MnO*V!V!2fdhS!a`!cpOq*Vqr1nrs(Vsv1nvw0pwx)ex!P1n!P!Q*V!Q!_1n!_!a*V!a!r1n!r!s!3t!s#s1n#s$f*V$f;'S1n;'S;=`3P<%l?Ah1n?Ah?BY*V?BY?Mn1n?MnO*V!V!3}dhS!a`!cpOq*Vqr1nrs(Vsv1nvw0pwx)ex!P1n!P!Q*V!Q!_1n!_!a*V!a!g1n!g!h!5]!h#s1n#s$f*V$f;'S1n;'S;=`3P<%l?Ah1n?Ah?BY*V?BY?Mn1n?MnO*V!V!5fchS!a`!cpOq!6qqr!5]rs!7hsv!5]vw!;`wx!9[x!P!5]!P!Q!6q!Q!_!5]!_!`!6q!`!a!:j!a#s!5]#s$f!6q$f;'S!5];'S;=`!<s<%l?Ah!5]?Ah?BY!6q?BY?Mn!5]?MnO!6q!R!6xY!a`!cpOr!6qrs!7hsv!6qvw!8Swx!9[x!`!6q!`!a!:j!a;'S!6q;'S;=`!;Y<%lO!6qq!7mV!cpOv!7hvx!8Sx!`!7h!`!a!8q!a;'S!7h;'S;=`!9U<%lO!7hP!8VTO!`!8S!`!a!8f!a;'S!8S;'S;=`!8k<%lO!8SP!8kO{PP!8nP;=`<%l!8Sq!8xS!cp{POv(Vx;'S(V;'S;=`(h<%lO(Vq!9XP;=`<%l!7ha!9aX!a`Or!9[rs!8Ssv!9[vw!8Sw!`!9[!`!a!9|!a;'S!9[;'S;=`!:d<%lO!9[a!:TT!a`{POr)esv)ew;'S)e;'S;=`)y<%lO)ea!:gP;=`<%l!9[!R!:sV!a`!cp{POr*Vrs(Vsv*Vwx)ex;'S*V;'S;=`*s<%lO*V!R!;]P;=`<%l!6qT!;ebhSOq!8Sqr!;`rs!8Ssw!;`wx!8Sx!P!;`!P!Q!8S!Q!_!;`!_!`!8S!`!a!8f!a#s!;`#s$f!8S$f;'S!;`;'S;=`!<m<%l?Ah!;`?Ah?BY!8S?BY?Mn!;`?MnO!8ST!<pP;=`<%l!;`!V!<vP;=`<%l!5]!V!=SdhS!a`!cpOq*Vqr1nrs(Vsv1nvw0pwx)ex!P1n!P!Q*V!Q!_1n!_!a*V!a#c1n#c#d!>b#d#s1n#s$f*V$f;'S1n;'S;=`3P<%l?Ah1n?Ah?BY*V?BY?Mn1n?MnO*V!V!>kdhS!a`!cpOq*Vqr1nrs(Vsv1nvw0pwx)ex!P1n!P!Q*V!Q!_1n!_!a*V!a#V1n#V#W!?y#W#s1n#s$f*V$f;'S1n;'S;=`3P<%l?Ah1n?Ah?BY*V?BY?Mn1n?MnO*V!V!@SdhS!a`!cpOq*Vqr1nrs(Vsv1nvw0pwx)ex!P1n!P!Q*V!Q!_1n!_!a*V!a#h1n#h#i!Ab#i#s1n#s$f*V$f;'S1n;'S;=`3P<%l?Ah1n?Ah?BY*V?BY?Mn1n?MnO*V!V!AkdhS!a`!cpOq*Vqr1nrs(Vsv1nvw0pwx)ex!P1n!P!Q*V!Q!_1n!_!a*V!a#m1n#m#n!By#n#s1n#s$f*V$f;'S1n;'S;=`3P<%l?Ah1n?Ah?BY*V?BY?Mn1n?MnO*V!V!CSdhS!a`!cpOq*Vqr1nrs(Vsv1nvw0pwx)ex!P1n!P!Q*V!Q!_1n!_!a*V!a#d1n#d#e!Db#e#s1n#s$f*V$f;'S1n;'S;=`3P<%l?Ah1n?Ah?BY*V?BY?Mn1n?MnO*V!V!DkdhS!a`!cpOq*Vqr1nrs(Vsv1nvw0pwx)ex!P1n!P!Q*V!Q!_1n!_!a*V!a#X1n#X#Y!5]#Y#s1n#s$f*V$f;'S1n;'S;=`3P<%l?Ah1n?Ah?BY*V?BY?Mn1n?MnO*V!V!FSchS!a`!cpOq!G_qr!Eyrs!HUsv!Eyvw!Ncwx!Jvx!P!Ey!P!Q!G_!Q!_!Ey!_!a!G_!a!b##T!b#s!Ey#s$f!G_$f;'S!Ey;'S;=`#$i<%l?Ah!Ey?Ah?BY!G_?BY?Mn!Ey?MnO!G_!R!GfY!a`!cpOr!G_rs!HUsv!G_vw!Hpwx!Jvx!a!G_!a!b!Lv!b;'S!G_;'S;=`!N]<%lO!G_q!HZV!cpOv!HUvx!Hpx!a!HU!a!b!Iq!b;'S!HU;'S;=`!Jp<%lO!HUP!HsTO!a!Hp!a!b!IS!b;'S!Hp;'S;=`!Ik<%lO!HpP!IVTO!`!Hp!`!a!If!a;'S!Hp;'S;=`!Ik<%lO!HpP!IkOxPP!InP;=`<%l!Hpq!IvV!cpOv!HUvx!Hpx!`!HU!`!a!J]!a;'S!HU;'S;=`!Jp<%lO!HUq!JdS!cpxPOv(Vx;'S(V;'S;=`(h<%lO(Vq!JsP;=`<%l!HUa!J{X!a`Or!Jvrs!Hpsv!Jvvw!Hpw!a!Jv!a!b!Kh!b;'S!Jv;'S;=`!Lp<%lO!Jva!KmX!a`Or!Jvrs!Hpsv!Jvvw!Hpw!`!Jv!`!a!LY!a;'S!Jv;'S;=`!Lp<%lO!Jva!LaT!a`xPOr)esv)ew;'S)e;'S;=`)y<%lO)ea!LsP;=`<%l!Jv!R!L}Y!a`!cpOr!G_rs!HUsv!G_vw!Hpwx!Jvx!`!G_!`!a!Mm!a;'S!G_;'S;=`!N]<%lO!G_!R!MvV!a`!cpxPOr*Vrs(Vsv*Vwx)ex;'S*V;'S;=`*s<%lO*V!R!N`P;=`<%l!G_T!NhbhSOq!Hpqr!Ncrs!Hpsw!Ncwx!Hpx!P!Nc!P!Q!Hp!Q!_!Nc!_!a!Hp!a!b# p!b#s!Nc#s$f!Hp$f;'S!Nc;'S;=`#!}<%l?Ah!Nc?Ah?BY!Hp?BY?Mn!Nc?MnO!HpT# ubhSOq!Hpqr!Ncrs!Hpsw!Ncwx!Hpx!P!Nc!P!Q!Hp!Q!_!Nc!_!`!Hp!`!a!If!a#s!Nc#s$f!Hp$f;'S!Nc;'S;=`#!}<%l?Ah!Nc?Ah?BY!Hp?BY?Mn!Nc?MnO!HpT##QP;=`<%l!Nc!V##^chS!a`!cpOq!G_qr!Eyrs!HUsv!Eyvw!Ncwx!Jvx!P!Ey!P!Q!G_!Q!_!Ey!_!`!G_!`!a!Mm!a#s!Ey#s$f!G_$f;'S!Ey;'S;=`#$i<%l?Ah!Ey?Ah?BY!G_?BY?Mn!Ey?MnO!G_!V#$lP;=`<%l!Ey!V#$zXiS`P!a`!cpOr&Xrs&}sv&Xwx(tx!^&X!^!_*V!_;'S&X;'S;=`*y<%lO&X",
+      tokenData: "!<p!aR!YOX$qXY,QYZ,QZ[$q[]&X]^,Q^p$qpq,Qqr-_rs3_sv-_vw3}wxHYx}-_}!OH{!O!P-_!P!Q$q!Q![-_![!]Mz!]!^-_!^!_!$S!_!`!;x!`!a&X!a!c-_!c!}Mz!}#R-_#R#SMz#S#T1k#T#oMz#o#s-_#s$f$q$f%W-_%W%oMz%o%p-_%p&aMz&a&b-_&b1pMz1p4U-_4U4dMz4d4e-_4e$ISMz$IS$I`-_$I`$IbMz$Ib$Kh-_$Kh%#tMz%#t&/x-_&/x&EtMz&Et&FV-_&FV;'SMz;'S;:j!#|;:j;=`3X<%l?&r-_?&r?AhMz?Ah?BY$q?BY?MnMz?MnO$q!Z$|c`PkW!a`!cpOX$qXZ&XZ[$q[^&X^p$qpq&Xqr$qrs&}sv$qvw+Pwx(tx!^$q!^!_*V!_!a&X!a#S$q#S#T&X#T;'S$q;'S;=`+z<%lO$q!R&bX`P!a`!cpOr&Xrs&}sv&Xwx(tx!^&X!^!_*V!_;'S&X;'S;=`*y<%lO&Xq'UV`P!cpOv&}wx'kx!^&}!^!_(V!_;'S&};'S;=`(n<%lO&}P'pT`POv'kw!^'k!_;'S'k;'S;=`(P<%lO'kP(SP;=`<%l'kp([S!cpOv(Vx;'S(V;'S;=`(h<%lO(Vp(kP;=`<%l(Vq(qP;=`<%l&}a({W`P!a`Or(trs'ksv(tw!^(t!^!_)e!_;'S(t;'S;=`*P<%lO(t`)jT!a`Or)esv)ew;'S)e;'S;=`)y<%lO)e`)|P;=`<%l)ea*SP;=`<%l(t!Q*^V!a`!cpOr*Vrs(Vsv*Vwx)ex;'S*V;'S;=`*s<%lO*V!Q*vP;=`<%l*V!R*|P;=`<%l&XW+UYkWOX+PZ[+P^p+Pqr+Psw+Px!^+P!a#S+P#T;'S+P;'S;=`+t<%lO+PW+wP;=`<%l+P!Z+}P;=`<%l$q!a,]``P!a`!cp!^^OX&XXY,QYZ,QZ]&X]^,Q^p&Xpq,Qqr&Xrs&}sv&Xwx(tx!^&X!^!_*V!_;'S&X;'S;=`*y<%lO&X!_-ljhS`PkW!a`!cpOX$qXZ&XZ[$q[^&X^p$qpq&Xqr-_rs&}sv-_vw/^wx(tx!P-_!P!Q$q!Q!^-_!^!_*V!_!a&X!a#S-_#S#T1k#T#s-_#s$f$q$f;'S-_;'S;=`3X<%l?Ah-_?Ah?BY$q?BY?Mn-_?MnO$q[/ebhSkWOX+PZ[+P^p+Pqr/^sw/^x!P/^!P!Q+P!Q!^/^!a#S/^#S#T0m#T#s/^#s$f+P$f;'S/^;'S;=`1e<%l?Ah/^?Ah?BY+P?BY?Mn/^?MnO+PS0rXhSqr0msw0mx!P0m!Q!^0m!a#s0m$f;'S0m;'S;=`1_<%l?Ah0m?BY?Mn0mS1bP;=`<%l0m[1hP;=`<%l/^!V1vchS`P!a`!cpOq&Xqr1krs&}sv1kvw0mwx(tx!P1k!P!Q&X!Q!^1k!^!_*V!_!a&X!a#s1k#s$f&X$f;'S1k;'S;=`3R<%l?Ah1k?Ah?BY&X?BY?Mn1k?MnO&X!V3UP;=`<%l1k!_3[P;=`<%l-_!Z3hV!`h`P!cpOv&}wx'kx!^&}!^!_(V!_;'S&};'S;=`(n<%lO&}!_4WihSkWc!ROX5uXZ7SZ[5u[^7S^p5uqr8trs7Sst>]tw8twx7Sx!P8t!P!Q5u!Q!]8t!]!^/^!^!a7S!a#S8t#S#T;{#T#s8t#s$f5u$f;'S8t;'S;=`>V<%l?Ah8t?Ah?BY5u?BY?Mn8t?MnO5u!Z5zbkWOX5uXZ7SZ[5u[^7S^p5uqr5urs7Sst+Ptw5uwx7Sx!]5u!]!^7w!^!a7S!a#S5u#S#T7S#T;'S5u;'S;=`8n<%lO5u!R7VVOp7Sqs7St!]7S!]!^7l!^;'S7S;'S;=`7q<%lO7S!R7qOa!R!R7tP;=`<%l7S!Z8OYkWa!ROX+PZ[+P^p+Pqr+Psw+Px!^+P!a#S+P#T;'S+P;'S;=`+t<%lO+P!Z8qP;=`<%l5u!_8{ihSkWOX5uXZ7SZ[5u[^7S^p5uqr8trs7Sst/^tw8twx7Sx!P8t!P!Q5u!Q!]8t!]!^:j!^!a7S!a#S8t#S#T;{#T#s8t#s$f5u$f;'S8t;'S;=`>V<%l?Ah8t?Ah?BY5u?BY?Mn8t?MnO5u!_:sbhSkWa!ROX+PZ[+P^p+Pqr/^sw/^x!P/^!P!Q+P!Q!^/^!a#S/^#S#T0m#T#s/^#s$f+P$f;'S/^;'S;=`1e<%l?Ah/^?Ah?BY+P?BY?Mn/^?MnO+P!V<QchSOp7Sqr;{rs7Sst0mtw;{wx7Sx!P;{!P!Q7S!Q!];{!]!^=]!^!a7S!a#s;{#s$f7S$f;'S;{;'S;=`>P<%l?Ah;{?Ah?BY7S?BY?Mn;{?MnO7S!V=dXhSa!Rqr0msw0mx!P0m!Q!^0m!a#s0m$f;'S0m;'S;=`1_<%l?Ah0m?BY?Mn0m!V>SP;=`<%l;{!_>YP;=`<%l8t!_>dhhSkWOX@OXZAYZ[@O[^AY^p@OqrBwrsAYswBwwxAYx!PBw!P!Q@O!Q!]Bw!]!^/^!^!aAY!a#SBw#S#TE{#T#sBw#s$f@O$f;'SBw;'S;=`HS<%l?AhBw?Ah?BY@O?BY?MnBw?MnO@O!Z@TakWOX@OXZAYZ[@O[^AY^p@Oqr@OrsAYsw@OwxAYx!]@O!]!^Az!^!aAY!a#S@O#S#TAY#T;'S@O;'S;=`Bq<%lO@O!RA]UOpAYq!]AY!]!^Ao!^;'SAY;'S;=`At<%lOAY!RAtOb!R!RAwP;=`<%lAY!ZBRYkWb!ROX+PZ[+P^p+Pqr+Psw+Px!^+P!a#S+P#T;'S+P;'S;=`+t<%lO+P!ZBtP;=`<%l@O!_COhhSkWOX@OXZAYZ[@O[^AY^p@OqrBwrsAYswBwwxAYx!PBw!P!Q@O!Q!]Bw!]!^Dj!^!aAY!a#SBw#S#TE{#T#sBw#s$f@O$f;'SBw;'S;=`HS<%l?AhBw?Ah?BY@O?BY?MnBw?MnO@O!_DsbhSkWb!ROX+PZ[+P^p+Pqr/^sw/^x!P/^!P!Q+P!Q!^/^!a#S/^#S#T0m#T#s/^#s$f+P$f;'S/^;'S;=`1e<%l?Ah/^?Ah?BY+P?BY?Mn/^?MnO+P!VFQbhSOpAYqrE{rsAYswE{wxAYx!PE{!P!QAY!Q!]E{!]!^GY!^!aAY!a#sE{#s$fAY$f;'SE{;'S;=`G|<%l?AhE{?Ah?BYAY?BY?MnE{?MnOAY!VGaXhSb!Rqr0msw0mx!P0m!Q!^0m!a#s0m$f;'S0m;'S;=`1_<%l?Ah0m?BY?Mn0m!VHPP;=`<%lE{!_HVP;=`<%lBw!ZHcW!bx`P!a`Or(trs'ksv(tw!^(t!^!_)e!_;'S(t;'S;=`*P<%lO(t!aIYlhS`PkW!a`!cpOX$qXZ&XZ[$q[^&X^p$qpq&Xqr-_rs&}sv-_vw/^wx(tx}-_}!OKQ!O!P-_!P!Q$q!Q!^-_!^!_*V!_!a&X!a#S-_#S#T1k#T#s-_#s$f$q$f;'S-_;'S;=`3X<%l?Ah-_?Ah?BY$q?BY?Mn-_?MnO$q!aK_khS`PkW!a`!cpOX$qXZ&XZ[$q[^&X^p$qpq&Xqr-_rs&}sv-_vw/^wx(tx!P-_!P!Q$q!Q!^-_!^!_*V!_!`&X!`!aMS!a#S-_#S#T1k#T#s-_#s$f$q$f;'S-_;'S;=`3X<%l?Ah-_?Ah?BY$q?BY?Mn-_?MnO$q!TM_X`P!a`!cp!eQOr&Xrs&}sv&Xwx(tx!^&X!^!_*V!_;'S&X;'S;=`*y<%lO&X!aNZ!ZhSfQ`PkW!a`!cpOX$qXZ&XZ[$q[^&X^p$qpq&Xqr-_rs&}sv-_vw/^wx(tx}-_}!OMz!O!PMz!P!Q$q!Q![Mz![!]Mz!]!^-_!^!_*V!_!a&X!a!c-_!c!}Mz!}#R-_#R#SMz#S#T1k#T#oMz#o#s-_#s$f$q$f$}-_$}%OMz%O%W-_%W%oMz%o%p-_%p&aMz&a&b-_&b1pMz1p4UMz4U4dMz4d4e-_4e$ISMz$IS$I`-_$I`$IbMz$Ib$Je-_$Je$JgMz$Jg$Kh-_$Kh%#tMz%#t&/x-_&/x&EtMz&Et&FV-_&FV;'SMz;'S;:j!#|;:j;=`3X<%l?&r-_?&r?AhMz?Ah?BY$q?BY?MnMz?MnO$q!a!$PP;=`<%lMz!R!$ZY!a`!cpOq*Vqr!$yrs(Vsv*Vwx)ex!a*V!a!b!4t!b;'S*V;'S;=`*s<%lO*V!R!%Q]!a`!cpOr*Vrs(Vsv*Vwx)ex}*V}!O!%y!O!f*V!f!g!']!g#W*V#W#X!0`#X;'S*V;'S;=`*s<%lO*V!R!&QX!a`!cpOr*Vrs(Vsv*Vwx)ex}*V}!O!&m!O;'S*V;'S;=`*s<%lO*V!R!&vV!a`!cp!dPOr*Vrs(Vsv*Vwx)ex;'S*V;'S;=`*s<%lO*V!R!'dX!a`!cpOr*Vrs(Vsv*Vwx)ex!q*V!q!r!(P!r;'S*V;'S;=`*s<%lO*V!R!(WX!a`!cpOr*Vrs(Vsv*Vwx)ex!e*V!e!f!(s!f;'S*V;'S;=`*s<%lO*V!R!(zX!a`!cpOr*Vrs(Vsv*Vwx)ex!v*V!v!w!)g!w;'S*V;'S;=`*s<%lO*V!R!)nX!a`!cpOr*Vrs(Vsv*Vwx)ex!{*V!{!|!*Z!|;'S*V;'S;=`*s<%lO*V!R!*bX!a`!cpOr*Vrs(Vsv*Vwx)ex!r*V!r!s!*}!s;'S*V;'S;=`*s<%lO*V!R!+UX!a`!cpOr*Vrs(Vsv*Vwx)ex!g*V!g!h!+q!h;'S*V;'S;=`*s<%lO*V!R!+xY!a`!cpOr!+qrs!,hsv!+qvw!-Swx!.[x!`!+q!`!a!/j!a;'S!+q;'S;=`!0Y<%lO!+qq!,mV!cpOv!,hvx!-Sx!`!,h!`!a!-q!a;'S!,h;'S;=`!.U<%lO!,hP!-VTO!`!-S!`!a!-f!a;'S!-S;'S;=`!-k<%lO!-SP!-kO{PP!-nP;=`<%l!-Sq!-xS!cp{POv(Vx;'S(V;'S;=`(h<%lO(Vq!.XP;=`<%l!,ha!.aX!a`Or!.[rs!-Ssv!.[vw!-Sw!`!.[!`!a!.|!a;'S!.[;'S;=`!/d<%lO!.[a!/TT!a`{POr)esv)ew;'S)e;'S;=`)y<%lO)ea!/gP;=`<%l!.[!R!/sV!a`!cp{POr*Vrs(Vsv*Vwx)ex;'S*V;'S;=`*s<%lO*V!R!0]P;=`<%l!+q!R!0gX!a`!cpOr*Vrs(Vsv*Vwx)ex#c*V#c#d!1S#d;'S*V;'S;=`*s<%lO*V!R!1ZX!a`!cpOr*Vrs(Vsv*Vwx)ex#V*V#V#W!1v#W;'S*V;'S;=`*s<%lO*V!R!1}X!a`!cpOr*Vrs(Vsv*Vwx)ex#h*V#h#i!2j#i;'S*V;'S;=`*s<%lO*V!R!2qX!a`!cpOr*Vrs(Vsv*Vwx)ex#m*V#m#n!3^#n;'S*V;'S;=`*s<%lO*V!R!3eX!a`!cpOr*Vrs(Vsv*Vwx)ex#d*V#d#e!4Q#e;'S*V;'S;=`*s<%lO*V!R!4XX!a`!cpOr*Vrs(Vsv*Vwx)ex#X*V#X#Y!+q#Y;'S*V;'S;=`*s<%lO*V!R!4{Y!a`!cpOr!4trs!5ksv!4tvw!6Vwx!8]x!a!4t!a!b!:]!b;'S!4t;'S;=`!;r<%lO!4tq!5pV!cpOv!5kvx!6Vx!a!5k!a!b!7W!b;'S!5k;'S;=`!8V<%lO!5kP!6YTO!a!6V!a!b!6i!b;'S!6V;'S;=`!7Q<%lO!6VP!6lTO!`!6V!`!a!6{!a;'S!6V;'S;=`!7Q<%lO!6VP!7QOxPP!7TP;=`<%l!6Vq!7]V!cpOv!5kvx!6Vx!`!5k!`!a!7r!a;'S!5k;'S;=`!8V<%lO!5kq!7yS!cpxPOv(Vx;'S(V;'S;=`(h<%lO(Vq!8YP;=`<%l!5ka!8bX!a`Or!8]rs!6Vsv!8]vw!6Vw!a!8]!a!b!8}!b;'S!8];'S;=`!:V<%lO!8]a!9SX!a`Or!8]rs!6Vsv!8]vw!6Vw!`!8]!`!a!9o!a;'S!8];'S;=`!:V<%lO!8]a!9vT!a`xPOr)esv)ew;'S)e;'S;=`)y<%lO)ea!:YP;=`<%l!8]!R!:dY!a`!cpOr!4trs!5ksv!4tvw!6Vwx!8]x!`!4t!`!a!;S!a;'S!4t;'S;=`!;r<%lO!4t!R!;]V!a`!cpxPOr*Vrs(Vsv*Vwx)ex;'S*V;'S;=`*s<%lO*V!R!;uP;=`<%l!4t!V!<TXiS`P!a`!cpOr&Xrs&}sv&Xwx(tx!^&X!^!_*V!_;'S&X;'S;=`*y<%lO&X",
       tokenizers: [scriptTokens, styleTokens, textareaTokens, endTag, tagStart, commentContent, 0, 1, 2, 3, 4, 5],
       topRules: {"Document":[0,15]},
       dialects: {noMatch: 0, selfClosing: 485},
@@ -27333,10 +27329,28 @@
                 return new AgentContexts('-T--');
             }
         }
+        GetSuperType(Name) {
+            var Type = this.BreedTypes.get(Name);
+            if (Type == BreedType$1.Patch)
+                return 'patches';
+            else if (Type == BreedType$1.Turtle)
+                return 'turtles';
+            else if (Type == BreedType$1.DirectedLink || Type == BreedType$1.UndirectedLink)
+                return 'links';
+            return null;
+        }
         /** GetBreedVariableContexts: Get the context for a breed variable. */
         GetBreedVariableContexts(Name) {
-            if (this.BreedVarToPlurals.has(Name))
-                return this.GetBreedContext(this.BreedVarToPlurals.get(Name), true);
+            if (this.BreedVarToPlurals.has(Name)) {
+                let breeds = this.BreedVarToPlurals.get(Name);
+                if (breeds && breeds.length > 0) {
+                    let context = new AgentContexts();
+                    for (let b of breeds) {
+                        context = combineContexts(context, this.GetBreedContext(b, true));
+                    }
+                    return context;
+                }
+            } //return this.GetBreedContext(this.BreedVarToPlurals.get(Name)!, true);
         }
         /** GetReporterBreed: Get the breed for a reporter. */
         GetReporterBreed(Name) {
@@ -27706,7 +27720,51 @@
             procedure.AnonymousProcedures = this.gatherAnonProcedures(Node, State, procedure);
             procedure.Context = this.getContext(Node, State);
             procedure.CodeBlocks = this.gatherCodeBlocks(State, Node, procedure.Context, procedure.Variables, procedure.Arguments);
+            this.checkReporterContext(Node, State);
             return procedure;
+        }
+        checkReporterContext(Node, State) {
+            Node.cursor().iterate((noderef) => {
+                if (noderef.name == 'ReporterLeft1Args') {
+                    let left = null;
+                    let right = null;
+                    if (getCodeName(State, noderef) == 'of') {
+                        left = noderef.node.prevSibling;
+                        right = noderef.node.nextSibling;
+                    }
+                    else if (getCodeName(State, noderef) == 'with') {
+                        right = noderef.node.prevSibling;
+                        left = noderef.node.nextSibling;
+                    }
+                    if (left && right) {
+                        let breed = this.identifyBreed(right, State);
+                        let str = getCodeName(State, left);
+                        str = str.replace(/^\s*\[/, '');
+                        str = str.replace(/\]\s$/, '');
+                        str = str.replace(/\[[^\]]*\]/, '');
+                        if (breed) {
+                            for (let s of str.split(' ')) {
+                                if (this.Preprocess.BreedVarToPlurals.has(s.toLowerCase())) {
+                                    let var_breed = this.Preprocess.BreedVarToPlurals.get(s.toLowerCase());
+                                    let supertype = this.Preprocess.GetSuperType(breed);
+                                    let context = new AgentContexts();
+                                    if (supertype && var_breed && !var_breed.includes(breed) && !var_breed.includes(supertype)) {
+                                        if (supertype == 'turtles' && var_breed.includes('patches')) {
+                                            continue;
+                                        }
+                                        else {
+                                            for (let b of var_breed) {
+                                                context = combineContexts(context, this.Preprocess.GetBreedContext(b, true));
+                                            }
+                                            this.ContextErrors.push(new ContextError(left.from, left.to, this.Preprocess.GetBreedContext(breed, false), context, s));
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            });
         }
         /** getContext: Identify context of a block by looking at primitives and variable names. */
         getContext(node, state, priorContext_param) {
@@ -27722,7 +27780,7 @@
         }
         /** combineContext: Identify context of a block by combining with the previous context. */
         combineContext(node, state, priorContext, newContext) {
-            var _a, _b;
+            var _a, _b, _c, _d;
             let cursor = node.cursor();
             let child = cursor.firstChild();
             while (child) {
@@ -27762,6 +27820,22 @@
                         else {
                             context = (_b = this.Preprocess.GetBreedVariableContexts(name)) !== null && _b !== void 0 ? _b : context;
                         }
+                        newContext = combineContexts(context, priorContext);
+                        if (!noContext(newContext)) {
+                            priorContext = newContext;
+                        }
+                        else {
+                            this.ContextErrors.push(new ContextError(cursor.node.from, cursor.node.to, priorContext, context, name));
+                        }
+                    }
+                }
+                else if (cursor.node.name.includes('Special') &&
+                    !cursor.node.name.includes('Both') &&
+                    !cursor.node.name.includes('Turtle') &&
+                    !cursor.node.name.includes('Link')) {
+                    let name = getCodeName(state, cursor.node);
+                    let context = (_d = (_c = this.Procedures.get(name)) === null || _c === void 0 ? void 0 : _c.Context) !== null && _d !== void 0 ? _d : null;
+                    if (context) {
                         newContext = combineContexts(context, priorContext);
                         if (!noContext(newContext)) {
                             priorContext = newContext;
@@ -27891,7 +27965,7 @@
                 return breed;
             // If we find a breed name, return it
             Node.cursor().iterate((noderef) => {
-                if (breed != '')
+                if (breed != undefined)
                     return false;
                 let str = getCodeName(State, noderef);
                 if (str.startsWith('['))
@@ -28085,12 +28159,41 @@
         }
         /** processBreedVars: Parse the code for breed variables. */
         processBreedVars(matches) {
+            var _a, _b, _c;
             for (var m of matches) {
                 let variables = m[4];
                 variables = variables.replace(/;[^\n]*\n/g, '');
                 variables = variables.replace(/\n/g, ' ');
                 this.BreedVars.set(m[3], variables.split(' ').filter((v) => v != '' && v != '\n'));
             }
+            this.BreedVars.set('patches', ((_a = this.BreedVars.get('patches')) !== null && _a !== void 0 ? _a : []).concat(['pxcor', 'pycor', 'pcolor', 'plabel', 'plabel-color']));
+            this.BreedVars.set('turtles', ((_b = this.BreedVars.get('turtles')) !== null && _b !== void 0 ? _b : []).concat([
+                'who',
+                'color',
+                'heading',
+                'xcor',
+                'ycor',
+                'shape',
+                'label',
+                'label-color',
+                'hidden?',
+                'size',
+                'pen-size',
+                'pen-mode',
+                'breed',
+            ]));
+            this.BreedVars.set('links', ((_c = this.BreedVars.get('links')) !== null && _c !== void 0 ? _c : []).concat([
+                'end1',
+                'end2',
+                'color',
+                'label',
+                'label-color',
+                'hidden?',
+                'breed',
+                'thickness',
+                'shape',
+                'tie-mode',
+            ]));
         }
         /** processProcedures: Parse the code for procedure names. */
         processProcedures(procedures) {
@@ -28972,6 +29075,16 @@
             background: '#FAD842',
             content: 'none',
         },
+        '.cm-added': {
+            textDecoration: 'overline underline',
+            textDecorationColor: '#117432',
+            textDecorationThickness: '2px',
+        },
+        '.cm-removed': {
+            textDecoration: 'overline underline',
+            textDecorationColor: '#cc2200',
+            textDecorationThickness: '2px',
+        },
     });
 
     // This file was generated by lezer-generator. You probably shouldn't edit it.
@@ -29685,9 +29798,9 @@
     // This file was generated by lezer-generator. You probably shouldn't edit it.
     const parser$3 = LRParser.deserialize({
       version: 14,
-      states: "#@OO%|QROOO&dQPO'#E[O&iQPO'#E^O&nQPO'#E_O&sQPO'#EbOOQQ'#Fa'#FaOOQQ'#Ej'#EjO+uQRO'#EiOOQQ'#Ep'#EpO6^QRO'#EpO;iQRO'#EvO@`QROOOOQQ'#Ev'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvOCjQRO'#EvOEyQRO'#EvOCjQRO'#EvOMxQRO'#EuOOQQ'#Ef'#EfO!%SQRO'#EeOOQQ'#Ee'#EeO@nQRO'#FdO@nQRO'#FeO!%ZQRO'#E|O!'vQRO'#E}OOQQ'#E{'#E{OOQQ'#Ed'#EdO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO!/]QRO'#EcO!1nQRO'#FPOOQQ'#FT'#FTO!2_QRO'#EYO!4WQRO'#FSQOQPOOO!4_QRO,5:vO!4gQRO,5:xO!4oQRO,5:yO!4zQRO,5:|O!8XQRO'#FVO!8lQRO'#FVO!9kQRO,5;TO!9rQRO'#EiO!CkQRO,5;TOOQQ'#Eo'#EoO!ErQRO'#EpOOQQ'#En'#EnO;iQRO'#EnO!HlQRO'#FWOOQQ'#FW'#FWO!IPQRO,5;XO!K[QRO'#EpO!NiQRO'#ErOOQO'#Er'#ErO!NtQRO'#EvOOQQ'#Eu'#EuO# [QPO,5;]O# aQRO,5;fO# rQRO,5;eO#&wQRO'#EdO#'[QRO'#EvO#*ZQRO,5;bO#*lQRO,5;bO#-hQRO,5;QO#-yQPO,5;wO@nQRO,5;bO@nQRO,5;bO@nQRO,5;bO#.OQRO'#EpO#1zQRO,5;bO#4xQRO,5;bO#4xQRO,5;bO#4xQRO,5;bO#4xQRO,5;bO#4xQRO,5;bO#5YQRO'#F[OOQQ,5;b,5;bO#4xQRO,5;bO#4xQRO,5;bO#4xQRO,5;bO#4xQRO,5;bO#4xQRO,5;bO#?oQRO'#ExOOQQ'#Ew'#EwO#BcQRO,5;bO@nQRO,5;bO#BjQRO,5<OO#HOQRO,5<POOQQ'#Fg'#FgOOQQ'#Ff'#FfO#MdQRO,5;hO#MdQRO,5;iO$%OQRO,5;OO#4xQRO,5;OO#4xQRO,5;OO#4xQRO,5;OO#4xQRO,5;OO#4xQRO,5;OOOQQ,5;O,5;OO#4xQRO,5;OO#4xQRO,5;OO#4xQRO,5;OO#4xQRO,5;OO#4xQRO,5;OO$,ZQRO,5;OOOQQ'#FQ'#FQO$,eQRO,5;kOOQQ'#Ec'#EcOOQQ-E9R-E9ROHuQRO'#EuONPQRO'#EeOOQQ'#F]'#F]OOQQ-E9Z-E9ZOOQQ'#FU'#FUO$.dQRO1G0bOOQQ1G0b1G0bO$.lQRO1G0dOOQQ1G0d1G0dOOQQ'#E`'#E`O$.tQRO1G0eO$.|QRO1G0hOOQQ1G0h1G0hOOQQ'#FV'#FVOOQQ-E9T-E9TO$/UQRO'#EiOOQQ1G0o1G0oO$4PQRO,5;TO$5`QRO,5;_O!4oQRO,5;ZO$5nQPO,5;YO$5sQRO'#EiO$8OQPO'#EoO$9}QRO'#EnOOQQ-E9U-E9UOOQQ1G0s1G0sOOQQ'#FX'#FXOOQQ-E9V-E9VO$:UQRO,5;bO$:lQRO1G0wOOQQ1G1Q1G1QOOQQ1G1P1G1PO$:|QRO,5;OO$=eQRO1G0|O$CaQRO1G0|OOQQ1G0l1G0lOOQQ1G1c1G1cOOQQ1G0|1G0|O#4xQRO1G0|O$IXQRO1G0|O#4xQRO1G0|O#4xQRO1G0|O#4xQRO1G0|O#4xQRO1G0|OOQQ-E9Y-E9YO#4xQRO1G0|O#4xQRO1G0|O#4xQRO1G0|O#4xQRO1G0|O$IfQRO'#EpOOQQ'#FY'#FYO$IsQRO,5;dOOQQ,5;d,5;dO$NkQRO,5;dO$NrQRO,5;dO%$]QRO'#FZO%$dQRO,5;bO%)zQRO1G1hO%/bQRO1G1iO%7iQRO1G1SO%7yQRO1G1SO%=jQRO1G1TO%=zQRO1G1TO%@zQRO1G0jO#4xQRO1G0jO#4xQRO1G0jO#4xQRO1G0jO#4xQRO1G0jOOQQ1G0j1G0jO#4xQRO1G0jO#4xQRO1G0jO#4xQRO1G0jO#4xQRO1G0jO%HuQRO'#EiO&!aQRO'#EpO&,`QRO'#EfOOQQ'#FO'#FOO&.zQRO'#EsO&/VQRO1G1VOOQQ1G1V1G1VO&/VQRO1G1VOOQQ-E9S-E9SOOQQ7+%|7+%|OOQQ7+&O7+&OOOQO'#Ea'#EaO&1RQPO7+&POOQQ7+&S7+&SOOQQ,5;T,5;TOOQQ1G0y1G0yO$.tQRO1G0uOOQQ1G0t1G0tO!5SQRO'#FVO&1WQRO1G0|O&1nQRO,5;bO&2UQRO7+&cO&4QQRO7+&cOOQQ7+&c7+&cO&4XQRO7+&cO&4jQRO1G0jOOQQ7+&h7+&hO&9wQRO7+&hO#4xQRO7+&hO#4xQRO7+&hO#4xQRO7+&hO#4xQRO7+&hO#4xQRO7+&hO#4xQRO7+&hOOQQ-E9W-E9WOOQQ1G1O1G1OOOQQ-E9X-E9XO&?eQRO7+&UO#4xQRO7+&UO#4xQRO7+&UO#4xQRO7+&UOOQQ7+&U7+&UO#4xQRO7+&UO#4xQRO7+&UO#4xQRO7+&UO&B]QRO,5;TO&GeQRO'#FWO&IyQRO,5;dO&J[QRO,5;eO&JcQRO,5;_OOQQ,5;_,5;_OOQQ7+&q7+&qO&JnQRO7+&qOOQQ<<Ik<<IkO&LjQPO7+&aO&LoQRO7+&hOOQQ<<I}<<I}O&MVQRO7+&UO'$dQRO<<JSO#4xQRO<<JSO#4xQRO<<JSOOQQ<<JS<<JSO#4xQRO<<JSO#4xQRO<<JSO'*QQRO<<IpO#4xQRO<<IpO#4xQRO<<IpOOQQ<<Ip<<IpO#4xQRO<<IpO#4xQRO<<IpO',xQRO1G1OOOQQ<<J]<<J]OOQQ<<I{<<I{O'2hQRO<<JSO'3OQRO<<IpO'8]QROAN?nO#4xQROAN?nOOQQAN?nAN?nO#4xQROAN?nO'=yQROAN?[O#4xQROAN?[OOQQAN?[AN?[O#4xQROAN?[O'@qQROAN?nO'AXQROAN?[O'FfQROG25YOOQQG25YG25YO'LSQROG24vOOQQG24vG24vO'NzQROG25YO( bQROG24vO(#yQRO'#EpO()hQRO'#EvO@nQRO'#EvO(,dQRO'#EdO@nQRO'#EdO(/`QRO'#FVO(0PQRO'#EpO(3aQRO'#EpO(9hQRO'#EpO(ArQRO'#EvO(GrQRO'#EvO(HSQRO'#EvO(JvQRO'#EvO(MwQRO'#EdO(NOQRO'#EdO(NfQRO'#EdO()hQRO,5;bO)#^QRO,5;bO(,dQRO,5;bOEyQRO,5;bO)&YQRO,5;bO()hQRO,5;bO)#^QRO,5;bOEyQRO,5;bO(,dQRO,5;bO)&YQRO,5;bO))UQRO'#EpO)*_QRO,5;bO)-YQRO,5;bO)/pQRO,5;bO)/}QRO,5;bO)2nQRO,5;bO)2{QRO,5;bO)3]QRO,5;bO)3mQRO,5;bO)3}QRO,5;bO)4_QRO,5;bO#4xQRO,5;bO)4oQRO,5;bO@nQRO,5;bO)4vQRO,5<OO)7wQRO,5<OO):lQRO,5<OO);PQRO,5<OO)=nQRO,5<PO)@oQRO,5<PO)CdQRO,5<PO)CwQRO,5<PO)FfQRO,5;hO)IbQRO,5;hO#'_QRO,5;hO)L^QRO,5;hO)FfQRO,5;iO)IbQRO,5;iO#'_QRO,5;iO)L^QRO,5;iO* YQRO,5;OO*$SQRO,5;OO*$dQRO,5;OO*'UQRO,5;OO)3}QRO,5;OO)3]QRO,5;OO*'fQRO,5;OO)4_QRO,5;OO#4xQRO,5;OO*'vQRO,5;bO*(yQRO,5;bO*+wQRO,5;bO*.{QRO,5;bO*1jQRO,5;OO*1qQRO,5;OO*4fQRO,5;OO*7^QRO1G0|O*?qQRO1G0|O)2{QRO1G0|O)3]QRO1G0|O)3mQRO1G0|O)3}QRO1G0|O)4_QRO1G0|O*@RQRO1G0|O*B|QRO1G0|O*EdQRO1G0|O*EqQRO1G0|O*HbQRO1G0|O)2{QRO1G0|O)3]QRO1G0|O)3mQRO1G0|O)3}QRO1G0|O)4_QRO1G0|O#4xQRO1G0|O*HoQRO1G1hO*K]QRO1G1hO*KyQRO1G1hO*L[QRO1G1hO*LrQRO1G1iO+ `QRO1G1iO+ |QRO1G1iO+!_QRO1G1iO+!uQRO1G0jO+%oQRO1G0jO+&PQRO1G0jO+(qQRO1G0jO)3}QRO1G0jO)3]QRO1G0jO*'fQRO1G0jO)4_QRO1G0jO#4xQRO1G0jO+)RQRO'#EpO+0WQRO'#EpO+5_QRO'#EpO+5fQRO'#EpO+5pQRO'#EfO+<uQRO'#EfO+A|QRO'#EfO+BTQRO'#EfO+B_QRO1G0|O+CbQRO1G0|O+F`QRO1G0|O+IdQRO1G0|O+LyQRO,5;bO, UQRO,5;bO,$YQRO,5;bO,'^QRO,5;bO,*_QRO1G0jO,*fQRO1G0jO,-ZQRO1G0jO,0RQRO7+&hO,2|QRO7+&hO,5dQRO7+&hO,5qQRO7+&hO,8bQRO7+&hO)2{QRO7+&hO)3]QRO7+&hO)3mQRO7+&hO)3}QRO7+&hO)4_QRO7+&hO#4xQRO7+&hO,8oQRO7+&UO,;iQRO7+&UO,;yQRO7+&UO,>kQRO7+&UO)3}QRO7+&UO)3]QRO7+&UO*'fQRO7+&UO)4_QRO7+&UO#4xQRO7+&UO,>{QRO,5;TO,ApQRO,5;TO,DXQRO,5;TO,D`QRO,5;TO,FqQRO7+&hO,GtQRO7+&hO,JrQRO7+&hO,MvQRO7+&hO-!eQRO7+&UO-!lQRO7+&UO-%aQRO7+&UO-(XQRO<<JSO-+SQRO<<JSO--jQRO<<JSO--wQRO<<JSO-0hQRO<<JSO)2{QRO<<JSO)3]QRO<<JSO)3mQRO<<JSO)3}QRO<<JSO)4_QRO<<JSO#4xQRO<<JSO-0uQRO<<IpO-3oQRO<<IpO-4PQRO<<IpO-6qQRO<<IpO)3}QRO<<IpO)3]QRO<<IpO*'fQRO<<IpO)4_QRO<<IpO#4xQRO<<IpO-7RQRO<<JSO-8UQRO<<JSO-;SQRO<<JSO->WQRO<<JSO-@uQRO<<IpO-@|QRO<<IpO-CqQRO<<IpO-FiQROAN?nO-IdQROAN?nO-KzQROAN?nO-LXQROAN?nO-NxQROAN?nO)2{QROAN?nO)3]QROAN?nO)3mQROAN?nO)3}QROAN?nO)4_QROAN?nO#4xQROAN?nO. VQROAN?[O.$PQROAN?[O.$aQROAN?[O.'RQROAN?[O)3}QROAN?[O)3]QROAN?[O*'fQROAN?[O)4_QROAN?[O#4xQROAN?[O.'cQROAN?nO.(fQROAN?nO.+dQROAN?nO..hQROAN?nO.1VQROAN?[O.1^QROAN?[O.4RQROAN?[O.6yQROG25YO.9tQROG25YO.<[QROG25YO.<iQROG25YO.?YQROG25YO.?gQROG24vO.BaQROG24vO.BqQROG24vO.EcQROG24vO.EsQROG25YO.FvQROG25YO.ItQROG25YO.LxQROG25YO/ gQROG24vO/ nQROG24vO/$cQROG24vO/'ZQRO'#EvO/'iQRO'#EvO/'wQRO'#EvO/(VQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvOCjQRO'#EvOCjQRO'#EvOCjQRO'#EvOCjQRO'#EvOCjQRO'#EvOEyQRO'#EvOCjQRO'#EvO@nQRO'#FdO@nQRO'#FdO@nQRO'#FdO@nQRO'#FdO@nQRO'#FeO@nQRO'#FeO@nQRO'#FeO@nQRO'#FeO!%ZQRO'#E|O!%ZQRO'#E|O!%ZQRO'#E|O!%ZQRO'#E|O!'vQRO'#E}O!'vQRO'#E}O!'vQRO'#E}O!'vQRO'#E}O@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO/(eQRO,5;bO/(vQRO,5;bO@nQRO,5;bO@nQRO,5;bO@nQRO,5;bO@nQRO,5;bO@nQRO,5;bO#4xQRO,5;bO#4xQRO,5;bO#4xQRO,5;bO#4xQRO,5;bO#4xQRO,5;bO#4xQRO,5;bO#4xQRO,5;OO#4xQRO,5;OO#4xQRO,5;OO#4xQRO,5;OO#4xQRO,5;OO/)XQRO,5;OO/)cQRO,5;OO/)mQRO,5;OO/)wQRO,5;OO#4xQRO1G0|O#4xQRO1G0|O#4xQRO1G0|O#4xQRO1G0|O#4xQRO1G0|O#4xQRO1G0|O#4xQRO1G0jO#4xQRO1G0jO#4xQRO1G0jO#4xQRO1G0jO#4xQRO1G0jO/*RQRO'#EiO/*YQRO'#EiO/*aQRO'#EiO/*hQRO'#EiO#4xQRO7+&hO#4xQRO7+&hO#4xQRO7+&hO#4xQRO7+&hO#4xQRO7+&hO#4xQRO7+&hO#4xQRO7+&UO#4xQRO7+&UO#4xQRO7+&UO#4xQRO7+&UO#4xQRO7+&UO#4xQRO<<JSO#4xQRO<<JSO#4xQRO<<JSO#4xQRO<<JSO#4xQRO<<JSO#4xQRO<<JSO#4xQRO<<IpO#4xQRO<<IpO#4xQRO<<IpO#4xQRO<<IpO#4xQRO<<IpO)#^QRO'#EvO)&YQRO'#EvO(,dQRO'#EvOEyQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO)#^QRO'#EdO)&YQRO'#EdO#*lQRO'#EdO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO#4xQRO,5;bO#4xQRO,5;bO#4xQRO,5;bO#4xQRO,5;bO/*oQRO,5;bO/*vQRO,5;bO/*}QRO,5;bO/+UQRO,5;bO@nQRO,5;bO@nQRO,5;bO@nQRO,5;bO@nQRO,5;bO#4xQRO,5;OO#4xQRO,5;OO#4xQRO,5;OO#4xQRO1G0|O#4xQRO1G0|O#4xQRO1G0|O#4xQRO1G0|O#4xQRO1G0jO#4xQRO1G0jO#4xQRO1G0jO#4xQRO7+&hO#4xQRO7+&hO#4xQRO7+&hO#4xQRO7+&hO#4xQRO7+&UO#4xQRO7+&UO#4xQRO7+&UO#4xQRO<<JSO#4xQRO<<JSO#4xQRO<<JSO#4xQRO<<JSO#4xQRO<<IpO#4xQRO<<IpO#4xQRO<<IpO#4xQROAN?nO#4xQROAN?nO#4xQROAN?nO#4xQROAN?nO#4xQROAN?[O#4xQROAN?[O#4xQROAN?[O@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO;iQRO'#EnO#'[QRO'#EvO#'[QRO'#EvO#4xQRO,5;bO#4xQRO,5;bO#4xQRO,5;bO#4xQRO,5;bO#4xQRO,5;bO#4xQRO,5;bO#4xQRO,5;OO#4xQRO,5;OO#4xQRO,5;OO#4xQRO,5;OO#4xQRO,5;OO#4xQRO1G0|O#4xQRO1G0|O#4xQRO1G0|O#4xQRO1G0|O#4xQRO1G0|O#4xQRO1G0|O#4xQRO1G0jO#4xQRO1G0jO#4xQRO1G0jO#4xQRO1G0jO#4xQRO1G0jO#4xQRO7+&hO#4xQRO7+&hO#4xQRO7+&hO#4xQRO7+&hO#4xQRO7+&hO#4xQRO7+&hO#4xQRO7+&UO#4xQRO7+&UO#4xQRO7+&UO#4xQRO7+&UO#4xQRO7+&UO#*lQRO'#EvO#*lQRO,5;bO#*lQRO,5;bO/+]QRO,5;bO*'fQRO,5;bO/+nQRO,5;hO/+nQRO,5;iO*'fQRO1G0|O/.jQRO1G0|O*'fQRO1G0|O/.{QRO7+&hO*'fQRO7+&hO//^QRO<<JSO*'fQRO<<JSO//oQROAN?nO*'fQROAN?nO/0QQROG25YO/0cQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvOCjQRO'#EvOEyQRO'#EvOEyQRO'#EvOEyQRO'#EvOEyQRO'#EvOCjQRO'#EvOCjQRO'#EvOCjQRO'#EvOCjQRO'#EvO!%ZQRO'#E|O!'vQRO'#E}O@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO@nQRO,5;bO#4xQRO,5;bO#4xQRO,5;bO#4xQRO,5;bO#4xQRO,5;bO#4xQRO,5;bO#4xQRO,5;OO#4xQRO,5;OO#4xQRO,5;OO#4xQRO1G0|O#4xQRO1G0|O#4xQRO1G0|O#4xQRO1G0|O#4xQRO1G0|O#4xQRO1G0jO#4xQRO1G0jO#4xQRO1G0jO#4xQRO7+&hO#4xQRO7+&hO#4xQRO7+&hO#4xQRO7+&hO#4xQRO7+&hO#4xQRO7+&UO#4xQRO7+&UO#4xQRO7+&UO#4xQRO<<JSO#4xQRO<<JSO#4xQRO<<JSO#4xQRO<<JSO#4xQRO<<JSO#4xQRO<<IpO#4xQRO<<IpO#4xQRO<<IpO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO#4xQRO,5;bO#4xQRO,5;bO#4xQRO,5;bO#4xQRO,5;bO#4xQRO,5;bO#4xQRO,5;bO#4xQRO,5;OO#4xQRO,5;OO#4xQRO,5;OO#4xQRO,5;OO#4xQRO,5;OO#4xQRO1G0|O#4xQRO1G0|O#4xQRO1G0|O#4xQRO1G0|O#4xQRO1G0|O#4xQRO1G0|O#4xQRO1G0jO#4xQRO1G0jO#4xQRO1G0jO#4xQRO1G0jO#4xQRO1G0jO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO#4xQRO,5;bO#4xQRO,5;bO#4xQRO,5;bO#4xQRO,5;bO#4xQRO,5;bO#4xQRO,5;OO#4xQRO,5;OO#4xQRO,5;OO#4xQRO1G0|O#4xQRO1G0|O#4xQRO1G0|O#4xQRO1G0|O#4xQRO1G0|O#4xQRO1G0jO#4xQRO1G0jO#4xQRO1G0jO#4xQRO7+&hO#4xQRO7+&hO#4xQRO7+&hO#4xQRO7+&hO#4xQRO7+&hO#4xQRO7+&UO#4xQRO7+&UO#4xQRO7+&UO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO#4xQRO,5;bO#4xQRO,5;bO#4xQRO,5;bO#4xQRO,5;bO#4xQRO,5;bO#4xQRO,5;bO#4xQRO,5;OO#4xQRO,5;OO#4xQRO,5;OO#4xQRO,5;OO#4xQRO,5;OO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO#4xQRO,5;bO#4xQRO,5;bO#4xQRO,5;bO#4xQRO,5;bO#4xQRO,5;bO#4xQRO,5;OO#4xQRO,5;OO#4xQRO,5;OO#4xQRO1G0|O#4xQRO1G0|O#4xQRO1G0|O#4xQRO1G0|O#4xQRO1G0|O#4xQRO1G0jO#4xQRO1G0jO#4xQRO1G0jO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EdO@nQRO'#EdO@nQRO'#EdO#4xQRO,5;bO#4xQRO,5;bO#4xQRO,5;bO#4xQRO,5;bO#4xQRO,5;bO#4xQRO,5;OO#4xQRO,5;OO#4xQRO,5;OO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EvO@nQRO'#EdO@nQRO'#EdO@nQRO'#Ed",
-      stateData: "/0q~O$SOS!zOS~OXsOYrO_WOdWOeWOfWOgUOhuOkWOm!SOnjOokOpiOqXOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O!buO!cvO!dwO!exO!fyO!gzO!h{O!iuO!j|O!k}O!l!OO!m!PO!n!QO!o!RO!p!OO!quO!rvO!swO!txO!uyO!vzO!w{O!xpO!yqO#PVO#ZYO#_UO#`UO~OSQOTPOUROWSOZ!UO$Q!|P~PYO#P!ZO~O#P![O~O#P!]O~O#P!^O~OSQOTPOUROWSOX,}OY,yOdWOeWOfWOgUOhuOk!eOm/{On,oOo,pOp,jOr[Os'dOt,dOu/pOv2_Ow3rOx4rOy!nOz'eO{,iO|/uO}2dO!O3wO!P4wO!Q,iO!R'eO!S[O!T'dO!U,dO!V/pO!W2_O!X3rO!Y4rO!Z'dO![[O!]'dO!^,dO!_[O!`'dO!a[O!buO!c'fO!d-RO!e/vO!f2eO!g3xO!h4xO!i!sO!j'gO!k-VO!l/zO!m2iO!n3|O!o4|O!p/zO!quO!r'fO!s-RO!t/vO!u2eO!v3xO!w4xO!x,qO!y,uO#P!bO#Z!gO#_UO#`UO#h#fP~O_!`Oq!kO!}!cO~P&xOP#dXP#jXQ#dXQ#jXR#dXR#jXX#dXX#jXY#dXY#jX_#dX_#jXd#dXd#jXe#dXe#jXf#dXf#jXg#dXg#jXh#dXh#jXk#dXk#jXl#dXl#jXm#dXm#jXn#dXn#jXo#dXo#jXp#dXp#jXq#dXq#jXr#dXr#jXs#dXs#jXt#dXt#jXu#dXu#jXv#dXv#jXw#dXw#jXx#dXx#jXy#dXy#jXz#dXz#jX{#dX{#jX|#dX|#jX}#dX}#jX!O#dX!O#jX!P#dX!P#jX!Q#dX!Q#jX!R#dX!R#jX!S#dX!S#jX!T#dX!T#jX!U#dX!U#jX!V#dX!V#jX!W#dX!W#jX!X#dX!X#jX!Y#dX!Y#jX!Z#dX!Z#jX![#dX![#jX!]#dX!]#jX!^#dX!^#jX!_#dX!_#jX!`#dX!`#jX!a#dX!a#jX!b#dX!b#jX!c#dX!c#jX!d#dX!d#jX!e#dX!e#jX!f#dX!f#jX!g#dX!g#jX!h#dX!h#jX!i#dX!i#jX!j#dX!j#jX!k#dX!k#jX!l#dX!l#jX!m#dX!m#jX!n#dX!n#jX!o#dX!o#jX!p#dX!p#jX!q#dX!q#jX!r#dX!r#jX!s#dX!s#jX!t#dX!t#jX!u#dX!u#jX!v#dX!v#jX!w#dX!w#jX!x#dX!x#jX!y#dX!y#jX#P#dX#P#jX#Z#dX#Z#jX#_#dX#_#jX#`#dX#`#jX$Q#dX$Q#jX#[#dX#[#jX~OS#WXT#WXU#WXW#WXX#WXY#WXZ#WX_#WXd#WXe#WXf#WXg#WXh#WXk#WXm#WXn#WXo#WXp#WXq#WXr#WXs#WXt#WXu#WXv#WXw#WXx#WXy#WXz#WX{#WX|#WX}#WX!O#WX!P#WX!Q#WX!R#WX!S#WX!T#WX!U#WX!V#WX!W#WX!X#WX!Y#WX!Z#WX![#WX!]#WX!^#WX!_#WX!`#WX!a#WX!b#WX!c#WX!d#WX!e#WX!f#WX!g#WX!h#WX!i#WX!j#WX!k#WX!l#WX!m#WX!n#WX!o#WX!p#WX!q#WX!r#WX!s#WX!t#WX!u#WX!v#WX!w#WX!x#WX!y#WX#P#WX#Z#WX#_#WX#`#WX$Q#WX#[#WX~P,SOR!vOX-POY,{O_WOdWOeWOfWOgUOhuOkWOm/}On,oOo,pOp1^OqXOr[Os0uOt1XOu3QOv4YOw4}Ox5_Oy!nOz'eO{,iO|/uO}2dO!O3wO!P4wO!Q,iO!R'eO!S[O!T0uO!U1XO!V3QO!W4YO!X4}O!Y5_O!Z0uO![[O!]0uO!^1XO!_[O!`0uO!a[O!buO!c.oO!d-TO!e/xO!f2gO!g3zO!h4zO!i'pO!j.rO!k1kO!l3XO!m4aO!n5UO!o5fO!p3XO!quO!r.oO!s-TO!t/xO!u2gO!v3zO!w4zO!x,sO!y,wO#PVO#Z!tO#_UO#`UO~OP!yOQ!zOR!yOl!{O~O_WOdWOeWOfWOgUOkWOnjOokOpiOq!|Or[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O#PVO#Z0QO#_UO#`UO~OP#]OQ#]OR#]O_#]Or#]Os#]Ot#]Ou#]Ov#]Ow#]Ox#]Oy#]Oz#]O{#]O|#]O}#]O!O#]O!P#]O!Q#]O!R#]O!S#]O!T#]O!U#]O!V#]O!W#]O!X#]O!Y#]O!Z#]O![#]O!]#]O!^#]O!_#]O!`#]O!a#]O#P#[O~O_WOdWOeWOfWOgUOkWOn1bOo1fOp,lOq!|Or[Os.hOt,fOu/rOv2aOw3tOx4tOy'lOz.lO{1]O|3UO}4^O!O5RO!P5cO!Q1]O!R.lO!S[O!T.hO!U,fO!V/rO!W2aO!X3tO!Y4tO!Z.hO![[O!].hO!^,fO!_[O!`.hO!a[O#PVO#Z0QO#_UO#`UO~OP#iXQ#iXR#iXX$PXY$PX_$PXd$PXe$PXf$PXg$PXh$PXk$PXl#iXm$PXn$PXo$PXp$PXq$PXr$PXs$PXt$PXu$PXv$PXw$PXx$PXy$PXz$PX{$PX|$PX}$PX!O$PX!P$PX!Q$PX!R$PX!S$PX!T$PX!U$PX!V$PX!W$PX!X$PX!Y$PX!Z$PX![$PX!]$PX!^$PX!_$PX!`$PX!a$PX!b$PX!c$PX!d$PX!e$PX!f$PX!g$PX!h$PX!i$PX!j$PX!k$PX!l$PX!m$PX!n$PX!o$PX!p$PX!q$PX!r$PX!s$PX!t$PX!u$PX!v$PX!w$PX!x$PX!y$PX#P$PX#Z$PX#_$PX#`$PX$Q$PX~O$Q#uX~PHuOP#XXQ#XXR#XXX$PXY$PX_$PXd$PXe$PXf$PXg$PXh$PXk$PXl#XXm$PXn$PXo$PXp$PXq$PXr$PXs$PXt$PXu$PXv$PXw$PXx$PXy$PXz$PX{$PX|$PX}$PX!O$PX!P$PX!Q$PX!R$PX!S$PX!T$PX!U$PX!V$PX!W$PX!X$PX!Y$PX!Z$PX![$PX!]$PX!^$PX!_$PX!`$PX!a$PX!b$PX!c$PX!d$PX!e$PX!f$PX!g$PX!h$PX!i$PX!j$PX!k$PX!l$PX!m$PX!n$PX!o$PX!p$PX!q$PX!r$PX!s$PX!t$PX!u$PX!v$PX!w$PX!x$PX!y$PX#P$PX#Z$PX#_$PX#`$PX$Q$PX~O$Q#uX~PNPOP#bOQ#bOR#bO_#cOd#cOe#cOf#cOq#cOr#bOs#bOt#bOu#bOv#bOw#bOx#bOy#bOz#bO{#bO|#bO}#bO!O#bO!P#bO!Q#bO!R#bO!b#bO!c#bO!d#bO!e#bO!f#bO!g#bO!h#bO!i#bO!j#bO!k#bO!l#bO!m#bO!n#bO!o#bO!p#bO~OP#bOQ#bOR#bO_WOdWOeWOfWOkWOqWOr#bOs#bOt#bOu#bOv#bOw#bOx#bOy#bOz#bO{#bO|#bO}#bO!O#bO!P#bO!Q#bO!R#bO!b#bO!c#bO!d#bO!e#bO!f#bO!g#bO!h#bO!i#bO!j#bO!k#bO!l#bO!m#bO!n#bO!o#bO!p#bO~OX$PXY$PX_$PXd$PXe$PXf$PXg$PXh$PXk$PXm$PXn$PXo$PXp$PXq$PXr$PXs$PXt$PXu$PXv$PXw$PXx$PXy$PXz$PX{$PX|$PX}$PX!O$PX!P$PX!Q$PX!R$PX!S$PX!T$PX!U$PX!V$PX!W$PX!X$PX!Y$PX!Z$PX![$PX!]$PX!^$PX!_$PX!`$PX!a$PX!b$PX!c$PX!d$PX!e$PX!f$PX!g$PX!h$PX!i$PX!j$PX!k$PX!l$PX!m$PX!n$PX!o$PX!p$PX!q$PX!r$PX!s$PX!t$PX!u$PX!v$PX!w$PX!x$PX!y$PX#P$PX#Z$PX#_$PX#`$PX$Q$PX~OS#VXT#VXU#VXW#VXX#VXY#VXZ#VXh#VXm#VXq#VX!b#VX!c#VX!d#VX!e#VX!f#VX!g#VX!h#VX!i#VX!j#VX!k#VX!l#VX!m#VX!n#VX!o#VX!p#VX!q#VX!r#VX!s#VX!t#VX!u#VX!v#VX!w#VX!x#VX!y#VX$Q#VX~P!*fO_#sO~OSQOTPOUROWSOhuOquO!buO!quO~OX-QOY,|OZ!UOm0OO!c.nO!d-UO!e/yO!f2hO!g3{O!h4{O!i'rO!j.qO!k1jO!l3WO!m4`O!n5TO!o5eO!p3WO!r.nO!s-UO!t/yO!u2hO!v3{O!w4{O!x,tO!y,xO$Q!|X~P!1sO$Q#vX~PYO_#{O!}#}O~O_#{O!}$PO~O_$QOr$QO!T$QO~O_#{O!}$TO~OS#zXT#zXU#zXW#zXX#zXY#zX_#yX_#zXg#yXg#zXh#zXk#zXm#zXq#zX!b#zX!c#zX!d#zX!e#zX!f#zX!g#zX!h#zX!i#zX!j#zX!k#zX!l#zX!m#zX!n#zX!o#zX!p#zX!q#zX!r#zX!s#zX!t#zX!u#zX!v#zX!w#zX!x#zX!y#zX!}#yX!}#zX#P#yX#P#zX#Z#zX#_#yX#_#zX#`#yX#`#zX~OP#YXQ#YXR#YXl#YX!}#YX~P!5SOP#dXQ#dXR#dX_#{Xl#dXq#{X!}#dX#h#{X~P!5SO_$UOgUO#P$WO#_UO#`UO~O!}$XO~P!9YO_'hOq'iO!}$YO~P&xOP#]aP#aaQ#]aQ#aaR#]aR#aa_#]a_#aad#]ad#aae#]ae#aaf#]af#aag#]ag#aak#]ak#aal#]al#aan#]an#aao#]ao#aap#]ap#aaq#]aq#aar#]ar#aas#]as#aat#]at#aau#]au#aav#]av#aaw#]aw#aax#]ax#aay#]ay#aaz#]az#aa{#]a{#aa|#]a|#aa}#]a}#aa!O#]a!O#aa!P#]a!P#aa!Q#]a!Q#aa!R#]a!R#aa!S#]a!S#aa!T#]a!T#aa!U#]a!U#aa!V#]a!V#aa!W#]a!W#aa!X#]a!X#aa!Y#]a!Y#aa!Z#]a!Z#aa![#]a![#aa!]#]a!]#aa!^#]a!^#aa!_#]a!_#aa!`#]a!`#aa!a#]a!a#aa!b#]a!b#aa!c#]a!c#aa!d#]a!d#aa!e#]a!e#aa!f#]a!f#aa!g#]a!g#aa!h#]a!h#aa!i#]a!i#aa!j#]a!j#aa!k#]a!k#aa!l#]a!l#aa!m#]a!m#aa!n#]a!n#aa!o#]a!o#aa!p#]a!p#aa!q#]a!q#aa!r#]a!r#aa!s#]a!s#aa!t#]a!t#aa!u#]a!u#aa!v#]a!v#aa!w#]a!w#aa!x#]a!x#aa!y#]a!y#aa#P#]a#P#aa#Z#]a#Z#aa#_#]a#_#aa#`#]a#`#aaj#]aj#aa~OX#]aX#aaY#]aY#aah#]ah#aam#]am#aa$Q#]a$Q#aa#[#]a#[#aaS#]aS#aaT#]aT#aaU#]aU#aaW#]aW#aaZ#]aZ#aa!}#]a!}#aa[#]a[#aa~P!:POP#dXQ#dXR#dXl#dX!}#dX~O#P$[O~P!EaOS#zXT#zXU#zXW#zXX#zXY#zX_#zXg#zXh#zXk#zXm#zXq#zX!b#zX!c#zX!d#zX!e#zX!f#zX!g#zX!h#zX!i#zX!j#zX!k#zX!l#zX!m#zX!n#zX!o#zX!p#zX!q#zX!r#zX!s#zX!t#zX!u#zX!v#zX!w#zX!x#zX!y#zX!}#zX#P#zX#Z#zX#_#zX#`#zX~OP#YXQ#YXR#YXl#YX!}#YX~P!EyOX,}OY,yO_!iOgUOk$_Om/{O!c'fO!d-RO!e/vO!f2eO!g3xO!h4xO!i!sO!j'gO!k-VO!l/zO!m2iO!n3|O!o4|O!p/zO!r'fO!s-RO!t/vO!u2eO!v3xO!w4xO!x,qO!y,uO!}$bO#P$^O#Z$`O#_UO#`UO~P!1sOP#jXQ#jXR#jXS#WXT#WXU#WXW#WXX#WXY#WX_#WX_#{Xg#WXh#WXk#WXl#jXm#WXq#WXq#{X!b#WX!c#WX!d#WX!e#WX!f#WX!g#WX!h#WX!i#WX!j#WX!k#WX!l#WX!m#WX!n#WX!o#WX!p#WX!q#WX!r#WX!s#WX!t#WX!u#WX!v#WX!w#WX!x#WX!y#WX!}#WX!}#jX#P#WX#Z#WX#_#WX#`#WX#h#{X~P!EaO_$cOq$cO#h#fX~OP#jXQ#jXR#jXl#jX!}#jX#[#jX~P@nO#h$fO~O!}$gOP#YXQ#YXR#YXl#YX~O!}$hOP#XXQ#XXR#XXl#XX~OdWOeWOfWOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[OS#WXT#WXU#WXW#WXX#WXY#WXh#WXk#WXm#WXq#WX!b#WX!c#WX!d#WX!e#WX!f#WX!g#WX!h#WX!i#WX!j#WX!k#WX!l#WX!m#WX!n#WX!o#WX!p#WX!q#WX!r#WX!s#WX!t#WX!u#WX!v#WX!w#WX!x#WX!y#WX!}#WX#Z#WX~O_#WXg#WX#P#WX#_#WX#`#WX~P#!TOR!vO_WOdWOeWOfWOgUOkWOn,oOo,pOp1^Oq!|Or[Os0uOt1XOu3QOv4YOw4}Ox5_Oy!nOz'eO{,iO|/uO}2dO!O3wO!P4wO!Q,iO!R'eO!S[O!T0uO!U1XO!V3QO!W4YO!X4}O!Y5_O!Z0uO![[O!]0uO!^1XO!_[O!`0uO!a[O#PVO#Z!tO#_UO#`UO~O#[$jOP#iXQ#iXR#iXl#iX~O_WOdWOeWOfWOgUOkWOn,oOo,pOp1^Oq!|Or[Os0uOt1XOu3QOv4YOw4}Ox5_Oy!nOz'eO{,iO|/uO}2dO!O3wO!P4wO!Q,iO!R'eO!S[O!T0uO!U1XO!V3QO!W4YO!X4}O!Y5_O!Z0uO![[O!]0uO!^1XO!_[O!`0uO!a[O#PVO#Z0QO#_UO#`UO~O#[$lOP#XXQ#XXR#XXl#XX~O#[$mO~OS#dXS#jXT#dXT#jXU#dXU#jXW#dXW#jXZ#dXZ#jXj#dXj#jX!}#dX!}#jX[#dX[#jX~P,SOX#jaY#ja_#jag#jah#jak#jal#jam#jaq#ja!b#ja!c#ja!d#ja!e#ja!f#ja!g#ja!h#ja!i#ja!j#ja!k#ja!l#ja!m#ja!n#ja!o#ja!p#ja!q#ja!r#ja!s#ja!t#ja!u#ja!v#ja!w#ja!x#ja!y#ja#P#ja#Z#ja#_#ja#`#jaS#jaT#jaU#jaW#ja!}#ja~OP!yOQ!zOR!yOd#jae#jaf#jan#jao#jap#jar#jas#jat#jau#jav#jaw#jax#jay#jaz#ja{#ja|#ja}#ja!O#ja!P#ja!Q#ja!R#ja!S#ja!T#ja!U#ja!V#ja!W#ja!X#ja!Y#ja!Z#ja![#ja!]#ja!^#ja!_#ja!`#ja!a#ja$Q#jaZ#jaj#ja#[#ja[#ja~P#/UOP!yOQ!zOR!yOl!{O~P@nOP!yOQ!zOR!yOl!{OX$OXY$OX_$OXd$OXe$OXf$OXg$OXh$OXk$OXm$OXn$OXo$OXp$OXq$OXr$OXs$OXt$OXu$OXv$OXw$OXx$OXy$OXz$OX{$OX|$OX}$OX!O$OX!P$OX!Q$OX!R$OX!S$OX!T$OX!U$OX!V$OX!W$OX!X$OX!Y$OX!Z$OX![$OX!]$OX!^$OX!_$OX!`$OX!a$OX!b$OX!c$OX!d$OX!e$OX!f$OX!g$OX!h$OX!i$OX!j$OX!k$OX!l$OX!m$OX!n$OX!o$OX!p$OX!q$OX!r$OX!s$OX!t$OX!u$OX!v$OX!w$OX!x$OX!y$OX#P$OX#Z$OX#_$OX#`$OX$Q$OXS$OXT$OXU$OXW$OXZ$OXj$OX!}$OX#[$OX[$OX~OSQOTPOUROWSOX1hOY1gOdWOeWOfWOgUOhuOk!eOm/|OnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O!buO!c.mO!d-SO!e/wO!f2fO!g3yO!h4yO!i'qO!j.pO!k1iO!l3VO!m4_O!n5SO!o5dO!p3VO!quO!r.mO!s-SO!t/wO!u2fO!v3yO!w4yO!x,rO!y,vO#Z0PO#_UO#`UO~O_$zOq'kO!}$}O#P!bO#h#fP~P#:xOP%ROR%RO_#]Ol'zOr#]Os#]Ot#]Ou#]Ov#]Ow#]Ox#]Oy#]Oz#]O{#]O|#]O}#]O!O#]O!P#]O!Q#]O!R#]O!S#]O!T#]O!U#]O!V#]O!W#]O!X#]O!Y#]O!Z#]O![#]O!]#]O!^#]O!_#]O!`#]O!a#]O#P#[O~OQ#]O~P#@SOP!yOQ!zOR!yOl!{OS$WaT$WaU$WaW$WaX$WaY$WaZ$Wa_$Wad$Wae$Waf$Wag$Wah$Wak$Wam$Wan$Wao$Wap$Waq$War$Was$Wat$Wau$Wav$Waw$Wax$Way$Waz$Wa{$Wa|$Wa}$Wa!O$Wa!P$Wa!Q$Wa!R$Wa!S$Wa!T$Wa!U$Wa!V$Wa!W$Wa!X$Wa!Y$Wa!Z$Wa![$Wa!]$Wa!^$Wa!_$Wa!`$Wa!a$Wa!b$Wa!c$Wa!d$Wa!e$Wa!f$Wa!g$Wa!h$Wa!i$Wa!j$Wa!k$Wa!l$Wa!m$Wa!n$Wa!o$Wa!p$Wa!q$Wa!r$Wa!s$Wa!t$Wa!u$Wa!v$Wa!w$Wa!x$Wa!y$Wa#P$Wa#Z$Wa#_$Wa#`$Wa$Q$Wa~P@nOP!yOQ!zOR!yOl!{OS$XaT$XaU$XaW$XaX$XaY$XaZ$Xa_$Xad$Xae$Xaf$Xag$Xah$Xak$Xam$Xan$Xao$Xap$Xaq$Xar$Xas$Xat$Xau$Xav$Xaw$Xax$Xay$Xaz$Xa{$Xa|$Xa}$Xa!O$Xa!P$Xa!Q$Xa!R$Xa!S$Xa!T$Xa!U$Xa!V$Xa!W$Xa!X$Xa!Y$Xa!Z$Xa![$Xa!]$Xa!^$Xa!_$Xa!`$Xa!a$Xa!b$Xa!c$Xa!d$Xa!e$Xa!f$Xa!g$Xa!h$Xa!i$Xa!j$Xa!k$Xa!l$Xa!m$Xa!n$Xa!o$Xa!p$Xa!q$Xa!r$Xa!s$Xa!t$Xa!u$Xa!v$Xa!w$Xa!x$Xa!y$Xa#P$Xa#Z$Xa#_$Xa#`$Xa$Q$Xa~P@nO_WOdWOeWOfWOgUOkWOnjOokOpiOq!|Or[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O#PVO#Z!tO#_UO#`UO~OS#WaT#WaU#WaW#WaX#WaY#Wa_#Wag#Wah#Wak#Wam#Waq#Wa!b#Wa!c#Wa!d#Wa!e#Wa!f#Wa!g#Wa!h#Wa!i#Wa!j#Wa!k#Wa!l#Wa!m#Wa!n#Wa!o#Wa!p#Wa!q#Wa!r#Wa!s#Wa!t#Wa!u#Wa!v#Wa!w#Wa!x#Wa!y#Wa#P#Wa#Z#Wa#_#Wa#`#Wa~OP!yOQ!zOR!yOl!{OZ#Wad#Wae#Waf#Wan#Wao#Wap#War#Was#Wat#Wau#Wav#Waw#Wax#Way#Waz#Wa{#Wa|#Wa}#Wa!O#Wa!P#Wa!Q#Wa!R#Wa!S#Wa!T#Wa!U#Wa!V#Wa!W#Wa!X#Wa!Y#Wa!Z#Wa![#Wa!]#Wa!^#Wa!_#Wa!`#Wa!a#Wa$Q#Wa~P$!`OdWOeWOfWOgUOj%gOkWOnjOokOpiOq!|Or[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O!b%gO!c%gO!d%gO!e%gO!f%gO!g%gO!h%gO!i%gO!j%gO!k%gO!l%gO!m%gO!n%gO!o%gO!p%gO!q%gO!r%gO!s%gO!t%gO!u%gO!v%gO!w%gO!x%gO!y%gO#Z0QO#_UO#`UO~O_%eO#P%dO~P$'vOX-OOY,zO[%jOk$_Om/|O!c.mO!d-SO!e/wO!f2fO!g3yO!h4yO!i'qO!j.pO!k1iO!l3VO!m4_O!n5SO!o5dO!p3VO!r.mO!s-SO!t/wO!u2fO!v3yO!w4yO!x,rO!y,vO#P%hO#Z$`O~P!1sO_#{O!}%mO~O_#{O!}%nO~O_%oO!T%oO~O_#{O!}%qO~O!}%rO~P!9YOP#]aP#aaQ#]aQ#aaR#]aR#aa_#]a_#aag#]ag#aak#]ak#aal#]al#aaq#]aq#aa!b#]a!b#aa!c#]a!c#aa!d#]a!d#aa!e#]a!e#aa!f#]a!f#aa!g#]a!g#aa!h#]a!h#aa!i#]a!i#aa!j#]a!j#aa!k#]a!k#aa!l#]a!l#aa!m#]a!m#aa!n#]a!n#aa!o#]a!o#aa!p#]a!p#aa!q#]a!q#aa!r#]a!r#aa!s#]a!s#aa!t#]a!t#aa!u#]a!u#aa!v#]a!v#aa!w#]a!w#aa!x#]a!x#aa!y#]a!y#aa#P#]a#P#aa#Z#]a#Z#aa#_#]a#_#aa#`#]a#`#aa~OS#]aS#aaT#]aT#aaU#]aU#aaW#]aW#aaX#]aX#aaY#]aY#aah#]ah#aam#]am#aa!}#]a!}#aa#h#ga~P$/]O_$cOq$cO!}%sO#h#fX~O#[%uO~OX,}OY,yO_%vOgUOk$_Om/{O!c'fO!d-RO!e/vO!f2eO!g3xO!h4xO!i!sO!j'gO!k-VO!l/zO!m2iO!n3|O!o4|O!p/zO!r'fO!s-RO!t/vO!u2eO!v3xO!w4xO!x,qO!y,uO!}!cO#P$^O#Z$`O#_UO#`UO~P!1sO#P$[O~OX-POY,{OhuOm/}O!buO!c.oO!d-TO!e/xO!f2gO!g3zO!h4zO!i'pO!j.rO!k1kO!l3XO!m4aO!n5UO!o5fO!p3XO!quO!r.oO!s-TO!t/xO!u2gO!v3zO!w4zO!x,sO!y,wO~OquO~P$8TOP#jaQ#jaR#jal#ja!}#ja#[#ja~P@nO_WOq'cO!}%{O#PVO~P#:xOdWOeWOfWOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O!}#Wa~P$!`OP#iiP#jiQ#iiQ#jiR#iiR#jiX#jiY#ji_#jid#jie#jif#jig#jih#jik#jil#iil#jim#jin#jio#jip#jiq#jir#jis#jit#jiu#jiv#jiw#jix#jiy#jiz#ji{#ji|#ji}#ji!O#ji!P#ji!Q#ji!R#ji!S#ji!T#ji!U#ji!V#ji!W#ji!X#ji!Y#ji!Z#ji![#ji!]#ji!^#ji!_#ji!`#ji!a#ji!b#ji!c#ji!d#ji!e#ji!f#ji!g#ji!h#ji!i#ji!j#ji!k#ji!l#ji!m#ji!n#ji!o#ji!p#ji!q#ji!r#ji!s#ji!t#ji!u#ji!v#ji!w#ji!x#ji!y#ji#P#ji#Z#ji#_#ji#`#ji$Q#ji!}#ii!}#ji#[#jiS#jiT#jiU#jiW#jiZ#ji[#ji~OP0vOQ1lOR0vOl0wO#[&OO~OX#jiY#ji_#jid#jie#jif#jig#jih#jik#jil#jim#jin#jio#jip#jiq#jir#jis#jit#jiu#jiv#jiw#jix#jiy#jiz#ji{#ji|#ji}#ji!O#ji!P#ji!Q#ji!R#ji!S#ji!T#ji!U#ji!V#ji!W#ji!X#ji!Y#ji!Z#ji![#ji!]#ji!^#ji!_#ji!`#ji!a#ji!b#ji!c#ji!d#ji!e#ji!f#ji!g#ji!h#ji!i#ji!j#ji!k#ji!l#ji!m#ji!n#ji!o#ji!p#ji!q#ji!r#ji!s#ji!t#ji!u#ji!v#ji!w#ji!x#ji!y#ji#P#ji#Z#ji#_#ji#`#ji$Q#jiS#jiT#jiU#jiW#jiZ#jij#ji!}#ji#[#ji[#ji~OP!yOQ!zOR!yO~P$CrO_#{Xq#{X#h#{X~P!EaOX1hOY1gOk$_Om/|O!c.mO!d-SO!e/wO!f2fO!g3yO!h4yO!i'qO!j.pO!k1iO!l3VO!m4_O!n5SO!o5dO!p3VO!r.mO!s-SO!t/wO!u2fO!v3yO!w4yO!x,rO!y,vO!}&XO#Z$`O~P!1sO_WOdWOeWOfWOgUOkWOnjOokOpiOq'}Or[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O#PVO#Z0QO#_UO#`UO~O!}&XO~P$KoO!}&XOP#XXQ#XXR#XXl#XX~OP#XXQ#XXR#XX_#}Xd#}Xe#}Xf#}Xg#}Xk#}Xl#XXn#}Xo#}Xp#}Xq#}Xr#}Xs#}Xt#}Xu#}Xv#}Xw#}Xx#}Xy#}Xz#}X{#}X|#}X}#}X!O#}X!P#}X!Q#}X!R#}X!S#}X!T#}X!U#}X!V#}X!W#}X!X#}X!Y#}X!Z#}X![#}X!]#}X!^#}X!_#}X!`#}X!a#}X#P#}X#Z#}X#_#}X#`#}X~O!}#}X~P% TOP#kXQ#kXR#kXX#kXY#kXh#kXl#kXm#kX!b#kX!c#kX!d#kX!e#kX!f#kX!g#kX!h#kX!i#kX!j#kX!k#kX!l#kX!m#kX!n#kX!o#kX!p#kX!q#kX!r#kX!s#kX!t#kX!u#kX!v#kX!w#kX!x#kX!y#kX$Q#kX!}#kX#[#kXS#kXT#kXU#kXW#kXZ#kXj#kX[#kX~PEyOS$UiT$UiU$UiW$UiX$UiY$Ui_$Uig$Uih$Uik$Uim$Uiq$Ui!b$Ui!c$Ui!d$Ui!e$Ui!f$Ui!g$Ui!h$Ui!i$Ui!j$Ui!k$Ui!l$Ui!m$Ui!n$Ui!o$Ui!p$Ui!q$Ui!r$Ui!s$Ui!t$Ui!u$Ui!v$Ui!w$Ui!x$Ui!y$Ui#P$Ui#Z$Ui#_$Ui#`$Ui~OP!yOQ!zOR!yOl!{OZ$Uid$Uie$Uif$Uin$Uio$Uip$Uir$Uis$Uit$Uiu$Uiv$Uiw$Uix$Uiy$Uiz$Ui{$Ui|$Ui}$Ui!O$Ui!P$Ui!Q$Ui!R$Ui!S$Ui!T$Ui!U$Ui!V$Ui!W$Ui!X$Ui!Y$Ui!Z$Ui![$Ui!]$Ui!^$Ui!_$Ui!`$Ui!a$Ui$Q$Ui~P%'[OS$ViT$ViU$ViW$ViX$ViY$Vi_$Vig$Vih$Vik$Vim$Viq$Vi!b$Vi!c$Vi!d$Vi!e$Vi!f$Vi!g$Vi!h$Vi!i$Vi!j$Vi!k$Vi!l$Vi!m$Vi!n$Vi!o$Vi!p$Vi!q$Vi!r$Vi!s$Vi!t$Vi!u$Vi!v$Vi!w$Vi!x$Vi!y$Vi#P$Vi#Z$Vi#_$Vi#`$Vi~OP!yOQ!zOR!yOl!{OZ$Vid$Vie$Vif$Vin$Vio$Vip$Vir$Vis$Vit$Viu$Viv$Viw$Vix$Viy$Viz$Vi{$Vi|$Vi}$Vi!O$Vi!P$Vi!Q$Vi!R$Vi!S$Vi!T$Vi!U$Vi!V$Vi!W$Vi!X$Vi!Y$Vi!Z$Vi![$Vi!]$Vi!^$Vi!_$Vi!`$Vi!a$Vi$Q$Vi~P%,rOS#piT#piU#piW#piX#piY#piZ#pi_#pid#pie#pif#pig#pih#pik#pim#pin#pio#pip#piq#pir#pis#pit#piu#piv#piw#pix#piy#piz#pi{#pi|#pi}#pi!O#pi!P#pi!Q#pi!R#pi!S#pi!T#pi!U#pi!V#pi!W#pi!X#pi!Y#pi!Z#pi![#pi!]#pi!^#pi!_#pi!`#pi!a#pi!b#pi!c#pi!d#pi!e#pi!f#pi!g#pi!h#pi!i#pi!j#pi!k#pi!l#pi!m#pi!n#pi!o#pi!p#pi!q#pi!r#pi!s#pi!t#pi!u#pi!v#pi!w#pi!x#pi!y#pi#P#pi#Z#pi#_#pi#`#pi$Q#pi!}#pi#[#pi[#pi~OP#iXQ#iXR#iXl#iX~P%2YOP#XXQ#XXR#XXl#XX~P%2YOS#qiT#qiU#qiW#qiX#qiY#qiZ#qi_#qid#qie#qif#qig#qih#qik#qim#qin#qio#qip#qiq#qir#qis#qit#qiu#qiv#qiw#qix#qiy#qiz#qi{#qi|#qi}#qi!O#qi!P#qi!Q#qi!R#qi!S#qi!T#qi!U#qi!V#qi!W#qi!X#qi!Y#qi!Z#qi![#qi!]#qi!^#qi!_#qi!`#qi!a#qi!b#qi!c#qi!d#qi!e#qi!f#qi!g#qi!h#qi!i#qi!j#qi!k#qi!l#qi!m#qi!n#qi!o#qi!p#qi!q#qi!r#qi!s#qi!t#qi!u#qi!v#qi!w#qi!x#qi!y#qi#P#qi#Z#qi#_#qi#`#qi$Q#qi!}#qi#[#qi[#qi~OP#iXQ#iXR#iXl#iX~P%8ZOP#XXQ#XXR#XXl#XX~P%8ZOS#WiT#WiU#WiW#WiX#WiY#Wi_#Wig#Wih#Wik#Wim#Wiq#Wi!b#Wi!c#Wi!d#Wi!e#Wi!f#Wi!g#Wi!h#Wi!i#Wi!j#Wi!k#Wi!l#Wi!m#Wi!n#Wi!o#Wi!p#Wi!q#Wi!r#Wi!s#Wi!t#Wi!u#Wi!v#Wi!w#Wi!x#Wi!y#Wi#P#Wi#Z#Wi#_#Wi#`#Wi~OP!yOQ!zOR!yOl!{OZ#Wid#Wie#Wif#Win#Wio#Wip#Wir#Wis#Wit#Wiu#Wiv#Wiw#Wix#Wiy#Wiz#Wi{#Wi|#Wi}#Wi!O#Wi!P#Wi!Q#Wi!R#Wi!S#Wi!T#Wi!U#Wi!V#Wi!W#Wi!X#Wi!Y#Wi!Z#Wi![#Wi!]#Wi!^#Wi!_#Wi!`#Wi!a#Wi$Q#Wi~P%>[OSQOTPOUROWSOX,}OY,yO_!`OdWOeWOfWOgUOhuOk!eOm/{OnjOokOpiOq'jOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O!buO!c'fO!d-RO!e/vO!f2eO!g3xO!h4xO!i!sO!j'gO!k-VO!l/zO!m2iO!n3|O!o4|O!p/zO!quO!r'fO!s-RO!t/vO!u2eO!v3xO!w4xO!x,qO!y,uO#P!bO#Z0PO#_UO#`UO#h#fP~O!}&cO~P%CrOP#dXQ#dXR#dXS#rXT#rXU#rXW#rXX#rXY#rX_#dX_#rXd#dXe#dXf#dXg#dXg#rXh#rXj#dXk#dXk#rXl#dXm#rXn#dXo#dXp#dXq#dXq#rXr#dXs#dXt#dXu#dXv#dXw#dXx#dXy#dXz#dX{#dX|#dX}#dX!O#dX!P#dX!Q#dX!R#dX!S#dX!T#dX!U#dX!V#dX!W#dX!X#dX!Y#dX!Z#dX![#dX!]#dX!^#dX!_#dX!`#dX!a#dX!b#dX!b#rX!c#dX!c#rX!d#dX!d#rX!e#dX!e#rX!f#dX!f#rX!g#dX!g#rX!h#dX!h#rX!i#dX!i#rX!j#dX!j#rX!k#dX!k#rX!l#dX!l#rX!m#dX!m#rX!n#dX!n#rX!o#dX!o#rX!p#dX!p#rX!q#dX!q#rX!r#dX!r#rX!s#dX!s#rX!t#dX!t#rX!u#dX!u#rX!v#dX!v#rX!w#dX!w#rX!x#dX!x#rX!y#dX!y#rX#P#dX#P#rX#Z#dX#Z#rX#_#dX#_#rX#`#dX#`#rX~OZ#rXd#rXe#rXf#rXn#rXo#rXp#rXr#rXs#rXt#rXu#rXv#rXw#rXx#rXy#rXz#rX{#rX|#rX}#rX!O#rX!P#rX!Q#rX!R#rX!S#rX!T#rX!U#rX!V#rX!W#rX!X#rX!Y#rX!Z#rX![#rX!]#rX!^#rX!_#rX!`#rX!a#rX$Q#rX~P%H|OP#YXQ#YXR#YXS#rXT#rXU#rXW#rXX#rXY#rX_#YX_#rXd#YXe#YXf#YXg#YXg#rXh#rXj#YXk#YXk#rXl#YXm#rXn#YXo#YXp#YXq#YXq#rXr#YXs#YXt#YXu#YXv#YXw#YXx#YXy#YXz#YX{#YX|#YX}#YX!O#YX!P#YX!Q#YX!R#YX!S#YX!T#YX!U#YX!V#YX!W#YX!X#YX!Y#YX!Z#YX![#YX!]#YX!^#YX!_#YX!`#YX!a#YX!b#YX!b#rX!c#YX!c#rX!d#YX!d#rX!e#YX!e#rX!f#YX!f#rX!g#YX!g#rX!h#YX!h#rX!i#YX!i#rX!j#YX!j#rX!k#YX!k#rX!l#YX!l#rX!m#YX!m#rX!n#YX!n#rX!o#YX!o#rX!p#YX!p#rX!q#YX!q#rX!r#YX!r#rX!s#YX!s#rX!t#YX!t#rX!u#YX!u#rX!v#YX!v#rX!w#YX!w#rX!x#YX!x#rX!y#YX!y#rX#P#YX#P#rX#Z#YX#Z#rX#_#YX#_#rX#`#YX#`#rX~OZ#rXd#rXe#rXf#rXn#rXo#rXp#rXr#rXs#rXt#rXu#rXv#rXw#rXx#rXy#rXz#rX{#rX|#rX}#rX!O#rX!P#rX!Q#rX!R#rX!S#rX!T#rX!U#rX!V#rX!W#rX!X#rX!Y#rX!Z#rX![#rX!]#rX!^#rX!_#rX!`#rX!a#rX$Q#rX~P&${O_$cOq$cO!}&hO~OX-OOY,zO[&iOk$_Om/|O!c.mO!d-SO!e/wO!f2fO!g3yO!h4yO!i'qO!j.pO!k1iO!l3VO!m4_O!n5SO!o5dO!p3VO!r.mO!s-SO!t/wO!u2fO!v3yO!w4yO!x,rO!y,vO#Z$`O~P!1sO!}&kO~OP#jiQ#jiR#jil#ji!}#ji#[#ji~P@nOP#kXQ#kXR#kXl#kX!}#kX#[#kX~P@nOX1hOY1gOk$_Om/|O!c.mO!d-SO!e/wO!f2fO!g3yO!h4yO!i'qO!j.pO!k1iO!l3VO!m4_O!n5SO!o5dO!p3VO!r.mO!s-SO!t/wO!u2fO!v3yO!w4yO!x,rO!y,vO!}&nO#Z$`O~P!1sO!}&nO~P$KoO!}&nOP#XXQ#XXR#XXl#XX~OdWOeWOfWOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O!}#Wi~P%>[OX#jqY#jq_#jqg#jqh#jqk#jql#jqm#jqq#jq!b#jq!c#jq!d#jq!e#jq!f#jq!g#jq!h#jq!i#jq!j#jq!k#jq!l#jq!m#jq!n#jq!o#jq!p#jq!q#jq!r#jq!s#jq!t#jq!u#jq!v#jq!w#jq!x#jq!y#jq#P#jq#Z#jq#_#jq#`#jqS#jqT#jqU#jqW#jq!}#jq~OP!yOQ!zOR!yOd#jqe#jqf#jqn#jqo#jqp#jqr#jqs#jqt#jqu#jqv#jqw#jqx#jqy#jqz#jq{#jq|#jq}#jq!O#jq!P#jq!Q#jq!R#jq!S#jq!T#jq!U#jq!V#jq!W#jq!X#jq!Y#jq!Z#jq![#jq!]#jq!^#jq!_#jq!`#jq!a#jq$Q#jqZ#jqj#jq#[#jq[#jq~P&7ROS#WqT#WqU#WqW#WqX#WqY#Wq_#Wqg#Wqh#Wqk#Wqm#Wqq#Wq!b#Wq!c#Wq!d#Wq!e#Wq!f#Wq!g#Wq!h#Wq!i#Wq!j#Wq!k#Wq!l#Wq!m#Wq!n#Wq!o#Wq!p#Wq!q#Wq!r#Wq!s#Wq!t#Wq!u#Wq!v#Wq!w#Wq!x#Wq!y#Wq#P#Wq#Z#Wq#_#Wq#`#Wq~OP!yOQ!zOR!yOl!{OZ#Wqd#Wqe#Wqf#Wqn#Wqo#Wqp#Wqr#Wqs#Wqt#Wqu#Wqv#Wqw#Wqx#Wqy#Wqz#Wq{#Wq|#Wq}#Wq!O#Wq!P#Wq!Q#Wq!R#Wq!S#Wq!T#Wq!U#Wq!V#Wq!W#Wq!X#Wq!Y#Wq!Z#Wq![#Wq!]#Wq!^#Wq!_#Wq!`#Wq!a#Wq$Q#Wq~P&<uOS#laT#laU#laW#laX#laY#laZ#la_#lad#lae#laf#lag#lah#lak#lam#lan#lao#lap#laq#lar#las#lat#lau#lav#law#lax#lay#laz#la{#la|#la}#la!O#la!P#la!Q#la!R#la!S#la!T#la!U#la!V#la!W#la!X#la!Y#la!Z#la![#la!]#la!^#la!_#la!`#la!a#la!b#la!c#la!d#la!e#la!f#la!g#la!h#la!i#la!j#la!k#la!l#la!m#la!n#la!o#la!p#la!q#la!r#la!s#la!t#la!u#la!v#la!w#la!x#la!y#la#P#la#Z#la#_#la#`#la$Q#la~P!:POS#|XT#|XU#|XW#|XX#|XY#|Xh#|Xk#|Xm#|Xq#|X!b#|X!c#|X!d#|X!e#|X!f#|X!g#|X!h#|X!i#|X!j#|X!k#|X!l#|X!m#|X!n#|X!o#|X!p#|X!q#|X!r#|X!s#|X!t#|X!u#|X!v#|X!w#|X!x#|X!y#|X!}#|X#Z#|X~P!EyO!}&|OP#XXQ#XXR#XXl#XX~O!}$hO~P% TO_$cOq$cO!}%sO~OX-OOY,zO[&}Ok$_Om/|O!c.mO!d-SO!e/wO!f2fO!g3yO!h4yO!i'qO!j.pO!k1iO!l3VO!m4_O!n5SO!o5dO!p3VO!r.mO!s-SO!t/wO!u2fO!v3yO!w4yO!x,rO!y,vO#Z$`O~P!1sO!}'OO~OP#jqQ#jqR#jql#jq!}#jq#[#jq~P@nOdWOeWOfWOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O!}#Wq~P&<uOX#jyY#jy_#jyg#jyh#jyk#jyl#jym#jyq#jy!b#jy!c#jy!d#jy!e#jy!f#jy!g#jy!h#jy!i#jy!j#jy!k#jy!l#jy!m#jy!n#jy!o#jy!p#jy!q#jy!r#jy!s#jy!t#jy!u#jy!v#jy!w#jy!x#jy!y#jy#P#jy#Z#jy#_#jy#`#jyS#jyT#jyU#jyW#jy!}#jy~OP!yOQ!zOR!yOd#jye#jyf#jyn#jyo#jyp#jyr#jys#jyt#jyu#jyv#jyw#jyx#jyy#jyz#jy{#jy|#jy}#jy!O#jy!P#jy!Q#jy!R#jy!S#jy!T#jy!U#jy!V#jy!W#jy!X#jy!Y#jy!Z#jy![#jy!]#jy!^#jy!_#jy!`#jy!a#jy$Q#jyZ#jyj#jy#[#jy[#jy~P' nOS#WyT#WyU#WyW#WyX#WyY#Wy_#Wyg#Wyh#Wyk#Wym#Wyq#Wy!b#Wy!c#Wy!d#Wy!e#Wy!f#Wy!g#Wy!h#Wy!i#Wy!j#Wy!k#Wy!l#Wy!m#Wy!n#Wy!o#Wy!p#Wy!q#Wy!r#Wy!s#Wy!t#Wy!u#Wy!v#Wy!w#Wy!x#Wy!y#Wy#P#Wy#Z#Wy#_#Wy#`#Wy~OP!yOQ!zOR!yOl!{OZ#Wyd#Wye#Wyf#Wyn#Wyo#Wyp#Wyr#Wys#Wyt#Wyu#Wyv#Wyw#Wyx#Wyy#Wyz#Wy{#Wy|#Wy}#Wy!O#Wy!P#Wy!Q#Wy!R#Wy!S#Wy!T#Wy!U#Wy!V#Wy!W#Wy!X#Wy!Y#Wy!Z#Wy![#Wy!]#Wy!^#Wy!_#Wy!`#Wy!a#Wy$Q#Wy~P''bOP#miQ#miR#miS#liT#liU#liW#liX#liY#liZ#li_#mid#mie#mif#mig#mih#lij#mik#mil#mim#lin#mio#mip#miq#mir#mis#mit#miu#miv#miw#mix#miy#miz#mi{#mi|#mi}#mi!O#mi!P#mi!Q#mi!R#mi!S#mi!T#mi!U#mi!V#mi!W#mi!X#mi!Y#mi!Z#mi![#mi!]#mi!^#mi!_#mi!`#mi!a#mi!b#mi!c#mi!d#mi!e#mi!f#mi!g#mi!h#mi!i#mi!j#mi!k#mi!l#mi!m#mi!n#mi!o#mi!p#mi!q#mi!r#mi!s#mi!t#mi!u#mi!v#mi!w#mi!x#mi!y#mi#P#mi#Z#mi#_#mi#`#mi$Q#li!}#li#[#li[#li~OP#jyQ#jyR#jyl#jy!}#jy#[#jy~P@nOdWOeWOfWOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O!}#Wy~P''bOX#j!RY#j!R_#j!Rg#j!Rh#j!Rk#j!Rl#j!Rm#j!Rq#j!R!b#j!R!c#j!R!d#j!R!e#j!R!f#j!R!g#j!R!h#j!R!i#j!R!j#j!R!k#j!R!l#j!R!m#j!R!n#j!R!o#j!R!p#j!R!q#j!R!r#j!R!s#j!R!t#j!R!u#j!R!v#j!R!w#j!R!x#j!R!y#j!R#P#j!R#Z#j!R#_#j!R#`#j!RS#j!RT#j!RU#j!RW#j!R!}#j!R~OP!yOQ!zOR!yOd#j!Re#j!Rf#j!Rn#j!Ro#j!Rp#j!Rr#j!Rs#j!Rt#j!Ru#j!Rv#j!Rw#j!Rx#j!Ry#j!Rz#j!R{#j!R|#j!R}#j!R!O#j!R!P#j!R!Q#j!R!R#j!R!S#j!R!T#j!R!U#j!R!V#j!R!W#j!R!X#j!R!Y#j!R!Z#j!R![#j!R!]#j!R!^#j!R!_#j!R!`#j!R!a#j!R$Q#j!RZ#j!Rj#j!R#[#j!R[#j!R~P'5gOS#W!RT#W!RU#W!RW#W!RX#W!RY#W!R_#W!Rg#W!Rh#W!Rk#W!Rm#W!Rq#W!R!b#W!R!c#W!R!d#W!R!e#W!R!f#W!R!g#W!R!h#W!R!i#W!R!j#W!R!k#W!R!l#W!R!m#W!R!n#W!R!o#W!R!p#W!R!q#W!R!r#W!R!s#W!R!t#W!R!u#W!R!v#W!R!w#W!R!x#W!R!y#W!R#P#W!R#Z#W!R#_#W!R#`#W!R~OP!yOQ!zOR!yOl!{OZ#W!Rd#W!Re#W!Rf#W!Rn#W!Ro#W!Rp#W!Rr#W!Rs#W!Rt#W!Ru#W!Rv#W!Rw#W!Rx#W!Ry#W!Rz#W!R{#W!R|#W!R}#W!R!O#W!R!P#W!R!Q#W!R!R#W!R!S#W!R!T#W!R!U#W!R!V#W!R!W#W!R!X#W!R!Y#W!R!Z#W!R![#W!R!]#W!R!^#W!R!_#W!R!`#W!R!a#W!R$Q#W!R~P';ZOP#j!RQ#j!RR#j!Rl#j!R!}#j!R#[#j!R~P@nOdWOeWOfWOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O!}#W!R~P';ZOX#j!ZY#j!Z_#j!Zg#j!Zh#j!Zk#j!Zl#j!Zm#j!Zq#j!Z!b#j!Z!c#j!Z!d#j!Z!e#j!Z!f#j!Z!g#j!Z!h#j!Z!i#j!Z!j#j!Z!k#j!Z!l#j!Z!m#j!Z!n#j!Z!o#j!Z!p#j!Z!q#j!Z!r#j!Z!s#j!Z!t#j!Z!u#j!Z!v#j!Z!w#j!Z!x#j!Z!y#j!Z#P#j!Z#Z#j!Z#_#j!Z#`#j!ZS#j!ZT#j!ZU#j!ZW#j!Z!}#j!Z~OP!yOQ!zOR!yOd#j!Ze#j!Zf#j!Zn#j!Zo#j!Zp#j!Zr#j!Zs#j!Zt#j!Zu#j!Zv#j!Zw#j!Zx#j!Zy#j!Zz#j!Z{#j!Z|#j!Z}#j!Z!O#j!Z!P#j!Z!Q#j!Z!R#j!Z!S#j!Z!T#j!Z!U#j!Z!V#j!Z!W#j!Z!X#j!Z!Y#j!Z!Z#j!Z![#j!Z!]#j!Z!^#j!Z!_#j!Z!`#j!Z!a#j!Z$Q#j!ZZ#j!Zj#j!Z#[#j!Z[#j!Z~P'CpOS#W!ZT#W!ZU#W!ZW#W!ZX#W!ZY#W!Z_#W!Zg#W!Zh#W!Zk#W!Zm#W!Zq#W!Z!b#W!Z!c#W!Z!d#W!Z!e#W!Z!f#W!Z!g#W!Z!h#W!Z!i#W!Z!j#W!Z!k#W!Z!l#W!Z!m#W!Z!n#W!Z!o#W!Z!p#W!Z!q#W!Z!r#W!Z!s#W!Z!t#W!Z!u#W!Z!v#W!Z!w#W!Z!x#W!Z!y#W!Z#P#W!Z#Z#W!Z#_#W!Z#`#W!Z~OP!yOQ!zOR!yOl!{OZ#W!Zd#W!Ze#W!Zf#W!Zn#W!Zo#W!Zp#W!Zr#W!Zs#W!Zt#W!Zu#W!Zv#W!Zw#W!Zx#W!Zy#W!Zz#W!Z{#W!Z|#W!Z}#W!Z!O#W!Z!P#W!Z!Q#W!Z!R#W!Z!S#W!Z!T#W!Z!U#W!Z!V#W!Z!W#W!Z!X#W!Z!Y#W!Z!Z#W!Z![#W!Z!]#W!Z!^#W!Z!_#W!Z!`#W!Z!a#W!Z$Q#W!Z~P'IdOP#j!ZQ#j!ZR#j!Zl#j!Z!}#j!Z#[#j!Z~P@nOdWOeWOfWOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O!}#W!Z~P'IdOP#jXQ#jXR#jXS#WXT#WXU#WXW#WXX#WXY#WX_#jXd#jXe#jXf#jXg#jXh#WXk#WXk#jXl#jXm#WXn#jXo#jXp#jXq#WXq#jXr#jXs#jXt#jXu#jXv#jXw#jXx#jXy#jXz#jX{#jX|#jX}#jX!O#jX!P#jX!Q#jX!R#jX!S#jX!T#jX!U#jX!V#jX!W#jX!X#jX!Y#jX!Z#jX![#jX!]#jX!^#jX!_#jX!`#jX!a#jX!b#WX!c#WX!d#WX!e#WX!f#WX!g#WX!h#WX!i#WX!j#WX!k#WX!l#WX!m#WX!n#WX!o#WX!p#WX!q#WX!r#WX!s#WX!t#WX!u#WX!v#WX!w#WX!x#WX!y#WX!}#WX!}#jX#P#jX#Z#WX#Z#jX#_#jX#`#jX~P!EaO_WOdWOeWOfWOgUOkWOn,oOo,pOp,jOq!|Or[Os'dOt,dOu/pOv2_Ow3rOx4rOy!nOz'eO{,iO|/uO}2dO!O3wO!P4wO!Q,iO!R'eO!S[O!T'dO!U,dO!V/pO!W2_O!X3rO!Y4rO!Z'dO![[O!]'dO!^,dO!_[O!`'dO!a[O#PVO#Z!tO#_UO#`UO~O_WOdWOeWOfWOgUOkWOn1aOo1eOp,mOq!|Or[Os.gOt,gOu/sOv2bOw3uOx4uOy'oOz.kO{1[O|3TO}4]O!O5QO!P5bO!Q1[O!R.kO!S[O!T.gO!U,gO!V/sO!W2bO!X3uO!Y4uO!Z.gO![[O!].gO!^,gO!_[O!`.gO!a[O#PVO#Z0QO#_UO#`UO~OP#dXQ#dXR#dX_#{Xl#dXq#{X!}#dX!}#{X#h#{X~P!5SOP#jXQ#jXR#jXS#WXT#WXU#WXW#WXX#WXY#WX_#WX_#{Xg#WXh#WXk#WXl#jXm#WXq#WXq#{X!b#WX!c#WX!d#WX!e#WX!f#WX!g#WX!h#WX!i#WX!j#WX!k#WX!l#WX!m#WX!n#WX!o#WX!p#WX!q#WX!r#WX!s#WX!t#WX!u#WX!v#WX!w#WX!x#WX!y#WX!}#WX!}#jX!}#{X#P#WX#Z#WX#_#WX#`#WX#h#{X~P!EaOP#jXQ#jXR#jXS#WXT#WXU#WXW#WXX#WXY#WX_#WX_#jX_#{Xd#jXe#jXf#jXg#WXg#jXh#WXk#WXk#jXl#jXm#WXn#jXo#jXp#jXq#WXq#jXq#{Xr#jXs#jXt#jXu#jXv#jXw#jXx#jXy#jXz#jX{#jX|#jX}#jX!O#jX!P#jX!Q#jX!R#jX!S#jX!T#jX!U#jX!V#jX!W#jX!X#jX!Y#jX!Z#jX![#jX!]#jX!^#jX!_#jX!`#jX!a#jX!b#WX!c#WX!d#WX!e#WX!f#WX!g#WX!h#WX!i#WX!j#WX!k#WX!l#WX!m#WX!n#WX!o#WX!p#WX!q#WX!r#WX!s#WX!t#WX!u#WX!v#WX!w#WX!x#WX!y#WX!}#WX!}#jX#P#WX#P#jX#Z#WX#Z#jX#_#WX#_#jX#`#WX#`#jX#h#{X~P!EaOP#jXQ#jXR#jXS#WXT#WXU#WXW#WXX#WXY#WX_#jX_#{Xd#jXe#jXf#jXg#jXh#WXk#WXk#jXl#jXm#WXn#jXo#jXp#jXq#WXq#jXq#{Xr#jXs#jXt#jXu#jXv#jXw#jXx#jXy#jXz#jX{#jX|#jX}#jX!O#jX!P#jX!Q#jX!R#jX!S#jX!T#jX!U#jX!V#jX!W#jX!X#jX!Y#jX!Z#jX![#jX!]#jX!^#jX!_#jX!`#jX!a#jX!b#WX!c#WX!d#WX!e#WX!f#WX!g#WX!h#WX!i#WX!j#WX!k#WX!l#WX!m#WX!n#WX!o#WX!p#WX!q#WX!r#WX!s#WX!t#WX!u#WX!v#WX!w#WX!x#WX!y#WX!}#WX!}#jX#P#jX#Z#WX#Z#jX#_#jX#`#jX#h#{X~P!EaOP#jXQ#jXR#jX_#jXl#jXr#jXs#jXt#jXu#jXv#jXw#jXx#jXy#jXz#jX{#jX|#jX}#jX!O#jX!P#jX!Q#jX!R#jX!S#jX!T#jX!U#jX!V#jX!W#jX!X#jX!Y#jX!Z#jX![#jX!]#jX!^#jX!_#jX!`#jX!a#jX#P#jX~OdWOeWOfWOgUOkWOnjOokOpiOq!|O#Z0QO#_UO#`UO~P(?`O_WOdWOeWOfWOgUOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O#PVO#_UO#`UOP#jXQ#jXR#jXS#jXT#jXU#jXW#jXX#jXY#jXh#jXl#jXm#jXq#jX!b#jX!c#jX!d#jX!e#jX!f#jX!g#jX!h#jX!i#jX!j#jX!k#jX!l#jX!m#jX!n#jX!o#jX!p#jX!q#jX!r#jX!s#jX!t#jX!u#jX!v#jX!w#jX!x#jX!y#jX~Ok#jX!}#jX#Z#jX[#jX~P(BlOkWO#Z0QOZ#jX$Q#jX~P(BlOdWOeWOfWOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O~OP#jXQ#jXR#jXS#jXT#jXU#jXW#jXX#jXY#jX_#jXg#jXh#jXk#jXl#jXm#jXq#jX!b#jX!c#jX!d#jX!e#jX!f#jX!g#jX!h#jX!i#jX!j#jX!k#jX!l#jX!m#jX!n#jX!o#jX!p#jX!q#jX!r#jX!s#jX!t#jX!u#jX!v#jX!w#jX!x#jX!y#jX!}#jX#P#jX#Z#jX#_#jX#`#jX~P(HdO#[#WX~P@nO_WOgUO#PVO#_UO#`UO[#WX~P#!TO_WOgUOkWO#PVO#Z0QO#_UO#`UOS#WXT#WXU#WXW#WXX#WXY#WXZ#WXh#WXm#WXq#WX!b#WX!c#WX!d#WX!e#WX!f#WX!g#WX!h#WX!i#WX!j#WX!k#WX!l#WX!m#WX!n#WX!o#WX!p#WX!q#WX!r#WX!s#WX!t#WX!u#WX!v#WX!w#WX!x#WX!y#WX$Q#WX~P(HdO_WOdWOeWOfWOgUOkWOn1_Oo1cOp,kOq!|Or[Os.eOt,eOu/qOv2`Ow3sOx4sOy'mOz.iO{1YO|3RO}4ZO!O5OO!P5`O!Q1YO!R.iO!S[O!T.eO!U,eO!V/qO!W2`O!X3sO!Y4sO!Z.eO![[O!].eO!^,eO!_[O!`.eO!a[O#PVO#Z0QO#_UO#`UO~O_WOdWOeWOfWOgUOkWOn1`Oo1dOp,nOq!|Or[Os.fOt,hOu/tOv2cOw3vOx4vOy'nOz.jO{1ZO|3SO}4[O!O5PO!P5aO!Q1ZO!R.jO!S[O!T.fO!U,hO!V/tO!W2cO!X3vO!Y4vO!Z.fO![[O!].fO!^,hO!_[O!`.fO!a[O#PVO#Z0QO#_UO#`UO~OP#dXQ#dXR#dXd#jXe#jXf#jXg#jXk#jXl#dXn#jXo#jXp#jXq#jX!}#jX#Z#jX#_#jX#`#jX~P(?`OP'sOQ-YOR'sOl#ja!}#ja~OS#jaT#jaU#jaW#jaX#jaY#jah#jak#jal#jam#jaq#ja!b#ja!c#ja!d#ja!e#ja!f#ja!g#ja!h#ja!i#ja!j#ja!k#ja!l#ja!m#ja!n#ja!o#ja!p#ja!q#ja!r#ja!s#ja!t#ja!u#ja!v#ja!w#ja!x#ja!y#ja!}#ja#Z#ja[#ja~OP'tOQ-ZOR'tO~P)*pO_#jal#jar#jas#jat#jau#jav#jaw#jax#jay#jaz#ja{#ja|#ja}#ja!O#ja!P#ja!Q#ja!R#ja!S#ja!T#ja!U#ja!V#ja!W#ja!X#ja!Y#ja!Z#ja![#ja!]#ja!^#ja!_#ja!`#ja!a#ja#P#ja~OP'vOQ-]OR'vO~P)-gOP'uOQ-[OR'uO~P#/UOS#jaT#jaU#jaW#jaX#jaY#jaZ#jah#jal#jam#jaq#ja!b#ja!c#ja!d#ja!e#ja!f#ja!g#ja!h#ja!i#ja!j#ja!k#ja!l#ja!m#ja!n#ja!o#ja!p#ja!q#ja!r#ja!s#ja!t#ja!u#ja!v#ja!w#ja!x#ja!y#ja$Q#ja~OP'wOQ-^OR'wO~P)0[OP!yOQ!zOR!yOl!{O~P()hOP!yOQ!zOR!yOl!{O~P)#^OP!yOQ!zOR!yOl!{O~PEyOP!yOQ!zOR!yOl!{O~P(,dOP!yOQ!zOR!yOl!{O~P)&YOQ%xO~P#@SOP!yOQ!zOR!yOl!{OS$WaT$WaU$WaW$WaX$WaY$Wa_$Wag$Wah$Wak$Wam$Waq$Wa!b$Wa!c$Wa!d$Wa!e$Wa!f$Wa!g$Wa!h$Wa!i$Wa!j$Wa!k$Wa!l$Wa!m$Wa!n$Wa!o$Wa!p$Wa!q$Wa!r$Wa!s$Wa!t$Wa!u$Wa!v$Wa!w$Wa!x$Wa!y$Wa!}$Wa#P$Wa#Z$Wa#_$Wa#`$Wa~P(,dOP!yOQ!zOR!yOl!{OS$WaT$WaU$WaW$WaX$WaY$Wah$Wak$Wam$Waq$Wa!b$Wa!c$Wa!d$Wa!e$Wa!f$Wa!g$Wa!h$Wa!i$Wa!j$Wa!k$Wa!l$Wa!m$Wa!n$Wa!o$Wa!p$Wa!q$Wa!r$Wa!s$Wa!t$Wa!u$Wa!v$Wa!w$Wa!x$Wa!y$Wa!}$Wa#Z$Wa[$Wa~P)#^OP!yOQ!zOR!yOl!{O#[$Wa~P#*lOP!yOQ!zOR!yOl!{OS$WaT$WaU$WaW$WaX$WaY$WaZ$Wah$Wam$Waq$Wa!b$Wa!c$Wa!d$Wa!e$Wa!f$Wa!g$Wa!h$Wa!i$Wa!j$Wa!k$Wa!l$Wa!m$Wa!n$Wa!o$Wa!p$Wa!q$Wa!r$Wa!s$Wa!t$Wa!u$Wa!v$Wa!w$Wa!x$Wa!y$Wa$Q$Wa~P)&YOP!yOQ!zOR!yOl!{OS$XaT$XaU$XaW$XaX$XaY$Xa_$Xag$Xah$Xak$Xam$Xaq$Xa!b$Xa!c$Xa!d$Xa!e$Xa!f$Xa!g$Xa!h$Xa!i$Xa!j$Xa!k$Xa!l$Xa!m$Xa!n$Xa!o$Xa!p$Xa!q$Xa!r$Xa!s$Xa!t$Xa!u$Xa!v$Xa!w$Xa!x$Xa!y$Xa!}$Xa#P$Xa#Z$Xa#_$Xa#`$Xa~P(,dOP!yOQ!zOR!yOl!{OS$XaT$XaU$XaW$XaX$XaY$Xah$Xak$Xam$Xaq$Xa!b$Xa!c$Xa!d$Xa!e$Xa!f$Xa!g$Xa!h$Xa!i$Xa!j$Xa!k$Xa!l$Xa!m$Xa!n$Xa!o$Xa!p$Xa!q$Xa!r$Xa!s$Xa!t$Xa!u$Xa!v$Xa!w$Xa!x$Xa!y$Xa!}$Xa#Z$Xa[$Xa~P)#^OP!yOQ!zOR!yOl!{O#[$Xa~P#*lOP!yOQ!zOR!yOl!{OS$XaT$XaU$XaW$XaX$XaY$XaZ$Xah$Xam$Xaq$Xa!b$Xa!c$Xa!d$Xa!e$Xa!f$Xa!g$Xa!h$Xa!i$Xa!j$Xa!k$Xa!l$Xa!m$Xa!n$Xa!o$Xa!p$Xa!q$Xa!r$Xa!s$Xa!t$Xa!u$Xa!v$Xa!w$Xa!x$Xa!y$Xa$Q$Xa~P)&YO_WOdWOeWOfWOgUOkWOn1aOo1eOp,mOq!|Or[Os.gOt,gOu/sOv2bOw3uOx4uOy'oOz.kO{1[O|3TO}4]O!O5QO!P5bO!Q1[O!R.kO!S[O!T.gO!U,gO!V/sO!W2bO!X3uO!Y4uO!Z.gO![[O!].gO!^,gO!_[O!`.gO!a[O#PVO#Z0RO#_UO#`UO~O_WOdWOeWOfWOgUOkWOn1_Oo1cOp,kOq!|Or[Os.eOt,eOu/qOv2`Ow3sOx4sOy'mOz.iO{1YO|3RO}4ZO!O5OO!P5`O!Q1YO!R.iO!S[O!T.eO!U,eO!V/qO!W2`O!X3sO!Y4sO!Z.eO![[O!].eO!^,eO!_[O!`.eO!a[O#PVO#Z!tO#_UO#`UO~O_WOdWOeWOfWOgUOkWOn1`Oo1dOp,nOq!|Or[Os.fOt,hOu/tOv2cOw3vOx4vOy'nOz.jO{1ZO|3SO}4[O!O5PO!P5aO!Q1ZO!R.jO!S[O!T.fO!U,hO!V/tO!W2cO!X3vO!Y4vO!Z.fO![[O!].fO!^,hO!_[O!`.fO!a[O#PVO#Z!tO#_UO#`UO~OP'uOQ-[OR'uOl'{O!}#Wa~P$!`OS#WaT#WaU#WaW#WaX#WaY#Wah#Wak#Wam#Waq#Wa!b#Wa!c#Wa!d#Wa!e#Wa!f#Wa!g#Wa!h#Wa!i#Wa!j#Wa!k#Wa!l#Wa!m#Wa!n#Wa!o#Wa!p#Wa!q#Wa!r#Wa!s#Wa!t#Wa!u#Wa!v#Wa!w#Wa!x#Wa!y#Wa!}#Wa#Z#Wa[#Wa~OP'tOQ-ZOR'tOl'yO~P* mOP0vOQ1lOR0vOl0wO#[#Wa~OS#WaT#WaU#WaW#WaX#WaY#WaZ#Wah#Wam#Waq#Wa!b#Wa!c#Wa!d#Wa!e#Wa!f#Wa!g#Wa!h#Wa!i#Wa!j#Wa!k#Wa!l#Wa!m#Wa!n#Wa!o#Wa!p#Wa!q#Wa!r#Wa!s#Wa!t#Wa!u#Wa!v#Wa!w#Wa!x#Wa!y#Wa$Q#Wa~OP'wOQ-^OR'wOl'|O~P*$uOP!yOQ!zOR!yOl!{O~P#*lOdWOeWOfWOgUOkWOnjOokOpiOq!|O#Z0QO#_UO#`UOP#jaQ#jaR#ja~P)-gO_WOdWOeWOfWOgUOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O#PVO#_UO#`UOP#jaQ#jaR#ja~P)*pO_WOgUOkWO#PVO#Z0QO#_UO#`UOP#jaQ#jaR#jaS#jaT#jaU#jaW#jaX#jaY#jaZ#jah#jal#jam#jaq#ja!b#ja!c#ja!d#ja!e#ja!f#ja!g#ja!h#ja!i#ja!j#ja!k#ja!l#ja!m#ja!n#ja!o#ja!p#ja!q#ja!r#ja!s#ja!t#ja!u#ja!v#ja!w#ja!x#ja!y#ja$Q#ja~P(HdOdWOeWOfWOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[OP#jaQ#jaR#ja~P#/UO#[#Wa~P@nO_WOdWOeWOfWOgUOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O#PVO#_UO#`UO~P* mO_WOgUOkWO#PVO#Z0QO#_UO#`UOS#WaT#WaU#WaW#WaX#WaY#WaZ#Wah#Wam#Waq#Wa!b#Wa!c#Wa!d#Wa!e#Wa!f#Wa!g#Wa!h#Wa!i#Wa!j#Wa!k#Wa!l#Wa!m#Wa!n#Wa!o#Wa!p#Wa!q#Wa!r#Wa!s#Wa!t#Wa!u#Wa!v#Wa!w#Wa!x#Wa!y#Wa$Q#Wa~P(HdOX#iiY#ii_#iid#iie#iif#iig#iih#iik#iim#iin#iio#iip#iiq#iir#iis#iit#iiu#iiv#iiw#iix#iiy#iiz#ii{#ii|#ii}#ii!O#ii!P#ii!Q#ii!R#ii!S#ii!T#ii!U#ii!V#ii!W#ii!X#ii!Y#ii!Z#ii![#ii!]#ii!^#ii!_#ii!`#ii!a#ii!b#ii!c#ii!d#ii!e#ii!f#ii!g#ii!h#ii!i#ii!j#ii!k#ii!l#ii!m#ii!n#ii!o#ii!p#ii!q#ii!r#ii!s#ii!t#ii!u#ii!v#ii!w#ii!x#ii!y#ii#P#ii#Z#ii#_#ii#`#ii$Q#iiS#iiT#iiU#iiW#iiZ#iij#iij#ji#[#ii[#ii~P$=eOP#jiQ#jiR#jiS#jiT#jiU#jiW#jiX#jiY#ji_#jig#jih#jik#jil#jim#jiq#ji!b#ji!c#ji!d#ji!e#ji!f#ji!g#ji!h#ji!i#ji!j#ji!k#ji!l#ji!m#ji!n#ji!o#ji!p#ji!q#ji!r#ji!s#ji!t#ji!u#ji!v#ji!w#ji!x#ji!y#ji!}#ji#P#ji#Z#ji#_#ji#`#ji~OP#iiQ#iiR#iil#ii~P*<rOP'sOQ-YOR'sOl#ji!}#ji~OS#jiT#jiU#jiW#jiX#jiY#jih#jik#jil#jim#jiq#ji!b#ji!c#ji!d#ji!e#ji!f#ji!g#ji!h#ji!i#ji!j#ji!k#ji!l#ji!m#ji!n#ji!o#ji!p#ji!q#ji!r#ji!s#ji!t#ji!u#ji!v#ji!w#ji!x#ji!y#ji!}#ji#Z#ji[#ji~OP'tOQ-ZOR'tO~P*@dO_#jil#jir#jis#jit#jiu#jiv#jiw#jix#jiy#jiz#ji{#ji|#ji}#ji!O#ji!P#ji!Q#ji!R#ji!S#ji!T#ji!U#ji!V#ji!W#ji!X#ji!Y#ji!Z#ji![#ji!]#ji!^#ji!_#ji!`#ji!a#ji#P#ji~OP'vOQ-]OR'vO~P*CZOP'uOQ-[OR'uO~P*<{OS#jiT#jiU#jiW#jiX#jiY#jiZ#jih#jil#jim#jiq#ji!b#ji!c#ji!d#ji!e#ji!f#ji!g#ji!h#ji!i#ji!j#ji!k#ji!l#ji!m#ji!n#ji!o#ji!p#ji!q#ji!r#ji!s#ji!t#ji!u#ji!v#ji!w#ji!x#ji!y#ji$Q#ji~OP'wOQ-^OR'wO~P*FOOP'uOQ-[OR'uOl'{O!}$Ui~P%'[OS$UiT$UiU$UiW$UiX$UiY$Uih$Uim$Uiq$Ui!b$Ui!c$Ui!d$Ui!e$Ui!f$Ui!g$Ui!h$Ui!i$Ui!j$Ui!k$Ui!l$Ui!m$Ui!n$Ui!o$Ui!p$Ui!q$Ui!r$Ui!s$Ui!t$Ui!u$Ui!v$Ui!w$Ui!x$Ui!y$Ui~OP'tOQ-ZOR'tOl'yOk$Ui!}$Ui#Z$Ui[$Ui~P*ISOP0vOQ1lOR0vOl0wO#[$Ui~OP'wOQ-^OR'wOl'|OZ$Ui$Q$Ui~P*ISOP'uOQ-[OR'uOl'{O!}$Vi~P%,rOS$ViT$ViU$ViW$ViX$ViY$Vih$Vim$Viq$Vi!b$Vi!c$Vi!d$Vi!e$Vi!f$Vi!g$Vi!h$Vi!i$Vi!j$Vi!k$Vi!l$Vi!m$Vi!n$Vi!o$Vi!p$Vi!q$Vi!r$Vi!s$Vi!t$Vi!u$Vi!v$Vi!w$Vi!x$Vi!y$Vi~OP'tOQ-ZOR'tOl'yOk$Vi!}$Vi#Z$Vi[$Vi~P*MVOP0vOQ1lOR0vOl0wO#[$Vi~OP'wOQ-^OR'wOl'|OZ$Vi$Q$Vi~P*MVOP'uOQ-[OR'uOl'{O!}#Wi~P%>[OS#WiT#WiU#WiW#WiX#WiY#Wih#Wik#Wim#Wiq#Wi!b#Wi!c#Wi!d#Wi!e#Wi!f#Wi!g#Wi!h#Wi!i#Wi!j#Wi!k#Wi!l#Wi!m#Wi!n#Wi!o#Wi!p#Wi!q#Wi!r#Wi!s#Wi!t#Wi!u#Wi!v#Wi!w#Wi!x#Wi!y#Wi!}#Wi#Z#Wi[#Wi~OP'tOQ-ZOR'tOl'yO~P+#YOP0vOQ1lOR0vOl0wO#[#Wi~OS#WiT#WiU#WiW#WiX#WiY#WiZ#Wih#Wim#Wiq#Wi!b#Wi!c#Wi!d#Wi!e#Wi!f#Wi!g#Wi!h#Wi!i#Wi!j#Wi!k#Wi!l#Wi!m#Wi!n#Wi!o#Wi!p#Wi!q#Wi!r#Wi!s#Wi!t#Wi!u#Wi!v#Wi!w#Wi!x#Wi!y#Wi$Q#Wi~OP'wOQ-^OR'wOl'|O~P+&bO!}#rX~P%H|OP#dXQ#dXR#dXS#rXT#rXU#rXW#rXX#rXY#rX_#dXd#dXe#dXf#dXg#dXh#rXj#dXk#dXl#dXm#rXn#dXo#dXp#dXq#dXq#rXr#dXs#dXt#dXu#dXv#dXw#dXx#dXy#dXz#dX{#dX|#dX}#dX!O#dX!P#dX!Q#dX!R#dX!S#dX!T#dX!U#dX!V#dX!W#dX!X#dX!Y#dX!Z#dX![#dX!]#dX!^#dX!_#dX!`#dX!a#dX!b#dX!b#rX!c#dX!c#rX!d#dX!d#rX!e#dX!e#rX!f#dX!f#rX!g#dX!g#rX!h#dX!h#rX!i#dX!i#rX!j#dX!j#rX!k#dX!k#rX!l#dX!l#rX!m#dX!m#rX!n#dX!n#rX!o#dX!o#rX!p#dX!p#rX!q#dX!q#rX!r#dX!r#rX!s#dX!s#rX!t#dX!t#rX!u#dX!u#rX!v#dX!v#rX!w#dX!w#rX!x#dX!x#rX!y#dX!y#rX#P#dX#Z#dX#_#dX#`#dX~Ok#rX!}#rX#Z#rX[#rX~P+)YOP#dXQ#dXR#dX_#dXd#dXe#dXf#dXg#dXj#dXk#dXl#dXn#dXo#dXp#dXq#dXr#dXs#dXt#dXu#dXv#dXw#dXx#dXy#dXz#dX{#dX|#dX}#dX!O#dX!P#dX!Q#dX!R#dX!S#dX!T#dX!U#dX!V#dX!W#dX!X#dX!Y#dX!Z#dX![#dX!]#dX!^#dX!_#dX!`#dX!a#dX!b#dX!c#dX!d#dX!e#dX!f#dX!g#dX!h#dX!i#dX!j#dX!k#dX!l#dX!m#dX!n#dX!o#dX!p#dX!q#dX!r#dX!s#dX!t#dX!u#dX!v#dX!w#dX!x#dX!y#dX#P#dX#Z#dX#_#dX#`#dX~O#[#rX~P+0hOZ#rX$Q#rX~P+)YO!}#rX~P&${OP#YXQ#YXR#YXS#rXT#rXU#rXW#rXX#rXY#rX_#YXd#YXe#YXf#YXg#YXh#rXj#YXk#YXl#YXm#rXn#YXo#YXp#YXq#YXq#rXr#YXs#YXt#YXu#YXv#YXw#YXx#YXy#YXz#YX{#YX|#YX}#YX!O#YX!P#YX!Q#YX!R#YX!S#YX!T#YX!U#YX!V#YX!W#YX!X#YX!Y#YX!Z#YX![#YX!]#YX!^#YX!_#YX!`#YX!a#YX!b#YX!b#rX!c#YX!c#rX!d#YX!d#rX!e#YX!e#rX!f#YX!f#rX!g#YX!g#rX!h#YX!h#rX!i#YX!i#rX!j#YX!j#rX!k#YX!k#rX!l#YX!l#rX!m#YX!m#rX!n#YX!n#rX!o#YX!o#rX!p#YX!p#rX!q#YX!q#rX!r#YX!r#rX!s#YX!s#rX!t#YX!t#rX!u#YX!u#rX!v#YX!v#rX!w#YX!w#rX!x#YX!x#rX!y#YX!y#rX#P#YX#Z#YX#_#YX#`#YX~Ok#rX!}#rX#Z#rX[#rX~P+5wOP#YXQ#YXR#YX_#YXd#YXe#YXf#YXg#YXj#YXk#YXl#YXn#YXo#YXp#YXq#YXr#YXs#YXt#YXu#YXv#YXw#YXx#YXy#YXz#YX{#YX|#YX}#YX!O#YX!P#YX!Q#YX!R#YX!S#YX!T#YX!U#YX!V#YX!W#YX!X#YX!Y#YX!Z#YX![#YX!]#YX!^#YX!_#YX!`#YX!a#YX!b#YX!c#YX!d#YX!e#YX!f#YX!g#YX!h#YX!i#YX!j#YX!k#YX!l#YX!m#YX!n#YX!o#YX!p#YX!q#YX!r#YX!s#YX!t#YX!u#YX!v#YX!w#YX!x#YX!y#YX#P#YX#Z#YX#_#YX#`#YX~O#[#rX~P+=VOZ#rX$Q#rX~P+5wOdWOeWOfWOgUOkWOnjOokOpiOq!|O#Z0QO#_UO#`UOP#jiQ#jiR#ji~P*CZO_WOdWOeWOfWOgUOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O#PVO#_UO#`UOP#jiQ#jiR#ji~P*@dO_WOgUOkWO#PVO#Z0QO#_UO#`UOP#jiQ#jiR#jiS#jiT#jiU#jiW#jiX#jiY#jiZ#jih#jil#jim#jiq#ji!b#ji!c#ji!d#ji!e#ji!f#ji!g#ji!h#ji!i#ji!j#ji!k#ji!l#ji!m#ji!n#ji!o#ji!p#ji!q#ji!r#ji!s#ji!t#ji!u#ji!v#ji!w#ji!x#ji!y#ji$Q#ji~P(HdOdWOeWOfWOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O~P*<rOdWOeWOfWOgUOkWOnjOokOpiO#Z0QO#_UO#`UOP#kXQ#kXR#kXl#kX~Oq!|O_#kXr#kXs#kXt#kXu#kXv#kXw#kXx#kXy#kXz#kX{#kX|#kX}#kX!O#kX!P#kX!Q#kX!R#kX!S#kX!T#kX!U#kX!V#kX!W#kX!X#kX!Y#kX!Z#kX![#kX!]#kX!^#kX!_#kX!`#kX!a#kX#P#kX~P+KxO_WOgUO#PVO#_UO#`UOP#kXQ#kXR#kXS#kXT#kXU#kXW#kXX#kXY#kXh#kXk#kXl#kXm#kXq#kX!b#kX!c#kX!d#kX!e#kX!f#kX!g#kX!h#kX!i#kX!j#kX!k#kX!l#kX!m#kX!n#kX!o#kX!p#kX!q#kX!r#kX!s#kX!t#kX!u#kX!v#kX!w#kX!x#kX!y#kX!}#kX#Z#kX[#kX~P(HdO_WOgUOkWO#PVO#Z0QO#_UO#`UOP#kXQ#kXR#kXS#kXT#kXU#kXW#kXX#kXY#kXZ#kXh#kXl#kXm#kXq#kX!b#kX!c#kX!d#kX!e#kX!f#kX!g#kX!h#kX!i#kX!j#kX!k#kX!l#kX!m#kX!n#kX!o#kX!p#kX!q#kX!r#kX!s#kX!t#kX!u#kX!v#kX!w#kX!x#kX!y#kX$Q#kX~P(HdOP#kXQ#kXR#kXS#kXT#kXU#kXW#kXX#kXY#kX_#kXg#kXh#kXk#kXl#kXm#kXq#kX!b#kX!c#kX!d#kX!e#kX!f#kX!g#kX!h#kX!i#kX!j#kX!k#kX!l#kX!m#kX!n#kX!o#kX!p#kX!q#kX!r#kX!s#kX!t#kX!u#kX!v#kX!w#kX!x#kX!y#kX!}#kX#P#kX#Z#kX#_#kX#`#kX~P(HdO#[#Wi~P@nO_WOdWOeWOfWOgUOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O#PVO#_UO#`UO~P+#YO_WOgUOkWO#PVO#Z0QO#_UO#`UOS#WiT#WiU#WiW#WiX#WiY#WiZ#Wih#Wim#Wiq#Wi!b#Wi!c#Wi!d#Wi!e#Wi!f#Wi!g#Wi!h#Wi!i#Wi!j#Wi!k#Wi!l#Wi!m#Wi!n#Wi!o#Wi!p#Wi!q#Wi!r#Wi!s#Wi!t#Wi!u#Wi!v#Wi!w#Wi!x#Wi!y#Wi$Q#Wi~P(HdOP'sOQ-YOR'sOl#jq!}#jq~OS#jqT#jqU#jqW#jqX#jqY#jqh#jqk#jql#jqm#jqq#jq!b#jq!c#jq!d#jq!e#jq!f#jq!g#jq!h#jq!i#jq!j#jq!k#jq!l#jq!m#jq!n#jq!o#jq!p#jq!q#jq!r#jq!s#jq!t#jq!u#jq!v#jq!w#jq!x#jq!y#jq!}#jq#Z#jq[#jq~OP'tOQ-ZOR'tO~P,0dO_#jql#jqr#jqs#jqt#jqu#jqv#jqw#jqx#jqy#jqz#jq{#jq|#jq}#jq!O#jq!P#jq!Q#jq!R#jq!S#jq!T#jq!U#jq!V#jq!W#jq!X#jq!Y#jq!Z#jq![#jq!]#jq!^#jq!_#jq!`#jq!a#jq#P#jq~OP'vOQ-]OR'vO~P,3ZOP'uOQ-[OR'uO~P&7ROS#jqT#jqU#jqW#jqX#jqY#jqZ#jqh#jql#jqm#jqq#jq!b#jq!c#jq!d#jq!e#jq!f#jq!g#jq!h#jq!i#jq!j#jq!k#jq!l#jq!m#jq!n#jq!o#jq!p#jq!q#jq!r#jq!s#jq!t#jq!u#jq!v#jq!w#jq!x#jq!y#jq$Q#jq~OP'wOQ-^OR'wO~P,6OOP'uOQ-[OR'uOl'{O!}#Wq~P&<uOS#WqT#WqU#WqW#WqX#WqY#Wqh#Wqk#Wqm#Wqq#Wq!b#Wq!c#Wq!d#Wq!e#Wq!f#Wq!g#Wq!h#Wq!i#Wq!j#Wq!k#Wq!l#Wq!m#Wq!n#Wq!o#Wq!p#Wq!q#Wq!r#Wq!s#Wq!t#Wq!u#Wq!v#Wq!w#Wq!x#Wq!y#Wq!}#Wq#Z#Wq[#Wq~OP'tOQ-ZOR'tOl'yO~P,9SOP0vOQ1lOR0vOl0wO#[#Wq~OS#WqT#WqU#WqW#WqX#WqY#WqZ#Wqh#Wqm#Wqq#Wq!b#Wq!c#Wq!d#Wq!e#Wq!f#Wq!g#Wq!h#Wq!i#Wq!j#Wq!k#Wq!l#Wq!m#Wq!n#Wq!o#Wq!p#Wq!q#Wq!r#Wq!s#Wq!t#Wq!u#Wq!v#Wq!w#Wq!x#Wq!y#Wq$Q#Wq~OP'wOQ-^OR'wOl'|O~P,<[OS#laT#laU#laW#laX#laY#la_#lag#lah#lak#lam#laq#la!b#la!c#la!d#la!e#la!f#la!g#la!h#la!i#la!j#la!k#la!l#la!m#la!n#la!o#la!p#la!q#la!r#la!s#la!t#la!u#la!v#la!w#la!x#la!y#la!}#la#P#la#Z#la#_#la#`#la~P!:POS#laT#laU#laW#laX#laY#lah#lak#lam#laq#la!b#la!c#la!d#la!e#la!f#la!g#la!h#la!i#la!j#la!k#la!l#la!m#la!n#la!o#la!p#la!q#la!r#la!s#la!t#la!u#la!v#la!w#la!x#la!y#la!}#la#Z#la[#la~P!:PO#[#la~P!:POS#laT#laU#laW#laX#laY#laZ#lah#lam#laq#la!b#la!c#la!d#la!e#la!f#la!g#la!h#la!i#la!j#la!k#la!l#la!m#la!n#la!o#la!p#la!q#la!r#la!s#la!t#la!u#la!v#la!w#la!x#la!y#la$Q#la~P!:POdWOeWOfWOgUOkWOnjOokOpiOq!|O#Z0QO#_UO#`UOP#jqQ#jqR#jq~P,3ZO_WOdWOeWOfWOgUOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O#PVO#_UO#`UOP#jqQ#jqR#jq~P,0dO_WOgUOkWO#PVO#Z0QO#_UO#`UOP#jqQ#jqR#jqS#jqT#jqU#jqW#jqX#jqY#jqZ#jqh#jql#jqm#jqq#jq!b#jq!c#jq!d#jq!e#jq!f#jq!g#jq!h#jq!i#jq!j#jq!k#jq!l#jq!m#jq!n#jq!o#jq!p#jq!q#jq!r#jq!s#jq!t#jq!u#jq!v#jq!w#jq!x#jq!y#jq$Q#jq~P(HdOdWOeWOfWOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[OP#jqQ#jqR#jq~P&7RO#[#Wq~P@nO_WOdWOeWOfWOgUOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O#PVO#_UO#`UO~P,9SO_WOgUOkWO#PVO#Z0QO#_UO#`UOS#WqT#WqU#WqW#WqX#WqY#WqZ#Wqh#Wqm#Wqq#Wq!b#Wq!c#Wq!d#Wq!e#Wq!f#Wq!g#Wq!h#Wq!i#Wq!j#Wq!k#Wq!l#Wq!m#Wq!n#Wq!o#Wq!p#Wq!q#Wq!r#Wq!s#Wq!t#Wq!u#Wq!v#Wq!w#Wq!x#Wq!y#Wq$Q#Wq~P(HdOP'sOQ-YOR'sOl#jy!}#jy~OS#jyT#jyU#jyW#jyX#jyY#jyh#jyk#jyl#jym#jyq#jy!b#jy!c#jy!d#jy!e#jy!f#jy!g#jy!h#jy!i#jy!j#jy!k#jy!l#jy!m#jy!n#jy!o#jy!p#jy!q#jy!r#jy!s#jy!t#jy!u#jy!v#jy!w#jy!x#jy!y#jy!}#jy#Z#jy[#jy~OP'tOQ-ZOR'tO~P-(jO_#jyl#jyr#jys#jyt#jyu#jyv#jyw#jyx#jyy#jyz#jy{#jy|#jy}#jy!O#jy!P#jy!Q#jy!R#jy!S#jy!T#jy!U#jy!V#jy!W#jy!X#jy!Y#jy!Z#jy![#jy!]#jy!^#jy!_#jy!`#jy!a#jy#P#jy~OP'vOQ-]OR'vO~P-+aOP'uOQ-[OR'uO~P' nOS#jyT#jyU#jyW#jyX#jyY#jyZ#jyh#jyl#jym#jyq#jy!b#jy!c#jy!d#jy!e#jy!f#jy!g#jy!h#jy!i#jy!j#jy!k#jy!l#jy!m#jy!n#jy!o#jy!p#jy!q#jy!r#jy!s#jy!t#jy!u#jy!v#jy!w#jy!x#jy!y#jy$Q#jy~OP'wOQ-^OR'wO~P-.UOP'uOQ-[OR'uOl'{O!}#Wy~P''bOS#WyT#WyU#WyW#WyX#WyY#Wyh#Wyk#Wym#Wyq#Wy!b#Wy!c#Wy!d#Wy!e#Wy!f#Wy!g#Wy!h#Wy!i#Wy!j#Wy!k#Wy!l#Wy!m#Wy!n#Wy!o#Wy!p#Wy!q#Wy!r#Wy!s#Wy!t#Wy!u#Wy!v#Wy!w#Wy!x#Wy!y#Wy!}#Wy#Z#Wy[#Wy~OP'tOQ-ZOR'tOl'yO~P-1YOP0vOQ1lOR0vOl0wO#[#Wy~OS#WyT#WyU#WyW#WyX#WyY#WyZ#Wyh#Wym#Wyq#Wy!b#Wy!c#Wy!d#Wy!e#Wy!f#Wy!g#Wy!h#Wy!i#Wy!j#Wy!k#Wy!l#Wy!m#Wy!n#Wy!o#Wy!p#Wy!q#Wy!r#Wy!s#Wy!t#Wy!u#Wy!v#Wy!w#Wy!x#Wy!y#Wy$Q#Wy~OP'wOQ-^OR'wOl'|O~P-4bOdWOeWOfWOgUOkWOnjOokOpiOq!|O#Z0QO#_UO#`UOP#jyQ#jyR#jy~P-+aO_WOdWOeWOfWOgUOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O#PVO#_UO#`UOP#jyQ#jyR#jy~P-(jO_WOgUOkWO#PVO#Z0QO#_UO#`UOP#jyQ#jyR#jyS#jyT#jyU#jyW#jyX#jyY#jyZ#jyh#jyl#jym#jyq#jy!b#jy!c#jy!d#jy!e#jy!f#jy!g#jy!h#jy!i#jy!j#jy!k#jy!l#jy!m#jy!n#jy!o#jy!p#jy!q#jy!r#jy!s#jy!t#jy!u#jy!v#jy!w#jy!x#jy!y#jy$Q#jy~P(HdOdWOeWOfWOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[OP#jyQ#jyR#jy~P' nO#[#Wy~P@nO_WOdWOeWOfWOgUOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O#PVO#_UO#`UO~P-1YO_WOgUOkWO#PVO#Z0QO#_UO#`UOS#WyT#WyU#WyW#WyX#WyY#WyZ#Wyh#Wym#Wyq#Wy!b#Wy!c#Wy!d#Wy!e#Wy!f#Wy!g#Wy!h#Wy!i#Wy!j#Wy!k#Wy!l#Wy!m#Wy!n#Wy!o#Wy!p#Wy!q#Wy!r#Wy!s#Wy!t#Wy!u#Wy!v#Wy!w#Wy!x#Wy!y#Wy$Q#Wy~P(HdOP'sOQ-YOR'sOl#j!R!}#j!R~OS#j!RT#j!RU#j!RW#j!RX#j!RY#j!Rh#j!Rk#j!Rl#j!Rm#j!Rq#j!R!b#j!R!c#j!R!d#j!R!e#j!R!f#j!R!g#j!R!h#j!R!i#j!R!j#j!R!k#j!R!l#j!R!m#j!R!n#j!R!o#j!R!p#j!R!q#j!R!r#j!R!s#j!R!t#j!R!u#j!R!v#j!R!w#j!R!x#j!R!y#j!R!}#j!R#Z#j!R[#j!R~OP'tOQ-ZOR'tO~P-FzO_#j!Rl#j!Rr#j!Rs#j!Rt#j!Ru#j!Rv#j!Rw#j!Rx#j!Ry#j!Rz#j!R{#j!R|#j!R}#j!R!O#j!R!P#j!R!Q#j!R!R#j!R!S#j!R!T#j!R!U#j!R!V#j!R!W#j!R!X#j!R!Y#j!R!Z#j!R![#j!R!]#j!R!^#j!R!_#j!R!`#j!R!a#j!R#P#j!R~OP'vOQ-]OR'vO~P-IqOP'uOQ-[OR'uO~P'5gOS#j!RT#j!RU#j!RW#j!RX#j!RY#j!RZ#j!Rh#j!Rl#j!Rm#j!Rq#j!R!b#j!R!c#j!R!d#j!R!e#j!R!f#j!R!g#j!R!h#j!R!i#j!R!j#j!R!k#j!R!l#j!R!m#j!R!n#j!R!o#j!R!p#j!R!q#j!R!r#j!R!s#j!R!t#j!R!u#j!R!v#j!R!w#j!R!x#j!R!y#j!R$Q#j!R~OP'wOQ-^OR'wO~P-LfOP'uOQ-[OR'uOl'{O!}#W!R~P';ZOS#W!RT#W!RU#W!RW#W!RX#W!RY#W!Rh#W!Rk#W!Rm#W!Rq#W!R!b#W!R!c#W!R!d#W!R!e#W!R!f#W!R!g#W!R!h#W!R!i#W!R!j#W!R!k#W!R!l#W!R!m#W!R!n#W!R!o#W!R!p#W!R!q#W!R!r#W!R!s#W!R!t#W!R!u#W!R!v#W!R!w#W!R!x#W!R!y#W!R!}#W!R#Z#W!R[#W!R~OP'tOQ-ZOR'tOl'yO~P. jOP0vOQ1lOR0vOl0wO#[#W!R~OS#W!RT#W!RU#W!RW#W!RX#W!RY#W!RZ#W!Rh#W!Rm#W!Rq#W!R!b#W!R!c#W!R!d#W!R!e#W!R!f#W!R!g#W!R!h#W!R!i#W!R!j#W!R!k#W!R!l#W!R!m#W!R!n#W!R!o#W!R!p#W!R!q#W!R!r#W!R!s#W!R!t#W!R!u#W!R!v#W!R!w#W!R!x#W!R!y#W!R$Q#W!R~OP'wOQ-^OR'wOl'|O~P.$rOdWOeWOfWOgUOkWOnjOokOpiOq!|O#Z0QO#_UO#`UOP#j!RQ#j!RR#j!R~P-IqO_WOdWOeWOfWOgUOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O#PVO#_UO#`UOP#j!RQ#j!RR#j!R~P-FzO_WOgUOkWO#PVO#Z0QO#_UO#`UOP#j!RQ#j!RR#j!RS#j!RT#j!RU#j!RW#j!RX#j!RY#j!RZ#j!Rh#j!Rl#j!Rm#j!Rq#j!R!b#j!R!c#j!R!d#j!R!e#j!R!f#j!R!g#j!R!h#j!R!i#j!R!j#j!R!k#j!R!l#j!R!m#j!R!n#j!R!o#j!R!p#j!R!q#j!R!r#j!R!s#j!R!t#j!R!u#j!R!v#j!R!w#j!R!x#j!R!y#j!R$Q#j!R~P(HdOdWOeWOfWOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[OP#j!RQ#j!RR#j!R~P'5gO#[#W!R~P@nO_WOdWOeWOfWOgUOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O#PVO#_UO#`UO~P. jO_WOgUOkWO#PVO#Z0QO#_UO#`UOS#W!RT#W!RU#W!RW#W!RX#W!RY#W!RZ#W!Rh#W!Rm#W!Rq#W!R!b#W!R!c#W!R!d#W!R!e#W!R!f#W!R!g#W!R!h#W!R!i#W!R!j#W!R!k#W!R!l#W!R!m#W!R!n#W!R!o#W!R!p#W!R!q#W!R!r#W!R!s#W!R!t#W!R!u#W!R!v#W!R!w#W!R!x#W!R!y#W!R$Q#W!R~P(HdOP'sOQ-YOR'sOl#j!Z!}#j!Z~OS#j!ZT#j!ZU#j!ZW#j!ZX#j!ZY#j!Zh#j!Zk#j!Zl#j!Zm#j!Zq#j!Z!b#j!Z!c#j!Z!d#j!Z!e#j!Z!f#j!Z!g#j!Z!h#j!Z!i#j!Z!j#j!Z!k#j!Z!l#j!Z!m#j!Z!n#j!Z!o#j!Z!p#j!Z!q#j!Z!r#j!Z!s#j!Z!t#j!Z!u#j!Z!v#j!Z!w#j!Z!x#j!Z!y#j!Z!}#j!Z#Z#j!Z[#j!Z~OP'tOQ-ZOR'tO~P.7[O_#j!Zl#j!Zr#j!Zs#j!Zt#j!Zu#j!Zv#j!Zw#j!Zx#j!Zy#j!Zz#j!Z{#j!Z|#j!Z}#j!Z!O#j!Z!P#j!Z!Q#j!Z!R#j!Z!S#j!Z!T#j!Z!U#j!Z!V#j!Z!W#j!Z!X#j!Z!Y#j!Z!Z#j!Z![#j!Z!]#j!Z!^#j!Z!_#j!Z!`#j!Z!a#j!Z#P#j!Z~OP'vOQ-]OR'vO~P.:ROP'uOQ-[OR'uO~P'CpOS#j!ZT#j!ZU#j!ZW#j!ZX#j!ZY#j!ZZ#j!Zh#j!Zl#j!Zm#j!Zq#j!Z!b#j!Z!c#j!Z!d#j!Z!e#j!Z!f#j!Z!g#j!Z!h#j!Z!i#j!Z!j#j!Z!k#j!Z!l#j!Z!m#j!Z!n#j!Z!o#j!Z!p#j!Z!q#j!Z!r#j!Z!s#j!Z!t#j!Z!u#j!Z!v#j!Z!w#j!Z!x#j!Z!y#j!Z$Q#j!Z~OP'wOQ-^OR'wO~P.<vOP'uOQ-[OR'uOl'{O!}#W!Z~P'IdOS#W!ZT#W!ZU#W!ZW#W!ZX#W!ZY#W!Zh#W!Zk#W!Zm#W!Zq#W!Z!b#W!Z!c#W!Z!d#W!Z!e#W!Z!f#W!Z!g#W!Z!h#W!Z!i#W!Z!j#W!Z!k#W!Z!l#W!Z!m#W!Z!n#W!Z!o#W!Z!p#W!Z!q#W!Z!r#W!Z!s#W!Z!t#W!Z!u#W!Z!v#W!Z!w#W!Z!x#W!Z!y#W!Z!}#W!Z#Z#W!Z[#W!Z~OP'tOQ-ZOR'tOl'yO~P.?zOP0vOQ1lOR0vOl0wO#[#W!Z~OS#W!ZT#W!ZU#W!ZW#W!ZX#W!ZY#W!ZZ#W!Zh#W!Zm#W!Zq#W!Z!b#W!Z!c#W!Z!d#W!Z!e#W!Z!f#W!Z!g#W!Z!h#W!Z!i#W!Z!j#W!Z!k#W!Z!l#W!Z!m#W!Z!n#W!Z!o#W!Z!p#W!Z!q#W!Z!r#W!Z!s#W!Z!t#W!Z!u#W!Z!v#W!Z!w#W!Z!x#W!Z!y#W!Z$Q#W!Z~OP'wOQ-^OR'wOl'|O~P.CSOdWOeWOfWOgUOkWOnjOokOpiOq!|O#Z0QO#_UO#`UOP#j!ZQ#j!ZR#j!Z~P.:RO_WOdWOeWOfWOgUOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O#PVO#_UO#`UOP#j!ZQ#j!ZR#j!Z~P.7[O_WOgUOkWO#PVO#Z0QO#_UO#`UOP#j!ZQ#j!ZR#j!ZS#j!ZT#j!ZU#j!ZW#j!ZX#j!ZY#j!ZZ#j!Zh#j!Zl#j!Zm#j!Zq#j!Z!b#j!Z!c#j!Z!d#j!Z!e#j!Z!f#j!Z!g#j!Z!h#j!Z!i#j!Z!j#j!Z!k#j!Z!l#j!Z!m#j!Z!n#j!Z!o#j!Z!p#j!Z!q#j!Z!r#j!Z!s#j!Z!t#j!Z!u#j!Z!v#j!Z!w#j!Z!x#j!Z!y#j!Z$Q#j!Z~P(HdOdWOeWOfWOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[OP#j!ZQ#j!ZR#j!Z~P'CpO#[#W!Z~P@nO_WOdWOeWOfWOgUOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O#PVO#_UO#`UO~P.?zO_WOgUOkWO#PVO#Z0QO#_UO#`UOS#W!ZT#W!ZU#W!ZW#W!ZX#W!ZY#W!ZZ#W!Zh#W!Zm#W!Zq#W!Z!b#W!Z!c#W!Z!d#W!Z!e#W!Z!f#W!Z!g#W!Z!h#W!Z!i#W!Z!j#W!Z!k#W!Z!l#W!Z!m#W!Z!n#W!Z!o#W!Z!p#W!Z!q#W!Z!r#W!Z!s#W!Z!t#W!Z!u#W!Z!v#W!Z!w#W!Z!x#W!Z!y#W!Z$Q#W!Z~P(HdOP'sOQ-YOR'sOl'xO~OP'tOQ-ZOR'tOl'yO~OP'wOQ-^OR'wOl'|O~OP'uOQ-[OR'uOl'{O~O#[(}OP#iXQ#iXR#iXl#iX~O#[)OOP#iXQ#iXR#iXl#iX~O_)rO#P-yO~P$'vO_)sO#P-zO~P$'vO_)tO#P-{O~P$'vO_)uO#P-|O~P$'vO!}*kO~P%CrO!}*lO~P%CrO!}*mO~P%CrO!}*nO~P%CrOQ*PO~P#@SOQ*QO~P#@SOQ*RO~P#@SOQ*OO~P#@SOP0vOQ1lOR0vOl#ja#[#ja~O_WOdWOeWOfWOgUOkWOn1_Oo1cOp,kOq!|Or[Os.eOt,eOu/qOv2`Ow3sOx4sOy'mOz.iO{1YO|3RO}4ZO!O5OO!P5`O!Q1YO!R.iO!S[O!T.eO!U,eO!V/qO!W2`O!X3sO!Y4sO!Z.eO![[O!].eO!^,eO!_[O!`.eO!a[O#PVO#Z0RO#_UO#`UO~OP0vOQ1lOR0vOl#ji#[#ji~OP0vOQ1lOR0vOl#jq#[#jq~OP0vOQ1lOR0vOl#jy#[#jy~OP0vOQ1lOR0vOl#j!R#[#j!R~OP0vOQ1lOR0vOl#j!Z#[#j!Z~OP0vOQ1lOR0vOl0wO~O",
-      goto: "$M^$[PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP$]P$`P$`$`$u${$`%R%V%{HVPP!(u!6vPP!EP#$z#%c#%v#4h#B|#CWP#Ce$#w$2c$3d$4Q$4Q$Au$Ba$Ba$B{%R$CS$]$]$CV$C]$Ck$Cy$DW$Dl$ET$Ed$KqPPP$Kw$Au$Au$Au$Au$L`$LrR!YOwTOV!W!b!j#[#t$^$f$|%d%i%k%y&j-y-z-{-|Q$R!]R%t$[Q%p$RR&l%tT!VO!WQ!TOr!fV!b!j#[#t$^$f$|%d%i%k%y&j-y-z-{-|Q!xYQ#u!WQ#y!XV$]!g$`0PjZO!X#[#d#e$f%O%d%z-y-z-{-|Q!}]Q#O^Q#P_Q#Q`Q#RaQ#Sb'^#Tc|!S!n!s#V#_#m#r$e$i$v%`%w%}&T&`&m&o&t&z'P'Q'U'Y'Z'['a'b'e'g'l'm'n'o'p'q'r(Y([(u(v(w(x(y(z({(|)`)q)z){)|)}*S*T*U*a*j*o*p*q*r*s*t*u+Q+Z+[+]+^+_+`+a+b+m+v+w+x+y+z+{+|+},X,Y,Z,[,],^,_-j-k-l-m.i.j.k.l.p.q.r.s.t.u.v.{.|.}/O/P/Q/R/S/T/U/V/W/X/Y/Z/[/]/^/_/`/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/{/|/}0OQ#VdQ#WeQ#XfQ#YgQ#ZhQ#^jQ#`pQ#aqQ#fvQ#gwQ#hxQ#iyQ#jzQ#k{Q#m}Q#n!OQ#o!PQ#p!QQ#q!RQ$k!v`$n!y%R's't'u'v'w0vQ$o!zS$p!{#OQ$q#PQ$r#QQ$s#RQ$t#SQ$v#WQ$w#XQ$x#YQ$y#ZQ%S#`Q%T#aQ%Y#gQ%Z#hQ%[#iQ%]#jQ%^#kQ%`#nQ%a#oQ%b#pQ%c#q^&O$o)P)Q)R)S)T0|Q&P$qQ&Q$rQ&R$sQ&S$tQ&T$wQ&U$xQ&V$yQ&Z%ZQ&[%[Q&]%]Q&^%^Q&`%aQ&a%bQ&b%cQ&p&QQ&q&RQ&r&SQ&t&UQ&u&VQ&v&[Q&w&]Q&x&^Q&z&aQ&{&bQ'R&qQ'S&rQ'U&uQ'V&wQ'W&xQ'Y&{Q']'SQ'_'WQ(O'dQ(P.eQ(Q.hQ(R.gQ(S.fQ(T,dQ(U,eQ(V,fQ(W,gQ(X,hQ(Y,iQ(Z,oQ(],qQ(^,rQ(_,sQ(`,tQ(a,uQ(b,vQ(c,wQ(d,xQ(m'fQ(n.mQ(o.oQ(p.nQ(q-RQ(r-SQ(s-TQ(t-UQ(u-VQ)P-YQ)Q-Z[)R%x*O*P*Q*R-]Q)S-[Q)T-^S)U'x(TS)V'y(US)W'z(VS)X'{(WS)Y'|(XQ)Z-_Q)[-`Q)]-aQ)^-bQ)_-cQ)`-dQ)a(]Q)b(^Q)c(_Q)d(`Q)e(aQ)f(bQ)g(cQ)h(dQ)i(qQ)j(rQ)k(sQ)l(tQ)m-eQ)n-fQ)o-gQ)p-hQ)q-iQ*V)ZQ*W)[Q*X)]Q*Y)^Q*Z)_Q*[-nQ*]-oQ*^-pQ*_-qQ*`-rQ*a-sQ*b)mQ*c)nQ*d)oQ*e)pQ*f-tQ*g-uQ*h-vQ*i-wQ*j-xQ*v*[Q*w*]Q*x*^Q*y*_Q*z*`Q*{-}Q*|.OQ*}.PQ+O.QQ+P.RQ+Q.SQ+R*fQ+S*gQ+T*hQ+U*iQ+V.TQ+W.UQ+X.VQ+Y.WQ+Z.XQ+c*{Q+d*|Q+e*}Q+f+OQ+g+PQ+h.YQ+i.ZQ+j.[Q+k.]Q+l.^Q+m._Q+n+VQ+o+WQ+p+XQ+q+YQ+r.`Q+s.aQ+t.bQ+u.cQ+v.dQ,O+hQ,P+iQ,Q+jQ,R+kQ,S+lQ,T+rQ,U+sQ,V+tQ,W+uS,`V!bW,a(f(j0z0{S,b(h(lS,c(e(iQ-_/pQ-`/qQ-a/rQ-b/sQ-c/tQ-d/uQ-e/vQ-f/wQ-g/xQ-h/yQ-i/zQ-n0SQ-o0TQ-p0UQ-q0VQ-r0WQ-s0XQ-t0YQ-u0ZQ-v0[Q-w0]Q-x0^Q-}0_Q.O0`Q.P0aQ.Q0bQ.R0cQ.S0dQ.T0eQ.U0fQ.V0gQ.W0hQ.X0iQ.Y0jQ.Z0kQ.[0lQ.]0mQ.^0nQ._0oQ.`0pQ.a0qQ.b0rQ.c0sQ.d0tQ.s1YQ.t1ZQ.u1[Q.v1]Q.w1_Q.x1`Q.y1aQ.z1bQ/P1iQ/Q1jQ/R1kQ/S1nQ/T1oQ/U1pQ/V1qQ/W1rQ/X1sQ/Y1tQ/Z1vQ/[1wQ/]1xQ/^1yQ/_1zQ/`1{Q/a1|Q/b2OQ/c2PQ/d2QQ/e2RQ/f2SQ/g2TQ/h2UQ/i2WQ/j2XQ/k2YQ/l2ZQ/m2[Q/n2]Q/o2^Q0S2_Q0T2`Q0U2aQ0V2bQ0W2cQ0X2dQ0Y2eQ0Z2fQ0[2gQ0]2hQ0^2iQ0_2jQ0`2kQ0a2lQ0b2mQ0c2nQ0d2oQ0e2pQ0f2qQ0g2rQ0h2sQ0i2tQ0j2uQ0k2vQ0l2wQ0m2xQ0n2yQ0o2zQ0p2{Q0q2|Q0r2}Q0s3OQ0t3PQ0x0uQ0y1XQ0|1lS0}0w0yQ1O1mQ1P1OQ1Q1uQ1R1QQ1S1}Q1T1SQ1U2VQ1V1U`1WY!g!t(g(k0P0Q0RQ1m3QQ1n3RQ1o3SQ1p3TQ1q3UQ1r3VQ1s3WQ1t3XQ1u3YQ1v3ZQ1w3[Q1x3]Q1y3^Q1z3_Q1{3`Q1|3aQ1}3bQ2O3cQ2P3dQ2Q3eQ2R3fQ2S3gQ2T3hQ2U3iQ2V3jQ2W3kQ2X3lQ2Y3mQ2Z3nQ2[3oQ2]3pQ2^3qQ2j3rQ2k3sQ2l3tQ2m3uQ2n3vQ2o3wQ2p3xQ2q3yQ2r3zQ2s3{Q2t3|Q2u3}Q2v4OQ2w4PQ2x4QQ2y4RQ2z4SQ2{4TQ2|4UQ2}4VQ3O4WQ3P4XQ3Y4YQ3Z4ZQ3[4[Q3]4]Q3^4^Q3_4_Q3`4`Q3a4aQ3b4bQ3c4cQ3d4dQ3e4eQ3f4fQ3g4gQ3h4hQ3i4iQ3j4jQ3k4kQ3l4lQ3m4mQ3n4nQ3o4oQ3p4pQ3q4qQ3}4rQ4O4sQ4P4tQ4Q4uQ4R4vQ4S4wQ4T4xQ4U4yQ4V4zQ4W4{Q4X4|Q4b4}Q4c5OQ4d5PQ4e5QQ4f5RQ4g5SQ4h5TQ4i5UQ4j5VQ4k5WQ4l5XQ4m5YQ4n5ZQ4o5[Q4p5]Q4q5^Q5V5_Q5W5`Q5X5aQ5Y5bQ5Z5cQ5[5dQ5]5eR5^5fQnO<Wo]^_`abcdefghjpqvwxyz{|}!O!P!Q!R!S!n!s!v!y!z!{#O#P#Q#R#S#V#W#X#Y#Z#_#`#a#g#h#i#j#k#m#n#o#p#q#r$e$i$o$q$r$s$t$v$w$x$y%O%R%Z%[%]%^%`%a%b%c%w%x%z%}&Q&R&S&T&U&V&[&]&^&`&a&b&m&o&q&r&t&u&w&x&z&{'P'Q'S'U'W'Y'Z'['a'b'd'e'f'g'l'm'n'o'p'q'r's't'u'v'w'x'y'z'{'|(T(U(V(W(X(Y([(](^(_(`(a(b(c(d(q(r(s(t(u(v(w(x(y(z({(|)P)Q)R)S)T)Z)[)])^)_)`)m)n)o)p)q)z){)|)}*O*P*Q*R*S*T*U*[*]*^*_*`*a*f*g*h*i*j*o*p*q*r*s*t*u*{*|*}+O+P+Q+V+W+X+Y+Z+[+]+^+_+`+a+b+h+i+j+k+l+m+r+s+t+u+v+w+x+y+z+{+|+},X,Y,Z,[,],^,_,d,e,f,g,h,i,o,q,r,s,t,u,v,w,x-R-S-T-U-V-Y-Z-[-]-^-_-`-a-b-c-d-e-f-g-h-i-j-k-l-m-n-o-p-q-r-s-t-u-v-w-x-}.O.P.Q.R.S.T.U.V.W.X.Y.Z.[.].^._.`.a.b.c.d.e.f.g.h.i.j.k.l.m.n.o.p.q.r.s.t.u.v.{.|.}/O/P/Q/R/S/T/U/V/W/X/Y/Z/[/]/^/_/`/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/{/|/}0O0S0T0U0V0W0X0Y0Z0[0]0^0_0`0a0b0c0d0e0f0g0h0i0j0k0l0m0n0o0p0q0r0s0t0u0v0w0y0|1O1Q1S1U1X1Y1Z1[1]1_1`1a1b1i1j1k1l1m1n1o1p1q1r1s1t1u1v1w1x1y1z1{1|1}2O2P2Q2R2S2T2U2V2W2X2Y2Z2[2]2^2_2`2a2b2c2d2e2f2g2h2i2j2k2l2m2n2o2p2q2r2s2t2u2v2w2x2y2z2{2|2}3O3P3Q3R3S3T3U3V3W3X3Y3Z3[3]3^3_3`3a3b3c3d3e3f3g3h3i3j3k3l3m3n3o3p3q3r3s3t3u3v3w3x3y3z3{3|3}4O4P4Q4R4S4T4U4V4W4X4Y4Z4[4]4^4_4`4a4b4c4d4e4f4g4h4i4j4k4l4m4n4o4p4q4r4s4t4u4v4w4x4y4z4{4|4}5O5P5Q5R5S5T5U5V5W5X5Y5Z5[5]5^5_5`5a5b5c5d5e5fS!rV!b[!wY!g!t0P0Q0RQ#x!XQ%P#[[%V#d(e(f(g(h0z[%X#e(i(j(k(l0{Q%|$fZ&e%d-y-z-{-|<UmOY]^_`abcdefghjpqvwxyz{|}!O!P!Q!R!S!X!g!n!t!v!y!z!{#O#P#Q#R#S#V#W#X#Y#Z#[#_#`#a#d#e#g#h#i#j#k#m#n#o#p#q#r$e$f$o$q$r$s$t$v$w$x$y%O%R%Z%[%]%^%`%a%b%c%w%x%z&Q&R&S&T&U&V&[&]&^&`&a&b&m&q&r&t&u&w&x&z&{'P'S'U'W'Y'Z'a'd'e'f'g'm'n'p'q'r's't'u'v'w'x'y'z'{'|(T(U(V(W(X(Y([(](^(_(`(a(b(c(d(e(f(g(h(i(j(k(l(q(r(s(t(u(w(x(z({(|)P)Q)R)S)T)Z)[)])^)_)`)m)n)o)p)q){)|*P*Q*S*T*U*[*]*^*_*`*a*f*g*h*i*j*p*q*s*t*u*{*|*}+O+P+Q+V+W+X+Y+Z+]+^+`+a+b+h+i+j+k+l+m+r+s+t+u+v+x+y+{+|+},Y,Z,],^,_,d,e,f,g,h,i,o,q,r,s,t,u,v,w,x-R-S-T-U-V-Y-Z-[-]-^-_-`-a-b-c-d-e-f-g-h-i-j-k-l-m-n-o-p-q-r-s-t-u-v-w-x-}.O.P.Q.R.S.T.U.V.W.X.Y.Z.[.].^._.`.a.b.c.d.e.f.g.h.i.j.k.l.m.n.o.p.q.r.s.t.u.v.{.|.}/O/P/Q/R/S/T/U/V/W/X/Y/Z/[/]/^/_/`/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/{/|/}0O0P0Q0R0S0T0U0V0W0X0Y0Z0[0]0^0_0`0a0b0c0d0e0f0g0h0i0j0k0l0m0n0o0p0q0r0s0t0u0v0w0y0z0{0|1O1Q1S1U1X1Y1Z1[1]1_1`1a1b1i1j1k1l1m1n1o1p1q1r1s1t1u1v1w1x1y1z1{1|1}2O2P2Q2R2S2T2U2V2W2X2Y2Z2[2]2^2_2`2a2b2c2d2e2f2g2h2i2j2k2l2m2n2o2p2q2r2s2t2u2v2w2x2y2z2{2|2}3O3P3Q3R3S3T3U3V3W3X3Y3Z3[3]3^3_3`3a3b3c3d3e3f3g3h3i3j3k3l3m3n3o3p3q3r3s3t3u3v3w3x3y3z3{3|3}4O4P4Q4R4S4T4U4V4W4X4Y4Z4[4]4^4_4`4a4b4c4d4e4f4g4h4i4j4k4l4m4n4o4p4q4r4s4t4u4v4w4x4y4z4{4|4}5O5P5Q5R5S5T5U5V5W5X5Y5Z5[5]5^5_5`5a5b5c5d5e5f^!_V!b%d-y-z-{-|Q!i!jS$U!a$WR%v$^<fmOY]^_`abcdefghjpqvwxyz{|}!O!P!Q!R!S!X!g!n!t!v!y!z!{#O#P#Q#R#S#V#W#X#Y#Z#[#_#`#a#d#e#g#h#i#j#k#m#n#o#p#q#r$e$f$o$q$r$s$t$v$w$x$y%O%R%Z%[%]%^%`%a%b%c%w%x%z&Q&R&S&T&U&V&[&]&^&`&a&b&m&q&r&t&u&w&x&z&{'P'S'U'W'Y'Z'a'd'e'f'g'l'm'n'p'q'r's't'u'v'w'x'y'z'{'|(T(U(V(W(X(Y([(](^(_(`(a(b(c(d(e(f(g(h(i(j(k(l(q(r(s(t(u(v(w(x(z({(|)P)Q)R)S)T)Z)[)])^)_)`)m)n)o)p)q)z){)|*O*P*Q*S*T*U*[*]*^*_*`*a*f*g*h*i*j*o*p*q*s*t*u*{*|*}+O+P+Q+V+W+X+Y+Z+[+]+^+`+a+b+h+i+j+k+l+m+r+s+t+u+v+w+x+y+{+|+},X,Y,Z,],^,_,d,e,f,g,h,i,o,q,r,s,t,u,v,w,x-R-S-T-U-V-Y-Z-[-]-^-_-`-a-b-c-d-e-f-g-h-i-j-k-l-m-n-o-p-q-r-s-t-u-v-w-x-}.O.P.Q.R.S.T.U.V.W.X.Y.Z.[.].^._.`.a.b.c.d.e.f.g.h.i.j.k.l.m.n.o.p.q.r.s.t.u.v.{.|.}/O/P/Q/R/S/T/U/V/W/X/Y/Z/[/]/^/_/`/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/{/|/}0O0P0Q0R0S0T0U0V0W0X0Y0Z0[0]0^0_0`0a0b0c0d0e0f0g0h0i0j0k0l0m0n0o0p0q0r0s0t0u0v0w0y0z0{0|1O1Q1S1U1X1Y1Z1[1]1_1`1a1b1i1j1k1l1m1n1o1p1q1r1s1t1u1v1w1x1y1z1{1|1}2O2P2Q2R2S2T2U2V2W2X2Y2Z2[2]2^2_2`2a2b2c2d2e2f2g2h2i2j2k2l2m2n2o2p2q2r2s2t2u2v2w2x2y2z2{2|2}3O3P3Q3R3S3T3U3V3W3X3Y3Z3[3]3^3_3`3a3b3c3d3e3f3g3h3i3j3k3l3m3n3o3p3q3r3s3t3u3v3w3x3y3z3{3|3}4O4P4Q4R4S4T4U4V4W4X4Y4Z4[4]4^4_4`4a4b4c4d4e4f4g4h4i4j4k4l4m4n4o4p4q4r4s4t4u4v4w4x4y4z4{4|4}5O5P5Q5R5S5T5U5V5W5X5Y5Z5[5]5^5_5`5a5b5c5d5e5f^!_V!b%d-y-z-{-|Q!i!jS$U!a$WR%v$^<UmOY]^_`abcdefghjpqvwxyz{|}!O!P!Q!R!S!X!g!n!t!v!y!z!{#O#P#Q#R#S#V#W#X#Y#Z#[#_#`#a#d#e#g#h#i#j#k#m#n#o#p#q#r$e$f$o$q$r$s$t$v$w$x$y%O%R%Z%[%]%^%`%a%b%c%w%x%z&Q&R&S&T&U&V&[&]&^&`&a&b&m&q&r&t&u&w&x&z&{'P'S'U'W'Y'Z'a'd'e'f'g'm'n'p'q'r's't'u'v'w'x'y'z'{'|(T(U(V(W(X(Y([(](^(_(`(a(b(c(d(e(f(g(h(i(j(k(l(q(r(s(t(u(w(x(z({(|)P)Q)R)S)T)Z)[)])^)_)`)m)n)o)p)q){)|*P*Q*S*T*U*[*]*^*_*`*a*f*g*h*i*j*p*q*s*t*u*{*|*}+O+P+Q+V+W+X+Y+Z+]+^+`+a+b+h+i+j+k+l+m+r+s+t+u+v+x+y+{+|+},Y,Z,],^,_,d,e,f,g,h,i,o,q,r,s,t,u,v,w,x-R-S-T-U-V-Y-Z-[-]-^-_-`-a-b-c-d-e-f-g-h-i-j-k-l-m-n-o-p-q-r-s-t-u-v-w-x-}.O.P.Q.R.S.T.U.V.W.X.Y.Z.[.].^._.`.a.b.c.d.e.f.g.h.i.j.k.l.m.n.o.p.q.r.s.t.u.v.{.|.}/O/P/Q/R/S/T/U/V/W/X/Y/Z/[/]/^/_/`/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/{/|/}0O0P0Q0R0S0T0U0V0W0X0Y0Z0[0]0^0_0`0a0b0c0d0e0f0g0h0i0j0k0l0m0n0o0p0q0r0s0t0u0v0w0y0z0{0|1O1Q1S1U1X1Y1Z1[1]1_1`1a1b1i1j1k1l1m1n1o1p1q1r1s1t1u1v1w1x1y1z1{1|1}2O2P2Q2R2S2T2U2V2W2X2Y2Z2[2]2^2_2`2a2b2c2d2e2f2g2h2i2j2k2l2m2n2o2p2q2r2s2t2u2v2w2x2y2z2{2|2}3O3P3Q3R3S3T3U3V3W3X3Y3Z3[3]3^3_3`3a3b3c3d3e3f3g3h3i3j3k3l3m3n3o3p3q3r3s3t3u3v3w3x3y3z3{3|3}4O4P4Q4R4S4T4U4V4W4X4Y4Z4[4]4^4_4`4a4b4c4d4e4f4g4h4i4j4k4l4m4n4o4p4q4r4s4t4u4v4w4x4y4z4{4|4}5O5P5Q5R5S5T5U5V5W5X5Y5Z5[5]5^5_5`5a5b5c5d5e5f^!hV!b%d-y-z-{-|T!i!j$^W!iV!b!j$^`${#[#t$f$|%i%k%y&jZ&d%d-y-z-{-|s!fV!b!j#[#t$^$f$|%d%i%k%y&j-y-z-{-|=UmOY]^_`abcdefghjpqvwxyz{|}!O!P!Q!R!S!X!g!n!s!t!v!y!z!{#O#P#Q#R#S#V#W#X#Y#Z#[#_#`#a#d#e#g#h#i#j#k#m#n#o#p#q#r$e$f$i$o$q$r$s$t$v$w$x$y%O%R%Z%[%]%^%`%a%b%c%w%x%z%}&Q&R&S&T&U&V&[&]&^&`&a&b&m&o&q&r&t&u&w&x&z&{'P'Q'S'U'W'Y'Z'['a'b'd'e'f'g'l'm'n'o'p'q'r's't'u'v'w'x'y'z'{'|(T(U(V(W(X(Y([(](^(_(`(a(b(c(d(e(f(g(h(i(j(k(l(q(r(s(t(u(v(w(x(y(z({(|)P)Q)R)S)T)Z)[)])^)_)`)m)n)o)p)q)z){)|)}*O*P*Q*R*S*T*U*[*]*^*_*`*a*f*g*h*i*j*o*p*q*r*s*t*u*{*|*}+O+P+Q+V+W+X+Y+Z+[+]+^+_+`+a+b+h+i+j+k+l+m+r+s+t+u+v+w+x+y+z+{+|+},X,Y,Z,[,],^,_,d,e,f,g,h,i,o,q,r,s,t,u,v,w,x-R-S-T-U-V-Y-Z-[-]-^-_-`-a-b-c-d-e-f-g-h-i-j-k-l-m-n-o-p-q-r-s-t-u-v-w-x-}.O.P.Q.R.S.T.U.V.W.X.Y.Z.[.].^._.`.a.b.c.d.e.f.g.h.i.j.k.l.m.n.o.p.q.r.s.t.u.v.{.|.}/O/P/Q/R/S/T/U/V/W/X/Y/Z/[/]/^/_/`/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/{/|/}0O0P0Q0R0S0T0U0V0W0X0Y0Z0[0]0^0_0`0a0b0c0d0e0f0g0h0i0j0k0l0m0n0o0p0q0r0s0t0u0v0w0y0z0{0|1O1Q1S1U1X1Y1Z1[1]1_1`1a1b1i1j1k1l1m1n1o1p1q1r1s1t1u1v1w1x1y1z1{1|1}2O2P2Q2R2S2T2U2V2W2X2Y2Z2[2]2^2_2`2a2b2c2d2e2f2g2h2i2j2k2l2m2n2o2p2q2r2s2t2u2v2w2x2y2z2{2|2}3O3P3Q3R3S3T3U3V3W3X3Y3Z3[3]3^3_3`3a3b3c3d3e3f3g3h3i3j3k3l3m3n3o3p3q3r3s3t3u3v3w3x3y3z3{3|3}4O4P4Q4R4S4T4U4V4W4X4Y4Z4[4]4^4_4`4a4b4c4d4e4f4g4h4i4j4k4l4m4n4o4p4q4r4s4t4u4v4w4x4y4z4{4|4}5O5P5Q5R5S5T5U5V5W5X5Y5Z5[5]5^5_5`5a5b5c5d5e5f^!qV!b%d-y-z-{-|Q#esQ(i,}Q(j-OQ(k-PQ(l-QR0{1h<YmOVY]^_`abcdefghjpqvwxyz{|}!O!P!Q!R!S!X!b!g!n!t!v!y!z!{#O#P#Q#R#S#V#W#X#Y#Z#[#_#`#a#d#e#g#h#i#j#k#m#n#o#p#q$e$f$o$q$r$s$t$v$w$x$y%O%R%Z%[%]%^%`%a%b%c%d%w%x%z&Q&R&S&T&U&V&[&]&^&`&a&b&m&q&r&t&u&w&x&z&{'P'S'U'W'Y'Z'a'd'e'f'g'm'n'p'q'r's't'u'v'w'x'y'z'{'|(T(U(V(W(X(Y([(](^(_(`(a(b(c(d(e(f(g(h(i(j(k(l(q(r(s(t(u(w(x(z({(|)P)Q)R)S)T)Z)[)])^)_)`)m)n)o)p)q){)|*P*Q*S*T*U*[*]*^*_*`*a*f*g*h*i*j*p*q*s*t*u*{*|*}+O+P+Q+V+W+X+Y+Z+]+^+`+a+b+h+i+j+k+l+m+r+s+t+u+v+x+y+{+|+},Y,Z,],^,_,d,e,f,g,h,i,o,q,r,s,t,u,v,w,x-R-S-T-U-V-Y-Z-[-]-^-_-`-a-b-c-d-e-f-g-h-i-n-o-p-q-r-s-t-u-v-w-x-y-z-{-|-}.O.P.Q.R.S.T.U.V.W.X.Y.Z.[.].^._.`.a.b.c.d.e.f.g.h.i.j.k.l.m.n.o.p.q.r.s.t.u.v.{.|.}/O/P/Q/R/S/T/U/V/W/X/Y/Z/[/]/^/_/`/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/{/|/}0O0P0Q0R0S0T0U0V0W0X0Y0Z0[0]0^0_0`0a0b0c0d0e0f0g0h0i0j0k0l0m0n0o0p0q0r0s0t0u0v0w0y0z0{0|1O1Q1S1U1X1Y1Z1[1]1_1`1a1b1i1j1k1l1m1n1o1p1q1r1s1t1u1v1w1x1y1z1{1|1}2O2P2Q2R2S2T2U2V2W2X2Y2Z2[2]2^2_2`2a2b2c2d2e2f2g2h2i2j2k2l2m2n2o2p2q2r2s2t2u2v2w2x2y2z2{2|2}3O3P3Q3R3S3T3U3V3W3X3Y3Z3[3]3^3_3`3a3b3c3d3e3f3g3h3i3j3k3l3m3n3o3p3q3r3s3t3u3v3w3x3y3z3{3|3}4O4P4Q4R4S4T4U4V4W4X4Y4Z4[4]4^4_4`4a4b4c4d4e4f4g4h4i4j4k4l4m4n4o4p4q4r4s4t4u4v4w4x4y4z4{4|4}5O5P5Q5R5S5T5U5V5W5X5Y5Z5[5]5^5_5`5a5b5c5d5e5fv#]ik#^(Z,j,k,l,m,n,p.w.x.y.z1^1c1d1e1fQ%f#rQ)v-jQ)w-kQ)x-lR)y-ma!pV!b#[%d-y-z-{-|`!mV!b#[%d-y-z-{-|R%k#t<|oOY]^_`abcdefghjpqvwxyz{|}!O!P!Q!R!S!X!g!n!s!t!v!y!z!{#O#P#Q#R#S#V#W#X#Y#Z#_#`#a#d#e#g#h#i#j#k#m#n#o#p#q#r$e$i$o$q$r$s$t$v$w$x$y%R%Z%[%]%^%`%a%b%c%w%x%}&Q&R&S&T&U&V&[&]&^&`&a&b&m&o&q&r&t&u&w&x&z&{'P'Q'S'U'W'Y'Z'['a'b'd'e'f'g'l'm'n'o'p'q'r's't'u'v'w'x'y'z'{'|(T(U(V(W(X(Y([(](^(_(`(a(b(c(d(e(f(g(h(i(j(k(l(q(r(s(t(u(v(w(x(y(z({(|)P)Q)R)S)T)Z)[)])^)_)`)m)n)o)p)q)z){)|)}*O*P*Q*R*S*T*U*[*]*^*_*`*a*f*g*h*i*j*o*p*q*r*s*t*u*{*|*}+O+P+Q+V+W+X+Y+Z+[+]+^+_+`+a+b+h+i+j+k+l+m+r+s+t+u+v+w+x+y+z+{+|+},X,Y,Z,[,],^,_,d,e,f,g,h,i,o,q,r,s,t,u,v,w,x-R-S-T-U-V-Y-Z-[-]-^-_-`-a-b-c-d-e-f-g-h-i-j-k-l-m-n-o-p-q-r-s-t-u-v-w-x-}.O.P.Q.R.S.T.U.V.W.X.Y.Z.[.].^._.`.a.b.c.d.e.f.g.h.i.j.k.l.m.n.o.p.q.r.s.t.u.v.{.|.}/O/P/Q/R/S/T/U/V/W/X/Y/Z/[/]/^/_/`/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/{/|/}0O0P0Q0R0S0T0U0V0W0X0Y0Z0[0]0^0_0`0a0b0c0d0e0f0g0h0i0j0k0l0m0n0o0p0q0r0s0t0u0v0w0y0z0{0|1O1Q1S1U1X1Y1Z1[1]1_1`1a1b1i1j1k1l1m1n1o1p1q1r1s1t1u1v1w1x1y1z1{1|1}2O2P2Q2R2S2T2U2V2W2X2Y2Z2[2]2^2_2`2a2b2c2d2e2f2g2h2i2j2k2l2m2n2o2p2q2r2s2t2u2v2w2x2y2z2{2|2}3O3P3Q3R3S3T3U3V3W3X3Y3Z3[3]3^3_3`3a3b3c3d3e3f3g3h3i3j3k3l3m3n3o3p3q3r3s3t3u3v3w3x3y3z3{3|3}4O4P4Q4R4S4T4U4V4W4X4Y4Z4[4]4^4_4`4a4b4c4d4e4f4g4h4i4j4k4l4m4n4o4p4q4r4s4t4u4v4w4x4y4z4{4|4}5O5P5Q5R5S5T5U5V5W5X5Y5Z5[5]5^5_5`5a5b5c5d5e5fS!rV!bW%Q#[$f%O%zZ&f%d-y-z-{-|QlO<j!oV]^_`abcdefghjpqvwxyz{|}!O!P!Q!R!S!b!n!s!v!y!z!{#O#P#Q#R#S#V#W#X#Y#Z#[#_#`#a#g#h#i#j#k#m#n#o#p#q#r$e$f$i$o$q$r$s$t$v$w$x$y%O%R%Z%[%]%^%`%a%b%c%d%w%x%z%}&Q&R&S&T&U&V&[&]&^&`&a&b&m&o&q&r&t&u&w&x&z&{'P'Q'S'U'W'Y'Z'['a'b'd'e'f'g'l'm'n'o'p'q'r's't'u'v'w'x'y'z'{'|(T(U(V(W(X(Y([(](^(_(`(a(b(c(d(q(r(s(t(u(v(w(x(y(z({(|)P)Q)R)S)T)Z)[)])^)_)`)m)n)o)p)q)z){)|)}*O*P*Q*R*S*T*U*[*]*^*_*`*a*f*g*h*i*j*o*p*q*r*s*t*u*{*|*}+O+P+Q+V+W+X+Y+Z+[+]+^+_+`+a+b+h+i+j+k+l+m+r+s+t+u+v+w+x+y+z+{+|+},X,Y,Z,[,],^,_,d,e,f,g,h,i,o,q,r,s,t,u,v,w,x-R-S-T-U-V-Y-Z-[-]-^-_-`-a-b-c-d-e-f-g-h-i-j-k-l-m-n-o-p-q-r-s-t-u-v-w-x-y-z-{-|-}.O.P.Q.R.S.T.U.V.W.X.Y.Z.[.].^._.`.a.b.c.d.e.f.g.h.i.j.k.l.m.n.o.p.q.r.s.t.u.v.{.|.}/O/P/Q/R/S/T/U/V/W/X/Y/Z/[/]/^/_/`/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/{/|/}0O0S0T0U0V0W0X0Y0Z0[0]0^0_0`0a0b0c0d0e0f0g0h0i0j0k0l0m0n0o0p0q0r0s0t0u0v0w0y0|1O1Q1S1U1X1Y1Z1[1]1_1`1a1b1i1j1k1l1m1n1o1p1q1r1s1t1u1v1w1x1y1z1{1|1}2O2P2Q2R2S2T2U2V2W2X2Y2Z2[2]2^2_2`2a2b2c2d2e2f2g2h2i2j2k2l2m2n2o2p2q2r2s2t2u2v2w2x2y2z2{2|2}3O3P3Q3R3S3T3U3V3W3X3Y3Z3[3]3^3_3`3a3b3c3d3e3f3g3h3i3j3k3l3m3n3o3p3q3r3s3t3u3v3w3x3y3z3{3|3}4O4P4Q4R4S4T4U4V4W4X4Y4Z4[4]4^4_4`4a4b4c4d4e4f4g4h4i4j4k4l4m4n4o4p4q4r4s4t4u4v4w4x4y4z4{4|4}5O5P5Q5R5S5T5U5V5W5X5Y5Z5[5]5^5_5`5a5b5c5d5e5fU!uY!g!tQ#w!X[%U#d(e(f(g(h0z[%W#e(i(j(k(l0{S-W0P0QR-X0RQ!{iQ#_k[$n#^(Z.w.x.y.zQ'x,jQ'y,kQ'z,lQ'{,mQ'|,nQ([,pQ.{1cQ.|1dQ.}1eQ/O1fR0w1^v#]ik#^(Z,j,k,l,m,n,p.w.x.y.z1^1c1d1e1fZ%g#r-j-k-l-m<eoOVY]^_`abcdefghjpqvwxyz{|}!O!P!Q!R!S!X!b!g!n!t!v!y!z!{#O#P#Q#R#S#V#W#X#Y#Z#[#_#`#a#d#e#g#h#i#j#k#m#n#o#p#q#r$e$f$o$q$r$s$t$v$w$x$y%O%R%Z%[%]%^%`%a%b%c%d%w%x%z&Q&R&S&T&U&V&[&]&^&`&a&b&m&q&r&t&u&w&x&z&{'P'S'U'W'Y'Z'a'd'e'f'g'm'n'p'q'r's't'u'v'w'x'y'z'{'|(T(U(V(W(X(Y([(](^(_(`(a(b(c(d(e(f(g(h(i(j(k(l(q(r(s(t(u(w(x(z({(|)P)Q)R)S)T)Z)[)])^)_)`)m)n)o)p)q){)|*P*Q*S*T*U*[*]*^*_*`*a*f*g*h*i*j*p*q*s*t*u*{*|*}+O+P+Q+V+W+X+Y+Z+]+^+`+a+b+h+i+j+k+l+m+r+s+t+u+v+x+y+{+|+},Y,Z,],^,_,d,e,f,g,h,i,o,q,r,s,t,u,v,w,x-R-S-T-U-V-Y-Z-[-]-^-_-`-a-b-c-d-e-f-g-h-i-j-k-l-m-n-o-p-q-r-s-t-u-v-w-x-y-z-{-|-}.O.P.Q.R.S.T.U.V.W.X.Y.Z.[.].^._.`.a.b.c.d.e.f.g.h.i.j.k.l.m.n.o.p.q.r.s.t.u.v.{.|.}/O/P/Q/R/S/T/U/V/W/X/Y/Z/[/]/^/_/`/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/{/|/}0O0P0Q0R0S0T0U0V0W0X0Y0Z0[0]0^0_0`0a0b0c0d0e0f0g0h0i0j0k0l0m0n0o0p0q0r0s0t0u0v0w0y0z0{0|1O1Q1S1U1X1Y1Z1[1]1_1`1a1b1i1j1k1l1m1n1o1p1q1r1s1t1u1v1w1x1y1z1{1|1}2O2P2Q2R2S2T2U2V2W2X2Y2Z2[2]2^2_2`2a2b2c2d2e2f2g2h2i2j2k2l2m2n2o2p2q2r2s2t2u2v2w2x2y2z2{2|2}3O3P3Q3R3S3T3U3V3W3X3Y3Z3[3]3^3_3`3a3b3c3d3e3f3g3h3i3j3k3l3m3n3o3p3q3r3s3t3u3v3w3x3y3z3{3|3}4O4P4Q4R4S4T4U4V4W4X4Y4Z4[4]4^4_4`4a4b4c4d4e4f4g4h4i4j4k4l4m4n4o4p4q4r4s4t4u4v4w4x4y4z4{4|4}5O5P5Q5R5S5T5U5V5W5X5Y5Z5[5]5^5_5`5a5b5c5d5e5f!RuOVY!W!X!b!g!j#[#t$^$`$f$|%d%i%k%y&j-y-z-{-|0P!RtOVY!W!X!b!g!j#[#t$^$`$f$|%d%i%k%y&j-y-z-{-|0PZ%_#r-j-k-l-mR#t!UQ!WOR#v!WQ#|!ZQ$O![Q$S!^V%l#|$O$Sb!aV!b$W$^%d-y-z-{-|R$V!a`!jV!b$^%d-y-z-{-|R$a!j^!lV#[%d-y-z-{-|Q$Z!bU$d!l$Z&gR&g%h[$|#[%d-y-z-{-|Q%i#tQ%y$fW&W$|%i%y&jR&j%k[%O#[%d-y-z-{-|Q%z$fT&Y%O%zQ#UcQ#l|Q#r!SS$e!n'eS$i!s'gS$n#V#_#j$u#r$e$i%w%}&m&o'P'Q'Z'['a'b(v(w(x(y(z({(|)z){)|)}*S*T*U*o*p*q*r*s*t*u+[+]+^+_+`+a+b+w+x+y+z+{+|+},X,Y,Z,[,],^,_-j-k-l-mQ%_#mS%w(Y([Q%}(uQ&O$vQ&_%`Q&m)`Q&o)qQ&s&TQ&y&`Q'P*aQ'Q*jQ'T&tQ'X&zQ'Z+QQ'[+ZQ'^'UQ'`'YQ'a+mQ'b+vS(v'l.lS(w'm.iS(x'n.jS(y'o.kS(z'p.rS({'q.pS(|'r.qS)z.v/OS){.s.{S)|.t.|S)}.u.}Q*S/RQ*T/PQ*U/QQ*o/VQ*p/SQ*q/TQ*r/UQ*s/YQ*t/WQ*u/XQ+[/^Q+]/ZQ+^/[Q+_/]Q+`/aQ+a/_Q+b/`Q+w/eQ+x/bQ+y/cQ+z/dQ+{/hQ+|/fQ+}/gQ,X/lQ,Y/iQ,Z/jQ,[/kQ,]/oQ,^/mQ,_/nQ-j/{Q-k/|Q-l/}R-m0OQ!XOR#z!XS!VO!Ws!dV!b!j#[#t$^$f$|%d%i%k%y&j-y-z-{-|Q#drQ(e,yQ(f,zQ(g,{Q(h,|R0z1g[#cr,y,z,{,|1gQ#esQ(i,}Q(j-OQ(k-PQ(l-QR0{1h",
+      states: "#A|O%|QROOO&dQPO'#E[O&iQPO'#E^O&nQPO'#E_O&sQPO'#EbOOQQ'#Fa'#FaOOQQ'#Ej'#EjO+uQRO'#EiOOQQ'#Ep'#EpO6^QRO'#EpO;iQRO'#EvO@cQROOOOQQ'#Ev'#EvO@qQRO'#EvO@qQRO'#EvO@qQRO'#EvO@qQRO'#EvO@qQRO'#EvO@qQRO'#EvO@qQRO'#EvO@qQRO'#EvO@qQRO'#EvO@qQRO'#EvO@qQRO'#EvO@qQRO'#EvOCmQRO'#EvOE|QRO'#EvOCmQRO'#EvOM{QRO'#EuOOQQ'#Ef'#EfO!%VQRO'#EeOOQQ'#Ee'#EeO@qQRO'#EdO@qQRO'#EdO!%^QRO'#E|O!'yQRO'#E}OOQQ'#E{'#E{OOQQ'#Ed'#EdO@qQRO'#EdO@qQRO'#EdO@qQRO'#EdO@qQRO'#EdO@qQRO'#EdO@qQRO'#EdO@qQRO'#EdO@qQRO'#EdO@qQRO'#EdO@qQRO'#EdO@qQRO'#EdO@qQRO'#EdO@qQRO'#EdO!/`QRO'#EcO!1qQRO'#FPOOQQ'#FT'#FTO!2bQRO'#EYO!4ZQRO'#FSQOQPOOO!4bQRO,5:vO!4jQRO,5:xO!4rQRO,5:yO!4}QRO,5:|O!8[QRO'#FVO!8oQRO'#FVO!9nQRO,5;TO!9uQRO'#EiO!CnQRO,5;TOOQQ'#Eo'#EoO!EuQRO'#EpOOQQ'#En'#EnO;iQRO'#EnO!HoQRO'#FWOOQQ'#FW'#FWO!ISQRO,5;XO!K_QRO'#EpO!NlQRO'#ErOOQO'#Er'#ErO!NwQRO'#EvOOQQ'#Eu'#EuO# _QPO,5;]O# dQRO,5;fO# uQRO,5;eO#&zQRO'#EdO#'_QRO'#FbO#*ZQRO'#EvO#-]QRO,5;bO#-nQPO,5;bO#-sQRO,5;QO#.UQPO,5;wO@qQRO'#FcOOQQ,5;b,5;bO@qQRO,5;bO#.ZQRO'#EpO#2VQRO,5;bO#5TQRO,5;bO#5TQRO,5;bO#5TQRO,5;bO#5TQRO,5;bO#5TQRO,5;bO#5eQRO'#F[O#5TQRO,5;bO#5TQRO,5;bO#5TQRO,5;bO#5TQRO,5;bO#5TQRO,5;bO#?zQRO'#ExOOQQ'#Ew'#EwO#BnQRO,5;bO@qQRO,5;bO#BuQRO,5;OO#BuQRO,5;OOOQQ'#Fg'#FgOOQQ'#Ff'#FfO#EaQRO,5;hO#EaQRO,5;iO#J{QRO,5;OO#5TQRO,5;OO#5TQRO,5;OO#5TQRO,5;OO#5TQRO,5;OO#5TQRO,5;OOOQQ,5;O,5;OO#5TQRO,5;OO#5TQRO,5;OO#5TQRO,5;OO#5TQRO,5;OO#5TQRO,5;OO$$WQRO,5;OOOQQ'#FQ'#FQO$$bQRO,5;kOOQQ'#Ec'#EcOOQQ-E9R-E9ROHxQRO'#EuONSQRO'#EeOOQQ'#F]'#F]OOQQ-E9Z-E9ZOOQQ'#FU'#FUO$&aQRO1G0bOOQQ1G0b1G0bO$&iQRO1G0dOOQQ1G0d1G0dOOQQ'#E`'#E`O$&qQRO1G0eO$&yQRO1G0hOOQQ1G0h1G0hOOQQ'#FV'#FVOOQQ-E9T-E9TO$'RQRO'#EiOOQQ1G0o1G0oO$+|QRO,5;TO$-]QRO,5;_O!4rQRO,5;ZO$-kQPO,5;YO$-pQRO'#EiO$/{QPO'#EoO$1zQRO'#EnOOQQ-E9U-E9UOOQQ1G0s1G0sOOQQ'#FX'#FXOOQQ-E9V-E9VO$2RQRO,5;bO$2iQRO1G0wOOQQ1G1Q1G1QOOQQ1G1P1G1PO$2yQRO,5;OO$5bQRO,5;|O$5sQRO1G0|OOQQ1G0|1G0|OOQQ1G0l1G0lOOQQ1G1c1G1cO#5TQRO,5;}O$AUQRO1G0|O#5TQRO1G0|O#5TQRO1G0|O#5TQRO1G0|O#5TQRO1G0|OOQQ-E9Y-E9YO#5TQRO1G0|O#5TQRO1G0|O#5TQRO1G0|O#5TQRO1G0|O$AcQRO'#EpOOQQ'#FY'#FYO$ApQRO,5;dOOQQ,5;d,5;dO$FhQRO,5;dO$FoQRO,5;dO$JYQRO'#FZO$JaQRO'#EwO% wQRO1G1jO%'_QRO1G1kO%/fQRO1G1SO%/vQRO1G1SO%5gQRO1G1TO%5wQRO1G1TO%8wQRO1G0jO#5TQRO1G0jO#5TQRO1G0jO#5TQRO1G0jO#5TQRO1G0jOOQQ1G0j1G0jO#5TQRO1G0jO#5TQRO1G0jO#5TQRO1G0jO#5TQRO1G0jO%@rQRO'#EiO%H^QRO'#EpO&$]QRO'#EfOOQQ'#FO'#FOO&&wQRO'#EsO&'SQRO1G1VOOQQ1G1V1G1VO&'SQRO1G1VOOQQ-E9S-E9SOOQQ7+%|7+%|OOQQ7+&O7+&OOOQO'#Ea'#EaO&)OQPO7+&POOQQ7+&S7+&SOOQQ,5;T,5;TOOQQ1G0y1G0yO$&qQRO1G0uOOQQ1G0t1G0tO!5VQRO'#FVO&)TQRO1G0|O&)kQRO'#EwO&*RQRO7+&cO&+}QRO7+&cOOQQ7+&c7+&cO&,UQRO7+&cO&,gQRO1G0jO&1tQRO1G1iO&7hQRO7+&hO#5TQRO7+&hO#5TQRO7+&hO#5TQRO7+&hOOQQ7+&h7+&hO#5TQRO7+&hO#5TQRO7+&hO#5TQRO7+&hOOQQ-E9W-E9WOOQQ1G1O1G1OOOQQ-E9X-E9XO&=UQRO7+&UO#5TQRO7+&UO#5TQRO7+&UO#5TQRO7+&UOOQQ7+&U7+&UO#5TQRO7+&UO#5TQRO7+&UO#5TQRO7+&UO&?|QRO,5;TO&EUQRO'#FWO&GjQRO,5;dO&G{QRO,5;eO&HSQRO,5;_OOQQ,5;_,5;_OOQQ7+&q7+&qO&H_QRO7+&qOOQQ<<Ik<<IkO&JZQPO7+&aO&J`QRO7+&hOOQQ<<I}<<I}O&JvQRO7+&UO'!TQRO<<JSO#5TQRO<<JSO#5TQRO<<JSOOQQ<<JS<<JSO#5TQRO<<JSO#5TQRO<<JSO''qQRO<<IpO#5TQRO<<IpO#5TQRO<<IpOOQQ<<Ip<<IpO#5TQRO<<IpO#5TQRO<<IpO'*iQRO1G1OOOQQ<<J]<<J]OOQQ<<I{<<I{O'0XQRO<<JSO'0oQRO<<IpO'5|QROAN?nO#5TQROAN?nOOQQAN?nAN?nO#5TQROAN?nO';jQROAN?[O#5TQROAN?[OOQQAN?[AN?[O#5TQROAN?[O'>bQROAN?nO'>xQROAN?[O'DVQROG25YOOQQG25YG25YO'IsQROG24vOOQQG24vG24vO'LkQROG25YO'MRQROG24vO( jQRO'#EpO('XQRO'#EvO@qQRO'#EvO(*TQRO'#EdO@qQRO'#EdO(-PQRO'#FVO(-pQRO'#EpO(1QQRO'#EpO(7XQRO'#EpO(?cQRO'#EvO(EcQRO'#EvO(EsQRO'#EvO(HgQRO'#EvO(KhQRO'#EdO(KoQRO'#EdO(LVQRO'#EdO@qQRO'#FbO(N}QRO'#FbO)#yQRO'#FbO(*TQRO'#FbOE|QRO'#FbO('XQRO,5;bO(N}QRO,5;bO)#yQRO,5;bOE|QRO,5;bO(*TQRO,5;bO)&uQRO'#EpO)(OQRO,5;bO)*yQRO,5;bO)-jQRO,5;bO)0QQRO,5;bO)0_QRO,5;bO)0lQRO,5;bO)0|QRO,5;bO)1^QRO,5;bO)1nQRO,5;bO)2OQRO,5;bO#5TQRO,5;bO)2`QRO,5;bO@qQRO,5;bO)2gQRO,5;OO)5OQRO,5;OO)7jQRO,5;OO)7}QRO,5;OO)2gQRO,5;OO)5OQRO,5;OO)7jQRO,5;OO)7}QRO,5;OO):iQRO,5;hO)=eQRO,5;hO#*aQRO,5;hO)@aQRO,5;hO):iQRO,5;iO)=eQRO,5;iO#*aQRO,5;iO)@aQRO,5;iO)C]QRO,5;OO)FVQRO,5;OO)FgQRO,5;OO)IXQRO,5;OO)2OQRO,5;OO)0|QRO,5;OO)IiQRO,5;OO)1^QRO,5;OO#5TQRO,5;OO)IyQRO,5;bO)J|QRO,5;bO)MzQRO,5;bO*#OQRO,5;bO*%mQRO,5;OO*%tQRO,5;OO*(iQRO,5;OO*.VQRO,5;|O*3jQRO,5;|O*6WQRO,5;|O*6kQRO,5;|O*6xQRO,5;|O*9[QRO,5;|O*9mQRO1G0|O*BQQRO1G0|O)0lQRO,5;}O)0|QRO,5;}O)1^QRO,5;}O)1nQRO,5;}O)2OQRO,5;}O*BbQRO1G0|O*E]QRO1G0|O*G|QRO1G0|O*JdQRO1G0|O*JqQRO1G0|O)0lQRO1G0|O)0|QRO1G0|O)1^QRO1G0|O)1nQRO1G0|O)2OQRO1G0|O#5TQRO1G0|O*KOQRO1G1jO*MlQRO1G1jO*NYQRO1G1jO*NkQRO1G1jO+ RQRO1G1kO+#oQRO1G1kO+$]QRO1G1kO+$nQRO1G1kO+%UQRO1G0jO+(OQRO1G0jO+(`QRO1G0jO++QQRO1G0jO)2OQRO1G0jO)0|QRO1G0jO)IiQRO1G0jO)1^QRO1G0jO#5TQRO1G0jO++bQRO'#EpO+2gQRO'#EpO+7nQRO'#EpO+7uQRO'#EpO+8PQRO'#EfO+?UQRO'#EfO+D]QRO'#EfO+DdQRO'#EfO+DnQRO1G0|O+EqQRO1G0|O+HoQRO1G0|O+KsQRO1G0|O, YQRO'#EwO,#eQRO'#EwO,&iQRO'#EwO,)mQRO'#EwO,,nQRO1G0jO,,uQRO1G0jO,/jQRO1G0jO,2bQRO1G1iO,5YQRO1G1iO,7vQRO1G1iO,8ZQRO1G1iO,:mQRO1G1iO,:zQRO7+&hO,=uQRO7+&hO,@fQRO7+&hO,B|QRO7+&hO,CZQRO7+&hO)0lQRO7+&hO)0|QRO7+&hO)1^QRO7+&hO)1nQRO7+&hO)2OQRO7+&hO#5TQRO7+&hO,ChQRO7+&UO,FbQRO7+&UO,FrQRO7+&UO,IdQRO7+&UO)2OQRO7+&UO)0|QRO7+&UO)IiQRO7+&UO)1^QRO7+&UO#5TQRO7+&UO,ItQRO,5;TO,LiQRO,5;TO- QQRO,5;TO- XQRO,5;TO-#jQRO7+&hO-$mQRO7+&hO-'kQRO7+&hO-*oQRO7+&hO--^QRO7+&UO--eQRO7+&UO-0YQRO7+&UO-3QQRO<<JSO-5{QRO<<JSO-8lQRO<<JSO-;SQRO<<JSO-;aQRO<<JSO)0lQRO<<JSO)0|QRO<<JSO)1^QRO<<JSO)1nQRO<<JSO)2OQRO<<JSO#5TQRO<<JSO-;nQRO<<IpO->hQRO<<IpO->xQRO<<IpO-AjQRO<<IpO)2OQRO<<IpO)0|QRO<<IpO)IiQRO<<IpO)1^QRO<<IpO#5TQRO<<IpO-AzQRO<<JSO-B}QRO<<JSO-E{QRO<<JSO-IPQRO<<JSO-KnQRO<<IpO-KuQRO<<IpO-NjQRO<<IpO.#bQROAN?nO.&]QROAN?nO.(|QROAN?nO.+dQROAN?nO.+qQROAN?nO)0lQROAN?nO)0|QROAN?nO)1^QROAN?nO)1nQROAN?nO)2OQROAN?nO#5TQROAN?nO.,OQROAN?[O..xQROAN?[O./YQROAN?[O.1zQROAN?[O)2OQROAN?[O)0|QROAN?[O)IiQROAN?[O)1^QROAN?[O#5TQROAN?[O.2[QROAN?nO.3_QROAN?nO.6]QROAN?nO.9aQROAN?nO.<OQROAN?[O.<VQROAN?[O.>zQROAN?[O.ArQROG25YO.DmQROG25YO.G^QROG25YO.ItQROG25YO.JRQROG25YO.J`QROG24vO.MYQROG24vO.MjQROG24vO/![QROG24vO/!lQROG25YO/#oQROG25YO/&mQROG25YO/)qQROG25YO/,`QROG24vO/,gQROG24vO//[QROG24vO/2SQRO'#EvO/2bQRO'#EvO/2pQRO'#EvO/3OQRO'#EvO@qQRO'#EvO@qQRO'#EvO@qQRO'#EvO@qQRO'#EvO@qQRO'#EvO@qQRO'#EvOCmQRO'#EvOCmQRO'#EvOCmQRO'#EvOCmQRO'#EvOCmQRO'#EvOE|QRO'#EvOCmQRO'#EvO@qQRO'#EdO@qQRO'#EdO@qQRO'#EdO@qQRO'#EdO@qQRO'#EdO@qQRO'#EdO@qQRO'#EdO@qQRO'#EdO!%^QRO'#E|O!%^QRO'#E|O!%^QRO'#E|O!%^QRO'#E|O!'yQRO'#E}O!'yQRO'#E}O!'yQRO'#E}O!'yQRO'#E}O@qQRO'#EdO@qQRO'#EdO@qQRO'#EdO@qQRO'#EdO@qQRO'#EdO#'_QRO'#FbO/3^QRO,5;bO/3oQRO,5;bO@qQRO'#FcO@qQRO'#FcO@qQRO'#FcO@qQRO'#FcO@qQRO'#FcO#5TQRO,5;bO#5TQRO,5;bO#5TQRO,5;bO#5TQRO,5;bO#5TQRO,5;bO#5TQRO,5;bO#5TQRO,5;OO#5TQRO,5;OO#5TQRO,5;OO#5TQRO,5;OO#5TQRO,5;OO/4QQRO,5;OO/4[QRO,5;OO/4fQRO,5;OO/4pQRO,5;OO#5TQRO1G0|O#5TQRO1G0|O#5TQRO1G0|O#5TQRO1G0|O#5TQRO1G0|O#5TQRO1G0|O#5TQRO1G0jO#5TQRO1G0jO#5TQRO1G0jO#5TQRO1G0jO#5TQRO1G0jO/4zQRO'#EiO/5RQRO'#EiO/5YQRO'#EiO/5aQRO'#EiO#5TQRO7+&hO#5TQRO7+&hO#5TQRO7+&hO#5TQRO7+&hO#5TQRO7+&hO#5TQRO7+&hO#5TQRO7+&UO#5TQRO7+&UO#5TQRO7+&UO#5TQRO7+&UO#5TQRO7+&UO#5TQRO<<JSO#5TQRO<<JSO#5TQRO<<JSO#5TQRO<<JSO#5TQRO<<JSO#5TQRO<<JSO#5TQRO<<IpO#5TQRO<<IpO#5TQRO<<IpO#5TQRO<<IpO#5TQRO<<IpO(N}QRO'#EvO)#yQRO'#EvOE|QRO'#EvO(*TQRO'#EvO@qQRO'#EvO@qQRO'#EvO@qQRO'#EvO@qQRO'#EvO(N}QRO'#EdO)#yQRO'#EdO#'_QRO'#EdO@qQRO'#EdO@qQRO'#EdO@qQRO'#EdO#5TQRO,5;bO#5TQRO,5;bO#5TQRO,5;bO#5TQRO,5;bO/5hQRO,5;bO/5oQRO,5;bO/5vQRO,5;bO/5}QRO,5;bO@qQRO,5;bO@qQRO,5;bO@qQRO,5;bO@qQRO,5;bO#5TQRO,5;OO#5TQRO,5;OO#5TQRO,5;OO#5TQRO1G0|O#5TQRO1G0|O#5TQRO1G0|O#5TQRO1G0|O#5TQRO1G0jO#5TQRO1G0jO#5TQRO1G0jO#5TQRO7+&hO#5TQRO7+&hO#5TQRO7+&hO#5TQRO7+&hO#5TQRO7+&UO#5TQRO7+&UO#5TQRO7+&UO#5TQRO<<JSO#5TQRO<<JSO#5TQRO<<JSO#5TQRO<<JSO#5TQRO<<IpO#5TQRO<<IpO#5TQRO<<IpO#5TQROAN?nO#5TQROAN?nO#5TQROAN?nO#5TQROAN?nO#5TQROAN?[O#5TQROAN?[O#5TQROAN?[O@qQRO'#EvO@qQRO'#EvO@qQRO'#EvO@qQRO'#EvO@qQRO'#EvO@qQRO'#EvO@qQRO'#EdO@qQRO'#EdO@qQRO'#EdO@qQRO'#EdO@qQRO'#EdO@qQRO'#EdO@qQRO'#EdO@qQRO'#EdO@qQRO'#EdO;iQRO'#EnO#*ZQRO'#EvO#*ZQRO'#EvO#5TQRO,5;bO#5TQRO,5;bO#5TQRO,5;bO#5TQRO,5;bO#5TQRO,5;bO#5TQRO,5;bO#5TQRO,5;OO#5TQRO,5;OO#5TQRO,5;OO#5TQRO,5;OO#5TQRO,5;OO#5TQRO1G0|O#5TQRO1G0|O#5TQRO1G0|O#5TQRO1G0|O#5TQRO1G0|O#5TQRO1G0|O#5TQRO1G0jO#5TQRO1G0jO#5TQRO1G0jO#5TQRO1G0jO#5TQRO1G0jO#5TQRO7+&hO#5TQRO7+&hO#5TQRO7+&hO#5TQRO7+&hO#5TQRO7+&hO#5TQRO7+&hO#5TQRO7+&UO#5TQRO7+&UO#5TQRO7+&UO#5TQRO7+&UO#5TQRO7+&UO#'_QRO'#EvO#'_QRO,5;bO)IiQRO,5;bO/6UQRO,5;hO/6UQRO,5;iO)IiQRO,5;}O)IiQRO1G0|O)IiQRO7+&hO)IiQRO<<JSO)IiQROAN?nO/9QQRO'#EvO@qQRO'#EvO@qQRO'#EvO@qQRO'#EvO@qQRO'#EvO@qQRO'#EvOCmQRO'#EvOE|QRO'#EvOE|QRO'#EvOE|QRO'#EvOE|QRO'#EvOCmQRO'#EvOCmQRO'#EvOCmQRO'#EvOCmQRO'#EvO!%^QRO'#E|O!'yQRO'#E}O@qQRO'#EdO@qQRO'#EdO@qQRO'#EdO('XQRO'#FbO@qQRO'#FcO#5TQRO,5;bO#5TQRO,5;bO#5TQRO,5;bO#5TQRO,5;bO#5TQRO,5;bO#5TQRO,5;OO#5TQRO,5;OO#5TQRO,5;OO#5TQRO1G0|O#5TQRO1G0|O#5TQRO1G0|O#5TQRO1G0|O#5TQRO1G0|O#5TQRO1G0jO#5TQRO1G0jO#5TQRO1G0jO#5TQRO7+&hO#5TQRO7+&hO#5TQRO7+&hO#5TQRO7+&hO#5TQRO7+&hO#5TQRO7+&UO#5TQRO7+&UO#5TQRO7+&UO#5TQRO<<JSO#5TQRO<<JSO#5TQRO<<JSO#5TQRO<<JSO#5TQRO<<JSO#5TQRO<<IpO#5TQRO<<IpO#5TQRO<<IpO@qQRO'#EvO@qQRO'#EvO@qQRO'#EvO@qQRO'#EvO@qQRO'#EvO@qQRO'#EvO@qQRO'#EdO@qQRO'#EdO@qQRO'#EdO@qQRO'#EdO@qQRO'#EdO#5TQRO,5;bO#5TQRO,5;bO#5TQRO,5;bO#5TQRO,5;bO#5TQRO,5;bO#5TQRO,5;bO#5TQRO,5;OO#5TQRO,5;OO#5TQRO,5;OO#5TQRO,5;OO#5TQRO,5;OO#5TQRO1G0|O#5TQRO1G0|O#5TQRO1G0|O#5TQRO1G0|O#5TQRO1G0|O#5TQRO1G0|O#5TQRO1G0jO#5TQRO1G0jO#5TQRO1G0jO#5TQRO1G0jO#5TQRO1G0jO/9`QRO,5;bO/9qQRO,5;|O/:SQRO1G0|O/:eQRO1G1iO/:vQRO7+&hO/;XQRO<<JSO/;jQROAN?nO/;{QROG25YO@qQRO'#EvO@qQRO'#EvO@qQRO'#EvO@qQRO'#EvO@qQRO'#EvO@qQRO'#EdO@qQRO'#EdO@qQRO'#EdO#5TQRO,5;bO#5TQRO,5;bO#5TQRO,5;bO#5TQRO,5;bO#5TQRO,5;bO#5TQRO,5;OO#5TQRO,5;OO#5TQRO,5;OO#5TQRO1G0|O#5TQRO1G0|O#5TQRO1G0|O#5TQRO1G0|O#5TQRO1G0|O#5TQRO1G0jO#5TQRO1G0jO#5TQRO1G0jO#5TQRO7+&hO#5TQRO7+&hO#5TQRO7+&hO#5TQRO7+&hO#5TQRO7+&hO#5TQRO7+&UO#5TQRO7+&UO#5TQRO7+&UO@qQRO'#EvO@qQRO'#EvO@qQRO'#EvO@qQRO'#EvO@qQRO'#EvO@qQRO'#EvO@qQRO'#EdO@qQRO'#EdO@qQRO'#EdO@qQRO'#EdO@qQRO'#EdO#5TQRO,5;bO#5TQRO,5;bO#5TQRO,5;bO#5TQRO,5;bO#5TQRO,5;bO#5TQRO,5;bO#5TQRO,5;OO#5TQRO,5;OO#5TQRO,5;OO#5TQRO,5;OO#5TQRO,5;OO@qQRO'#EvO@qQRO'#EvO@qQRO'#EvO@qQRO'#EvO@qQRO'#EvO@qQRO'#EdO@qQRO'#EdO@qQRO'#EdO#5TQRO,5;bO#5TQRO,5;bO#5TQRO,5;bO#5TQRO,5;bO#5TQRO,5;bO#5TQRO,5;OO#5TQRO,5;OO#5TQRO,5;OO#5TQRO1G0|O#5TQRO1G0|O#5TQRO1G0|O#5TQRO1G0|O#5TQRO1G0|O#5TQRO1G0jO#5TQRO1G0jO#5TQRO1G0jO@qQRO'#EvO@qQRO'#EvO@qQRO'#EvO@qQRO'#EvO@qQRO'#EvO@qQRO'#EvO@qQRO'#EdO@qQRO'#EdO@qQRO'#EdO@qQRO'#EdO@qQRO'#EdO@qQRO'#EvO@qQRO'#EvO@qQRO'#EvO@qQRO'#EvO@qQRO'#EvO@qQRO'#EdO@qQRO'#EdO@qQRO'#EdO#5TQRO,5;bO#5TQRO,5;bO#5TQRO,5;bO#5TQRO,5;bO#5TQRO,5;bO#5TQRO,5;OO#5TQRO,5;OO#5TQRO,5;OO@qQRO'#EvO@qQRO'#EvO@qQRO'#EvO@qQRO'#EvO@qQRO'#EvO@qQRO'#EdO@qQRO'#EdO@qQRO'#Ed",
+      stateData: "/<^~O$SOS!zOS~OXsOYrO_WOdWOeWOfWOgUOhuOkWOm!SOnjOokOpiOqXOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O!buO!cvO!dwO!exO!fyO!gzO!h{O!iuO!j|O!k}O!l!OO!m!PO!n!QO!o!RO!p!OO!quO!rvO!swO!txO!uyO!vzO!w{O!xpO!yqO#PVO#ZYO#_UO#`UO~OSQOTPOUROWSOZ!UO$Q!|P~PYO#P!ZO~O#P![O~O#P!]O~O#P!^O~OSQOTPOUROWSOX-ZOY-VOdWOeWOfWOgUOhuOk!eOm0YOn,{Oo,|Op,vOr[Os'eOt,pOu/}Ov2fOw4ROx5ROy!nOz'fO{,uO|0SO}2kO!O4WO!P5WO!Q,uO!R'fO!S[O!T'eO!U,pO!V/}O!W2fO!X4RO!Y5RO!Z'eO![[O!]'eO!^,pO!_[O!`'eO!a[O!buO!c'gO!d-_O!e0TO!f2lO!g4XO!h5XO!i!sO!j'hO!k-cO!l0XO!m2pO!n4]O!o5]O!p0XO!quO!r'gO!s-_O!t0TO!u2lO!v4XO!w5XO!x,}O!y-RO#P!bO#Z!gO#_UO#`UO#h#fP~O_!`Oq!kO!}!cO~P&xOP#dXP#jXQ#dXQ#jXR#dXR#jXX#dXX#jXY#dXY#jX_#dX_#jXd#dXd#jXe#dXe#jXf#dXf#jXg#dXg#jXh#dXh#jXk#dXk#jXl#dXl#jXm#dXm#jXn#dXn#jXo#dXo#jXp#dXp#jXq#dXq#jXr#dXr#jXs#dXs#jXt#dXt#jXu#dXu#jXv#dXv#jXw#dXw#jXx#dXx#jXy#dXy#jXz#dXz#jX{#dX{#jX|#dX|#jX}#dX}#jX!O#dX!O#jX!P#dX!P#jX!Q#dX!Q#jX!R#dX!R#jX!S#dX!S#jX!T#dX!T#jX!U#dX!U#jX!V#dX!V#jX!W#dX!W#jX!X#dX!X#jX!Y#dX!Y#jX!Z#dX!Z#jX![#dX![#jX!]#dX!]#jX!^#dX!^#jX!_#dX!_#jX!`#dX!`#jX!a#dX!a#jX!b#dX!b#jX!c#dX!c#jX!d#dX!d#jX!e#dX!e#jX!f#dX!f#jX!g#dX!g#jX!h#dX!h#jX!i#dX!i#jX!j#dX!j#jX!k#dX!k#jX!l#dX!l#jX!m#dX!m#jX!n#dX!n#jX!o#dX!o#jX!p#dX!p#jX!q#dX!q#jX!r#dX!r#jX!s#dX!s#jX!t#dX!t#jX!u#dX!u#jX!v#dX!v#jX!w#dX!w#jX!x#dX!x#jX!y#dX!y#jX#P#dX#P#jX#Z#dX#Z#jX#_#dX#_#jX#`#dX#`#jX$Q#dX$Q#jX#[#dX#[#jX~OS#WXT#WXU#WXW#WXX#WXY#WXZ#WX_#WXd#WXe#WXf#WXg#WXh#WXk#WXm#WXn#WXo#WXp#WXq#WXr#WXs#WXt#WXu#WXv#WXw#WXx#WXy#WXz#WX{#WX|#WX}#WX!O#WX!P#WX!Q#WX!R#WX!S#WX!T#WX!U#WX!V#WX!W#WX!X#WX!Y#WX!Z#WX![#WX!]#WX!^#WX!_#WX!`#WX!a#WX!b#WX!c#WX!d#WX!e#WX!f#WX!g#WX!h#WX!i#WX!j#WX!k#WX!l#WX!m#WX!n#WX!o#WX!p#WX!q#WX!r#WX!s#WX!t#WX!u#WX!v#WX!w#WX!x#WX!y#WX#P#WX#Z#WX#_#WX#`#WX$Q#WX#[#WX~P,SOP!tOR!tOX-]OY-XO_WOdWOeWOfWOgUOhuOkWOm0[On,{Oo,|Op1dOqXOr[Os1SOt1_Ou3aOv4iOw5^Ox5nOy!nOz'fO{,uO|0SO}2kO!O4WO!P5WO!Q,uO!R'fO!S[O!T1SO!U1_O!V3aO!W4iO!X5^O!Y5nO!Z1SO![[O!]1SO!^1_O!_[O!`1SO!a[O!buO!c.|O!d-aO!e0VO!f2nO!g4ZO!h5ZO!i'qO!j/PO!k1qO!l3hO!m4pO!n5eO!o5uO!p3hO!quO!r.|O!s-aO!t0VO!u2nO!v4ZO!w5ZO!x-PO!y-TO#PVO#Z!uO#_UO#`UO~OP'tOQ!zOR'tOl!|O~O_WOdWOeWOfWOgUOkWOnjOokOpiOq!}Or[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O#PVO#Z0_O#_UO#`UO~OP#]OQ#]OR#]O_#]Or#]Os#]Ot#]Ou#]Ov#]Ow#]Ox#]Oy#]Oz#]O{#]O|#]O}#]O!O#]O!P#]O!Q#]O!R#]O!S#]O!T#]O!U#]O!V#]O!W#]O!X#]O!Y#]O!Z#]O![#]O!]#]O!^#]O!_#]O!`#]O!a#]O#P#[O~O_WOdWOeWOfWOgUOkWOn1gOo1kOp,yOq!}Or[Os.tOt,sOu0QOv2iOw4UOx5UOy'mOz.xO{1bO|3dO}4lO!O5aO!P5qO!Q1bO!R.xO!S[O!T.tO!U,sO!V0QO!W2iO!X4UO!Y5UO!Z.tO![[O!].tO!^,sO!_[O!`.tO!a[O#PVO#Z0_O#_UO#`UO~OP#iXQ#iXR#iXX$PXY$PX_$PXd$PXe$PXf$PXg$PXh$PXk$PXl#iXm$PXn$PXo$PXp$PXq$PXr$PXs$PXt$PXu$PXv$PXw$PXx$PXy$PXz$PX{$PX|$PX}$PX!O$PX!P$PX!Q$PX!R$PX!S$PX!T$PX!U$PX!V$PX!W$PX!X$PX!Y$PX!Z$PX![$PX!]$PX!^$PX!_$PX!`$PX!a$PX!b$PX!c$PX!d$PX!e$PX!f$PX!g$PX!h$PX!i$PX!j$PX!k$PX!l$PX!m$PX!n$PX!o$PX!p$PX!q$PX!r$PX!s$PX!t$PX!u$PX!v$PX!w$PX!x$PX!y$PX#P$PX#Z$PX#_$PX#`$PX$Q$PX~O$Q#uX~PHxOP#XXQ#XXR#XXX$PXY$PX_$PXd$PXe$PXf$PXg$PXh$PXk$PXl#XXm$PXn$PXo$PXp$PXq$PXr$PXs$PXt$PXu$PXv$PXw$PXx$PXy$PXz$PX{$PX|$PX}$PX!O$PX!P$PX!Q$PX!R$PX!S$PX!T$PX!U$PX!V$PX!W$PX!X$PX!Y$PX!Z$PX![$PX!]$PX!^$PX!_$PX!`$PX!a$PX!b$PX!c$PX!d$PX!e$PX!f$PX!g$PX!h$PX!i$PX!j$PX!k$PX!l$PX!m$PX!n$PX!o$PX!p$PX!q$PX!r$PX!s$PX!t$PX!u$PX!v$PX!w$PX!x$PX!y$PX#P$PX#Z$PX#_$PX#`$PX$Q$PX~O$Q#uX~PNSOP#bOQ#bOR#bO_#cOd#cOe#cOf#cOq#cOr#bOs#bOt#bOu#bOv#bOw#bOx#bOy#bOz#bO{#bO|#bO}#bO!O#bO!P#bO!Q#bO!R#bO!b#bO!c#bO!d#bO!e#bO!f#bO!g#bO!h#bO!i#bO!j#bO!k#bO!l#bO!m#bO!n#bO!o#bO!p#bO~OP#bOQ#bOR#bO_WOdWOeWOfWOkWOqWOr#bOs#bOt#bOu#bOv#bOw#bOx#bOy#bOz#bO{#bO|#bO}#bO!O#bO!P#bO!Q#bO!R#bO!b#bO!c#bO!d#bO!e#bO!f#bO!g#bO!h#bO!i#bO!j#bO!k#bO!l#bO!m#bO!n#bO!o#bO!p#bO~OX$PXY$PX_$PXd$PXe$PXf$PXg$PXh$PXk$PXm$PXn$PXo$PXp$PXq$PXr$PXs$PXt$PXu$PXv$PXw$PXx$PXy$PXz$PX{$PX|$PX}$PX!O$PX!P$PX!Q$PX!R$PX!S$PX!T$PX!U$PX!V$PX!W$PX!X$PX!Y$PX!Z$PX![$PX!]$PX!^$PX!_$PX!`$PX!a$PX!b$PX!c$PX!d$PX!e$PX!f$PX!g$PX!h$PX!i$PX!j$PX!k$PX!l$PX!m$PX!n$PX!o$PX!p$PX!q$PX!r$PX!s$PX!t$PX!u$PX!v$PX!w$PX!x$PX!y$PX#P$PX#Z$PX#_$PX#`$PX$Q$PX~OS#VXT#VXU#VXW#VXX#VXY#VXZ#VXh#VXm#VXq#VX!b#VX!c#VX!d#VX!e#VX!f#VX!g#VX!h#VX!i#VX!j#VX!k#VX!l#VX!m#VX!n#VX!o#VX!p#VX!q#VX!r#VX!s#VX!t#VX!u#VX!v#VX!w#VX!x#VX!y#VX$Q#VX~P!*iO_#sO~OSQOTPOUROWSOhuOquO!buO!quO~OX-^OY-YOZ!UOm0]O!c.{O!d-bO!e0WO!f2oO!g4[O!h5[O!i'sO!j/OO!k1pO!l3gO!m4oO!n5dO!o5tO!p3gO!r.{O!s-bO!t0WO!u2oO!v4[O!w5[O!x-QO!y-UO$Q!|X~P!1vO$Q#vX~PYO_#{O!}#}O~O_#{O!}$PO~O_$QOr$QO!T$QO~O_#{O!}$TO~OS#zXT#zXU#zXW#zXX#zXY#zX_#yX_#zXg#yXg#zXh#zXk#zXm#zXq#zX!b#zX!c#zX!d#zX!e#zX!f#zX!g#zX!h#zX!i#zX!j#zX!k#zX!l#zX!m#zX!n#zX!o#zX!p#zX!q#zX!r#zX!s#zX!t#zX!u#zX!v#zX!w#zX!x#zX!y#zX!}#yX!}#zX#P#yX#P#zX#Z#zX#_#yX#_#zX#`#yX#`#zX~OP#YXQ#YXR#YXl#YX!}#YX~P!5VOP#dXQ#dXR#dX_#{Xl#dXq#{X!}#dX#h#{X~P!5VO_$UOgUO#P$WO#_UO#`UO~O!}$XO~P!9]O_'iOq'jO!}$YO~P&xOP#]aP#aaQ#]aQ#aaR#]aR#aa_#]a_#aad#]ad#aae#]ae#aaf#]af#aag#]ag#aak#]ak#aal#]al#aan#]an#aao#]ao#aap#]ap#aaq#]aq#aar#]ar#aas#]as#aat#]at#aau#]au#aav#]av#aaw#]aw#aax#]ax#aay#]ay#aaz#]az#aa{#]a{#aa|#]a|#aa}#]a}#aa!O#]a!O#aa!P#]a!P#aa!Q#]a!Q#aa!R#]a!R#aa!S#]a!S#aa!T#]a!T#aa!U#]a!U#aa!V#]a!V#aa!W#]a!W#aa!X#]a!X#aa!Y#]a!Y#aa!Z#]a!Z#aa![#]a![#aa!]#]a!]#aa!^#]a!^#aa!_#]a!_#aa!`#]a!`#aa!a#]a!a#aa!b#]a!b#aa!c#]a!c#aa!d#]a!d#aa!e#]a!e#aa!f#]a!f#aa!g#]a!g#aa!h#]a!h#aa!i#]a!i#aa!j#]a!j#aa!k#]a!k#aa!l#]a!l#aa!m#]a!m#aa!n#]a!n#aa!o#]a!o#aa!p#]a!p#aa!q#]a!q#aa!r#]a!r#aa!s#]a!s#aa!t#]a!t#aa!u#]a!u#aa!v#]a!v#aa!w#]a!w#aa!x#]a!x#aa!y#]a!y#aa#P#]a#P#aa#Z#]a#Z#aa#_#]a#_#aa#`#]a#`#aaj#]aj#aa~OX#]aX#aaY#]aY#aah#]ah#aam#]am#aa$Q#]a$Q#aa#[#]a#[#aaS#]aS#aaT#]aT#aaU#]aU#aaW#]aW#aaZ#]aZ#aa!}#]a!}#aa[#]a[#aa~P!:SOP#dXQ#dXR#dXl#dX!}#dX~O#P$[O~P!EdOS#zXT#zXU#zXW#zXX#zXY#zX_#zXg#zXh#zXk#zXm#zXq#zX!b#zX!c#zX!d#zX!e#zX!f#zX!g#zX!h#zX!i#zX!j#zX!k#zX!l#zX!m#zX!n#zX!o#zX!p#zX!q#zX!r#zX!s#zX!t#zX!u#zX!v#zX!w#zX!x#zX!y#zX!}#zX#P#zX#Z#zX#_#zX#`#zX~OP#YXQ#YXR#YXl#YX!}#YX~P!E|OX-ZOY-VO_!iOgUOk$_Om0YO!c'gO!d-_O!e0TO!f2lO!g4XO!h5XO!i!sO!j'hO!k-cO!l0XO!m2pO!n4]O!o5]O!p0XO!r'gO!s-_O!t0TO!u2lO!v4XO!w5XO!x,}O!y-RO!}$bO#P$^O#Z$`O#_UO#`UO~P!1vOP#jXQ#jXR#jXS#WXT#WXU#WXW#WXX#WXY#WX_#WX_#{Xg#WXh#WXk#WXl#jXm#WXq#WXq#{X!b#WX!c#WX!d#WX!e#WX!f#WX!g#WX!h#WX!i#WX!j#WX!k#WX!l#WX!m#WX!n#WX!o#WX!p#WX!q#WX!r#WX!s#WX!t#WX!u#WX!v#WX!w#WX!x#WX!y#WX!}#WX!}#jX#P#WX#Z#WX#_#WX#`#WX#h#{X~P!EdO_$cOq$cO#h#fX~OP#jXQ#jXR#jXl#jX!}#jX#[#jX~P@qO#h$fO~O!}$gOP#YXQ#YXR#YXl#YX~O!}$hOP#XXQ#XXR#XXl#XX~OdWOeWOfWOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[OS#WXT#WXU#WXW#WXX#WXY#WXh#WXk#WXm#WXq#WX!b#WX!c#WX!d#WX!e#WX!f#WX!g#WX!h#WX!i#WX!j#WX!k#WX!l#WX!m#WX!n#WX!o#WX!p#WX!q#WX!r#WX!s#WX!t#WX!u#WX!v#WX!w#WX!x#WX!y#WX!}#WX#Z#WX~O_#WXg#WX#P#WX#_#WX#`#WX~P#!WO_WOdWOeWOfWOgUOkWOn,{Oo,|Op1dOq!}Or[Os1SOt1_Ou3aOv4iOw5^Ox5nOy!nOz'fO{,uO|0SO}2kO!O4WO!P5WO!Q,uO!R'fO!S[O!T1SO!U1_O!V3aO!W4iO!X5^O!Y5nO!Z1SO![[O!]1SO!^1_O!_[O!`1SO!a[O#PVO#Z0_O#_UO#`UO~OP!tOR!tO_WOdWOeWOfWOgUOkWOn,{Oo,|Op1dOq!}Or[Os1SOt1_Ou3aOv4iOw5^Ox5nOy!nOz'fO{,uO|0SO}2kO!O4WO!P5WO!Q,uO!R'fO!S[O!T1SO!U1_O!V3aO!W4iO!X5^O!Y5nO!Z1SO![[O!]1SO!^1_O!_[O!`1SO!a[O#PVO#Z!uO#_UO#`UO~O#[$kOP#iXQ#iXR#iXl#iX~O#[$lO~O#[$mOP#XXQ#XXR#XXl#XX~O#[$nO~OS#dXS#jXT#dXT#jXU#dXU#jXW#dXW#jXZ#dXZ#jXj#dXj#jX!}#dX!}#jX[#dX[#jX~P,SOX#jaY#ja_#jag#jah#jak#jal#jam#jaq#ja!b#ja!c#ja!d#ja!e#ja!f#ja!g#ja!h#ja!i#ja!j#ja!k#ja!l#ja!m#ja!n#ja!o#ja!p#ja!q#ja!r#ja!s#ja!t#ja!u#ja!v#ja!w#ja!x#ja!y#ja#P#ja#Z#ja#_#ja#`#jaS#jaT#jaU#jaW#ja!}#ja~OP'tOQ!zOR'tOd#jae#jaf#jan#jao#jap#jar#jas#jat#jau#jav#jaw#jax#jay#jaz#ja{#ja|#ja}#ja!O#ja!P#ja!Q#ja!R#ja!S#ja!T#ja!U#ja!V#ja!W#ja!X#ja!Y#ja!Z#ja![#ja!]#ja!^#ja!_#ja!`#ja!a#ja$Q#jaZ#jaj#ja#[#ja[#ja~P#/aOP'tOQ!zOR'tOl!|O~P@qOP'tOQ!zOR'tOl!|OX$OXY$OX_$OXd$OXe$OXf$OXg$OXh$OXk$OXm$OXn$OXo$OXp$OXq$OXr$OXs$OXt$OXu$OXv$OXw$OXx$OXy$OXz$OX{$OX|$OX}$OX!O$OX!P$OX!Q$OX!R$OX!S$OX!T$OX!U$OX!V$OX!W$OX!X$OX!Y$OX!Z$OX![$OX!]$OX!^$OX!_$OX!`$OX!a$OX!b$OX!c$OX!d$OX!e$OX!f$OX!g$OX!h$OX!i$OX!j$OX!k$OX!l$OX!m$OX!n$OX!o$OX!p$OX!q$OX!r$OX!s$OX!t$OX!u$OX!v$OX!w$OX!x$OX!y$OX#P$OX#Z$OX#_$OX#`$OX$Q$OXS$OXT$OXU$OXW$OXZ$OXj$OX!}$OX#[$OX[$OX~OSQOTPOUROWSOX1nOY1mOdWOeWOfWOgUOhuOk!eOm0ZOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O!buO!c.zO!d-`O!e0UO!f2mO!g4YO!h5YO!i'rO!j.}O!k1oO!l3fO!m4nO!n5cO!o5sO!p3fO!quO!r.zO!s-`O!t0UO!u2mO!v4YO!w5YO!x-OO!y-SO#Z0^O#_UO#`UO~O_$zOq'lO!}$}O#P!bO#h#fP~P#;TOP%ROR%RO_#]Ol'|Or#]Os#]Ot#]Ou#]Ov#]Ow#]Ox#]Oy#]Oz#]O{#]O|#]O}#]O!O#]O!P#]O!Q#]O!R#]O!S#]O!T#]O!U#]O!V#]O!W#]O!X#]O!Y#]O!Z#]O![#]O!]#]O!^#]O!_#]O!`#]O!a#]O#P#[O~OQ#]O~P#@_OP'tOQ!zOR'tOl!|OS#WaT#WaU#WaW#WaX#WaY#WaZ#Wah#Wam#Wa!b#Wa!c#Wa!d#Wa!e#Wa!f#Wa!g#Wa!h#Wa!i#Wa!j#Wa!k#Wa!l#Wa!m#Wa!n#Wa!o#Wa!p#Wa!q#Wa!r#Wa!s#Wa!t#Wa!u#Wa!v#Wa!w#Wa!x#Wa!y#Wa$Q#Wa~P@qO_WOdWOeWOfWOgUOkWOnjOokOpiOq!}Or[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O#PVO#Z!uO#_UO#`UO~OS#WaT#WaU#WaW#WaX#WaY#Wa_#Wag#Wah#Wak#Wam#Waq#Wa!b#Wa!c#Wa!d#Wa!e#Wa!f#Wa!g#Wa!h#Wa!i#Wa!j#Wa!k#Wa!l#Wa!m#Wa!n#Wa!o#Wa!p#Wa!q#Wa!r#Wa!s#Wa!t#Wa!u#Wa!v#Wa!w#Wa!x#Wa!y#Wa#P#Wa#Z#Wa#_#Wa#`#Wa~OP'tOQ!zOR'tOl!|OZ#Wad#Wae#Waf#Wan#Wao#Wap#War#Was#Wat#Wau#Wav#Waw#Wax#Way#Waz#Wa{#Wa|#Wa}#Wa!O#Wa!P#Wa!Q#Wa!R#Wa!S#Wa!T#Wa!U#Wa!V#Wa!W#Wa!X#Wa!Y#Wa!Z#Wa![#Wa!]#Wa!^#Wa!_#Wa!`#Wa!a#Wa$Q#Wa~P#H]OdWOeWOfWOgUOj%gOkWOnjOokOpiOq!}Or[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O!b%gO!c%gO!d%gO!e%gO!f%gO!g%gO!h%gO!i%gO!j%gO!k%gO!l%gO!m%gO!n%gO!o%gO!p%gO!q%gO!r%gO!s%gO!t%gO!u%gO!v%gO!w%gO!x%gO!y%gO#Z0_O#_UO#`UO~O_%eO#P%dO~P#MsOX-[OY-WO[%jOk$_Om0ZO!c.zO!d-`O!e0UO!f2mO!g4YO!h5YO!i'rO!j.}O!k1oO!l3fO!m4nO!n5cO!o5sO!p3fO!r.zO!s-`O!t0UO!u2mO!v4YO!w5YO!x-OO!y-SO#P%hO#Z$`O~P!1vO_#{O!}%mO~O_#{O!}%nO~O_%oO!T%oO~O_#{O!}%qO~O!}%rO~P!9]OP#]aP#aaQ#]aQ#aaR#]aR#aa_#]a_#aag#]ag#aak#]ak#aal#]al#aaq#]aq#aa!b#]a!b#aa!c#]a!c#aa!d#]a!d#aa!e#]a!e#aa!f#]a!f#aa!g#]a!g#aa!h#]a!h#aa!i#]a!i#aa!j#]a!j#aa!k#]a!k#aa!l#]a!l#aa!m#]a!m#aa!n#]a!n#aa!o#]a!o#aa!p#]a!p#aa!q#]a!q#aa!r#]a!r#aa!s#]a!s#aa!t#]a!t#aa!u#]a!u#aa!v#]a!v#aa!w#]a!w#aa!x#]a!x#aa!y#]a!y#aa#P#]a#P#aa#Z#]a#Z#aa#_#]a#_#aa#`#]a#`#aa~OS#]aS#aaT#]aT#aaU#]aU#aaW#]aW#aaX#]aX#aaY#]aY#aah#]ah#aam#]am#aa!}#]a!}#aa#h#ga~P$'YO_$cOq$cO!}%sO#h#fX~O#[%uO~OX-ZOY-VO_%vOgUOk$_Om0YO!c'gO!d-_O!e0TO!f2lO!g4XO!h5XO!i!sO!j'hO!k-cO!l0XO!m2pO!n4]O!o5]O!p0XO!r'gO!s-_O!t0TO!u2lO!v4XO!w5XO!x,}O!y-RO!}!cO#P$^O#Z$`O#_UO#`UO~P!1vO#P$[O~OX-]OY-XOhuOm0[O!buO!c.|O!d-aO!e0VO!f2nO!g4ZO!h5ZO!i'qO!j/PO!k1qO!l3hO!m4pO!n5eO!o5uO!p3hO!quO!r.|O!s-aO!t0VO!u2nO!v4ZO!w5ZO!x-PO!y-TO~OquO~P$0QOP#jaQ#jaR#jal#ja!}#ja#[#ja~P@qO_WOq'dO!}%{O#PVO~P#;TOdWOeWOfWOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O!}#Wa~P#H]OP-dOQ1sOR-dOl1TO#[$Ua~OP#iiP#jiQ#iiQ#jiR#iiR#jiX#jiY#ji_#jid#jie#jif#jig#jih#jik#jil#iil#jim#jin#jio#jip#jiq#jir#jis#jit#jiu#jiv#jiw#jix#jiy#jiz#ji{#ji|#ji}#ji!O#ji!P#ji!Q#ji!R#ji!S#ji!T#ji!U#ji!V#ji!W#ji!X#ji!Y#ji!Z#ji![#ji!]#ji!^#ji!_#ji!`#ji!a#ji!b#ji!c#ji!d#ji!e#ji!f#ji!g#ji!h#ji!i#ji!j#ji!k#ji!l#ji!m#ji!n#ji!o#ji!p#ji!q#ji!r#ji!s#ji!t#ji!u#ji!v#ji!w#ji!x#ji!y#ji#P#ji#Z#ji#_#ji#`#ji$Q#ji!}#ii!}#ji#[#jiS#jiT#jiU#jiW#jiZ#ji[#ji~OX#jiY#ji_#jid#jie#jif#jig#jih#jik#jil#jim#jin#jio#jip#jiq#jir#jis#jit#jiu#jiv#jiw#jix#jiy#jiz#ji{#ji|#ji}#ji!O#ji!P#ji!Q#ji!R#ji!S#ji!T#ji!U#ji!V#ji!W#ji!X#ji!Y#ji!Z#ji![#ji!]#ji!^#ji!_#ji!`#ji!a#ji!b#ji!c#ji!d#ji!e#ji!f#ji!g#ji!h#ji!i#ji!j#ji!k#ji!l#ji!m#ji!n#ji!o#ji!p#ji!q#ji!r#ji!s#ji!t#ji!u#ji!v#ji!w#ji!x#ji!y#ji#P#ji#Z#ji#_#ji#`#ji$Q#jiS#jiT#jiU#jiW#jiZ#jij#ji!}#ji#[#ji[#ji~OP'tOQ!zOR'tO~P$;oO_#{Xq#{X#h#{X~P!EdOX1nOY1mOk$_Om0ZO!c.zO!d-`O!e0UO!f2mO!g4YO!h5YO!i'rO!j.}O!k1oO!l3fO!m4nO!n5cO!o5sO!p3fO!r.zO!s-`O!t0UO!u2mO!v4YO!w5YO!x-OO!y-SO!}&YO#Z$`O~P!1vO_WOdWOeWOfWOgUOkWOnjOokOpiOq(OOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O#PVO#Z0_O#_UO#`UO~O!}&YO~P$ClO!}&YOP#XXQ#XXR#XXl#XX~OP#XXQ#XXR#XX_#}Xd#}Xe#}Xf#}Xg#}Xk#}Xl#XXn#}Xo#}Xp#}Xq#}Xr#}Xs#}Xt#}Xu#}Xv#}Xw#}Xx#}Xy#}Xz#}X{#}X|#}X}#}X!O#}X!P#}X!Q#}X!R#}X!S#}X!T#}X!U#}X!V#}X!W#}X!X#}X!Y#}X!Z#}X![#}X!]#}X!^#}X!_#}X!`#}X!a#}X#P#}X#Z#}X#_#}X#`#}X~O!}#}X~P$GQOP#kXQ#kXR#kXX#kXY#kXh#kXl#kXm#kX!b#kX!c#kX!d#kX!e#kX!f#kX!g#kX!h#kX!i#kX!j#kX!k#kX!l#kX!m#kX!n#kX!o#kX!p#kX!q#kX!r#kX!s#kX!t#kX!u#kX!v#kX!w#kX!x#kX!y#kX$Q#kX!}#kX#[#kXS#kXT#kXU#kXW#kXZ#kXj#kX[#kX~PE|OS$WiT$WiU$WiW$WiX$WiY$Wi_$Wig$Wih$Wik$Wim$Wiq$Wi!b$Wi!c$Wi!d$Wi!e$Wi!f$Wi!g$Wi!h$Wi!i$Wi!j$Wi!k$Wi!l$Wi!m$Wi!n$Wi!o$Wi!p$Wi!q$Wi!r$Wi!s$Wi!t$Wi!u$Wi!v$Wi!w$Wi!x$Wi!y$Wi#P$Wi#Z$Wi#_$Wi#`$Wi~OP'tOQ!zOR'tOl!|OZ$Wid$Wie$Wif$Win$Wio$Wip$Wir$Wis$Wit$Wiu$Wiv$Wiw$Wix$Wiy$Wiz$Wi{$Wi|$Wi}$Wi!O$Wi!P$Wi!Q$Wi!R$Wi!S$Wi!T$Wi!U$Wi!V$Wi!W$Wi!X$Wi!Y$Wi!Z$Wi![$Wi!]$Wi!^$Wi!_$Wi!`$Wi!a$Wi$Q$Wi~P$MXOS$XiT$XiU$XiW$XiX$XiY$Xi_$Xig$Xih$Xik$Xim$Xiq$Xi!b$Xi!c$Xi!d$Xi!e$Xi!f$Xi!g$Xi!h$Xi!i$Xi!j$Xi!k$Xi!l$Xi!m$Xi!n$Xi!o$Xi!p$Xi!q$Xi!r$Xi!s$Xi!t$Xi!u$Xi!v$Xi!w$Xi!x$Xi!y$Xi#P$Xi#Z$Xi#_$Xi#`$Xi~OP'tOQ!zOR'tOl!|OZ$Xid$Xie$Xif$Xin$Xio$Xip$Xir$Xis$Xit$Xiu$Xiv$Xiw$Xix$Xiy$Xiz$Xi{$Xi|$Xi}$Xi!O$Xi!P$Xi!Q$Xi!R$Xi!S$Xi!T$Xi!U$Xi!V$Xi!W$Xi!X$Xi!Y$Xi!Z$Xi![$Xi!]$Xi!^$Xi!_$Xi!`$Xi!a$Xi$Q$Xi~P%$oOS#piT#piU#piW#piX#piY#piZ#pi_#pid#pie#pif#pig#pih#pik#pim#pin#pio#pip#piq#pir#pis#pit#piu#piv#piw#pix#piy#piz#pi{#pi|#pi}#pi!O#pi!P#pi!Q#pi!R#pi!S#pi!T#pi!U#pi!V#pi!W#pi!X#pi!Y#pi!Z#pi![#pi!]#pi!^#pi!_#pi!`#pi!a#pi!b#pi!c#pi!d#pi!e#pi!f#pi!g#pi!h#pi!i#pi!j#pi!k#pi!l#pi!m#pi!n#pi!o#pi!p#pi!q#pi!r#pi!s#pi!t#pi!u#pi!v#pi!w#pi!x#pi!y#pi#P#pi#Z#pi#_#pi#`#pi$Q#pi!}#pi#[#pi[#pi~OP#iXQ#iXR#iXl#iX~P%*VOP#XXQ#XXR#XXl#XX~P%*VOS#qiT#qiU#qiW#qiX#qiY#qiZ#qi_#qid#qie#qif#qig#qih#qik#qim#qin#qio#qip#qiq#qir#qis#qit#qiu#qiv#qiw#qix#qiy#qiz#qi{#qi|#qi}#qi!O#qi!P#qi!Q#qi!R#qi!S#qi!T#qi!U#qi!V#qi!W#qi!X#qi!Y#qi!Z#qi![#qi!]#qi!^#qi!_#qi!`#qi!a#qi!b#qi!c#qi!d#qi!e#qi!f#qi!g#qi!h#qi!i#qi!j#qi!k#qi!l#qi!m#qi!n#qi!o#qi!p#qi!q#qi!r#qi!s#qi!t#qi!u#qi!v#qi!w#qi!x#qi!y#qi#P#qi#Z#qi#_#qi#`#qi$Q#qi!}#qi#[#qi[#qi~OP#iXQ#iXR#iXl#iX~P%0WOP#XXQ#XXR#XXl#XX~P%0WOS#WiT#WiU#WiW#WiX#WiY#Wi_#Wig#Wih#Wik#Wim#Wiq#Wi!b#Wi!c#Wi!d#Wi!e#Wi!f#Wi!g#Wi!h#Wi!i#Wi!j#Wi!k#Wi!l#Wi!m#Wi!n#Wi!o#Wi!p#Wi!q#Wi!r#Wi!s#Wi!t#Wi!u#Wi!v#Wi!w#Wi!x#Wi!y#Wi#P#Wi#Z#Wi#_#Wi#`#Wi~OP'tOQ!zOR'tOl!|OZ#Wid#Wie#Wif#Win#Wio#Wip#Wir#Wis#Wit#Wiu#Wiv#Wiw#Wix#Wiy#Wiz#Wi{#Wi|#Wi}#Wi!O#Wi!P#Wi!Q#Wi!R#Wi!S#Wi!T#Wi!U#Wi!V#Wi!W#Wi!X#Wi!Y#Wi!Z#Wi![#Wi!]#Wi!^#Wi!_#Wi!`#Wi!a#Wi$Q#Wi~P%6XOSQOTPOUROWSOX-ZOY-VO_!`OdWOeWOfWOgUOhuOk!eOm0YOnjOokOpiOq'kOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O!buO!c'gO!d-_O!e0TO!f2lO!g4XO!h5XO!i!sO!j'hO!k-cO!l0XO!m2pO!n4]O!o5]O!p0XO!quO!r'gO!s-_O!t0TO!u2lO!v4XO!w5XO!x,}O!y-RO#P!bO#Z0^O#_UO#`UO#h#fP~O!}&dO~P%;oOP#dXQ#dXR#dXS#rXT#rXU#rXW#rXX#rXY#rX_#dX_#rXd#dXe#dXf#dXg#dXg#rXh#rXj#dXk#dXk#rXl#dXm#rXn#dXo#dXp#dXq#dXq#rXr#dXs#dXt#dXu#dXv#dXw#dXx#dXy#dXz#dX{#dX|#dX}#dX!O#dX!P#dX!Q#dX!R#dX!S#dX!T#dX!U#dX!V#dX!W#dX!X#dX!Y#dX!Z#dX![#dX!]#dX!^#dX!_#dX!`#dX!a#dX!b#dX!b#rX!c#dX!c#rX!d#dX!d#rX!e#dX!e#rX!f#dX!f#rX!g#dX!g#rX!h#dX!h#rX!i#dX!i#rX!j#dX!j#rX!k#dX!k#rX!l#dX!l#rX!m#dX!m#rX!n#dX!n#rX!o#dX!o#rX!p#dX!p#rX!q#dX!q#rX!r#dX!r#rX!s#dX!s#rX!t#dX!t#rX!u#dX!u#rX!v#dX!v#rX!w#dX!w#rX!x#dX!x#rX!y#dX!y#rX#P#dX#P#rX#Z#dX#Z#rX#_#dX#_#rX#`#dX#`#rX~OZ#rXd#rXe#rXf#rXn#rXo#rXp#rXr#rXs#rXt#rXu#rXv#rXw#rXx#rXy#rXz#rX{#rX|#rX}#rX!O#rX!P#rX!Q#rX!R#rX!S#rX!T#rX!U#rX!V#rX!W#rX!X#rX!Y#rX!Z#rX![#rX!]#rX!^#rX!_#rX!`#rX!a#rX$Q#rX~P%@yOP#YXQ#YXR#YXS#rXT#rXU#rXW#rXX#rXY#rX_#YX_#rXd#YXe#YXf#YXg#YXg#rXh#rXj#YXk#YXk#rXl#YXm#rXn#YXo#YXp#YXq#YXq#rXr#YXs#YXt#YXu#YXv#YXw#YXx#YXy#YXz#YX{#YX|#YX}#YX!O#YX!P#YX!Q#YX!R#YX!S#YX!T#YX!U#YX!V#YX!W#YX!X#YX!Y#YX!Z#YX![#YX!]#YX!^#YX!_#YX!`#YX!a#YX!b#YX!b#rX!c#YX!c#rX!d#YX!d#rX!e#YX!e#rX!f#YX!f#rX!g#YX!g#rX!h#YX!h#rX!i#YX!i#rX!j#YX!j#rX!k#YX!k#rX!l#YX!l#rX!m#YX!m#rX!n#YX!n#rX!o#YX!o#rX!p#YX!p#rX!q#YX!q#rX!r#YX!r#rX!s#YX!s#rX!t#YX!t#rX!u#YX!u#rX!v#YX!v#rX!w#YX!w#rX!x#YX!x#rX!y#YX!y#rX#P#YX#P#rX#Z#YX#Z#rX#_#YX#_#rX#`#YX#`#rX~OZ#rXd#rXe#rXf#rXn#rXo#rXp#rXr#rXs#rXt#rXu#rXv#rXw#rXx#rXy#rXz#rX{#rX|#rX}#rX!O#rX!P#rX!Q#rX!R#rX!S#rX!T#rX!U#rX!V#rX!W#rX!X#rX!Y#rX!Z#rX![#rX!]#rX!^#rX!_#rX!`#rX!a#rX$Q#rX~P%JxO_$cOq$cO!}&iO~OX-[OY-WO[&jOk$_Om0ZO!c.zO!d-`O!e0UO!f2mO!g4YO!h5YO!i'rO!j.}O!k1oO!l3fO!m4nO!n5cO!o5sO!p3fO!r.zO!s-`O!t0UO!u2mO!v4YO!w5YO!x-OO!y-SO#Z$`O~P!1vO!}&lO~OP#jiQ#jiR#jil#ji!}#ji#[#ji~P@qOP#kXQ#kXR#kXl#kX!}#kX#[#kX~P@qOX1nOY1mOk$_Om0ZO!c.zO!d-`O!e0UO!f2mO!g4YO!h5YO!i'rO!j.}O!k1oO!l3fO!m4nO!n5cO!o5sO!p3fO!r.zO!s-`O!t0UO!u2mO!v4YO!w5YO!x-OO!y-SO!}&oO#Z$`O~P!1vO!}&oO~P$ClO!}&oOP#XXQ#XXR#XXl#XX~OdWOeWOfWOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O!}#Wi~P%6XOX$ViY$Vi_$Vig$Vih$Vik$Vil$Vim$Viq$Vi!b$Vi!c$Vi!d$Vi!e$Vi!f$Vi!g$Vi!h$Vi!i$Vi!j$Vi!k$Vi!l$Vi!m$Vi!n$Vi!o$Vi!p$Vi!q$Vi!r$Vi!s$Vi!t$Vi!u$Vi!v$Vi!w$Vi!x$Vi!y$Vi#P$Vi#Z$Vi#_$Vi#`$ViS$ViT$ViU$ViW$Vi!}$Vi~OP'tOQ!zOR'tOd$Vie$Vif$Vin$Vio$Vip$Vir$Vis$Vit$Viu$Viv$Viw$Vix$Viy$Viz$Vi{$Vi|$Vi}$Vi!O$Vi!P$Vi!Q$Vi!R$Vi!S$Vi!T$Vi!U$Vi!V$Vi!W$Vi!X$Vi!Y$Vi!Z$Vi![$Vi!]$Vi!^$Vi!_$Vi!`$Vi!a$Vi$Q$ViZ$Vij$Vi#[$Vi[$Vi~P&/OOX#jqY#jq_#jqg#jqh#jqk#jql#jqm#jqq#jq!b#jq!c#jq!d#jq!e#jq!f#jq!g#jq!h#jq!i#jq!j#jq!k#jq!l#jq!m#jq!n#jq!o#jq!p#jq!q#jq!r#jq!s#jq!t#jq!u#jq!v#jq!w#jq!x#jq!y#jq#P#jq#Z#jq#_#jq#`#jqS#jqT#jqU#jqW#jq!}#jq~OP'tOQ!zOR'tOd#jqe#jqf#jqn#jqo#jqp#jqr#jqs#jqt#jqu#jqv#jqw#jqx#jqy#jqz#jq{#jq|#jq}#jq!O#jq!P#jq!Q#jq!R#jq!S#jq!T#jq!U#jq!V#jq!W#jq!X#jq!Y#jq!Z#jq![#jq!]#jq!^#jq!_#jq!`#jq!a#jq$Q#jqZ#jqj#jq#[#jq[#jq~P&4rOS#WqT#WqU#WqW#WqX#WqY#Wq_#Wqg#Wqh#Wqk#Wqm#Wqq#Wq!b#Wq!c#Wq!d#Wq!e#Wq!f#Wq!g#Wq!h#Wq!i#Wq!j#Wq!k#Wq!l#Wq!m#Wq!n#Wq!o#Wq!p#Wq!q#Wq!r#Wq!s#Wq!t#Wq!u#Wq!v#Wq!w#Wq!x#Wq!y#Wq#P#Wq#Z#Wq#_#Wq#`#Wq~OP'tOQ!zOR'tOl!|OZ#Wqd#Wqe#Wqf#Wqn#Wqo#Wqp#Wqr#Wqs#Wqt#Wqu#Wqv#Wqw#Wqx#Wqy#Wqz#Wq{#Wq|#Wq}#Wq!O#Wq!P#Wq!Q#Wq!R#Wq!S#Wq!T#Wq!U#Wq!V#Wq!W#Wq!X#Wq!Y#Wq!Z#Wq![#Wq!]#Wq!^#Wq!_#Wq!`#Wq!a#Wq$Q#Wq~P&:fOS#laT#laU#laW#laX#laY#laZ#la_#lad#lae#laf#lag#lah#lak#lam#lan#lao#lap#laq#lar#las#lat#lau#lav#law#lax#lay#laz#la{#la|#la}#la!O#la!P#la!Q#la!R#la!S#la!T#la!U#la!V#la!W#la!X#la!Y#la!Z#la![#la!]#la!^#la!_#la!`#la!a#la!b#la!c#la!d#la!e#la!f#la!g#la!h#la!i#la!j#la!k#la!l#la!m#la!n#la!o#la!p#la!q#la!r#la!s#la!t#la!u#la!v#la!w#la!x#la!y#la#P#la#Z#la#_#la#`#la$Q#la~P!:SOS#|XT#|XU#|XW#|XX#|XY#|Xh#|Xk#|Xm#|Xq#|X!b#|X!c#|X!d#|X!e#|X!f#|X!g#|X!h#|X!i#|X!j#|X!k#|X!l#|X!m#|X!n#|X!o#|X!p#|X!q#|X!r#|X!s#|X!t#|X!u#|X!v#|X!w#|X!x#|X!y#|X!}#|X#Z#|X~P!E|O!}&}OP#XXQ#XXR#XXl#XX~O!}$hO~P$GQO_$cOq$cO!}%sO~OX-[OY-WO['OOk$_Om0ZO!c.zO!d-`O!e0UO!f2mO!g4YO!h5YO!i'rO!j.}O!k1oO!l3fO!m4nO!n5cO!o5sO!p3fO!r.zO!s-`O!t0UO!u2mO!v4YO!w5YO!x-OO!y-SO#Z$`O~P!1vO!}'PO~OP#jqQ#jqR#jql#jq!}#jq#[#jq~P@qOdWOeWOfWOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O!}#Wq~P&:fOX#jyY#jy_#jyg#jyh#jyk#jyl#jym#jyq#jy!b#jy!c#jy!d#jy!e#jy!f#jy!g#jy!h#jy!i#jy!j#jy!k#jy!l#jy!m#jy!n#jy!o#jy!p#jy!q#jy!r#jy!s#jy!t#jy!u#jy!v#jy!w#jy!x#jy!y#jy#P#jy#Z#jy#_#jy#`#jyS#jyT#jyU#jyW#jy!}#jy~OP'tOQ!zOR'tOd#jye#jyf#jyn#jyo#jyp#jyr#jys#jyt#jyu#jyv#jyw#jyx#jyy#jyz#jy{#jy|#jy}#jy!O#jy!P#jy!Q#jy!R#jy!S#jy!T#jy!U#jy!V#jy!W#jy!X#jy!Y#jy!Z#jy![#jy!]#jy!^#jy!_#jy!`#jy!a#jy$Q#jyZ#jyj#jy#[#jy[#jy~P&M_OS#WyT#WyU#WyW#WyX#WyY#Wy_#Wyg#Wyh#Wyk#Wym#Wyq#Wy!b#Wy!c#Wy!d#Wy!e#Wy!f#Wy!g#Wy!h#Wy!i#Wy!j#Wy!k#Wy!l#Wy!m#Wy!n#Wy!o#Wy!p#Wy!q#Wy!r#Wy!s#Wy!t#Wy!u#Wy!v#Wy!w#Wy!x#Wy!y#Wy#P#Wy#Z#Wy#_#Wy#`#Wy~OP'tOQ!zOR'tOl!|OZ#Wyd#Wye#Wyf#Wyn#Wyo#Wyp#Wyr#Wys#Wyt#Wyu#Wyv#Wyw#Wyx#Wyy#Wyz#Wy{#Wy|#Wy}#Wy!O#Wy!P#Wy!Q#Wy!R#Wy!S#Wy!T#Wy!U#Wy!V#Wy!W#Wy!X#Wy!Y#Wy!Z#Wy![#Wy!]#Wy!^#Wy!_#Wy!`#Wy!a#Wy$Q#Wy~P'%ROP#miQ#miR#miS#liT#liU#liW#liX#liY#liZ#li_#mid#mie#mif#mig#mih#lij#mik#mil#mim#lin#mio#mip#miq#mir#mis#mit#miu#miv#miw#mix#miy#miz#mi{#mi|#mi}#mi!O#mi!P#mi!Q#mi!R#mi!S#mi!T#mi!U#mi!V#mi!W#mi!X#mi!Y#mi!Z#mi![#mi!]#mi!^#mi!_#mi!`#mi!a#mi!b#mi!c#mi!d#mi!e#mi!f#mi!g#mi!h#mi!i#mi!j#mi!k#mi!l#mi!m#mi!n#mi!o#mi!p#mi!q#mi!r#mi!s#mi!t#mi!u#mi!v#mi!w#mi!x#mi!y#mi#P#mi#Z#mi#_#mi#`#mi$Q#li!}#li#[#li[#li~OP#jyQ#jyR#jyl#jy!}#jy#[#jy~P@qOdWOeWOfWOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O!}#Wy~P'%ROX#j!RY#j!R_#j!Rg#j!Rh#j!Rk#j!Rl#j!Rm#j!Rq#j!R!b#j!R!c#j!R!d#j!R!e#j!R!f#j!R!g#j!R!h#j!R!i#j!R!j#j!R!k#j!R!l#j!R!m#j!R!n#j!R!o#j!R!p#j!R!q#j!R!r#j!R!s#j!R!t#j!R!u#j!R!v#j!R!w#j!R!x#j!R!y#j!R#P#j!R#Z#j!R#_#j!R#`#j!RS#j!RT#j!RU#j!RW#j!R!}#j!R~OP'tOQ!zOR'tOd#j!Re#j!Rf#j!Rn#j!Ro#j!Rp#j!Rr#j!Rs#j!Rt#j!Ru#j!Rv#j!Rw#j!Rx#j!Ry#j!Rz#j!R{#j!R|#j!R}#j!R!O#j!R!P#j!R!Q#j!R!R#j!R!S#j!R!T#j!R!U#j!R!V#j!R!W#j!R!X#j!R!Y#j!R!Z#j!R![#j!R!]#j!R!^#j!R!_#j!R!`#j!R!a#j!R$Q#j!RZ#j!Rj#j!R#[#j!R[#j!R~P'3WOS#W!RT#W!RU#W!RW#W!RX#W!RY#W!R_#W!Rg#W!Rh#W!Rk#W!Rm#W!Rq#W!R!b#W!R!c#W!R!d#W!R!e#W!R!f#W!R!g#W!R!h#W!R!i#W!R!j#W!R!k#W!R!l#W!R!m#W!R!n#W!R!o#W!R!p#W!R!q#W!R!r#W!R!s#W!R!t#W!R!u#W!R!v#W!R!w#W!R!x#W!R!y#W!R#P#W!R#Z#W!R#_#W!R#`#W!R~OP'tOQ!zOR'tOl!|OZ#W!Rd#W!Re#W!Rf#W!Rn#W!Ro#W!Rp#W!Rr#W!Rs#W!Rt#W!Ru#W!Rv#W!Rw#W!Rx#W!Ry#W!Rz#W!R{#W!R|#W!R}#W!R!O#W!R!P#W!R!Q#W!R!R#W!R!S#W!R!T#W!R!U#W!R!V#W!R!W#W!R!X#W!R!Y#W!R!Z#W!R![#W!R!]#W!R!^#W!R!_#W!R!`#W!R!a#W!R$Q#W!R~P'8zOP#j!RQ#j!RR#j!Rl#j!R!}#j!R#[#j!R~P@qOdWOeWOfWOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O!}#W!R~P'8zOX#j!ZY#j!Z_#j!Zg#j!Zh#j!Zk#j!Zl#j!Zm#j!Zq#j!Z!b#j!Z!c#j!Z!d#j!Z!e#j!Z!f#j!Z!g#j!Z!h#j!Z!i#j!Z!j#j!Z!k#j!Z!l#j!Z!m#j!Z!n#j!Z!o#j!Z!p#j!Z!q#j!Z!r#j!Z!s#j!Z!t#j!Z!u#j!Z!v#j!Z!w#j!Z!x#j!Z!y#j!Z#P#j!Z#Z#j!Z#_#j!Z#`#j!ZS#j!ZT#j!ZU#j!ZW#j!Z!}#j!Z~OP'tOQ!zOR'tOd#j!Ze#j!Zf#j!Zn#j!Zo#j!Zp#j!Zr#j!Zs#j!Zt#j!Zu#j!Zv#j!Zw#j!Zx#j!Zy#j!Zz#j!Z{#j!Z|#j!Z}#j!Z!O#j!Z!P#j!Z!Q#j!Z!R#j!Z!S#j!Z!T#j!Z!U#j!Z!V#j!Z!W#j!Z!X#j!Z!Y#j!Z!Z#j!Z![#j!Z!]#j!Z!^#j!Z!_#j!Z!`#j!Z!a#j!Z$Q#j!ZZ#j!Zj#j!Z#[#j!Z[#j!Z~P'AaOS#W!ZT#W!ZU#W!ZW#W!ZX#W!ZY#W!Z_#W!Zg#W!Zh#W!Zk#W!Zm#W!Zq#W!Z!b#W!Z!c#W!Z!d#W!Z!e#W!Z!f#W!Z!g#W!Z!h#W!Z!i#W!Z!j#W!Z!k#W!Z!l#W!Z!m#W!Z!n#W!Z!o#W!Z!p#W!Z!q#W!Z!r#W!Z!s#W!Z!t#W!Z!u#W!Z!v#W!Z!w#W!Z!x#W!Z!y#W!Z#P#W!Z#Z#W!Z#_#W!Z#`#W!Z~OP'tOQ!zOR'tOl!|OZ#W!Zd#W!Ze#W!Zf#W!Zn#W!Zo#W!Zp#W!Zr#W!Zs#W!Zt#W!Zu#W!Zv#W!Zw#W!Zx#W!Zy#W!Zz#W!Z{#W!Z|#W!Z}#W!Z!O#W!Z!P#W!Z!Q#W!Z!R#W!Z!S#W!Z!T#W!Z!U#W!Z!V#W!Z!W#W!Z!X#W!Z!Y#W!Z!Z#W!Z![#W!Z!]#W!Z!^#W!Z!_#W!Z!`#W!Z!a#W!Z$Q#W!Z~P'GTOP#j!ZQ#j!ZR#j!Zl#j!Z!}#j!Z#[#j!Z~P@qOdWOeWOfWOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O!}#W!Z~P'GTOP#jXQ#jXR#jXS#WXT#WXU#WXW#WXX#WXY#WX_#jXd#jXe#jXf#jXg#jXh#WXk#WXk#jXl#jXm#WXn#jXo#jXp#jXq#WXq#jXr#jXs#jXt#jXu#jXv#jXw#jXx#jXy#jXz#jX{#jX|#jX}#jX!O#jX!P#jX!Q#jX!R#jX!S#jX!T#jX!U#jX!V#jX!W#jX!X#jX!Y#jX!Z#jX![#jX!]#jX!^#jX!_#jX!`#jX!a#jX!b#WX!c#WX!d#WX!e#WX!f#WX!g#WX!h#WX!i#WX!j#WX!k#WX!l#WX!m#WX!n#WX!o#WX!p#WX!q#WX!r#WX!s#WX!t#WX!u#WX!v#WX!w#WX!x#WX!y#WX!}#WX!}#jX#P#jX#Z#WX#Z#jX#_#jX#`#jX~P!EdO_WOdWOeWOfWOgUOkWOn,{Oo,|Op,vOq!}Or[Os'eOt,pOu/}Ov2fOw4ROx5ROy!nOz'fO{,uO|0SO}2kO!O4WO!P5WO!Q,uO!R'fO!S[O!T'eO!U,pO!V/}O!W2fO!X4RO!Y5RO!Z'eO![[O!]'eO!^,pO!_[O!`'eO!a[O#PVO#Z!uO#_UO#`UO~O_WOdWOeWOfWOgUOkWOn1hOo1lOp,zOq!}Or[Os.uOt,tOu0ROv2jOw4VOx5VOy'pOz.yO{1cO|3eO}4mO!O5bO!P5rO!Q1cO!R.yO!S[O!T.uO!U,tO!V0RO!W2jO!X4VO!Y5VO!Z.uO![[O!].uO!^,tO!_[O!`.uO!a[O#PVO#Z0_O#_UO#`UO~OP#dXQ#dXR#dX_#{Xl#dXq#{X!}#dX!}#{X#h#{X~P!5VOP#jXQ#jXR#jXS#WXT#WXU#WXW#WXX#WXY#WX_#WX_#{Xg#WXh#WXk#WXl#jXm#WXq#WXq#{X!b#WX!c#WX!d#WX!e#WX!f#WX!g#WX!h#WX!i#WX!j#WX!k#WX!l#WX!m#WX!n#WX!o#WX!p#WX!q#WX!r#WX!s#WX!t#WX!u#WX!v#WX!w#WX!x#WX!y#WX!}#WX!}#jX!}#{X#P#WX#Z#WX#_#WX#`#WX#h#{X~P!EdOP#jXQ#jXR#jXS#WXT#WXU#WXW#WXX#WXY#WX_#WX_#jX_#{Xd#jXe#jXf#jXg#WXg#jXh#WXk#WXk#jXl#jXm#WXn#jXo#jXp#jXq#WXq#jXq#{Xr#jXs#jXt#jXu#jXv#jXw#jXx#jXy#jXz#jX{#jX|#jX}#jX!O#jX!P#jX!Q#jX!R#jX!S#jX!T#jX!U#jX!V#jX!W#jX!X#jX!Y#jX!Z#jX![#jX!]#jX!^#jX!_#jX!`#jX!a#jX!b#WX!c#WX!d#WX!e#WX!f#WX!g#WX!h#WX!i#WX!j#WX!k#WX!l#WX!m#WX!n#WX!o#WX!p#WX!q#WX!r#WX!s#WX!t#WX!u#WX!v#WX!w#WX!x#WX!y#WX!}#WX!}#jX#P#WX#P#jX#Z#WX#Z#jX#_#WX#_#jX#`#WX#`#jX#h#{X~P!EdOP#jXQ#jXR#jXS#WXT#WXU#WXW#WXX#WXY#WX_#jX_#{Xd#jXe#jXf#jXg#jXh#WXk#WXk#jXl#jXm#WXn#jXo#jXp#jXq#WXq#jXq#{Xr#jXs#jXt#jXu#jXv#jXw#jXx#jXy#jXz#jX{#jX|#jX}#jX!O#jX!P#jX!Q#jX!R#jX!S#jX!T#jX!U#jX!V#jX!W#jX!X#jX!Y#jX!Z#jX![#jX!]#jX!^#jX!_#jX!`#jX!a#jX!b#WX!c#WX!d#WX!e#WX!f#WX!g#WX!h#WX!i#WX!j#WX!k#WX!l#WX!m#WX!n#WX!o#WX!p#WX!q#WX!r#WX!s#WX!t#WX!u#WX!v#WX!w#WX!x#WX!y#WX!}#WX!}#jX#P#jX#Z#WX#Z#jX#_#jX#`#jX#h#{X~P!EdOP#jXQ#jXR#jX_#jXl#jXr#jXs#jXt#jXu#jXv#jXw#jXx#jXy#jXz#jX{#jX|#jX}#jX!O#jX!P#jX!Q#jX!R#jX!S#jX!T#jX!U#jX!V#jX!W#jX!X#jX!Y#jX!Z#jX![#jX!]#jX!^#jX!_#jX!`#jX!a#jX#P#jX~OdWOeWOfWOgUOkWOnjOokOpiOq!}O#Z0_O#_UO#`UO~P(=PO_WOdWOeWOfWOgUOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O#PVO#_UO#`UOP#jXQ#jXR#jXS#jXT#jXU#jXW#jXX#jXY#jXh#jXl#jXm#jXq#jX!b#jX!c#jX!d#jX!e#jX!f#jX!g#jX!h#jX!i#jX!j#jX!k#jX!l#jX!m#jX!n#jX!o#jX!p#jX!q#jX!r#jX!s#jX!t#jX!u#jX!v#jX!w#jX!x#jX!y#jX~Ok#jX!}#jX#Z#jX[#jX~P(@]OkWO#Z0_OZ#jX$Q#jX~P(@]OdWOeWOfWOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O~OP#jXQ#jXR#jXS#jXT#jXU#jXW#jXX#jXY#jX_#jXg#jXh#jXk#jXl#jXm#jXq#jX!b#jX!c#jX!d#jX!e#jX!f#jX!g#jX!h#jX!i#jX!j#jX!k#jX!l#jX!m#jX!n#jX!o#jX!p#jX!q#jX!r#jX!s#jX!t#jX!u#jX!v#jX!w#jX!x#jX!y#jX!}#jX#P#jX#Z#jX#_#jX#`#jX~P(FTO#[#WX~P@qO_WOgUO#PVO#_UO#`UO[#WX~P#!WO_WOgUOkWO#PVO#Z0_O#_UO#`UOS#WXT#WXU#WXW#WXX#WXY#WXZ#WXh#WXm#WXq#WX!b#WX!c#WX!d#WX!e#WX!f#WX!g#WX!h#WX!i#WX!j#WX!k#WX!l#WX!m#WX!n#WX!o#WX!p#WX!q#WX!r#WX!s#WX!t#WX!u#WX!v#WX!w#WX!x#WX!y#WX$Q#WX~P(FTO_WOdWOeWOfWOgUOkWOn1eOo1iOp,wOq!}Or[Os.rOt,qOu0OOv2gOw4SOx5SOy'nOz.vO{1`O|3bO}4jO!O5_O!P5oO!Q1`O!R.vO!S[O!T.rO!U,qO!V0OO!W2gO!X4SO!Y5SO!Z.rO![[O!].rO!^,qO!_[O!`.rO!a[O#PVO#Z0_O#_UO#`UO~O_WOdWOeWOfWOgUOkWOn1fOo1jOp,xOq!}Or[Os.sOt,rOu0POv2hOw4TOx5TOy'oOz.wO{1aO|3cO}4kO!O5`O!P5pO!Q1aO!R.wO!S[O!T.sO!U,rO!V0PO!W2hO!X4TO!Y5TO!Z.sO![[O!].sO!^,rO!_[O!`.sO!a[O#PVO#Z0_O#_UO#`UO~OP#dXQ#dXR#dXd#jXe#jXf#jXg#jXk#jXl#dXn#jXo#jXp#jXq#jX!}#jX#Z#jX#_#jX#`#jX~P(=POP1rOQ-gOR1rOl#ja!}#ja~OS#jaT#jaU#jaW#jaX#jaY#jah#jak#jal#jam#jaq#ja!b#ja!c#ja!d#ja!e#ja!f#ja!g#ja!h#ja!i#ja!j#ja!k#ja!l#ja!m#ja!n#ja!o#ja!p#ja!q#ja!r#ja!s#ja!t#ja!u#ja!v#ja!w#ja!x#ja!y#ja!}#ja#Z#ja[#ja~OP'uOQ-hOR'uO~P)(aOS#jaT#jaU#jaW#jaX#jaY#jaZ#jah#jal#jam#jaq#ja!b#ja!c#ja!d#ja!e#ja!f#ja!g#ja!h#ja!i#ja!j#ja!k#ja!l#ja!m#ja!n#ja!o#ja!p#ja!q#ja!r#ja!s#ja!t#ja!u#ja!v#ja!w#ja!x#ja!y#ja$Q#ja~OP'vOQ-iOR'vO~P)+WO_#jal#jar#jas#jat#jau#jav#jaw#jax#jay#jaz#ja{#ja|#ja}#ja!O#ja!P#ja!Q#ja!R#ja!S#ja!T#ja!U#ja!V#ja!W#ja!X#ja!Y#ja!Z#ja![#ja!]#ja!^#ja!_#ja!`#ja!a#ja#P#ja~OP'xOQ-kOR'xO~P)-wOP'wOQ-jOR'wO~P#/aOP'tOQ!zOR'tOl!|O~P('XOP'tOQ!zOR'tOl!|O~P(N}OP'tOQ!zOR'tOl!|O~P)#yOP'tOQ!zOR'tOl!|O~PE|OP'tOQ!zOR'tOl!|O~P(*TOQ%xO~P#@_OP'tOQ!zOR'tOl!|OS#WaT#WaU#WaW#WaX#WaY#Wah#Wam#Wa!b#Wa!c#Wa!d#Wa!e#Wa!f#Wa!g#Wa!h#Wa!i#Wa!j#Wa!k#Wa!l#Wa!m#Wa!n#Wa!o#Wa!p#Wa!q#Wa!r#Wa!s#Wa!t#Wa!u#Wa!v#Wa!w#Wa!x#Wa!y#Wa!}#Wa~P(*TOP'tOQ!zOR'tOl!|OS#WaT#WaU#WaW#WaX#WaY#Wah#Wam#Wa!b#Wa!c#Wa!d#Wa!e#Wa!f#Wa!g#Wa!h#Wa!i#Wa!j#Wa!k#Wa!l#Wa!m#Wa!n#Wa!o#Wa!p#Wa!q#Wa!r#Wa!s#Wa!t#Wa!u#Wa!v#Wa!w#Wa!x#Wa!y#Wa!}#Wa[#Wa~P(N}OP'tOQ!zOR'tOl!|O#[#Wa~P#'_OP'tOQ!zOR'tOl!|OS#WaT#WaU#WaW#WaX#WaY#WaZ#Wah#Wam#Wa!b#Wa!c#Wa!d#Wa!e#Wa!f#Wa!g#Wa!h#Wa!i#Wa!j#Wa!k#Wa!l#Wa!m#Wa!n#Wa!o#Wa!p#Wa!q#Wa!r#Wa!s#Wa!t#Wa!u#Wa!v#Wa!w#Wa!x#Wa!y#Wa$Q#Wa~P)#yO_WOdWOeWOfWOgUOkWOn1hOo1lOp,zOq!}Or[Os.uOt,tOu0ROv2jOw4VOx5VOy'pOz.yO{1cO|3eO}4mO!O5bO!P5rO!Q1cO!R.yO!S[O!T.uO!U,tO!V0RO!W2jO!X4VO!Y5VO!Z.uO![[O!].uO!^,tO!_[O!`.uO!a[O#PVO#Z0`O#_UO#`UO~O_WOdWOeWOfWOgUOkWOn1eOo1iOp,wOq!}Or[Os.rOt,qOu0OOv2gOw4SOx5SOy'nOz.vO{1`O|3bO}4jO!O5_O!P5oO!Q1`O!R.vO!S[O!T.rO!U,qO!V0OO!W2gO!X4SO!Y5SO!Z.rO![[O!].rO!^,qO!_[O!`.rO!a[O#PVO#Z!uO#_UO#`UO~O_WOdWOeWOfWOgUOkWOn1fOo1jOp,xOq!}Or[Os.sOt,rOu0POv2hOw4TOx5TOy'oOz.wO{1aO|3cO}4kO!O5`O!P5pO!Q1aO!R.wO!S[O!T.sO!U,rO!V0PO!W2hO!X4TO!Y5TO!Z.sO![[O!].sO!^,rO!_[O!`.sO!a[O#PVO#Z!uO#_UO#`UO~OP'wOQ-jOR'wOl'}O!}#Wa~P#H]OS#WaT#WaU#WaW#WaX#WaY#Wah#Wak#Wam#Waq#Wa!b#Wa!c#Wa!d#Wa!e#Wa!f#Wa!g#Wa!h#Wa!i#Wa!j#Wa!k#Wa!l#Wa!m#Wa!n#Wa!o#Wa!p#Wa!q#Wa!r#Wa!s#Wa!t#Wa!u#Wa!v#Wa!w#Wa!x#Wa!y#Wa!}#Wa#Z#Wa[#Wa~OP'uOQ-hOR'uOl'zO~P)CpOP-dOQ1sOR-dOl1TO#[#Wa~OS#WaT#WaU#WaW#WaX#WaY#WaZ#Wah#Wam#Waq#Wa!b#Wa!c#Wa!d#Wa!e#Wa!f#Wa!g#Wa!h#Wa!i#Wa!j#Wa!k#Wa!l#Wa!m#Wa!n#Wa!o#Wa!p#Wa!q#Wa!r#Wa!s#Wa!t#Wa!u#Wa!v#Wa!w#Wa!x#Wa!y#Wa$Q#Wa~OP'vOQ-iOR'vOl'{O~P)FxOP'tOQ!zOR'tOl!|O~P#'_OdWOeWOfWOgUOkWOnjOokOpiOq!}O#Z0_O#_UO#`UOP#jaQ#jaR#ja~P)-wO_WOdWOeWOfWOgUOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O#PVO#_UO#`UOP#jaQ#jaR#ja~P)(aO_WOgUOkWO#PVO#Z0_O#_UO#`UOP#jaQ#jaR#jaS#jaT#jaU#jaW#jaX#jaY#jaZ#jah#jal#jam#jaq#ja!b#ja!c#ja!d#ja!e#ja!f#ja!g#ja!h#ja!i#ja!j#ja!k#ja!l#ja!m#ja!n#ja!o#ja!p#ja!q#ja!r#ja!s#ja!t#ja!u#ja!v#ja!w#ja!x#ja!y#ja$Q#ja~P(FTOdWOeWOfWOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[OP#jaQ#jaR#ja~P#/aO#[#Wa~P@qO_WOdWOeWOfWOgUOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O#PVO#_UO#`UO~P)CpO_WOgUOkWO#PVO#Z0_O#_UO#`UOS#WaT#WaU#WaW#WaX#WaY#WaZ#Wah#Wam#Waq#Wa!b#Wa!c#Wa!d#Wa!e#Wa!f#Wa!g#Wa!h#Wa!i#Wa!j#Wa!k#Wa!l#Wa!m#Wa!n#Wa!o#Wa!p#Wa!q#Wa!r#Wa!s#Wa!t#Wa!u#Wa!v#Wa!w#Wa!x#Wa!y#Wa$Q#Wa~P(FTOX$UaY$Ua_$Uag$Uah$Uak$Ual$Uam$Uaq$Ua!b$Ua!c$Ua!d$Ua!e$Ua!f$Ua!g$Ua!h$Ua!i$Ua!j$Ua!k$Ua!l$Ua!m$Ua!n$Ua!o$Ua!p$Ua!q$Ua!r$Ua!s$Ua!t$Ua!u$Ua!v$Ua!w$Ua!x$Ua!y$Ua#P$Ua#Z$Ua#_$Ua#`$UaS$UaT$UaU$UaW$Ua!}$Ua~OP'tOQ!zOR'tOd$Uae$Uaf$Uan$Uao$Uap$Uar$Uas$Uat$Uau$Uav$Uaw$Uax$Uay$Uaz$Ua{$Ua|$Ua}$Ua!O$Ua!P$Ua!Q$Ua!R$Ua!S$Ua!T$Ua!U$Ua!V$Ua!W$Ua!X$Ua!Y$Ua!Z$Ua![$Ua!]$Ua!^$Ua!_$Ua!`$Ua!a$Ua$Q$UaZ$Uaj$Ua#[$Ua[$Ua~P*+aOS$UaT$UaU$UaW$UaX$UaY$Uah$Uak$Ual$Uam$Uaq$Ua!b$Ua!c$Ua!d$Ua!e$Ua!f$Ua!g$Ua!h$Ua!i$Ua!j$Ua!k$Ua!l$Ua!m$Ua!n$Ua!o$Ua!p$Ua!q$Ua!r$Ua!s$Ua!t$Ua!u$Ua!v$Ua!w$Ua!x$Ua!y$Ua!}$Ua#Z$Ua~OP'uOQ-hOR'uO[$Ua~P*1TOS$UaT$UaU$UaW$UaX$UaY$Uah$Ual$Uam$Uaq$Ua!b$Ua!c$Ua!d$Ua!e$Ua!f$Ua!g$Ua!h$Ua!i$Ua!j$Ua!k$Ua!l$Ua!m$Ua!n$Ua!o$Ua!p$Ua!q$Ua!r$Ua!s$Ua!t$Ua!u$Ua!v$Ua!w$Ua!x$Ua!y$Ua~OP'vOQ-iOR'vOZ$Ua$Q$Ua~P*3zOP'wOQ-jOR'wO~P*+aOP'xOQ-kOR'xO_$Ual$Uar$Uas$Uat$Uau$Uav$Uaw$Uax$Uay$Uaz$Ua{$Ua|$Ua}$Ua!O$Ua!P$Ua!Q$Ua!R$Ua!S$Ua!T$Ua!U$Ua!V$Ua!W$Ua!X$Ua!Y$Ua!Z$Ua![$Ua!]$Ua!^$Ua!_$Ua!`$Ua!a$Ua#P$Ua~OP-dOQ1sOR-dOl$Ua#[$Ua~OX#iiY#ii_#iid#iie#iif#iig#iih#iik#iim#iin#iio#iip#iiq#iir#iis#iit#iiu#iiv#iiw#iix#iiy#iiz#ii{#ii|#ii}#ii!O#ii!P#ii!Q#ii!R#ii!S#ii!T#ii!U#ii!V#ii!W#ii!X#ii!Y#ii!Z#ii![#ii!]#ii!^#ii!_#ii!`#ii!a#ii!b#ii!c#ii!d#ii!e#ii!f#ii!g#ii!h#ii!i#ii!j#ii!k#ii!l#ii!m#ii!n#ii!o#ii!p#ii!q#ii!r#ii!s#ii!t#ii!u#ii!v#ii!w#ii!x#ii!y#ii#P#ii#Z#ii#_#ii#`#ii$Q#iiS#iiT#iiU#iiW#iiZ#iij#iij#ji#[#ii[#ii~P$5sOP#jiQ#jiR#jiS#jiT#jiU#jiW#jiX#jiY#ji_#jig#jih#jik#jil#jim#jiq#ji!b#ji!c#ji!d#ji!e#ji!f#ji!g#ji!h#ji!i#ji!j#ji!k#ji!l#ji!m#ji!n#ji!o#ji!p#ji!q#ji!r#ji!s#ji!t#ji!u#ji!v#ji!w#ji!x#ji!y#ji!}#ji#P#ji#Z#ji#_#ji#`#ji~OP#iiQ#iiR#iil#ii~P*?ROP1rOQ-gOR1rOl#ji!}#ji~OS#jiT#jiU#jiW#jiX#jiY#jih#jik#jil#jim#jiq#ji!b#ji!c#ji!d#ji!e#ji!f#ji!g#ji!h#ji!i#ji!j#ji!k#ji!l#ji!m#ji!n#ji!o#ji!p#ji!q#ji!r#ji!s#ji!t#ji!u#ji!v#ji!w#ji!x#ji!y#ji!}#ji#Z#ji[#ji~OP'uOQ-hOR'uO~P*BsOS#jiT#jiU#jiW#jiX#jiY#jiZ#jih#jil#jim#jiq#ji!b#ji!c#ji!d#ji!e#ji!f#ji!g#ji!h#ji!i#ji!j#ji!k#ji!l#ji!m#ji!n#ji!o#ji!p#ji!q#ji!r#ji!s#ji!t#ji!u#ji!v#ji!w#ji!x#ji!y#ji$Q#ji~OP'vOQ-iOR'vO~P*EjO_#jil#jir#jis#jit#jiu#jiv#jiw#jix#jiy#jiz#ji{#ji|#ji}#ji!O#ji!P#ji!Q#ji!R#ji!S#ji!T#ji!U#ji!V#ji!W#ji!X#ji!Y#ji!Z#ji![#ji!]#ji!^#ji!_#ji!`#ji!a#ji#P#ji~OP'xOQ-kOR'xO~P*HZOP'wOQ-jOR'wO~P*?[OP'wOQ-jOR'wOl'}O!}$Wi~P$MXOS$WiT$WiU$WiW$WiX$WiY$Wih$Wim$Wiq$Wi!b$Wi!c$Wi!d$Wi!e$Wi!f$Wi!g$Wi!h$Wi!i$Wi!j$Wi!k$Wi!l$Wi!m$Wi!n$Wi!o$Wi!p$Wi!q$Wi!r$Wi!s$Wi!t$Wi!u$Wi!v$Wi!w$Wi!x$Wi!y$Wi~OP'uOQ-hOR'uOl'zOk$Wi!}$Wi#Z$Wi[$Wi~P*KcOP-dOQ1sOR-dOl1TO#[$Wi~OP'vOQ-iOR'vOl'{OZ$Wi$Q$Wi~P*KcOP'wOQ-jOR'wOl'}O!}$Xi~P%$oOS$XiT$XiU$XiW$XiX$XiY$Xih$Xim$Xiq$Xi!b$Xi!c$Xi!d$Xi!e$Xi!f$Xi!g$Xi!h$Xi!i$Xi!j$Xi!k$Xi!l$Xi!m$Xi!n$Xi!o$Xi!p$Xi!q$Xi!r$Xi!s$Xi!t$Xi!u$Xi!v$Xi!w$Xi!x$Xi!y$Xi~OP'uOQ-hOR'uOl'zOk$Xi!}$Xi#Z$Xi[$Xi~P+ fOP-dOQ1sOR-dOl1TO#[$Xi~OP'vOQ-iOR'vOl'{OZ$Xi$Q$Xi~P+ fOP'wOQ-jOR'wOl'}O!}#Wi~P%6XOS#WiT#WiU#WiW#WiX#WiY#Wih#Wik#Wim#Wiq#Wi!b#Wi!c#Wi!d#Wi!e#Wi!f#Wi!g#Wi!h#Wi!i#Wi!j#Wi!k#Wi!l#Wi!m#Wi!n#Wi!o#Wi!p#Wi!q#Wi!r#Wi!s#Wi!t#Wi!u#Wi!v#Wi!w#Wi!x#Wi!y#Wi!}#Wi#Z#Wi[#Wi~OP'uOQ-hOR'uOl'zO~P+%iOP-dOQ1sOR-dOl1TO#[#Wi~OS#WiT#WiU#WiW#WiX#WiY#WiZ#Wih#Wim#Wiq#Wi!b#Wi!c#Wi!d#Wi!e#Wi!f#Wi!g#Wi!h#Wi!i#Wi!j#Wi!k#Wi!l#Wi!m#Wi!n#Wi!o#Wi!p#Wi!q#Wi!r#Wi!s#Wi!t#Wi!u#Wi!v#Wi!w#Wi!x#Wi!y#Wi$Q#Wi~OP'vOQ-iOR'vOl'{O~P+(qO!}#rX~P%@yOP#dXQ#dXR#dXS#rXT#rXU#rXW#rXX#rXY#rX_#dXd#dXe#dXf#dXg#dXh#rXj#dXk#dXl#dXm#rXn#dXo#dXp#dXq#dXq#rXr#dXs#dXt#dXu#dXv#dXw#dXx#dXy#dXz#dX{#dX|#dX}#dX!O#dX!P#dX!Q#dX!R#dX!S#dX!T#dX!U#dX!V#dX!W#dX!X#dX!Y#dX!Z#dX![#dX!]#dX!^#dX!_#dX!`#dX!a#dX!b#dX!b#rX!c#dX!c#rX!d#dX!d#rX!e#dX!e#rX!f#dX!f#rX!g#dX!g#rX!h#dX!h#rX!i#dX!i#rX!j#dX!j#rX!k#dX!k#rX!l#dX!l#rX!m#dX!m#rX!n#dX!n#rX!o#dX!o#rX!p#dX!p#rX!q#dX!q#rX!r#dX!r#rX!s#dX!s#rX!t#dX!t#rX!u#dX!u#rX!v#dX!v#rX!w#dX!w#rX!x#dX!x#rX!y#dX!y#rX#P#dX#Z#dX#_#dX#`#dX~Ok#rX!}#rX#Z#rX[#rX~P++iOP#dXQ#dXR#dX_#dXd#dXe#dXf#dXg#dXj#dXk#dXl#dXn#dXo#dXp#dXq#dXr#dXs#dXt#dXu#dXv#dXw#dXx#dXy#dXz#dX{#dX|#dX}#dX!O#dX!P#dX!Q#dX!R#dX!S#dX!T#dX!U#dX!V#dX!W#dX!X#dX!Y#dX!Z#dX![#dX!]#dX!^#dX!_#dX!`#dX!a#dX!b#dX!c#dX!d#dX!e#dX!f#dX!g#dX!h#dX!i#dX!j#dX!k#dX!l#dX!m#dX!n#dX!o#dX!p#dX!q#dX!r#dX!s#dX!t#dX!u#dX!v#dX!w#dX!x#dX!y#dX#P#dX#Z#dX#_#dX#`#dX~O#[#rX~P+2wOZ#rX$Q#rX~P++iO!}#rX~P%JxOP#YXQ#YXR#YXS#rXT#rXU#rXW#rXX#rXY#rX_#YXd#YXe#YXf#YXg#YXh#rXj#YXk#YXl#YXm#rXn#YXo#YXp#YXq#YXq#rXr#YXs#YXt#YXu#YXv#YXw#YXx#YXy#YXz#YX{#YX|#YX}#YX!O#YX!P#YX!Q#YX!R#YX!S#YX!T#YX!U#YX!V#YX!W#YX!X#YX!Y#YX!Z#YX![#YX!]#YX!^#YX!_#YX!`#YX!a#YX!b#YX!b#rX!c#YX!c#rX!d#YX!d#rX!e#YX!e#rX!f#YX!f#rX!g#YX!g#rX!h#YX!h#rX!i#YX!i#rX!j#YX!j#rX!k#YX!k#rX!l#YX!l#rX!m#YX!m#rX!n#YX!n#rX!o#YX!o#rX!p#YX!p#rX!q#YX!q#rX!r#YX!r#rX!s#YX!s#rX!t#YX!t#rX!u#YX!u#rX!v#YX!v#rX!w#YX!w#rX!x#YX!x#rX!y#YX!y#rX#P#YX#Z#YX#_#YX#`#YX~Ok#rX!}#rX#Z#rX[#rX~P+8WOP#YXQ#YXR#YX_#YXd#YXe#YXf#YXg#YXj#YXk#YXl#YXn#YXo#YXp#YXq#YXr#YXs#YXt#YXu#YXv#YXw#YXx#YXy#YXz#YX{#YX|#YX}#YX!O#YX!P#YX!Q#YX!R#YX!S#YX!T#YX!U#YX!V#YX!W#YX!X#YX!Y#YX!Z#YX![#YX!]#YX!^#YX!_#YX!`#YX!a#YX!b#YX!c#YX!d#YX!e#YX!f#YX!g#YX!h#YX!i#YX!j#YX!k#YX!l#YX!m#YX!n#YX!o#YX!p#YX!q#YX!r#YX!s#YX!t#YX!u#YX!v#YX!w#YX!x#YX!y#YX#P#YX#Z#YX#_#YX#`#YX~O#[#rX~P+?fOZ#rX$Q#rX~P+8WOdWOeWOfWOgUOkWOnjOokOpiOq!}O#Z0_O#_UO#`UOP#jiQ#jiR#ji~P*HZO_WOdWOeWOfWOgUOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O#PVO#_UO#`UOP#jiQ#jiR#ji~P*BsO_WOgUOkWO#PVO#Z0_O#_UO#`UOP#jiQ#jiR#jiS#jiT#jiU#jiW#jiX#jiY#jiZ#jih#jil#jim#jiq#ji!b#ji!c#ji!d#ji!e#ji!f#ji!g#ji!h#ji!i#ji!j#ji!k#ji!l#ji!m#ji!n#ji!o#ji!p#ji!q#ji!r#ji!s#ji!t#ji!u#ji!v#ji!w#ji!x#ji!y#ji$Q#ji~P(FTOdWOeWOfWOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O~P*?ROdWOeWOfWOgUOkWOnjOokOpiO#Z0_O#_UO#`UOP#kXQ#kXR#kXl#kX~Oq!}O_#kXr#kXs#kXt#kXu#kXv#kXw#kXx#kXy#kXz#kX{#kX|#kX}#kX!O#kX!P#kX!Q#kX!R#kX!S#kX!T#kX!U#kX!V#kX!W#kX!X#kX!Y#kX!Z#kX![#kX!]#kX!^#kX!_#kX!`#kX!a#kX#P#kX~P+NXO_WOgUO#PVO#_UO#`UOP#kXQ#kXR#kXS#kXT#kXU#kXW#kXX#kXY#kXh#kXk#kXl#kXm#kXq#kX!b#kX!c#kX!d#kX!e#kX!f#kX!g#kX!h#kX!i#kX!j#kX!k#kX!l#kX!m#kX!n#kX!o#kX!p#kX!q#kX!r#kX!s#kX!t#kX!u#kX!v#kX!w#kX!x#kX!y#kX!}#kX#Z#kX[#kX~P(FTO_WOgUOkWO#PVO#Z0_O#_UO#`UOP#kXQ#kXR#kXS#kXT#kXU#kXW#kXX#kXY#kXZ#kXh#kXl#kXm#kXq#kX!b#kX!c#kX!d#kX!e#kX!f#kX!g#kX!h#kX!i#kX!j#kX!k#kX!l#kX!m#kX!n#kX!o#kX!p#kX!q#kX!r#kX!s#kX!t#kX!u#kX!v#kX!w#kX!x#kX!y#kX$Q#kX~P(FTOP#kXQ#kXR#kXS#kXT#kXU#kXW#kXX#kXY#kX_#kXg#kXh#kXk#kXl#kXm#kXq#kX!b#kX!c#kX!d#kX!e#kX!f#kX!g#kX!h#kX!i#kX!j#kX!k#kX!l#kX!m#kX!n#kX!o#kX!p#kX!q#kX!r#kX!s#kX!t#kX!u#kX!v#kX!w#kX!x#kX!y#kX!}#kX#P#kX#Z#kX#_#kX#`#kX~P(FTO#[#Wi~P@qO_WOdWOeWOfWOgUOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O#PVO#_UO#`UO~P+%iO_WOgUOkWO#PVO#Z0_O#_UO#`UOS#WiT#WiU#WiW#WiX#WiY#WiZ#Wih#Wim#Wiq#Wi!b#Wi!c#Wi!d#Wi!e#Wi!f#Wi!g#Wi!h#Wi!i#Wi!j#Wi!k#Wi!l#Wi!m#Wi!n#Wi!o#Wi!p#Wi!q#Wi!r#Wi!s#Wi!t#Wi!u#Wi!v#Wi!w#Wi!x#Wi!y#Wi$Q#Wi~P(FTOP1rOQ-gOR1rOl$Vi!}$Vi~OS$ViT$ViU$ViW$ViX$ViY$Vih$Vik$Vil$Vim$Viq$Vi!b$Vi!c$Vi!d$Vi!e$Vi!f$Vi!g$Vi!h$Vi!i$Vi!j$Vi!k$Vi!l$Vi!m$Vi!n$Vi!o$Vi!p$Vi!q$Vi!r$Vi!s$Vi!t$Vi!u$Vi!v$Vi!w$Vi!x$Vi!y$Vi!}$Vi#Z$Vi~OP'uOQ-hOR'uO[$Vi~P,2sOS$ViT$ViU$ViW$ViX$ViY$Vih$Vil$Vim$Viq$Vi!b$Vi!c$Vi!d$Vi!e$Vi!f$Vi!g$Vi!h$Vi!i$Vi!j$Vi!k$Vi!l$Vi!m$Vi!n$Vi!o$Vi!p$Vi!q$Vi!r$Vi!s$Vi!t$Vi!u$Vi!v$Vi!w$Vi!x$Vi!y$Vi~OP'vOQ-iOR'vOZ$Vi$Q$Vi~P,5jOP'xOQ-kOR'xO_$Vil$Vir$Vis$Vit$Viu$Viv$Viw$Vix$Viy$Viz$Vi{$Vi|$Vi}$Vi!O$Vi!P$Vi!Q$Vi!R$Vi!S$Vi!T$Vi!U$Vi!V$Vi!W$Vi!X$Vi!Y$Vi!Z$Vi![$Vi!]$Vi!^$Vi!_$Vi!`$Vi!a$Vi#P$Vi~OP'wOQ-jOR'wO~P&/OOP1rOQ-gOR1rOl#jq!}#jq~OS#jqT#jqU#jqW#jqX#jqY#jqh#jqk#jql#jqm#jqq#jq!b#jq!c#jq!d#jq!e#jq!f#jq!g#jq!h#jq!i#jq!j#jq!k#jq!l#jq!m#jq!n#jq!o#jq!p#jq!q#jq!r#jq!s#jq!t#jq!u#jq!v#jq!w#jq!x#jq!y#jq!}#jq#Z#jq[#jq~OP'uOQ-hOR'uO~P,;]OS#jqT#jqU#jqW#jqX#jqY#jqZ#jqh#jql#jqm#jqq#jq!b#jq!c#jq!d#jq!e#jq!f#jq!g#jq!h#jq!i#jq!j#jq!k#jq!l#jq!m#jq!n#jq!o#jq!p#jq!q#jq!r#jq!s#jq!t#jq!u#jq!v#jq!w#jq!x#jq!y#jq$Q#jq~OP'vOQ-iOR'vO~P,>SO_#jql#jqr#jqs#jqt#jqu#jqv#jqw#jqx#jqy#jqz#jq{#jq|#jq}#jq!O#jq!P#jq!Q#jq!R#jq!S#jq!T#jq!U#jq!V#jq!W#jq!X#jq!Y#jq!Z#jq![#jq!]#jq!^#jq!_#jq!`#jq!a#jq#P#jq~OP'xOQ-kOR'xO~P,@sOP'wOQ-jOR'wO~P&4rOP'wOQ-jOR'wOl'}O!}#Wq~P&:fOS#WqT#WqU#WqW#WqX#WqY#Wqh#Wqk#Wqm#Wqq#Wq!b#Wq!c#Wq!d#Wq!e#Wq!f#Wq!g#Wq!h#Wq!i#Wq!j#Wq!k#Wq!l#Wq!m#Wq!n#Wq!o#Wq!p#Wq!q#Wq!r#Wq!s#Wq!t#Wq!u#Wq!v#Wq!w#Wq!x#Wq!y#Wq!}#Wq#Z#Wq[#Wq~OP'uOQ-hOR'uOl'zO~P,C{OP-dOQ1sOR-dOl1TO#[#Wq~OS#WqT#WqU#WqW#WqX#WqY#WqZ#Wqh#Wqm#Wqq#Wq!b#Wq!c#Wq!d#Wq!e#Wq!f#Wq!g#Wq!h#Wq!i#Wq!j#Wq!k#Wq!l#Wq!m#Wq!n#Wq!o#Wq!p#Wq!q#Wq!r#Wq!s#Wq!t#Wq!u#Wq!v#Wq!w#Wq!x#Wq!y#Wq$Q#Wq~OP'vOQ-iOR'vOl'{O~P,GTOS#laT#laU#laW#laX#laY#la_#lag#lah#lak#lam#laq#la!b#la!c#la!d#la!e#la!f#la!g#la!h#la!i#la!j#la!k#la!l#la!m#la!n#la!o#la!p#la!q#la!r#la!s#la!t#la!u#la!v#la!w#la!x#la!y#la!}#la#P#la#Z#la#_#la#`#la~P!:SOS#laT#laU#laW#laX#laY#lah#lak#lam#laq#la!b#la!c#la!d#la!e#la!f#la!g#la!h#la!i#la!j#la!k#la!l#la!m#la!n#la!o#la!p#la!q#la!r#la!s#la!t#la!u#la!v#la!w#la!x#la!y#la!}#la#Z#la[#la~P!:SO#[#la~P!:SOS#laT#laU#laW#laX#laY#laZ#lah#lam#laq#la!b#la!c#la!d#la!e#la!f#la!g#la!h#la!i#la!j#la!k#la!l#la!m#la!n#la!o#la!p#la!q#la!r#la!s#la!t#la!u#la!v#la!w#la!x#la!y#la$Q#la~P!:SOdWOeWOfWOgUOkWOnjOokOpiOq!}O#Z0_O#_UO#`UOP#jqQ#jqR#jq~P,@sO_WOdWOeWOfWOgUOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O#PVO#_UO#`UOP#jqQ#jqR#jq~P,;]O_WOgUOkWO#PVO#Z0_O#_UO#`UOP#jqQ#jqR#jqS#jqT#jqU#jqW#jqX#jqY#jqZ#jqh#jql#jqm#jqq#jq!b#jq!c#jq!d#jq!e#jq!f#jq!g#jq!h#jq!i#jq!j#jq!k#jq!l#jq!m#jq!n#jq!o#jq!p#jq!q#jq!r#jq!s#jq!t#jq!u#jq!v#jq!w#jq!x#jq!y#jq$Q#jq~P(FTOdWOeWOfWOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[OP#jqQ#jqR#jq~P&4rO#[#Wq~P@qO_WOdWOeWOfWOgUOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O#PVO#_UO#`UO~P,C{O_WOgUOkWO#PVO#Z0_O#_UO#`UOS#WqT#WqU#WqW#WqX#WqY#WqZ#Wqh#Wqm#Wqq#Wq!b#Wq!c#Wq!d#Wq!e#Wq!f#Wq!g#Wq!h#Wq!i#Wq!j#Wq!k#Wq!l#Wq!m#Wq!n#Wq!o#Wq!p#Wq!q#Wq!r#Wq!s#Wq!t#Wq!u#Wq!v#Wq!w#Wq!x#Wq!y#Wq$Q#Wq~P(FTOP1rOQ-gOR1rOl#jy!}#jy~OS#jyT#jyU#jyW#jyX#jyY#jyh#jyk#jyl#jym#jyq#jy!b#jy!c#jy!d#jy!e#jy!f#jy!g#jy!h#jy!i#jy!j#jy!k#jy!l#jy!m#jy!n#jy!o#jy!p#jy!q#jy!r#jy!s#jy!t#jy!u#jy!v#jy!w#jy!x#jy!y#jy!}#jy#Z#jy[#jy~OP'uOQ-hOR'uO~P-3cOS#jyT#jyU#jyW#jyX#jyY#jyZ#jyh#jyl#jym#jyq#jy!b#jy!c#jy!d#jy!e#jy!f#jy!g#jy!h#jy!i#jy!j#jy!k#jy!l#jy!m#jy!n#jy!o#jy!p#jy!q#jy!r#jy!s#jy!t#jy!u#jy!v#jy!w#jy!x#jy!y#jy$Q#jy~OP'vOQ-iOR'vO~P-6YO_#jyl#jyr#jys#jyt#jyu#jyv#jyw#jyx#jyy#jyz#jy{#jy|#jy}#jy!O#jy!P#jy!Q#jy!R#jy!S#jy!T#jy!U#jy!V#jy!W#jy!X#jy!Y#jy!Z#jy![#jy!]#jy!^#jy!_#jy!`#jy!a#jy#P#jy~OP'xOQ-kOR'xO~P-8yOP'wOQ-jOR'wO~P&M_OP'wOQ-jOR'wOl'}O!}#Wy~P'%ROS#WyT#WyU#WyW#WyX#WyY#Wyh#Wyk#Wym#Wyq#Wy!b#Wy!c#Wy!d#Wy!e#Wy!f#Wy!g#Wy!h#Wy!i#Wy!j#Wy!k#Wy!l#Wy!m#Wy!n#Wy!o#Wy!p#Wy!q#Wy!r#Wy!s#Wy!t#Wy!u#Wy!v#Wy!w#Wy!x#Wy!y#Wy!}#Wy#Z#Wy[#Wy~OP'uOQ-hOR'uOl'zO~P-<ROP-dOQ1sOR-dOl1TO#[#Wy~OS#WyT#WyU#WyW#WyX#WyY#WyZ#Wyh#Wym#Wyq#Wy!b#Wy!c#Wy!d#Wy!e#Wy!f#Wy!g#Wy!h#Wy!i#Wy!j#Wy!k#Wy!l#Wy!m#Wy!n#Wy!o#Wy!p#Wy!q#Wy!r#Wy!s#Wy!t#Wy!u#Wy!v#Wy!w#Wy!x#Wy!y#Wy$Q#Wy~OP'vOQ-iOR'vOl'{O~P-?ZOdWOeWOfWOgUOkWOnjOokOpiOq!}O#Z0_O#_UO#`UOP#jyQ#jyR#jy~P-8yO_WOdWOeWOfWOgUOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O#PVO#_UO#`UOP#jyQ#jyR#jy~P-3cO_WOgUOkWO#PVO#Z0_O#_UO#`UOP#jyQ#jyR#jyS#jyT#jyU#jyW#jyX#jyY#jyZ#jyh#jyl#jym#jyq#jy!b#jy!c#jy!d#jy!e#jy!f#jy!g#jy!h#jy!i#jy!j#jy!k#jy!l#jy!m#jy!n#jy!o#jy!p#jy!q#jy!r#jy!s#jy!t#jy!u#jy!v#jy!w#jy!x#jy!y#jy$Q#jy~P(FTOdWOeWOfWOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[OP#jyQ#jyR#jy~P&M_O#[#Wy~P@qO_WOdWOeWOfWOgUOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O#PVO#_UO#`UO~P-<RO_WOgUOkWO#PVO#Z0_O#_UO#`UOS#WyT#WyU#WyW#WyX#WyY#WyZ#Wyh#Wym#Wyq#Wy!b#Wy!c#Wy!d#Wy!e#Wy!f#Wy!g#Wy!h#Wy!i#Wy!j#Wy!k#Wy!l#Wy!m#Wy!n#Wy!o#Wy!p#Wy!q#Wy!r#Wy!s#Wy!t#Wy!u#Wy!v#Wy!w#Wy!x#Wy!y#Wy$Q#Wy~P(FTOP1rOQ-gOR1rOl#j!R!}#j!R~OS#j!RT#j!RU#j!RW#j!RX#j!RY#j!Rh#j!Rk#j!Rl#j!Rm#j!Rq#j!R!b#j!R!c#j!R!d#j!R!e#j!R!f#j!R!g#j!R!h#j!R!i#j!R!j#j!R!k#j!R!l#j!R!m#j!R!n#j!R!o#j!R!p#j!R!q#j!R!r#j!R!s#j!R!t#j!R!u#j!R!v#j!R!w#j!R!x#j!R!y#j!R!}#j!R#Z#j!R[#j!R~OP'uOQ-hOR'uO~P.#sOS#j!RT#j!RU#j!RW#j!RX#j!RY#j!RZ#j!Rh#j!Rl#j!Rm#j!Rq#j!R!b#j!R!c#j!R!d#j!R!e#j!R!f#j!R!g#j!R!h#j!R!i#j!R!j#j!R!k#j!R!l#j!R!m#j!R!n#j!R!o#j!R!p#j!R!q#j!R!r#j!R!s#j!R!t#j!R!u#j!R!v#j!R!w#j!R!x#j!R!y#j!R$Q#j!R~OP'vOQ-iOR'vO~P.&jO_#j!Rl#j!Rr#j!Rs#j!Rt#j!Ru#j!Rv#j!Rw#j!Rx#j!Ry#j!Rz#j!R{#j!R|#j!R}#j!R!O#j!R!P#j!R!Q#j!R!R#j!R!S#j!R!T#j!R!U#j!R!V#j!R!W#j!R!X#j!R!Y#j!R!Z#j!R![#j!R!]#j!R!^#j!R!_#j!R!`#j!R!a#j!R#P#j!R~OP'xOQ-kOR'xO~P.)ZOP'wOQ-jOR'wO~P'3WOP'wOQ-jOR'wOl'}O!}#W!R~P'8zOS#W!RT#W!RU#W!RW#W!RX#W!RY#W!Rh#W!Rk#W!Rm#W!Rq#W!R!b#W!R!c#W!R!d#W!R!e#W!R!f#W!R!g#W!R!h#W!R!i#W!R!j#W!R!k#W!R!l#W!R!m#W!R!n#W!R!o#W!R!p#W!R!q#W!R!r#W!R!s#W!R!t#W!R!u#W!R!v#W!R!w#W!R!x#W!R!y#W!R!}#W!R#Z#W!R[#W!R~OP'uOQ-hOR'uOl'zO~P.,cOP-dOQ1sOR-dOl1TO#[#W!R~OS#W!RT#W!RU#W!RW#W!RX#W!RY#W!RZ#W!Rh#W!Rm#W!Rq#W!R!b#W!R!c#W!R!d#W!R!e#W!R!f#W!R!g#W!R!h#W!R!i#W!R!j#W!R!k#W!R!l#W!R!m#W!R!n#W!R!o#W!R!p#W!R!q#W!R!r#W!R!s#W!R!t#W!R!u#W!R!v#W!R!w#W!R!x#W!R!y#W!R$Q#W!R~OP'vOQ-iOR'vOl'{O~P./kOdWOeWOfWOgUOkWOnjOokOpiOq!}O#Z0_O#_UO#`UOP#j!RQ#j!RR#j!R~P.)ZO_WOdWOeWOfWOgUOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O#PVO#_UO#`UOP#j!RQ#j!RR#j!R~P.#sO_WOgUOkWO#PVO#Z0_O#_UO#`UOP#j!RQ#j!RR#j!RS#j!RT#j!RU#j!RW#j!RX#j!RY#j!RZ#j!Rh#j!Rl#j!Rm#j!Rq#j!R!b#j!R!c#j!R!d#j!R!e#j!R!f#j!R!g#j!R!h#j!R!i#j!R!j#j!R!k#j!R!l#j!R!m#j!R!n#j!R!o#j!R!p#j!R!q#j!R!r#j!R!s#j!R!t#j!R!u#j!R!v#j!R!w#j!R!x#j!R!y#j!R$Q#j!R~P(FTOdWOeWOfWOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[OP#j!RQ#j!RR#j!R~P'3WO#[#W!R~P@qO_WOdWOeWOfWOgUOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O#PVO#_UO#`UO~P.,cO_WOgUOkWO#PVO#Z0_O#_UO#`UOS#W!RT#W!RU#W!RW#W!RX#W!RY#W!RZ#W!Rh#W!Rm#W!Rq#W!R!b#W!R!c#W!R!d#W!R!e#W!R!f#W!R!g#W!R!h#W!R!i#W!R!j#W!R!k#W!R!l#W!R!m#W!R!n#W!R!o#W!R!p#W!R!q#W!R!r#W!R!s#W!R!t#W!R!u#W!R!v#W!R!w#W!R!x#W!R!y#W!R$Q#W!R~P(FTOP1rOQ-gOR1rOl#j!Z!}#j!Z~OS#j!ZT#j!ZU#j!ZW#j!ZX#j!ZY#j!Zh#j!Zk#j!Zl#j!Zm#j!Zq#j!Z!b#j!Z!c#j!Z!d#j!Z!e#j!Z!f#j!Z!g#j!Z!h#j!Z!i#j!Z!j#j!Z!k#j!Z!l#j!Z!m#j!Z!n#j!Z!o#j!Z!p#j!Z!q#j!Z!r#j!Z!s#j!Z!t#j!Z!u#j!Z!v#j!Z!w#j!Z!x#j!Z!y#j!Z!}#j!Z#Z#j!Z[#j!Z~OP'uOQ-hOR'uO~P.BTOS#j!ZT#j!ZU#j!ZW#j!ZX#j!ZY#j!ZZ#j!Zh#j!Zl#j!Zm#j!Zq#j!Z!b#j!Z!c#j!Z!d#j!Z!e#j!Z!f#j!Z!g#j!Z!h#j!Z!i#j!Z!j#j!Z!k#j!Z!l#j!Z!m#j!Z!n#j!Z!o#j!Z!p#j!Z!q#j!Z!r#j!Z!s#j!Z!t#j!Z!u#j!Z!v#j!Z!w#j!Z!x#j!Z!y#j!Z$Q#j!Z~OP'vOQ-iOR'vO~P.DzO_#j!Zl#j!Zr#j!Zs#j!Zt#j!Zu#j!Zv#j!Zw#j!Zx#j!Zy#j!Zz#j!Z{#j!Z|#j!Z}#j!Z!O#j!Z!P#j!Z!Q#j!Z!R#j!Z!S#j!Z!T#j!Z!U#j!Z!V#j!Z!W#j!Z!X#j!Z!Y#j!Z!Z#j!Z![#j!Z!]#j!Z!^#j!Z!_#j!Z!`#j!Z!a#j!Z#P#j!Z~OP'xOQ-kOR'xO~P.GkOP'wOQ-jOR'wO~P'AaOP'wOQ-jOR'wOl'}O!}#W!Z~P'GTOS#W!ZT#W!ZU#W!ZW#W!ZX#W!ZY#W!Zh#W!Zk#W!Zm#W!Zq#W!Z!b#W!Z!c#W!Z!d#W!Z!e#W!Z!f#W!Z!g#W!Z!h#W!Z!i#W!Z!j#W!Z!k#W!Z!l#W!Z!m#W!Z!n#W!Z!o#W!Z!p#W!Z!q#W!Z!r#W!Z!s#W!Z!t#W!Z!u#W!Z!v#W!Z!w#W!Z!x#W!Z!y#W!Z!}#W!Z#Z#W!Z[#W!Z~OP'uOQ-hOR'uOl'zO~P.JsOP-dOQ1sOR-dOl1TO#[#W!Z~OS#W!ZT#W!ZU#W!ZW#W!ZX#W!ZY#W!ZZ#W!Zh#W!Zm#W!Zq#W!Z!b#W!Z!c#W!Z!d#W!Z!e#W!Z!f#W!Z!g#W!Z!h#W!Z!i#W!Z!j#W!Z!k#W!Z!l#W!Z!m#W!Z!n#W!Z!o#W!Z!p#W!Z!q#W!Z!r#W!Z!s#W!Z!t#W!Z!u#W!Z!v#W!Z!w#W!Z!x#W!Z!y#W!Z$Q#W!Z~OP'vOQ-iOR'vOl'{O~P.M{OdWOeWOfWOgUOkWOnjOokOpiOq!}O#Z0_O#_UO#`UOP#j!ZQ#j!ZR#j!Z~P.GkO_WOdWOeWOfWOgUOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O#PVO#_UO#`UOP#j!ZQ#j!ZR#j!Z~P.BTO_WOgUOkWO#PVO#Z0_O#_UO#`UOP#j!ZQ#j!ZR#j!ZS#j!ZT#j!ZU#j!ZW#j!ZX#j!ZY#j!ZZ#j!Zh#j!Zl#j!Zm#j!Zq#j!Z!b#j!Z!c#j!Z!d#j!Z!e#j!Z!f#j!Z!g#j!Z!h#j!Z!i#j!Z!j#j!Z!k#j!Z!l#j!Z!m#j!Z!n#j!Z!o#j!Z!p#j!Z!q#j!Z!r#j!Z!s#j!Z!t#j!Z!u#j!Z!v#j!Z!w#j!Z!x#j!Z!y#j!Z$Q#j!Z~P(FTOdWOeWOfWOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[OP#j!ZQ#j!ZR#j!Z~P'AaO#[#W!Z~P@qO_WOdWOeWOfWOgUOnjOokOpiOr[Os]Ot^Ou_Ov`OwaOxbOy[OzcO{dO|eO}fO!OgO!PhO!QdO!RcO!S[O!T]O!U^O!V_O!W`O!XaO!YbO!Z]O![[O!]]O!^^O!_[O!`]O!a[O#PVO#_UO#`UO~P.JsO_WOgUOkWO#PVO#Z0_O#_UO#`UOS#W!ZT#W!ZU#W!ZW#W!ZX#W!ZY#W!ZZ#W!Zh#W!Zm#W!Zq#W!Z!b#W!Z!c#W!Z!d#W!Z!e#W!Z!f#W!Z!g#W!Z!h#W!Z!i#W!Z!j#W!Z!k#W!Z!l#W!Z!m#W!Z!n#W!Z!o#W!Z!p#W!Z!q#W!Z!r#W!Z!s#W!Z!t#W!Z!u#W!Z!v#W!Z!w#W!Z!x#W!Z!y#W!Z$Q#W!Z~P(FTOP1rOQ-gOR1rOl'yO~OP'uOQ-hOR'uOl'zO~OP'vOQ-iOR'vOl'{O~OP'wOQ-jOR'wOl'}O~O#[)UOP#iXQ#iXR#iXl#iX~O#[)VOP#iXQ#iXR#iXl#iX~O_)yO#P.WO~P#MsO_)zO#P.XO~P#MsO_){O#P.YO~P#MsO_)|O#P.ZO~P#MsO!}*wO~P%;oO!}*xO~P%;oO!}*yO~P%;oO!}*zO~P%;oOQ*WO~P#@_OQ*XO~P#@_OQ*VO~P#@_OQ*YO~P#@_O_WOdWOeWOfWOgUOkWOn1eOo1iOp,wOq!}Or[Os.rOt,qOu0OOv2gOw4SOx5SOy'nOz.vO{1`O|3bO}4jO!O5_O!P5oO!Q1`O!R.vO!S[O!T.rO!U,qO!V0OO!W2gO!X4SO!Y5SO!Z.rO![[O!].rO!^,qO!_[O!`.rO!a[O#PVO#Z0`O#_UO#`UO~OP-dOQ1sOR-dOl1TO~OP-dOQ1sOR-dOl#ja#[#ja~OP1rOQ-gOR1rOl$Ua!}$Ua~OP-dOQ1sOR-dOl#ji#[#ji~OP-dOQ1sOR-dOl$Vi#[$Vi~OP-dOQ1sOR-dOl#jq#[#jq~OP-dOQ1sOR-dOl#jy#[#jy~OP-dOQ1sOR-dOl#j!R#[#j!R~OP-dOQ1sOR-dOl#j!Z#[#j!Z~O",
+      goto: "%*^$[PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP$]P$`P$`$`$u${$`%R%V%{HoPP!)_!7`PP!Ei#%d#%{#&`#5Q#Cf#CpP#C}$$a$2{$3|$4j$4j$B_$By$By$Ce%R$Cl$]$]$Co$Cu$DT$Dc$Dp$EU$Em$E|$LZPPP$La$Lx$MQ$B_$B_%)`%)rR!YOwTOV!W!b!j#[#t$^$f$|%d%i%k%y&k.W.X.Y.ZQ$R!]R%t$[Q%p$RR&m%tT!VO!WQ!TOr!fV!b!j#[#t$^$f$|%d%i%k%y&k.W.X.Y.ZQ!yYQ#u!WQ#y!XV$]!g$`0^jZO!X#[#d#e$f%O%d%z.W.X.Y.ZQ#O]Q#P^Q#Q_Q#R`Q#SaQ#Tb'^#Uc|!S!n!s#V#_#m#r$e$i$v%`%w%}&U&a&n&p&u&{'Q'R'V'Z'[']'b'c'f'h'm'n'o'p'q'r's(Z(](v(w(x(y(z({(|(})g)x*R*S*T*U*Z*[*]*m*v*{*|*}+O+P+Q+R+^+g+h+i+j+k+l+m+n+y,S,T,U,V,W,X,Y,Z,e,f,g,h,i,j,k-w-x-y-z.v.w.x.y.}/O/P/Q/R/S/T/Y/Z/[/]/^/_/`/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/{/|0Y0Z0[0]Q#VdQ#WeQ#XfQ#YgQ#ZhQ#^jQ#`pQ#aqQ#fvQ#gwQ#hxQ#iyQ#jzQ#k{Q#m}Q#n!OQ#o!PQ#p!QQ#q!RQ$j!tQ$o!zS$p!|#PQ$q#QQ$r#RQ$s#SQ$t#TQ$v#WQ$w#XQ$x#YQ$y#ZQ%S#`Q%T#aQ%Y#gQ%Z#hQ%[#iQ%]#jQ%^#kQ%`#nQ%a#oQ%b#pQ%c#qQ&O$oQ&P$qQ&Q$rQ&R$sQ&S$tQ&U$wQ&V$xQ&W$yQ&[%ZQ&]%[Q&^%]Q&_%^Q&a%aQ&b%bQ&c%cQ&q&QQ&r&RQ&s&SQ&u&VQ&v&WQ&w&]Q&x&^Q&y&_Q&{&bQ&|&cQ'S&rQ'T&sQ'V&vQ'W&xQ'X&yQ'Z&|Q'^'TQ'`'XQ(P'eQ(Q.rQ(R.sQ(S.tQ(T.uQ(U,pQ(V,qQ(W,rQ(X,sQ(Y,tQ(Z,uQ([,{Q(^,}Q(_-OQ(`-PQ(a-QQ(b-RQ(c-SQ(d-TQ(e-UQ(n'gQ(o.zQ(p.|Q(q.{Q(r-_Q(s-`Q(t-aQ(u-bQ(v-cQ)O'tQ)P'uQ)Q'vQ)R'wS)S%R'xQ)T-dQ)W-gQ)X-hQ)Y-i[)Z%x*V*W*X*Y-kQ)[-jS)]'y(US)^'z(VS)_'{(WS)`'|(XS)a'}(YQ)b-lQ)c-mQ)d-nQ)e-oQ)f-pQ)g-qQ)h(^Q)i(_Q)j(`Q)k(aQ)l(bQ)m(cQ)n(dQ)o(eQ)p(rQ)q(sQ)r(tQ)s(uQ)t-rQ)u-sQ)v-tQ)w-uQ)x-vQ*^)WQ*_)XQ*`)YQ*a)ZQ*b)[Q*c)bQ*d)cQ*e)dQ*f)eQ*g)fQ*h-{Q*i-|Q*j-}Q*k.OQ*l.PQ*m.QQ*n)tQ*o)uQ*p)vQ*q)wQ*r.RQ*s.SQ*t.TQ*u.UQ*v.VQ+S*hQ+T*iQ+U*jQ+V*kQ+W*lQ+X.[Q+Y.]Q+Z.^Q+[._Q+].`Q+^.aQ+_*rQ+`*sQ+a*tQ+b*uQ+c.bQ+d.cQ+e.dQ+f.eQ+g.fQ+o+XQ+p+YQ+q+ZQ+r+[Q+s+]Q+t.gQ+u.hQ+v.iQ+w.jQ+x.kQ+y.lQ+z+cQ+{+dQ+|+eQ+}+fQ,O.mQ,P.nQ,Q.oQ,R.pQ,S.qQ,[+tQ,]+uQ,^+vQ,_+wQ,`+xQ,a,OQ,b,PQ,c,QQ,d,RS,lV!bW,m(g(k1V1WS,n(i(mS,o(f(jQ-l/}Q-m0OQ-n0PQ-o0QQ-p0RQ-q0SQ-r0TQ-s0UQ-t0VQ-u0WQ-v0XQ-{0aQ-|0bQ-}0cQ.O0dQ.P0eQ.Q0fQ.R0gQ.S0hQ.T0iQ.U0jQ.V0kQ.[0lQ.]0mQ.^0nQ._0oQ.`0pQ.a0qQ.b0rQ.c0sQ.d0tQ.e0uQ.f0vQ.g0wQ.h0xQ.i0yQ.j0zQ.k0{Q.l0|Q.m0}Q.n1OQ.o1PQ.p1QQ.q1RQ/Q1`Q/R1aQ/S1bQ/T1cQ/U1eQ/V1fQ/W1gQ/X1hQ/^1oQ/_1pQ/`1qQ/a1uQ/b1vQ/c1wQ/d1xQ/e1yQ/f1zQ/g1{Q/h1}Q/i2OQ/j2PQ/k2QQ/l2RQ/m2SQ/n2TQ/o2VQ/p2WQ/q2XQ/r2YQ/s2ZQ/t2[Q/u2]Q/v2_Q/w2`Q/x2aQ/y2bQ/z2cQ/{2dQ/|2eQ0a2fQ0b2gQ0c2hQ0d2iQ0e2jQ0f2kQ0g2lQ0h2mQ0i2nQ0j2oQ0k2pQ0l2qQ0m2rQ0n2sQ0o2tQ0p2uQ0q2vQ0r2wQ0s2xQ0t2yQ0u2zQ0v2{Q0w2|Q0x2}Q0y3OQ0z3PQ0{3QQ0|3RQ0}3SQ1O3TQ1P3UQ1Q3VQ1R3WQ1U1_Q1X1sQ1Y1tQ1Z1|Q1[2UQ1]2^`1^Y!g!u(h(l0^0_0`Q1t3aQ1u3bQ1v3cQ1w3dQ1x3eQ1y3fQ1z3gQ1{3hQ1|3iQ1}3jQ2O3kQ2P3lQ2Q3mQ2R3nQ2S3oQ2T3pQ2U3qQ2V3rQ2W3sQ2X3tQ2Y3uQ2Z3vQ2[3wQ2]3xQ2^3yQ2_3zQ2`3{Q2a3|Q2b3}Q2c4OQ2d4PQ2e4QQ2q4RQ2r4SQ2s4TQ2t4UQ2u4VQ2v4WQ2w4XQ2x4YQ2y4ZQ2z4[Q2{4]Q2|4^Q2}4_Q3O4`Q3P4aQ3Q4bQ3R4cQ3S4dQ3T4eQ3U4fQ3V4gQ3W4hQ3X1SQ3Y1rS3Z1T1UQ3[1XQ3]1YQ3^1ZQ3_1[Q3`1]Q3i4iQ3j4jQ3k4kQ3l4lQ3m4mQ3n4nQ3o4oQ3p4pQ3q4qQ3r4rQ3s4sQ3t4tQ3u4uQ3v4vQ3w4wQ3x4xQ3y4yQ3z4zQ3{4{Q3|4|Q3}4}Q4O5OQ4P5PQ4Q5QQ4^5RQ4_5SQ4`5TQ4a5UQ4b5VQ4c5WQ4d5XQ4e5YQ4f5ZQ4g5[Q4h5]Q4q5^Q4r5_Q4s5`Q4t5aQ4u5bQ4v5cQ4w5dQ4x5eQ4y5fQ4z5gQ4{5hQ4|5iQ4}5jQ5O5kQ5P5lQ5Q5mQ5f5nQ5g5oQ5h5pQ5i5qQ5j5rQ5k5sQ5l5tR5m5uQnO<Wo]^_`abcdefghjpqvwxyz{|}!O!P!Q!R!S!n!s!t!z!|#P#Q#R#S#T#V#W#X#Y#Z#_#`#a#g#h#i#j#k#m#n#o#p#q#r$e$i$o$q$r$s$t$v$w$x$y%O%R%Z%[%]%^%`%a%b%c%w%x%z%}&Q&R&S&U&V&W&]&^&_&a&b&c&n&p&r&s&u&v&x&y&{&|'Q'R'T'V'X'Z'[']'b'c'e'f'g'h'm'n'o'p'q'r's't'u'v'w'x'y'z'{'|'}(U(V(W(X(Y(Z(](^(_(`(a(b(c(d(e(r(s(t(u(v(w(x(y(z({(|(})W)X)Y)Z)[)b)c)d)e)f)g)t)u)v)w)x*R*S*T*U*V*W*X*Y*Z*[*]*h*i*j*k*l*m*r*s*t*u*v*{*|*}+O+P+Q+R+X+Y+Z+[+]+^+c+d+e+f+g+h+i+j+k+l+m+n+t+u+v+w+x+y,O,P,Q,R,S,T,U,V,W,X,Y,Z,e,f,g,h,i,j,k,p,q,r,s,t,u,{,}-O-P-Q-R-S-T-U-_-`-a-b-c-d-g-h-i-j-k-l-m-n-o-p-q-r-s-t-u-v-w-x-y-z-{-|-}.O.P.Q.R.S.T.U.V.[.].^._.`.a.b.c.d.e.f.g.h.i.j.k.l.m.n.o.p.q.r.s.t.u.v.w.x.y.z.{.|.}/O/P/Q/R/S/T/Y/Z/[/]/^/_/`/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/{/|/}0O0P0Q0R0S0T0U0V0W0X0Y0Z0[0]0a0b0c0d0e0f0g0h0i0j0k0l0m0n0o0p0q0r0s0t0u0v0w0x0y0z0{0|0}1O1P1Q1R1S1T1U1X1Y1Z1[1]1_1`1a1b1c1e1f1g1h1o1p1q1r1s1t1u1v1w1x1y1z1{1|1}2O2P2Q2R2S2T2U2V2W2X2Y2Z2[2]2^2_2`2a2b2c2d2e2f2g2h2i2j2k2l2m2n2o2p2q2r2s2t2u2v2w2x2y2z2{2|2}3O3P3Q3R3S3T3U3V3W3a3b3c3d3e3f3g3h3i3j3k3l3m3n3o3p3q3r3s3t3u3v3w3x3y3z3{3|3}4O4P4Q4R4S4T4U4V4W4X4Y4Z4[4]4^4_4`4a4b4c4d4e4f4g4h4i4j4k4l4m4n4o4p4q4r4s4t4u4v4w4x4y4z4{4|4}5O5P5Q5R5S5T5U5V5W5X5Y5Z5[5]5^5_5`5a5b5c5d5e5f5g5h5i5j5k5l5m5n5o5p5q5r5s5t5uS!rV!b[!xY!g!u0^0_0`Q#x!XQ%P#[[%V#d(f(g(h(i1V[%X#e(j(k(l(m1WQ%|$fZ&f%d.W.X.Y.Z<UmOY]^_`abcdefghjpqvwxyz{|}!O!P!Q!R!S!X!g!n!t!u!z!|#P#Q#R#S#T#V#W#X#Y#Z#[#_#`#a#d#e#g#h#i#j#k#m#n#o#p#q#r$e$f$o$q$r$s$t$v$w$x$y%O%R%Z%[%]%^%`%a%b%c%w%x%z&Q&R&S&U&V&W&]&^&_&a&b&c&n&r&s&u&v&x&y&{&|'Q'T'V'X'Z'['b'e'f'g'h'n'o'q'r's't'u'v'w'x'y'z'{'|'}(U(V(W(X(Y(Z(](^(_(`(a(b(c(d(e(f(g(h(i(j(k(l(m(r(s(t(u(v(x(y({(|(})W)X)Y)Z)[)b)c)d)e)f)g)t)u)v)w)x*S*T*W*X*Z*[*]*h*i*j*k*l*m*r*s*t*u*v*|*}+P+Q+R+X+Y+Z+[+]+^+c+d+e+f+g+i+j+l+m+n+t+u+v+w+x+y,O,P,Q,R,S,U,V,X,Y,Z,f,g,i,j,k,p,q,r,s,t,u,{,}-O-P-Q-R-S-T-U-_-`-a-b-c-d-g-h-i-j-k-l-m-n-o-p-q-r-s-t-u-v-w-x-y-z-{-|-}.O.P.Q.R.S.T.U.V.[.].^._.`.a.b.c.d.e.f.g.h.i.j.k.l.m.n.o.p.q.r.s.t.u.v.w.x.y.z.{.|.}/O/P/Q/R/S/T/Y/Z/[/]/^/_/`/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/{/|/}0O0P0Q0R0S0T0U0V0W0X0Y0Z0[0]0^0_0`0a0b0c0d0e0f0g0h0i0j0k0l0m0n0o0p0q0r0s0t0u0v0w0x0y0z0{0|0}1O1P1Q1R1S1T1U1V1W1X1Y1Z1[1]1_1`1a1b1c1e1f1g1h1o1p1q1r1s1t1u1v1w1x1y1z1{1|1}2O2P2Q2R2S2T2U2V2W2X2Y2Z2[2]2^2_2`2a2b2c2d2e2f2g2h2i2j2k2l2m2n2o2p2q2r2s2t2u2v2w2x2y2z2{2|2}3O3P3Q3R3S3T3U3V3W3a3b3c3d3e3f3g3h3i3j3k3l3m3n3o3p3q3r3s3t3u3v3w3x3y3z3{3|3}4O4P4Q4R4S4T4U4V4W4X4Y4Z4[4]4^4_4`4a4b4c4d4e4f4g4h4i4j4k4l4m4n4o4p4q4r4s4t4u4v4w4x4y4z4{4|4}5O5P5Q5R5S5T5U5V5W5X5Y5Z5[5]5^5_5`5a5b5c5d5e5f5g5h5i5j5k5l5m5n5o5p5q5r5s5t5u^!_V!b%d.W.X.Y.ZQ!i!jS$U!a$WR%v$^<fmOY]^_`abcdefghjpqvwxyz{|}!O!P!Q!R!S!X!g!n!t!u!z!|#P#Q#R#S#T#V#W#X#Y#Z#[#_#`#a#d#e#g#h#i#j#k#m#n#o#p#q#r$e$f$o$q$r$s$t$v$w$x$y%O%R%Z%[%]%^%`%a%b%c%w%x%z&Q&R&S&U&V&W&]&^&_&a&b&c&n&r&s&u&v&x&y&{&|'Q'T'V'X'Z'['b'e'f'g'h'm'n'o'q'r's't'u'v'w'x'y'z'{'|'}(U(V(W(X(Y(Z(](^(_(`(a(b(c(d(e(f(g(h(i(j(k(l(m(r(s(t(u(v(w(x(y({(|(})W)X)Y)Z)[)b)c)d)e)f)g)t)u)v)w)x*R*S*T*V*W*X*Z*[*]*h*i*j*k*l*m*r*s*t*u*v*{*|*}+P+Q+R+X+Y+Z+[+]+^+c+d+e+f+g+h+i+j+l+m+n+t+u+v+w+x+y,O,P,Q,R,S,T,U,V,X,Y,Z,e,f,g,i,j,k,p,q,r,s,t,u,{,}-O-P-Q-R-S-T-U-_-`-a-b-c-d-g-h-i-j-k-l-m-n-o-p-q-r-s-t-u-v-w-x-y-z-{-|-}.O.P.Q.R.S.T.U.V.[.].^._.`.a.b.c.d.e.f.g.h.i.j.k.l.m.n.o.p.q.r.s.t.u.v.w.x.y.z.{.|.}/O/P/Q/R/S/T/Y/Z/[/]/^/_/`/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/{/|/}0O0P0Q0R0S0T0U0V0W0X0Y0Z0[0]0^0_0`0a0b0c0d0e0f0g0h0i0j0k0l0m0n0o0p0q0r0s0t0u0v0w0x0y0z0{0|0}1O1P1Q1R1S1T1U1V1W1X1Y1Z1[1]1_1`1a1b1c1e1f1g1h1o1p1q1r1s1t1u1v1w1x1y1z1{1|1}2O2P2Q2R2S2T2U2V2W2X2Y2Z2[2]2^2_2`2a2b2c2d2e2f2g2h2i2j2k2l2m2n2o2p2q2r2s2t2u2v2w2x2y2z2{2|2}3O3P3Q3R3S3T3U3V3W3a3b3c3d3e3f3g3h3i3j3k3l3m3n3o3p3q3r3s3t3u3v3w3x3y3z3{3|3}4O4P4Q4R4S4T4U4V4W4X4Y4Z4[4]4^4_4`4a4b4c4d4e4f4g4h4i4j4k4l4m4n4o4p4q4r4s4t4u4v4w4x4y4z4{4|4}5O5P5Q5R5S5T5U5V5W5X5Y5Z5[5]5^5_5`5a5b5c5d5e5f5g5h5i5j5k5l5m5n5o5p5q5r5s5t5u^!_V!b%d.W.X.Y.ZQ!i!jS$U!a$WR%v$^<UmOY]^_`abcdefghjpqvwxyz{|}!O!P!Q!R!S!X!g!n!t!u!z!|#P#Q#R#S#T#V#W#X#Y#Z#[#_#`#a#d#e#g#h#i#j#k#m#n#o#p#q#r$e$f$o$q$r$s$t$v$w$x$y%O%R%Z%[%]%^%`%a%b%c%w%x%z&Q&R&S&U&V&W&]&^&_&a&b&c&n&r&s&u&v&x&y&{&|'Q'T'V'X'Z'['b'e'f'g'h'n'o'q'r's't'u'v'w'x'y'z'{'|'}(U(V(W(X(Y(Z(](^(_(`(a(b(c(d(e(f(g(h(i(j(k(l(m(r(s(t(u(v(x(y({(|(})W)X)Y)Z)[)b)c)d)e)f)g)t)u)v)w)x*S*T*W*X*Z*[*]*h*i*j*k*l*m*r*s*t*u*v*|*}+P+Q+R+X+Y+Z+[+]+^+c+d+e+f+g+i+j+l+m+n+t+u+v+w+x+y,O,P,Q,R,S,U,V,X,Y,Z,f,g,i,j,k,p,q,r,s,t,u,{,}-O-P-Q-R-S-T-U-_-`-a-b-c-d-g-h-i-j-k-l-m-n-o-p-q-r-s-t-u-v-w-x-y-z-{-|-}.O.P.Q.R.S.T.U.V.[.].^._.`.a.b.c.d.e.f.g.h.i.j.k.l.m.n.o.p.q.r.s.t.u.v.w.x.y.z.{.|.}/O/P/Q/R/S/T/Y/Z/[/]/^/_/`/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/{/|/}0O0P0Q0R0S0T0U0V0W0X0Y0Z0[0]0^0_0`0a0b0c0d0e0f0g0h0i0j0k0l0m0n0o0p0q0r0s0t0u0v0w0x0y0z0{0|0}1O1P1Q1R1S1T1U1V1W1X1Y1Z1[1]1_1`1a1b1c1e1f1g1h1o1p1q1r1s1t1u1v1w1x1y1z1{1|1}2O2P2Q2R2S2T2U2V2W2X2Y2Z2[2]2^2_2`2a2b2c2d2e2f2g2h2i2j2k2l2m2n2o2p2q2r2s2t2u2v2w2x2y2z2{2|2}3O3P3Q3R3S3T3U3V3W3a3b3c3d3e3f3g3h3i3j3k3l3m3n3o3p3q3r3s3t3u3v3w3x3y3z3{3|3}4O4P4Q4R4S4T4U4V4W4X4Y4Z4[4]4^4_4`4a4b4c4d4e4f4g4h4i4j4k4l4m4n4o4p4q4r4s4t4u4v4w4x4y4z4{4|4}5O5P5Q5R5S5T5U5V5W5X5Y5Z5[5]5^5_5`5a5b5c5d5e5f5g5h5i5j5k5l5m5n5o5p5q5r5s5t5u^!hV!b%d.W.X.Y.ZT!i!j$^W!iV!b!j$^`${#[#t$f$|%i%k%y&kZ&e%d.W.X.Y.Zs!fV!b!j#[#t$^$f$|%d%i%k%y&k.W.X.Y.Z=UmOY]^_`abcdefghjpqvwxyz{|}!O!P!Q!R!S!X!g!n!s!t!u!z!|#P#Q#R#S#T#V#W#X#Y#Z#[#_#`#a#d#e#g#h#i#j#k#m#n#o#p#q#r$e$f$i$o$q$r$s$t$v$w$x$y%O%R%Z%[%]%^%`%a%b%c%w%x%z%}&Q&R&S&U&V&W&]&^&_&a&b&c&n&p&r&s&u&v&x&y&{&|'Q'R'T'V'X'Z'[']'b'c'e'f'g'h'm'n'o'p'q'r's't'u'v'w'x'y'z'{'|'}(U(V(W(X(Y(Z(](^(_(`(a(b(c(d(e(f(g(h(i(j(k(l(m(r(s(t(u(v(w(x(y(z({(|(})W)X)Y)Z)[)b)c)d)e)f)g)t)u)v)w)x*R*S*T*U*V*W*X*Y*Z*[*]*h*i*j*k*l*m*r*s*t*u*v*{*|*}+O+P+Q+R+X+Y+Z+[+]+^+c+d+e+f+g+h+i+j+k+l+m+n+t+u+v+w+x+y,O,P,Q,R,S,T,U,V,W,X,Y,Z,e,f,g,h,i,j,k,p,q,r,s,t,u,{,}-O-P-Q-R-S-T-U-_-`-a-b-c-d-g-h-i-j-k-l-m-n-o-p-q-r-s-t-u-v-w-x-y-z-{-|-}.O.P.Q.R.S.T.U.V.[.].^._.`.a.b.c.d.e.f.g.h.i.j.k.l.m.n.o.p.q.r.s.t.u.v.w.x.y.z.{.|.}/O/P/Q/R/S/T/Y/Z/[/]/^/_/`/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/{/|/}0O0P0Q0R0S0T0U0V0W0X0Y0Z0[0]0^0_0`0a0b0c0d0e0f0g0h0i0j0k0l0m0n0o0p0q0r0s0t0u0v0w0x0y0z0{0|0}1O1P1Q1R1S1T1U1V1W1X1Y1Z1[1]1_1`1a1b1c1e1f1g1h1o1p1q1r1s1t1u1v1w1x1y1z1{1|1}2O2P2Q2R2S2T2U2V2W2X2Y2Z2[2]2^2_2`2a2b2c2d2e2f2g2h2i2j2k2l2m2n2o2p2q2r2s2t2u2v2w2x2y2z2{2|2}3O3P3Q3R3S3T3U3V3W3a3b3c3d3e3f3g3h3i3j3k3l3m3n3o3p3q3r3s3t3u3v3w3x3y3z3{3|3}4O4P4Q4R4S4T4U4V4W4X4Y4Z4[4]4^4_4`4a4b4c4d4e4f4g4h4i4j4k4l4m4n4o4p4q4r4s4t4u4v4w4x4y4z4{4|4}5O5P5Q5R5S5T5U5V5W5X5Y5Z5[5]5^5_5`5a5b5c5d5e5f5g5h5i5j5k5l5m5n5o5p5q5r5s5t5u^!qV!b%d.W.X.Y.ZQ#esQ(j-ZQ(k-[Q(l-]Q(m-^R1W1n<YmOVY]^_`abcdefghjpqvwxyz{|}!O!P!Q!R!S!X!b!g!n!t!u!z!|#P#Q#R#S#T#V#W#X#Y#Z#[#_#`#a#d#e#g#h#i#j#k#m#n#o#p#q$e$f$o$q$r$s$t$v$w$x$y%O%R%Z%[%]%^%`%a%b%c%d%w%x%z&Q&R&S&U&V&W&]&^&_&a&b&c&n&r&s&u&v&x&y&{&|'Q'T'V'X'Z'['b'e'f'g'h'n'o'q'r's't'u'v'w'x'y'z'{'|'}(U(V(W(X(Y(Z(](^(_(`(a(b(c(d(e(f(g(h(i(j(k(l(m(r(s(t(u(v(x(y({(|(})W)X)Y)Z)[)b)c)d)e)f)g)t)u)v)w)x*S*T*W*X*Z*[*]*h*i*j*k*l*m*r*s*t*u*v*|*}+P+Q+R+X+Y+Z+[+]+^+c+d+e+f+g+i+j+l+m+n+t+u+v+w+x+y,O,P,Q,R,S,U,V,X,Y,Z,f,g,i,j,k,p,q,r,s,t,u,{,}-O-P-Q-R-S-T-U-_-`-a-b-c-d-g-h-i-j-k-l-m-n-o-p-q-r-s-t-u-v-{-|-}.O.P.Q.R.S.T.U.V.W.X.Y.Z.[.].^._.`.a.b.c.d.e.f.g.h.i.j.k.l.m.n.o.p.q.r.s.t.u.v.w.x.y.z.{.|.}/O/P/Q/R/S/T/Y/Z/[/]/^/_/`/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/{/|/}0O0P0Q0R0S0T0U0V0W0X0Y0Z0[0]0^0_0`0a0b0c0d0e0f0g0h0i0j0k0l0m0n0o0p0q0r0s0t0u0v0w0x0y0z0{0|0}1O1P1Q1R1S1T1U1V1W1X1Y1Z1[1]1_1`1a1b1c1e1f1g1h1o1p1q1r1s1t1u1v1w1x1y1z1{1|1}2O2P2Q2R2S2T2U2V2W2X2Y2Z2[2]2^2_2`2a2b2c2d2e2f2g2h2i2j2k2l2m2n2o2p2q2r2s2t2u2v2w2x2y2z2{2|2}3O3P3Q3R3S3T3U3V3W3a3b3c3d3e3f3g3h3i3j3k3l3m3n3o3p3q3r3s3t3u3v3w3x3y3z3{3|3}4O4P4Q4R4S4T4U4V4W4X4Y4Z4[4]4^4_4`4a4b4c4d4e4f4g4h4i4j4k4l4m4n4o4p4q4r4s4t4u4v4w4x4y4z4{4|4}5O5P5Q5R5S5T5U5V5W5X5Y5Z5[5]5^5_5`5a5b5c5d5e5f5g5h5i5j5k5l5m5n5o5p5q5r5s5t5uv#]ik#^([,v,w,x,y,z,|/U/V/W/X1d1i1j1k1lQ%f#rQ)}-wQ*O-xQ*P-yR*Q-za!pV!b#[%d.W.X.Y.Z`!mV!b#[%d.W.X.Y.ZR%k#t<|oOY]^_`abcdefghjpqvwxyz{|}!O!P!Q!R!S!X!g!n!s!t!u!z!|#P#Q#R#S#T#V#W#X#Y#Z#_#`#a#d#e#g#h#i#j#k#m#n#o#p#q#r$e$i$o$q$r$s$t$v$w$x$y%R%Z%[%]%^%`%a%b%c%w%x%}&Q&R&S&U&V&W&]&^&_&a&b&c&n&p&r&s&u&v&x&y&{&|'Q'R'T'V'X'Z'[']'b'c'e'f'g'h'm'n'o'p'q'r's't'u'v'w'x'y'z'{'|'}(U(V(W(X(Y(Z(](^(_(`(a(b(c(d(e(f(g(h(i(j(k(l(m(r(s(t(u(v(w(x(y(z({(|(})W)X)Y)Z)[)b)c)d)e)f)g)t)u)v)w)x*R*S*T*U*V*W*X*Y*Z*[*]*h*i*j*k*l*m*r*s*t*u*v*{*|*}+O+P+Q+R+X+Y+Z+[+]+^+c+d+e+f+g+h+i+j+k+l+m+n+t+u+v+w+x+y,O,P,Q,R,S,T,U,V,W,X,Y,Z,e,f,g,h,i,j,k,p,q,r,s,t,u,{,}-O-P-Q-R-S-T-U-_-`-a-b-c-d-g-h-i-j-k-l-m-n-o-p-q-r-s-t-u-v-w-x-y-z-{-|-}.O.P.Q.R.S.T.U.V.[.].^._.`.a.b.c.d.e.f.g.h.i.j.k.l.m.n.o.p.q.r.s.t.u.v.w.x.y.z.{.|.}/O/P/Q/R/S/T/Y/Z/[/]/^/_/`/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/{/|/}0O0P0Q0R0S0T0U0V0W0X0Y0Z0[0]0^0_0`0a0b0c0d0e0f0g0h0i0j0k0l0m0n0o0p0q0r0s0t0u0v0w0x0y0z0{0|0}1O1P1Q1R1S1T1U1V1W1X1Y1Z1[1]1_1`1a1b1c1e1f1g1h1o1p1q1r1s1t1u1v1w1x1y1z1{1|1}2O2P2Q2R2S2T2U2V2W2X2Y2Z2[2]2^2_2`2a2b2c2d2e2f2g2h2i2j2k2l2m2n2o2p2q2r2s2t2u2v2w2x2y2z2{2|2}3O3P3Q3R3S3T3U3V3W3a3b3c3d3e3f3g3h3i3j3k3l3m3n3o3p3q3r3s3t3u3v3w3x3y3z3{3|3}4O4P4Q4R4S4T4U4V4W4X4Y4Z4[4]4^4_4`4a4b4c4d4e4f4g4h4i4j4k4l4m4n4o4p4q4r4s4t4u4v4w4x4y4z4{4|4}5O5P5Q5R5S5T5U5V5W5X5Y5Z5[5]5^5_5`5a5b5c5d5e5f5g5h5i5j5k5l5m5n5o5p5q5r5s5t5uS!rV!bW%Q#[$f%O%zZ&g%d.W.X.Y.ZQlO<j!oV]^_`abcdefghjpqvwxyz{|}!O!P!Q!R!S!b!n!s!t!z!|#P#Q#R#S#T#V#W#X#Y#Z#[#_#`#a#g#h#i#j#k#m#n#o#p#q#r$e$f$i$o$q$r$s$t$v$w$x$y%O%R%Z%[%]%^%`%a%b%c%d%w%x%z%}&Q&R&S&U&V&W&]&^&_&a&b&c&n&p&r&s&u&v&x&y&{&|'Q'R'T'V'X'Z'[']'b'c'e'f'g'h'm'n'o'p'q'r's't'u'v'w'x'y'z'{'|'}(U(V(W(X(Y(Z(](^(_(`(a(b(c(d(e(r(s(t(u(v(w(x(y(z({(|(})W)X)Y)Z)[)b)c)d)e)f)g)t)u)v)w)x*R*S*T*U*V*W*X*Y*Z*[*]*h*i*j*k*l*m*r*s*t*u*v*{*|*}+O+P+Q+R+X+Y+Z+[+]+^+c+d+e+f+g+h+i+j+k+l+m+n+t+u+v+w+x+y,O,P,Q,R,S,T,U,V,W,X,Y,Z,e,f,g,h,i,j,k,p,q,r,s,t,u,{,}-O-P-Q-R-S-T-U-_-`-a-b-c-d-g-h-i-j-k-l-m-n-o-p-q-r-s-t-u-v-w-x-y-z-{-|-}.O.P.Q.R.S.T.U.V.W.X.Y.Z.[.].^._.`.a.b.c.d.e.f.g.h.i.j.k.l.m.n.o.p.q.r.s.t.u.v.w.x.y.z.{.|.}/O/P/Q/R/S/T/Y/Z/[/]/^/_/`/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/{/|/}0O0P0Q0R0S0T0U0V0W0X0Y0Z0[0]0a0b0c0d0e0f0g0h0i0j0k0l0m0n0o0p0q0r0s0t0u0v0w0x0y0z0{0|0}1O1P1Q1R1S1T1U1X1Y1Z1[1]1_1`1a1b1c1e1f1g1h1o1p1q1r1s1t1u1v1w1x1y1z1{1|1}2O2P2Q2R2S2T2U2V2W2X2Y2Z2[2]2^2_2`2a2b2c2d2e2f2g2h2i2j2k2l2m2n2o2p2q2r2s2t2u2v2w2x2y2z2{2|2}3O3P3Q3R3S3T3U3V3W3a3b3c3d3e3f3g3h3i3j3k3l3m3n3o3p3q3r3s3t3u3v3w3x3y3z3{3|3}4O4P4Q4R4S4T4U4V4W4X4Y4Z4[4]4^4_4`4a4b4c4d4e4f4g4h4i4j4k4l4m4n4o4p4q4r4s4t4u4v4w4x4y4z4{4|4}5O5P5Q5R5S5T5U5V5W5X5Y5Z5[5]5^5_5`5a5b5c5d5e5f5g5h5i5j5k5l5m5n5o5p5q5r5s5t5uU!vY!g!uQ#w!X[%U#d(f(g(h(i1V[%W#e(j(k(l(m1WS-e0^0_R-f0`Q!|iQ#_k[$l#^([/U/V/W/XQ'y,vQ'z,wQ'{,xQ'|,yQ'},zQ(],|Q/Y1iQ/Z1jQ/[1kQ/]1lR1T1dv#]ik#^([,v,w,x,y,z,|/U/V/W/X1d1i1j1k1lZ%g#r-w-x-y-z<eoOVY]^_`abcdefghjpqvwxyz{|}!O!P!Q!R!S!X!b!g!n!t!u!z!|#P#Q#R#S#T#V#W#X#Y#Z#[#_#`#a#d#e#g#h#i#j#k#m#n#o#p#q#r$e$f$o$q$r$s$t$v$w$x$y%O%R%Z%[%]%^%`%a%b%c%d%w%x%z&Q&R&S&U&V&W&]&^&_&a&b&c&n&r&s&u&v&x&y&{&|'Q'T'V'X'Z'['b'e'f'g'h'n'o'q'r's't'u'v'w'x'y'z'{'|'}(U(V(W(X(Y(Z(](^(_(`(a(b(c(d(e(f(g(h(i(j(k(l(m(r(s(t(u(v(x(y({(|(})W)X)Y)Z)[)b)c)d)e)f)g)t)u)v)w)x*S*T*W*X*Z*[*]*h*i*j*k*l*m*r*s*t*u*v*|*}+P+Q+R+X+Y+Z+[+]+^+c+d+e+f+g+i+j+l+m+n+t+u+v+w+x+y,O,P,Q,R,S,U,V,X,Y,Z,f,g,i,j,k,p,q,r,s,t,u,{,}-O-P-Q-R-S-T-U-_-`-a-b-c-d-g-h-i-j-k-l-m-n-o-p-q-r-s-t-u-v-w-x-y-z-{-|-}.O.P.Q.R.S.T.U.V.W.X.Y.Z.[.].^._.`.a.b.c.d.e.f.g.h.i.j.k.l.m.n.o.p.q.r.s.t.u.v.w.x.y.z.{.|.}/O/P/Q/R/S/T/Y/Z/[/]/^/_/`/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/{/|/}0O0P0Q0R0S0T0U0V0W0X0Y0Z0[0]0^0_0`0a0b0c0d0e0f0g0h0i0j0k0l0m0n0o0p0q0r0s0t0u0v0w0x0y0z0{0|0}1O1P1Q1R1S1T1U1V1W1X1Y1Z1[1]1_1`1a1b1c1e1f1g1h1o1p1q1r1s1t1u1v1w1x1y1z1{1|1}2O2P2Q2R2S2T2U2V2W2X2Y2Z2[2]2^2_2`2a2b2c2d2e2f2g2h2i2j2k2l2m2n2o2p2q2r2s2t2u2v2w2x2y2z2{2|2}3O3P3Q3R3S3T3U3V3W3a3b3c3d3e3f3g3h3i3j3k3l3m3n3o3p3q3r3s3t3u3v3w3x3y3z3{3|3}4O4P4Q4R4S4T4U4V4W4X4Y4Z4[4]4^4_4`4a4b4c4d4e4f4g4h4i4j4k4l4m4n4o4p4q4r4s4t4u4v4w4x4y4z4{4|4}5O5P5Q5R5S5T5U5V5W5X5Y5Z5[5]5^5_5`5a5b5c5d5e5f5g5h5i5j5k5l5m5n5o5p5q5r5s5t5u!RuOVY!W!X!b!g!j#[#t$^$`$f$|%d%i%k%y&k.W.X.Y.Z0^!RtOVY!W!X!b!g!j#[#t$^$`$f$|%d%i%k%y&k.W.X.Y.Z0^Z%_#r-w-x-y-zR#t!UQ!WOR#v!WQ#|!ZQ$O![Q$S!^V%l#|$O$Sb!aV!b$W$^%d.W.X.Y.ZR$V!a`!jV!b$^%d.W.X.Y.ZR$a!j^!lV#[%d.W.X.Y.ZQ$Z!bU$d!l$Z&hR&h%h[$|#[%d.W.X.Y.ZQ%i#tQ%y$fW&X$|%i%y&kR&k%k[%O#[%d.W.X.Y.ZQ%z$fT&Z%O%zQ!{cQ#l|Q#r!SS$e!n'fS$i!s'hS$l#V#_#j$u#r$e$i%w%}&n&p'Q'R'[']'b'c(w(x(y(z({(|(}*R*S*T*U*Z*[*]*{*|*}+O+P+Q+R+h+i+j+k+l+m+n,T,U,V,W,X,Y,Z,e,f,g,h,i,j,k-w-x-y-zQ%_#mS%w(Z(]Q%}(vQ&T$vQ&`%`Q&n)gQ&p)xQ&t&UQ&z&aQ'Q*mQ'R*vQ'U&uQ'Y&{Q'[+^Q']+gQ'_'VQ'a'ZQ'b+yQ'c,SS(w'm.xS(x'n.vS(y'o.wS(z'p.yS({'q/PS(|'r.}S(}'s/OS*R/S/[S*S/Q/YS*T/R/ZS*U/T/]Q*Z/`Q*[/^Q*]/_Q*{/cQ*|/aQ*}/bQ+O/dQ+P/gQ+Q/eQ+R/fQ+h/jQ+i/hQ+j/iQ+k/kQ+l/nQ+m/lQ+n/mQ,T/qQ,U/oQ,V/pQ,W/rQ,X/uQ,Y/sQ,Z/tQ,e/xQ,f/vQ,g/wQ,h/yQ,i/|Q,j/zQ,k/{Q-w0YQ-x0ZQ-y0[R-z0]Q!XOR#z!XS!VO!Ws!dV!b!j#[#t$^$f$|%d%i%k%y&k.W.X.Y.Z[!wY!g!u0^0_0`5i!{Z#O#P#Q#R#S#T#U#V#W#X#Y#Z#^#`#a#f#g#h#i#j#k#m#n#o#p#q$j$o$p$q$r$s$t$v$w$x$y%S%T%Y%Z%[%]%^%`%a%b%c&O&P&Q&R&S&U&V&W&[&]&^&_&a&b&c&q&r&s&u&v&w&x&y&{&|'S'T'V'W'X'Z'^'`(P(Q(R(S(T(U(V(W(X(Y(Z([(^(_(`(a(b(c(d(e(n(o(p(q(r(s(t(u(v)O)P)Q)R)S)T)W)X)Y)Z)[)])^)_)`)a)b)c)d)e)f)g)h)i)j)k)l)m)n)o)p)q)r)s)t)u)v)w)x*^*_*`*a*b*c*d*e*f*g*h*i*j*k*l*m*n*o*p*q*r*s*t*u*v+S+T+U+V+W+X+Y+Z+[+]+^+_+`+a+b+c+d+e+f+g+o+p+q+r+s+t+u+v+w+x+y+z+{+|+},O,P,Q,R,S,[,],^,_,`,a,b,c,d,l,m,n,o-l-m-n-o-p-q-r-s-t-u-v-{-|-}.O.P.Q.R.S.T.U.V.[.].^._.`.a.b.c.d.e.f.g.h.i.j.k.l.m.n.o.p.q/Q/R/S/T/U/V/W/X/^/_/`/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/{/|0a0b0c0d0e0f0g0h0i0j0k0l0m0n0o0p0q0r0s0t0u0v0w0x0y0z0{0|0}1O1P1Q1R1U1X1Y1Z1[1]1^1t1u1v1w1x1y1z1{1|1}2O2P2Q2R2S2T2U2V2W2X2Y2Z2[2]2^2_2`2a2b2c2d2e2q2r2s2t2u2v2w2x2y2z2{2|2}3O3P3Q3R3S3T3U3V3W3X3Y3Z3[3]3^3_3`3i3j3k3l3m3n3o3p3q3r3s3t3u3v3w3x3y3z3{3|3}4O4P4Q4^4_4`4a4b4c4d4e4f4g4h4q4r4s4t4u4v4w4x4y4z4{4|4}5O5P5Q5f5g5h5i5j5k5l5mQ#drQ(f-VQ(g-WQ(h-XQ(i-YR1V1m[#cr-V-W-X-Y1mQ#esQ(j-ZQ(k-[Q(l-]Q(m-^R1W1n",
       nodeNames: "⚠ ReporterLeft1Args ReporterLeft2Args ReporterLeft1ArgsOpt GlobalStr ExtensionStr BreedStr PlusMinus Own Set Let To End And Or Identifier Directive Command Reporter Extension TurtleVar PatchVar LinkVar Constant Unsupported SpecialReporter SpecialCommand BreedToken AndOr APCommand APReporterFlip APReporterVar APReporter UnsupportedPrim Reporter0Args Reporter1Args Reporter2Args Reporter3Args Reporter4Args Reporter5Args Reporter6Args Reporter0ArgsVar Reporter1ArgsVar Reporter2ArgsVar Reporter3ArgsVar Reporter4ArgsVar Reporter5ArgsVar Reporter6ArgsVar Reporter2ArgsVar0 Reporter1ArgsVar0 SpecialReporter0Args SpecialReporter1Args SpecialReporter2Args SpecialReporter3Args SpecialReporter4Args SpecialReporter5Args SpecialReporter6Args SpecialReporter1ArgsBoth SpecialReporter0ArgsLink SpecialReporter1ArgsLink SpecialReporter2ArgsTurtle SpecialReporter0ArgsTurtle SpecialReporter1ArgsTurtle SpecialReporter0ArgsLinkP Command0Args Command1Args Command2Args Command3Args Command4Args Command5Args Command6Args Command0ArgsVar Command1ArgsVar Command2ArgsVar Command3ArgsVar Command4ArgsVar Command5ArgsVar Command6ArgsVar Command3ArgsVar2 SpecialCommand0Args SpecialCommand1Args SpecialCommand2Args SpecialCommand3Args SpecialCommand4Args SpecialCommand5Args SpecialCommand6Args SpecialCommandCreateTurtle SpecialCommandCreateLink LineComment Program Normal CloseBracket Extensions OpenBracket Globals Breed BreedPlural BreedSingular BreedsOwn Misplaced CommandStatement Arg Value OpenParen CloseParen List Literal Numeric String CodeBlock ProcedureContent Error VariableName AnonymousProcedure AnonArguments Arguments Arrow ReporterContent ReporterStatement Reporters ShortAnonymousProcedure ReporterBlock Property VariableDeclaration NewVariableDeclaration SetVariable Commands Procedure ProcedureName OnelineReporter Embedded",
       maxTerm: 149,
       context: contextTracker,
@@ -29700,7 +29813,7 @@
       tokenData: "&d~R]XYzYZz]^zpqzrs!]xy#yyz$O}!O$T!O!P$a!Q![%^!]!^%q!}#O&Y#P#Q&_~!PS$S~XYzYZz]^zpqz~!`VOr!]rs!us#O!]#O#P!z#P;'S!];'S;=`#s<%lO!]~!zO#`~~!}RO;'S!];'S;=`#W;=`O!]~#ZWOr!]rs!us#O!]#O#P!z#P;'S!];'S;=`#s;=`<%l!]<%lO!]~#vP;=`<%l!]~$OO#Z~~$TO#[~~$WR!O!P$a!Q![%^!`!a%l~$dP!Q![$g~$lQ#_~!Q![$g#X#Y$r~$uR{|%O}!O%O!Q![%U~%RP!Q![%U~%ZP#_~!Q![%U~%cR#_~!O!P$g!Q![%^#X#Y$r~%qO#h~~%vS!z~OY%qZ;'S%q;'S;=`&S<%lO%q~&VP;=`<%l%q~&_O#P~~&dO!}~",
       tokenizers: [0, keyword],
       topRules: {"Program":[0,89]},
-      dynamicPrecedences: {"109":-1,"144":10,"145":10,"146":-5,"147":-5},
+      dynamicPrecedences: {"109":-1,"129":1},
       specialized: [{term: 18, get: (value, stack) => (specializeReporter(value) << 1), external: specializeReporter},{term: 25, get: (value, stack) => (specializeSpecialReporter(value) << 1), external: specializeSpecialReporter},{term: 17, get: (value, stack) => (specializeCommand(value) << 1), external: specializeCommand},{term: 26, get: (value, stack) => (specializeSpecialCommand(value) << 1), external: specializeSpecialCommand}],
       tokenPrec: 0
     });
@@ -30586,6 +30699,7 @@
                     diagnostics.push(getDiagnostic(view, Node, 'Missing command _'));
                 // Checking the arguments
                 let args = getArgs(Node);
+                // console.log(view.state.sliceDoc(args.func?.from, args.func?.to),args.leftArgs,args.rightArgs)
                 // Log(args.rightArgs.map((node)=>view.state.sliceDoc(node.from, node.to)))
                 // Log(args.rightArgs.map((node)=>node.name))
                 // Log(args.rightArgs.map((node)=>{
@@ -32619,6 +32733,1095 @@
         }
     }
 
+    function Diff() {}
+    Diff.prototype = {
+      diff: function diff(oldString, newString) {
+        var options = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : {};
+        var callback = options.callback;
+
+        if (typeof options === 'function') {
+          callback = options;
+          options = {};
+        }
+
+        this.options = options;
+        var self = this;
+
+        function done(value) {
+          if (callback) {
+            setTimeout(function () {
+              callback(undefined, value);
+            }, 0);
+            return true;
+          } else {
+            return value;
+          }
+        } // Allow subclasses to massage the input prior to running
+
+
+        oldString = this.castInput(oldString);
+        newString = this.castInput(newString);
+        oldString = this.removeEmpty(this.tokenize(oldString));
+        newString = this.removeEmpty(this.tokenize(newString));
+        var newLen = newString.length,
+            oldLen = oldString.length;
+        var editLength = 1;
+        var maxEditLength = newLen + oldLen;
+
+        if (options.maxEditLength) {
+          maxEditLength = Math.min(maxEditLength, options.maxEditLength);
+        }
+
+        var bestPath = [{
+          newPos: -1,
+          components: []
+        }]; // Seed editLength = 0, i.e. the content starts with the same values
+
+        var oldPos = this.extractCommon(bestPath[0], newString, oldString, 0);
+
+        if (bestPath[0].newPos + 1 >= newLen && oldPos + 1 >= oldLen) {
+          // Identity per the equality and tokenizer
+          return done([{
+            value: this.join(newString),
+            count: newString.length
+          }]);
+        } // Main worker method. checks all permutations of a given edit length for acceptance.
+
+
+        function execEditLength() {
+          for (var diagonalPath = -1 * editLength; diagonalPath <= editLength; diagonalPath += 2) {
+            var basePath = void 0;
+
+            var addPath = bestPath[diagonalPath - 1],
+                removePath = bestPath[diagonalPath + 1],
+                _oldPos = (removePath ? removePath.newPos : 0) - diagonalPath;
+
+            if (addPath) {
+              // No one else is going to attempt to use this value, clear it
+              bestPath[diagonalPath - 1] = undefined;
+            }
+
+            var canAdd = addPath && addPath.newPos + 1 < newLen,
+                canRemove = removePath && 0 <= _oldPos && _oldPos < oldLen;
+
+            if (!canAdd && !canRemove) {
+              // If this path is a terminal then prune
+              bestPath[diagonalPath] = undefined;
+              continue;
+            } // Select the diagonal that we want to branch from. We select the prior
+            // path whose position in the new string is the farthest from the origin
+            // and does not pass the bounds of the diff graph
+
+
+            if (!canAdd || canRemove && addPath.newPos < removePath.newPos) {
+              basePath = clonePath(removePath);
+              self.pushComponent(basePath.components, undefined, true);
+            } else {
+              basePath = addPath; // No need to clone, we've pulled it from the list
+
+              basePath.newPos++;
+              self.pushComponent(basePath.components, true, undefined);
+            }
+
+            _oldPos = self.extractCommon(basePath, newString, oldString, diagonalPath); // If we have hit the end of both strings, then we are done
+
+            if (basePath.newPos + 1 >= newLen && _oldPos + 1 >= oldLen) {
+              return done(buildValues(self, basePath.components, newString, oldString, self.useLongestToken));
+            } else {
+              // Otherwise track this path as a potential candidate and continue.
+              bestPath[diagonalPath] = basePath;
+            }
+          }
+
+          editLength++;
+        } // Performs the length of edit iteration. Is a bit fugly as this has to support the
+        // sync and async mode which is never fun. Loops over execEditLength until a value
+        // is produced, or until the edit length exceeds options.maxEditLength (if given),
+        // in which case it will return undefined.
+
+
+        if (callback) {
+          (function exec() {
+            setTimeout(function () {
+              if (editLength > maxEditLength) {
+                return callback();
+              }
+
+              if (!execEditLength()) {
+                exec();
+              }
+            }, 0);
+          })();
+        } else {
+          while (editLength <= maxEditLength) {
+            var ret = execEditLength();
+
+            if (ret) {
+              return ret;
+            }
+          }
+        }
+      },
+      pushComponent: function pushComponent(components, added, removed) {
+        var last = components[components.length - 1];
+
+        if (last && last.added === added && last.removed === removed) {
+          // We need to clone here as the component clone operation is just
+          // as shallow array clone
+          components[components.length - 1] = {
+            count: last.count + 1,
+            added: added,
+            removed: removed
+          };
+        } else {
+          components.push({
+            count: 1,
+            added: added,
+            removed: removed
+          });
+        }
+      },
+      extractCommon: function extractCommon(basePath, newString, oldString, diagonalPath) {
+        var newLen = newString.length,
+            oldLen = oldString.length,
+            newPos = basePath.newPos,
+            oldPos = newPos - diagonalPath,
+            commonCount = 0;
+
+        while (newPos + 1 < newLen && oldPos + 1 < oldLen && this.equals(newString[newPos + 1], oldString[oldPos + 1])) {
+          newPos++;
+          oldPos++;
+          commonCount++;
+        }
+
+        if (commonCount) {
+          basePath.components.push({
+            count: commonCount
+          });
+        }
+
+        basePath.newPos = newPos;
+        return oldPos;
+      },
+      equals: function equals(left, right) {
+        if (this.options.comparator) {
+          return this.options.comparator(left, right);
+        } else {
+          return left === right || this.options.ignoreCase && left.toLowerCase() === right.toLowerCase();
+        }
+      },
+      removeEmpty: function removeEmpty(array) {
+        var ret = [];
+
+        for (var i = 0; i < array.length; i++) {
+          if (array[i]) {
+            ret.push(array[i]);
+          }
+        }
+
+        return ret;
+      },
+      castInput: function castInput(value) {
+        return value;
+      },
+      tokenize: function tokenize(value) {
+        return value.split('');
+      },
+      join: function join(chars) {
+        return chars.join('');
+      }
+    };
+
+    function buildValues(diff, components, newString, oldString, useLongestToken) {
+      var componentPos = 0,
+          componentLen = components.length,
+          newPos = 0,
+          oldPos = 0;
+
+      for (; componentPos < componentLen; componentPos++) {
+        var component = components[componentPos];
+
+        if (!component.removed) {
+          if (!component.added && useLongestToken) {
+            var value = newString.slice(newPos, newPos + component.count);
+            value = value.map(function (value, i) {
+              var oldValue = oldString[oldPos + i];
+              return oldValue.length > value.length ? oldValue : value;
+            });
+            component.value = diff.join(value);
+          } else {
+            component.value = diff.join(newString.slice(newPos, newPos + component.count));
+          }
+
+          newPos += component.count; // Common case
+
+          if (!component.added) {
+            oldPos += component.count;
+          }
+        } else {
+          component.value = diff.join(oldString.slice(oldPos, oldPos + component.count));
+          oldPos += component.count; // Reverse add and remove so removes are output first to match common convention
+          // The diffing algorithm is tied to add then remove output and this is the simplest
+          // route to get the desired output with minimal overhead.
+
+          if (componentPos && components[componentPos - 1].added) {
+            var tmp = components[componentPos - 1];
+            components[componentPos - 1] = components[componentPos];
+            components[componentPos] = tmp;
+          }
+        }
+      } // Special case handle for when one terminal is ignored (i.e. whitespace).
+      // For this case we merge the terminal into the prior string and drop the change.
+      // This is only available for string mode.
+
+
+      var lastComponent = components[componentLen - 1];
+
+      if (componentLen > 1 && typeof lastComponent.value === 'string' && (lastComponent.added || lastComponent.removed) && diff.equals('', lastComponent.value)) {
+        components[componentLen - 2].value += lastComponent.value;
+        components.pop();
+      }
+
+      return components;
+    }
+
+    function clonePath(path) {
+      return {
+        newPos: path.newPos,
+        components: path.components.slice(0)
+      };
+    }
+
+    function generateOptions(options, defaults) {
+      if (typeof options === 'function') {
+        defaults.callback = options;
+      } else if (options) {
+        for (var name in options) {
+          /* istanbul ignore else */
+          if (options.hasOwnProperty(name)) {
+            defaults[name] = options[name];
+          }
+        }
+      }
+
+      return defaults;
+    }
+
+    //
+    // Ranges and exceptions:
+    // Latin-1 Supplement, 0080–00FF
+    //  - U+00D7  × Multiplication sign
+    //  - U+00F7  ÷ Division sign
+    // Latin Extended-A, 0100–017F
+    // Latin Extended-B, 0180–024F
+    // IPA Extensions, 0250–02AF
+    // Spacing Modifier Letters, 02B0–02FF
+    //  - U+02C7  ˇ &#711;  Caron
+    //  - U+02D8  ˘ &#728;  Breve
+    //  - U+02D9  ˙ &#729;  Dot Above
+    //  - U+02DA  ˚ &#730;  Ring Above
+    //  - U+02DB  ˛ &#731;  Ogonek
+    //  - U+02DC  ˜ &#732;  Small Tilde
+    //  - U+02DD  ˝ &#733;  Double Acute Accent
+    // Latin Extended Additional, 1E00–1EFF
+
+    var extendedWordChars = /^[A-Za-z\xC0-\u02C6\u02C8-\u02D7\u02DE-\u02FF\u1E00-\u1EFF]+$/;
+    var reWhitespace = /\S/;
+    var wordDiff = new Diff();
+
+    wordDiff.equals = function (left, right) {
+      if (this.options.ignoreCase) {
+        left = left.toLowerCase();
+        right = right.toLowerCase();
+      }
+
+      return left === right || this.options.ignoreWhitespace && !reWhitespace.test(left) && !reWhitespace.test(right);
+    };
+
+    wordDiff.tokenize = function (value) {
+      // All whitespace symbols except newline group into one token, each newline - in separate token
+      var tokens = value.split(/([^\S\r\n]+|[()[\]{}'"\r\n]|\b)/); // Join the boundary splits that we do not consider to be boundaries. This is primarily the extended Latin character set.
+
+      for (var i = 0; i < tokens.length - 1; i++) {
+        // If we have an empty string in the next field and we have only word chars before and after, merge
+        if (!tokens[i + 1] && tokens[i + 2] && extendedWordChars.test(tokens[i]) && extendedWordChars.test(tokens[i + 2])) {
+          tokens[i] += tokens[i + 2];
+          tokens.splice(i + 1, 2);
+          i--;
+        }
+      }
+
+      return tokens;
+    };
+
+    function diffWords(oldStr, newStr, options) {
+      options = generateOptions(options, {
+        ignoreWhitespace: true
+      });
+      return wordDiff.diff(oldStr, newStr, options);
+    }
+
+    var lineDiff = new Diff();
+
+    lineDiff.tokenize = function (value) {
+      var retLines = [],
+          linesAndNewlines = value.split(/(\n|\r\n)/); // Ignore the final empty token that occurs if the string ends with a new line
+
+      if (!linesAndNewlines[linesAndNewlines.length - 1]) {
+        linesAndNewlines.pop();
+      } // Merge the content and line separators into single tokens
+
+
+      for (var i = 0; i < linesAndNewlines.length; i++) {
+        var line = linesAndNewlines[i];
+
+        if (i % 2 && !this.options.newlineIsToken) {
+          retLines[retLines.length - 1] += line;
+        } else {
+          if (this.options.ignoreWhitespace) {
+            line = line.trim();
+          }
+
+          retLines.push(line);
+        }
+      }
+
+      return retLines;
+    };
+
+    var sentenceDiff = new Diff();
+
+    sentenceDiff.tokenize = function (value) {
+      return value.split(/(\S.+?[.!?])(?=\s+|$)/);
+    };
+
+    var cssDiff = new Diff();
+
+    cssDiff.tokenize = function (value) {
+      return value.split(/([{}:;,]|\s+)/);
+    };
+
+    function _typeof(obj) {
+      "@babel/helpers - typeof";
+
+      if (typeof Symbol === "function" && typeof Symbol.iterator === "symbol") {
+        _typeof = function (obj) {
+          return typeof obj;
+        };
+      } else {
+        _typeof = function (obj) {
+          return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj;
+        };
+      }
+
+      return _typeof(obj);
+    }
+
+    var objectPrototypeToString = Object.prototype.toString;
+    var jsonDiff = new Diff(); // Discriminate between two lines of pretty-printed, serialized JSON where one of them has a
+    // dangling comma and the other doesn't. Turns out including the dangling comma yields the nicest output:
+
+    jsonDiff.useLongestToken = true;
+    jsonDiff.tokenize = lineDiff.tokenize;
+
+    jsonDiff.castInput = function (value) {
+      var _this$options = this.options,
+          undefinedReplacement = _this$options.undefinedReplacement,
+          _this$options$stringi = _this$options.stringifyReplacer,
+          stringifyReplacer = _this$options$stringi === void 0 ? function (k, v) {
+        return typeof v === 'undefined' ? undefinedReplacement : v;
+      } : _this$options$stringi;
+      return typeof value === 'string' ? value : JSON.stringify(canonicalize(value, null, null, stringifyReplacer), stringifyReplacer, '  ');
+    };
+
+    jsonDiff.equals = function (left, right) {
+      return Diff.prototype.equals.call(jsonDiff, left.replace(/,([\r\n])/g, '$1'), right.replace(/,([\r\n])/g, '$1'));
+    };
+    // object that is already on the "stack" of items being processed. Accepts an optional replacer
+
+    function canonicalize(obj, stack, replacementStack, replacer, key) {
+      stack = stack || [];
+      replacementStack = replacementStack || [];
+
+      if (replacer) {
+        obj = replacer(key, obj);
+      }
+
+      var i;
+
+      for (i = 0; i < stack.length; i += 1) {
+        if (stack[i] === obj) {
+          return replacementStack[i];
+        }
+      }
+
+      var canonicalizedObj;
+
+      if ('[object Array]' === objectPrototypeToString.call(obj)) {
+        stack.push(obj);
+        canonicalizedObj = new Array(obj.length);
+        replacementStack.push(canonicalizedObj);
+
+        for (i = 0; i < obj.length; i += 1) {
+          canonicalizedObj[i] = canonicalize(obj[i], stack, replacementStack, replacer, key);
+        }
+
+        stack.pop();
+        replacementStack.pop();
+        return canonicalizedObj;
+      }
+
+      if (obj && obj.toJSON) {
+        obj = obj.toJSON();
+      }
+
+      if (_typeof(obj) === 'object' && obj !== null) {
+        stack.push(obj);
+        canonicalizedObj = {};
+        replacementStack.push(canonicalizedObj);
+
+        var sortedKeys = [],
+            _key;
+
+        for (_key in obj) {
+          /* istanbul ignore else */
+          if (obj.hasOwnProperty(_key)) {
+            sortedKeys.push(_key);
+          }
+        }
+
+        sortedKeys.sort();
+
+        for (i = 0; i < sortedKeys.length; i += 1) {
+          _key = sortedKeys[i];
+          canonicalizedObj[_key] = canonicalize(obj[_key], stack, replacementStack, replacer, _key);
+        }
+
+        stack.pop();
+        replacementStack.pop();
+      } else {
+        canonicalizedObj = obj;
+      }
+
+      return canonicalizedObj;
+    }
+
+    var arrayDiff = new Diff();
+
+    arrayDiff.tokenize = function (value) {
+      return value.slice();
+    };
+
+    arrayDiff.join = arrayDiff.removeEmpty = function (value) {
+      return value;
+    };
+
+    // Compressed representation of the Grapheme_Cluster_Break=Extend
+    // information from
+    // http://www.unicode.org/Public/13.0.0/ucd/auxiliary/GraphemeBreakProperty.txt.
+    // Each pair of elements represents a range, as an offet from the
+    // previous range and a length. Numbers are in base-36, with the empty
+    // string being a shorthand for 1.
+    let extend = /*@__PURE__*/"lc,34,7n,7,7b,19,,,,2,,2,,,20,b,1c,l,g,,2t,7,2,6,2,2,,4,z,,u,r,2j,b,1m,9,9,,o,4,,9,,3,,5,17,3,3b,f,,w,1j,,,,4,8,4,,3,7,a,2,t,,1m,,,,2,4,8,,9,,a,2,q,,2,2,1l,,4,2,4,2,2,3,3,,u,2,3,,b,2,1l,,4,5,,2,4,,k,2,m,6,,,1m,,,2,,4,8,,7,3,a,2,u,,1n,,,,c,,9,,14,,3,,1l,3,5,3,,4,7,2,b,2,t,,1m,,2,,2,,3,,5,2,7,2,b,2,s,2,1l,2,,,2,4,8,,9,,a,2,t,,20,,4,,2,3,,,8,,29,,2,7,c,8,2q,,2,9,b,6,22,2,r,,,,,,1j,e,,5,,2,5,b,,10,9,,2u,4,,6,,2,2,2,p,2,4,3,g,4,d,,2,2,6,,f,,jj,3,qa,3,t,3,t,2,u,2,1s,2,,7,8,,2,b,9,,19,3,3b,2,y,,3a,3,4,2,9,,6,3,63,2,2,,1m,,,7,,,,,2,8,6,a,2,,1c,h,1r,4,1c,7,,,5,,14,9,c,2,w,4,2,2,,3,1k,,,2,3,,,3,1m,8,2,2,48,3,,d,,7,4,,6,,3,2,5i,1m,,5,ek,,5f,x,2da,3,3x,,2o,w,fe,6,2x,2,n9w,4,,a,w,2,28,2,7k,,3,,4,,p,2,5,,47,2,q,i,d,,12,8,p,b,1a,3,1c,,2,4,2,2,13,,1v,6,2,2,2,2,c,,8,,1b,,1f,,,3,2,2,5,2,,,16,2,8,,6m,,2,,4,,fn4,,kh,g,g,g,a6,2,gt,,6a,,45,5,1ae,3,,2,5,4,14,3,4,,4l,2,fx,4,ar,2,49,b,4w,,1i,f,1k,3,1d,4,2,2,1x,3,10,5,,8,1q,,c,2,1g,9,a,4,2,,2n,3,2,,,2,6,,4g,,3,8,l,2,1l,2,,,,,m,,e,7,3,5,5f,8,2,3,,,n,,29,,2,6,,,2,,,2,,2,6j,,2,4,6,2,,2,r,2,2d,8,2,,,2,2y,,,,2,6,,,2t,3,2,4,,5,77,9,,2,6t,,a,2,,,4,,40,4,2,2,4,,w,a,14,6,2,4,8,,9,6,2,3,1a,d,,2,ba,7,,6,,,2a,m,2,7,,2,,2,3e,6,3,,,2,,7,,,20,2,3,,,,9n,2,f0b,5,1n,7,t4,,1r,4,29,,f5k,2,43q,,,3,4,5,8,8,2,7,u,4,44,3,1iz,1j,4,1e,8,,e,,m,5,,f,11s,7,,h,2,7,,2,,5,79,7,c5,4,15s,7,31,7,240,5,gx7k,2o,3k,6o".split(",").map(s => s ? parseInt(s, 36) : 1);
+    // Convert offsets into absolute values
+    for (let i = 1; i < extend.length; i++)
+        extend[i] += extend[i - 1];
+
+    /**
+    The data structure for documents.
+    */
+    class Text {
+        /**
+        @internal
+        */
+        constructor() { }
+        /**
+        Get the line description around the given position.
+        */
+        lineAt(pos) {
+            if (pos < 0 || pos > this.length)
+                throw new RangeError(`Invalid position ${pos} in document of length ${this.length}`);
+            return this.lineInner(pos, false, 1, 0);
+        }
+        /**
+        Get the description for the given (1-based) line number.
+        */
+        line(n) {
+            if (n < 1 || n > this.lines)
+                throw new RangeError(`Invalid line number ${n} in ${this.lines}-line document`);
+            return this.lineInner(n, true, 1, 0);
+        }
+        /**
+        Replace a range of the text with the given content.
+        */
+        replace(from, to, text) {
+            let parts = [];
+            this.decompose(0, from, parts, 2 /* To */);
+            if (text.length)
+                text.decompose(0, text.length, parts, 1 /* From */ | 2 /* To */);
+            this.decompose(to, this.length, parts, 1 /* From */);
+            return TextNode.from(parts, this.length - (to - from) + text.length);
+        }
+        /**
+        Append another document to this one.
+        */
+        append(other) {
+            return this.replace(this.length, this.length, other);
+        }
+        /**
+        Retrieve the text between the given points.
+        */
+        slice(from, to = this.length) {
+            let parts = [];
+            this.decompose(from, to, parts, 0);
+            return TextNode.from(parts, to - from);
+        }
+        /**
+        Test whether this text is equal to another instance.
+        */
+        eq(other) {
+            if (other == this)
+                return true;
+            if (other.length != this.length || other.lines != this.lines)
+                return false;
+            let start = this.scanIdentical(other, 1), end = this.length - this.scanIdentical(other, -1);
+            let a = new RawTextCursor(this), b = new RawTextCursor(other);
+            for (let skip = start, pos = start;;) {
+                a.next(skip);
+                b.next(skip);
+                skip = 0;
+                if (a.lineBreak != b.lineBreak || a.done != b.done || a.value != b.value)
+                    return false;
+                pos += a.value.length;
+                if (a.done || pos >= end)
+                    return true;
+            }
+        }
+        /**
+        Iterate over the text. When `dir` is `-1`, iteration happens
+        from end to start. This will return lines and the breaks between
+        them as separate strings, and for long lines, might split lines
+        themselves into multiple chunks as well.
+        */
+        iter(dir = 1) { return new RawTextCursor(this, dir); }
+        /**
+        Iterate over a range of the text. When `from` > `to`, the
+        iterator will run in reverse.
+        */
+        iterRange(from, to = this.length) { return new PartialTextCursor(this, from, to); }
+        /**
+        Return a cursor that iterates over the given range of lines,
+        _without_ returning the line breaks between, and yielding empty
+        strings for empty lines.
+        
+        When `from` and `to` are given, they should be 1-based line numbers.
+        */
+        iterLines(from, to) {
+            let inner;
+            if (from == null) {
+                inner = this.iter();
+            }
+            else {
+                if (to == null)
+                    to = this.lines + 1;
+                let start = this.line(from).from;
+                inner = this.iterRange(start, Math.max(start, to == this.lines + 1 ? this.length : to <= 1 ? 0 : this.line(to - 1).to));
+            }
+            return new LineCursor(inner);
+        }
+        /**
+        @internal
+        */
+        toString() { return this.sliceString(0); }
+        /**
+        Convert the document to an array of lines (which can be
+        deserialized again via [`Text.of`](https://codemirror.net/6/docs/ref/#text.Text^of)).
+        */
+        toJSON() {
+            let lines = [];
+            this.flatten(lines);
+            return lines;
+        }
+        /**
+        Create a `Text` instance for the given array of lines.
+        */
+        static of(text) {
+            if (text.length == 0)
+                throw new RangeError("A document must have at least one line");
+            if (text.length == 1 && !text[0])
+                return Text.empty;
+            return text.length <= 32 /* Branch */ ? new TextLeaf(text) : TextNode.from(TextLeaf.split(text, []));
+        }
+    }
+    // Leaves store an array of line strings. There are always line breaks
+    // between these strings. Leaves are limited in size and have to be
+    // contained in TextNode instances for bigger documents.
+    class TextLeaf extends Text {
+        constructor(text, length = textLength(text)) {
+            super();
+            this.text = text;
+            this.length = length;
+        }
+        get lines() { return this.text.length; }
+        get children() { return null; }
+        lineInner(target, isLine, line, offset) {
+            for (let i = 0;; i++) {
+                let string = this.text[i], end = offset + string.length;
+                if ((isLine ? line : end) >= target)
+                    return new Line(offset, end, line, string);
+                offset = end + 1;
+                line++;
+            }
+        }
+        decompose(from, to, target, open) {
+            let text = from <= 0 && to >= this.length ? this
+                : new TextLeaf(sliceText(this.text, from, to), Math.min(to, this.length) - Math.max(0, from));
+            if (open & 1 /* From */) {
+                let prev = target.pop();
+                let joined = appendText(text.text, prev.text.slice(), 0, text.length);
+                if (joined.length <= 32 /* Branch */) {
+                    target.push(new TextLeaf(joined, prev.length + text.length));
+                }
+                else {
+                    let mid = joined.length >> 1;
+                    target.push(new TextLeaf(joined.slice(0, mid)), new TextLeaf(joined.slice(mid)));
+                }
+            }
+            else {
+                target.push(text);
+            }
+        }
+        replace(from, to, text) {
+            if (!(text instanceof TextLeaf))
+                return super.replace(from, to, text);
+            let lines = appendText(this.text, appendText(text.text, sliceText(this.text, 0, from)), to);
+            let newLen = this.length + text.length - (to - from);
+            if (lines.length <= 32 /* Branch */)
+                return new TextLeaf(lines, newLen);
+            return TextNode.from(TextLeaf.split(lines, []), newLen);
+        }
+        sliceString(from, to = this.length, lineSep = "\n") {
+            let result = "";
+            for (let pos = 0, i = 0; pos <= to && i < this.text.length; i++) {
+                let line = this.text[i], end = pos + line.length;
+                if (pos > from && i)
+                    result += lineSep;
+                if (from < end && to > pos)
+                    result += line.slice(Math.max(0, from - pos), to - pos);
+                pos = end + 1;
+            }
+            return result;
+        }
+        flatten(target) {
+            for (let line of this.text)
+                target.push(line);
+        }
+        scanIdentical() { return 0; }
+        static split(text, target) {
+            let part = [], len = -1;
+            for (let line of text) {
+                part.push(line);
+                len += line.length + 1;
+                if (part.length == 32 /* Branch */) {
+                    target.push(new TextLeaf(part, len));
+                    part = [];
+                    len = -1;
+                }
+            }
+            if (len > -1)
+                target.push(new TextLeaf(part, len));
+            return target;
+        }
+    }
+    // Nodes provide the tree structure of the `Text` type. They store a
+    // number of other nodes or leaves, taking care to balance themselves
+    // on changes. There are implied line breaks _between_ the children of
+    // a node (but not before the first or after the last child).
+    class TextNode extends Text {
+        constructor(children, length) {
+            super();
+            this.children = children;
+            this.length = length;
+            this.lines = 0;
+            for (let child of children)
+                this.lines += child.lines;
+        }
+        lineInner(target, isLine, line, offset) {
+            for (let i = 0;; i++) {
+                let child = this.children[i], end = offset + child.length, endLine = line + child.lines - 1;
+                if ((isLine ? endLine : end) >= target)
+                    return child.lineInner(target, isLine, line, offset);
+                offset = end + 1;
+                line = endLine + 1;
+            }
+        }
+        decompose(from, to, target, open) {
+            for (let i = 0, pos = 0; pos <= to && i < this.children.length; i++) {
+                let child = this.children[i], end = pos + child.length;
+                if (from <= end && to >= pos) {
+                    let childOpen = open & ((pos <= from ? 1 /* From */ : 0) | (end >= to ? 2 /* To */ : 0));
+                    if (pos >= from && end <= to && !childOpen)
+                        target.push(child);
+                    else
+                        child.decompose(from - pos, to - pos, target, childOpen);
+                }
+                pos = end + 1;
+            }
+        }
+        replace(from, to, text) {
+            if (text.lines < this.lines)
+                for (let i = 0, pos = 0; i < this.children.length; i++) {
+                    let child = this.children[i], end = pos + child.length;
+                    // Fast path: if the change only affects one child and the
+                    // child's size remains in the acceptable range, only update
+                    // that child
+                    if (from >= pos && to <= end) {
+                        let updated = child.replace(from - pos, to - pos, text);
+                        let totalLines = this.lines - child.lines + updated.lines;
+                        if (updated.lines < (totalLines >> (5 /* BranchShift */ - 1)) &&
+                            updated.lines > (totalLines >> (5 /* BranchShift */ + 1))) {
+                            let copy = this.children.slice();
+                            copy[i] = updated;
+                            return new TextNode(copy, this.length - (to - from) + text.length);
+                        }
+                        return super.replace(pos, end, updated);
+                    }
+                    pos = end + 1;
+                }
+            return super.replace(from, to, text);
+        }
+        sliceString(from, to = this.length, lineSep = "\n") {
+            let result = "";
+            for (let i = 0, pos = 0; i < this.children.length && pos <= to; i++) {
+                let child = this.children[i], end = pos + child.length;
+                if (pos > from && i)
+                    result += lineSep;
+                if (from < end && to > pos)
+                    result += child.sliceString(from - pos, to - pos, lineSep);
+                pos = end + 1;
+            }
+            return result;
+        }
+        flatten(target) {
+            for (let child of this.children)
+                child.flatten(target);
+        }
+        scanIdentical(other, dir) {
+            if (!(other instanceof TextNode))
+                return 0;
+            let length = 0;
+            let [iA, iB, eA, eB] = dir > 0 ? [0, 0, this.children.length, other.children.length]
+                : [this.children.length - 1, other.children.length - 1, -1, -1];
+            for (;; iA += dir, iB += dir) {
+                if (iA == eA || iB == eB)
+                    return length;
+                let chA = this.children[iA], chB = other.children[iB];
+                if (chA != chB)
+                    return length + chA.scanIdentical(chB, dir);
+                length += chA.length + 1;
+            }
+        }
+        static from(children, length = children.reduce((l, ch) => l + ch.length + 1, -1)) {
+            let lines = 0;
+            for (let ch of children)
+                lines += ch.lines;
+            if (lines < 32 /* Branch */) {
+                let flat = [];
+                for (let ch of children)
+                    ch.flatten(flat);
+                return new TextLeaf(flat, length);
+            }
+            let chunk = Math.max(32 /* Branch */, lines >> 5 /* BranchShift */), maxChunk = chunk << 1, minChunk = chunk >> 1;
+            let chunked = [], currentLines = 0, currentLen = -1, currentChunk = [];
+            function add(child) {
+                let last;
+                if (child.lines > maxChunk && child instanceof TextNode) {
+                    for (let node of child.children)
+                        add(node);
+                }
+                else if (child.lines > minChunk && (currentLines > minChunk || !currentLines)) {
+                    flush();
+                    chunked.push(child);
+                }
+                else if (child instanceof TextLeaf && currentLines &&
+                    (last = currentChunk[currentChunk.length - 1]) instanceof TextLeaf &&
+                    child.lines + last.lines <= 32 /* Branch */) {
+                    currentLines += child.lines;
+                    currentLen += child.length + 1;
+                    currentChunk[currentChunk.length - 1] = new TextLeaf(last.text.concat(child.text), last.length + 1 + child.length);
+                }
+                else {
+                    if (currentLines + child.lines > chunk)
+                        flush();
+                    currentLines += child.lines;
+                    currentLen += child.length + 1;
+                    currentChunk.push(child);
+                }
+            }
+            function flush() {
+                if (currentLines == 0)
+                    return;
+                chunked.push(currentChunk.length == 1 ? currentChunk[0] : TextNode.from(currentChunk, currentLen));
+                currentLen = -1;
+                currentLines = currentChunk.length = 0;
+            }
+            for (let child of children)
+                add(child);
+            flush();
+            return chunked.length == 1 ? chunked[0] : new TextNode(chunked, length);
+        }
+    }
+    Text.empty = /*@__PURE__*/new TextLeaf([""], 0);
+    function textLength(text) {
+        let length = -1;
+        for (let line of text)
+            length += line.length + 1;
+        return length;
+    }
+    function appendText(text, target, from = 0, to = 1e9) {
+        for (let pos = 0, i = 0, first = true; i < text.length && pos <= to; i++) {
+            let line = text[i], end = pos + line.length;
+            if (end >= from) {
+                if (end > to)
+                    line = line.slice(0, to - pos);
+                if (pos < from)
+                    line = line.slice(from - pos);
+                if (first) {
+                    target[target.length - 1] += line;
+                    first = false;
+                }
+                else
+                    target.push(line);
+            }
+            pos = end + 1;
+        }
+        return target;
+    }
+    function sliceText(text, from, to) {
+        return appendText(text, [""], from, to);
+    }
+    class RawTextCursor {
+        constructor(text, dir = 1) {
+            this.dir = dir;
+            this.done = false;
+            this.lineBreak = false;
+            this.value = "";
+            this.nodes = [text];
+            this.offsets = [dir > 0 ? 1 : (text instanceof TextLeaf ? text.text.length : text.children.length) << 1];
+        }
+        nextInner(skip, dir) {
+            this.done = this.lineBreak = false;
+            for (;;) {
+                let last = this.nodes.length - 1;
+                let top = this.nodes[last], offsetValue = this.offsets[last], offset = offsetValue >> 1;
+                let size = top instanceof TextLeaf ? top.text.length : top.children.length;
+                if (offset == (dir > 0 ? size : 0)) {
+                    if (last == 0) {
+                        this.done = true;
+                        this.value = "";
+                        return this;
+                    }
+                    if (dir > 0)
+                        this.offsets[last - 1]++;
+                    this.nodes.pop();
+                    this.offsets.pop();
+                }
+                else if ((offsetValue & 1) == (dir > 0 ? 0 : 1)) {
+                    this.offsets[last] += dir;
+                    if (skip == 0) {
+                        this.lineBreak = true;
+                        this.value = "\n";
+                        return this;
+                    }
+                    skip--;
+                }
+                else if (top instanceof TextLeaf) {
+                    // Move to the next string
+                    let next = top.text[offset + (dir < 0 ? -1 : 0)];
+                    this.offsets[last] += dir;
+                    if (next.length > Math.max(0, skip)) {
+                        this.value = skip == 0 ? next : dir > 0 ? next.slice(skip) : next.slice(0, next.length - skip);
+                        return this;
+                    }
+                    skip -= next.length;
+                }
+                else {
+                    let next = top.children[offset + (dir < 0 ? -1 : 0)];
+                    if (skip > next.length) {
+                        skip -= next.length;
+                        this.offsets[last] += dir;
+                    }
+                    else {
+                        if (dir < 0)
+                            this.offsets[last]--;
+                        this.nodes.push(next);
+                        this.offsets.push(dir > 0 ? 1 : (next instanceof TextLeaf ? next.text.length : next.children.length) << 1);
+                    }
+                }
+            }
+        }
+        next(skip = 0) {
+            if (skip < 0) {
+                this.nextInner(-skip, (-this.dir));
+                skip = this.value.length;
+            }
+            return this.nextInner(skip, this.dir);
+        }
+    }
+    class PartialTextCursor {
+        constructor(text, start, end) {
+            this.value = "";
+            this.done = false;
+            this.cursor = new RawTextCursor(text, start > end ? -1 : 1);
+            this.pos = start > end ? text.length : 0;
+            this.from = Math.min(start, end);
+            this.to = Math.max(start, end);
+        }
+        nextInner(skip, dir) {
+            if (dir < 0 ? this.pos <= this.from : this.pos >= this.to) {
+                this.value = "";
+                this.done = true;
+                return this;
+            }
+            skip += Math.max(0, dir < 0 ? this.pos - this.to : this.from - this.pos);
+            let limit = dir < 0 ? this.pos - this.from : this.to - this.pos;
+            if (skip > limit)
+                skip = limit;
+            limit -= skip;
+            let { value } = this.cursor.next(skip);
+            this.pos += (value.length + skip) * dir;
+            this.value = value.length <= limit ? value : dir < 0 ? value.slice(value.length - limit) : value.slice(0, limit);
+            this.done = !this.value;
+            return this;
+        }
+        next(skip = 0) {
+            if (skip < 0)
+                skip = Math.max(skip, this.from - this.pos);
+            else if (skip > 0)
+                skip = Math.min(skip, this.to - this.pos);
+            return this.nextInner(skip, this.cursor.dir);
+        }
+        get lineBreak() { return this.cursor.lineBreak && this.value != ""; }
+    }
+    class LineCursor {
+        constructor(inner) {
+            this.inner = inner;
+            this.afterBreak = true;
+            this.value = "";
+            this.done = false;
+        }
+        next(skip = 0) {
+            let { done, lineBreak, value } = this.inner.next(skip);
+            if (done) {
+                this.done = true;
+                this.value = "";
+            }
+            else if (lineBreak) {
+                if (this.afterBreak) {
+                    this.value = "";
+                }
+                else {
+                    this.afterBreak = true;
+                    this.next();
+                }
+            }
+            else {
+                this.value = value;
+                this.afterBreak = false;
+            }
+            return this;
+        }
+        get lineBreak() { return false; }
+    }
+    if (typeof Symbol != "undefined") {
+        Text.prototype[Symbol.iterator] = function () { return this.iter(); };
+        RawTextCursor.prototype[Symbol.iterator] = PartialTextCursor.prototype[Symbol.iterator] =
+            LineCursor.prototype[Symbol.iterator] = function () { return this; };
+    }
+    /**
+    This type describes a line in the document. It is created
+    on-demand when lines are [queried](https://codemirror.net/6/docs/ref/#text.Text.lineAt).
+    */
+    class Line {
+        /**
+        @internal
+        */
+        constructor(
+        /**
+        The position of the start of the line.
+        */
+        from, 
+        /**
+        The position at the end of the line (_before_ the line break,
+        or at the end of document for the last line).
+        */
+        to, 
+        /**
+        This line's line number (1-based).
+        */
+        number, 
+        /**
+        The line's content.
+        */
+        text) {
+            this.from = from;
+            this.to = to;
+            this.number = number;
+            this.text = text;
+        }
+        /**
+        The length of the line (not including any line break after it).
+        */
+        get length() { return this.to - this.from; }
+    }
+
+    /* TextWidget: A CM6 Widget representing some text and its styling. */
+    class TextWidget extends WidgetType {
+        constructor(text, className = '') {
+            super();
+            this.text = text;
+            this.className = className;
+        }
+        toDOM() {
+            let wrap = document.createElement('span');
+            wrap.setAttribute('aria-hidden', 'true');
+            wrap.className = `cm-text ${this.className}`;
+            wrap.textContent = this.text;
+            return wrap;
+        }
+    }
+    /* CheckboxWidget: A "checkbox" DOM feature to accept changes. */
+    class CheckboxWidget extends WidgetType {
+        constructor(editor, finalText) {
+            super();
+            this.CodeMirror = editor;
+            this.CurrentVersion = finalText;
+        }
+        toDOM() {
+            let wrap = document.createElement('span');
+            wrap.setAttribute('aria-hidden', 'true');
+            let box = wrap.appendChild(document.createElement('input'));
+            box.type = 'checkbox';
+            box.addEventListener('click', (e) => {
+                // length of current codemirror
+                let length = this.CodeMirror.state.doc.length;
+                // turn currentVersion into an array
+                let currentAsArr = this.CurrentVersion.split('\n');
+                let newTextObj = Text.of(currentAsArr);
+                // create transaction
+                let transaction = this.CodeMirror.state.update({ changes: { from: 0, to: length, insert: newTextObj } });
+                // dispatch transaction
+                this.CodeMirror.dispatch(transaction);
+                // destroy widget
+                // this.destroy();
+            });
+            return wrap;
+        }
+        ignoreEvent() {
+            return false;
+        }
+    }
+
     /** SelectionFeatures: The selection and cursor features of the editor. */
     class SelectionFeatures {
         /** Constructor: Initialize the editing features. */
@@ -32675,7 +33878,134 @@
         // #region "Highlighting Changes"
         /** HighlightChanges: Highlight the changes in the editor. */
         HighlightChanges(PreviousVersion) {
-            this.Galapagos.GetCode();
+            let clicked = false;
+            // string of current state doc of editor at time of "HighlightChanges" call
+            const CurrentVersion = this.CodeMirror.state.doc.toString();
+            const currentState = this.CodeMirror.state;
+            const editorView = this.CodeMirror;
+            // create diff instance comparing previous version of string to current version
+            const diff = diffWords(PreviousVersion, CurrentVersion);
+            // separate words into added and removed
+            const removed = diff.filter((part) => part.removed).map((part) => part.value.replace('\n', '↵\n'));
+            const added = diff.filter((part) => part.added).map((part) => part.value);
+            // defining stateffect for added words using mark decoration --> should be green
+            const removedEffect = StateEffect.define({
+                map: ({ from, to }, change) => ({ from: change.mapPos(from), to: change.mapPos(to) }),
+            });
+            // stateEffect for removed words using widget decoration
+            const addTextWidget = StateEffect.define({
+                map: ({ from, to }, change) => ({ from: change.mapPos(from), to: change.mapPos(to) }),
+            });
+            // define mark decoration for added words
+            const addedMark = Decoration.mark({ attributes: { class: 'cm-added' } }); //mark decoration for removed words
+            // index tracker for removed array (tells us which removed words have already been highlighted )
+            let removedIndex = 0;
+            // define statefield for words needing to be highlighted (field for both added and removed words)
+            const changesField = StateField.define({
+                create() {
+                    return Decoration.none;
+                },
+                update(value, tr) {
+                    value = value.map(tr.changes);
+                    for (let e of tr.effects) {
+                        if (e.is(removedEffect)) {
+                            //if it is a added word then add "added" mark decoration
+                            value = value.update({
+                                add: [addedMark.range(e.value.from, e.value.to)],
+                            });
+                        }
+                        else if (e.is(addTextWidget)) {
+                            let decorationWidget = Decoration.widget({
+                                widget: new TextWidget(removed[removedIndex], 'cm-removed'),
+                                side: 1,
+                            });
+                            removedIndex++; // increment removedIndex because we have already added this word
+                            value = value.update({
+                                add: [decorationWidget.range(e.value.to)],
+                            });
+                        }
+                    }
+                    return value;
+                },
+                provide: (f) => EditorView.decorations.from(f),
+            });
+            /* highlightAdded: searches for the added word in previous string and highlights it as "removed" */
+            function highlightAdded(view, word) {
+                let effects = [];
+                // create a cursor to find the word
+                let cursor = new SearchCursor(view.state.doc, word, 0);
+                // find the word
+                cursor.next();
+                effects.push(removedEffect.of({
+                    from: cursor.value.from,
+                    to: cursor.value.to,
+                }));
+                if (!effects.length)
+                    return false;
+                if (!view.state.field(changesField, false)) {
+                    effects.push(StateEffect.appendConfig.of([changesField]));
+                }
+                view.dispatch({ effects });
+                return true;
+            }
+            /* makeWidget: creates a widget decoration of the added word (as 'text') and adds it to the EditorView at "end"*/
+            function makeWidget(view, end, type = 'text') {
+                let effects = [];
+                if (type === 'text') {
+                    effects.push(addTextWidget.of({
+                        from: 0,
+                        to: end,
+                    }));
+                }
+                if (!effects.length)
+                    return false;
+                effects.push(StateEffect.appendConfig.of([changesField]));
+                view.dispatch({ effects });
+                return true;
+            }
+            // iterate through added words and highlight them green
+            added.forEach((word) => highlightAdded(this.CodeMirror, word));
+            // iterate through added words and highlight them
+            let currentPos = 0; // position tracker for added words so they are added in the correct position based on where diff put them in the consolidated string
+            diff.forEach((part) => {
+                //updated current position
+                if (part.removed) {
+                    // add the widget to the editor
+                    makeWidget(this.CodeMirror, currentPos);
+                }
+                else {
+                    // if it is not an added word, then update the current position to be after the word that was not added
+                    currentPos += part.value.length;
+                }
+            });
+            function sleep(ms) {
+                return new Promise((resolve) => setTimeout(resolve, ms));
+            }
+            function revert(view, state) {
+                view.setState(state);
+                return;
+            }
+            //   //create another statefield to remove the highlight after 5 seconds
+            const removeChangesField = StateField.define({
+                create() {
+                },
+                update(lines, tr) {
+                    // check if cursor changed
+                    if (tr.selection && !clicked) {
+                        // if cursor changed, then remove the highlight
+                        console.log('selection changed ');
+                        sleep(50).then(() => {
+                            revert(editorView, currentState);
+                            clicked = false;
+                        });
+                    }
+                    return;
+                },
+            });
+            // add the statefield to the editor
+            this.CodeMirror.dispatch({
+                effects: StateEffect.appendConfig.of([removeChangesField]),
+            });
         }
     }
 
@@ -33117,389 +34447,405 @@
         Galapagos.Operations.AppendGlobals('Globals', Snapshot.Globals);
     }
 
-    function FixGeneratedCode(Editor, Source, Parent) {
-        Source = Source.trim();
-        if (Source == '')
-            return Source;
-        // Remove the trailing semicolon
-        if (Source.endsWith(';'))
-            Source = Source.slice(0, -1);
-        // First pass: prettify the code
-        Editor.SetCode(Source);
-        Editor.Semantics.PrettifyAll();
-        // Second pass: clean up global statements
-        var Snapshot = BuildSnapshot(Editor);
-        var intoProcedure = [];
-        let changes = [];
-        let state = Editor.CodeMirror.state;
-        let comments = [];
-        let commentsStart = null;
-        let commentFrom = null;
-        let procedureStart = null;
-        let first = { Globals: null, Extensions: null };
-        let reserved = GetReserved(Editor.LintContext);
-        let breeds = [];
-        let globals = [];
-        let extensions = [];
-        let reservedVars = [...turtleVars, ...patchVars, ...linkVars, ...constants];
-        var checkForMisplaced = (node) => {
-            if (node.name == 'Procedure' && procedureStart == null) {
-                procedureStart = node.from;
-            }
-            else if (node.name == 'Globals' || node.name == 'Extensions') {
-                if (first[node.name] == null) {
-                    if (procedureStart != null && procedureStart < node.from) {
-                        // console.log('Moving ' + node.name + ' to ' + procedureStart);
-                        changes.push({
-                            from: 0,
-                            to: 0,
-                            insert: AddComments(state.sliceDoc(node.from, node.to), comments) + '\n\n',
-                        });
-                        changes.push({
-                            from: commentsStart !== null && commentsStart !== void 0 ? commentsStart : node.from,
-                            to: node.to,
-                            insert: '',
-                        });
-                        first[node.name] = AddComments(state.sliceDoc(node.from, node.to), comments).length - 1;
-                        comments = [];
-                        commentFrom = null;
-                        commentsStart = null;
-                        return;
+    /** FixGeneratedCode: Fix the code generated by the LLM. */
+    function FixGeneratedCode(Editor, Source, Parent, try_again = true) {
+        return __awaiter(this, void 0, void 0, function* () {
+            Source = Source.trim();
+            if (Source == '')
+                return Source;
+            // Remove the trailing semicolon
+            if (Source.endsWith(';'))
+                Source = Source.slice(0, -1);
+            // First pass: prettify the code
+            Editor.SetCode(Source);
+            Editor.Semantics.PrettifyAll();
+            // Second pass: clean up global statements
+            var Snapshot = BuildSnapshot(Editor);
+            var intoProcedure = [];
+            let changes = [];
+            let state = Editor.CodeMirror.state;
+            let comments = [];
+            let commentsStart = null;
+            let commentFrom = null;
+            let procedureStart = null;
+            let first = { Globals: null, Extensions: null };
+            let reserved = GetReserved(Editor.LintContext);
+            let breeds = [];
+            let globals = [];
+            let extensions = [];
+            let reservedVars = [...turtleVars, ...patchVars, ...linkVars, ...constants];
+            var checkForMisplaced = (node) => {
+                if (node.name == 'Procedure' && procedureStart == null) {
+                    procedureStart = node.from;
+                }
+                else if (node.name == 'Globals' || node.name == 'Extensions') {
+                    if (first[node.name] == null) {
+                        if (procedureStart != null && procedureStart < node.from) {
+                            // console.log('Moving ' + node.name + ' to ' + procedureStart);
+                            changes.push({
+                                from: 0,
+                                to: 0,
+                                insert: AddComments(state.sliceDoc(node.from, node.to), comments) + '\n\n',
+                            });
+                            changes.push({
+                                from: commentsStart !== null && commentsStart !== void 0 ? commentsStart : node.from,
+                                to: node.to,
+                                insert: '',
+                            });
+                            first[node.name] = AddComments(state.sliceDoc(node.from, node.to), comments).length - 1;
+                            comments = [];
+                            commentFrom = null;
+                            commentsStart = null;
+                            return;
+                        }
+                        else {
+                            first[node.name] = node.to - 1;
+                        }
                     }
                     else {
-                        first[node.name] = node.to - 1;
+                        let to_add = state
+                            .sliceDoc(node.from, node.to)
+                            .replace(/globals\s*\[/i, '')
+                            .replace(/extensions\s*\[/i, '')
+                            .replace(/\]/, '');
+                        let index = first[node.name];
+                        // console.log('combining statements');
+                        if (index) {
+                            changes.push({
+                                from: index,
+                                to: index,
+                                insert: ' ' + to_add,
+                            });
+                            changes.push({
+                                from: commentsStart !== null && commentsStart !== void 0 ? commentsStart : node.from,
+                                to: node.to,
+                                insert: '',
+                            });
+                            comments = [];
+                            commentFrom = null;
+                            commentsStart = null;
+                            return;
+                        }
                     }
                 }
-                else {
-                    let to_add = state
-                        .sliceDoc(node.from, node.to)
-                        .replace(/globals\s*\[/i, '')
-                        .replace(/extensions\s*\[/i, '')
-                        .replace(/\]/, '');
-                    let index = first[node.name];
-                    // console.log('combining statements');
-                    if (index) {
-                        changes.push({
-                            from: index,
-                            to: index,
-                            insert: ' ' + to_add,
-                        });
-                        changes.push({
-                            from: commentsStart !== null && commentsStart !== void 0 ? commentsStart : node.from,
-                            to: node.to,
-                            insert: '',
-                        });
-                        comments = [];
-                        commentFrom = null;
-                        commentsStart = null;
-                        return;
-                    }
+                else if (procedureStart != null &&
+                    (node.name == 'BreedsOwn' ||
+                        (node.name == 'Misplaced' && node.node.resolveInner(node.from, 1).name == 'BreedToken'))) {
+                    // console.log('Moving ' + node.name + ' to ' + procedureStart);
+                    changes.push({
+                        from: 0,
+                        to: 0,
+                        insert: AddComments(state.sliceDoc(node.from, node.to), comments) + '\n\n',
+                    });
+                    changes.push({
+                        from: commentsStart !== null && commentsStart !== void 0 ? commentsStart : node.from,
+                        to: node.to,
+                        insert: '',
+                    });
+                    comments = [];
+                    commentFrom = null;
+                    commentsStart = null;
+                    return;
                 }
-            }
-            else if (procedureStart != null &&
-                (node.name == 'BreedsOwn' ||
-                    (node.name == 'Misplaced' && node.node.resolveInner(node.from, 1).name == 'BreedToken'))) {
-                // console.log('Moving ' + node.name + ' to ' + procedureStart);
-                changes.push({
-                    from: 0,
-                    to: 0,
-                    insert: AddComments(state.sliceDoc(node.from, node.to), comments) + '\n\n',
-                });
-                changes.push({
-                    from: commentsStart !== null && commentsStart !== void 0 ? commentsStart : node.from,
-                    to: node.to,
-                    insert: '',
-                });
-                comments = [];
-                commentFrom = null;
-                commentsStart = null;
-                return;
-            }
-            if (node.name == 'LineComment') {
-                // take only the one preceding comment
-                comments = [state.sliceDoc(node.from, node.to)];
-                commentsStart = node.from;
-                // take all immediately preceding comments
-                // comments.push(state.sliceDoc(node.from, node.to));
-                // commentsStart = commentsStart ?? node.from;
-            }
-            else if (comments.length > 0 && !commentFrom) {
-                // Record the position of what comes immediately after the comments
-                // (this is in case of nesting, so we don't lose the comments)
-                commentFrom = node.from;
-            }
-            else if (comments.length > 0 && commentFrom && node.from > commentFrom) {
-                // Discard the comment info when we move on to the next statement
-                comments = [];
-                commentFrom = null;
-                commentsStart = null;
-            }
-        };
-        //do some re-ordering at the top level
-        let cursor = syntaxTree(state).cursor();
-        cursor.firstChild();
-        if (cursor.node.name == 'Normal') {
-            if (cursor.firstChild()) {
-                checkForMisplaced(cursor.node);
-                // console.log(cursor.node.name, changes);
-                while (cursor.nextSibling()) {
+                if (node.name == 'LineComment') {
+                    // take only the one preceding comment
+                    comments = [state.sliceDoc(node.from, node.to)];
+                    commentsStart = node.from;
+                    // take all immediately preceding comments
+                    // comments.push(state.sliceDoc(node.from, node.to));
+                    // commentsStart = commentsStart ?? node.from;
+                }
+                else if (comments.length > 0 && !commentFrom) {
+                    // Record the position of what comes immediately after the comments
+                    // (this is in case of nesting, so we don't lose the comments)
+                    commentFrom = node.from;
+                }
+                else if (comments.length > 0 && commentFrom && node.from > commentFrom) {
+                    // Discard the comment info when we move on to the next statement
+                    comments = [];
+                    commentFrom = null;
+                    commentsStart = null;
+                }
+            };
+            // Do some re-ordering at the top level
+            let cursor = syntaxTree(state).cursor();
+            cursor.firstChild();
+            if (cursor.node.name == 'Normal') {
+                if (cursor.firstChild()) {
                     checkForMisplaced(cursor.node);
                     // console.log(cursor.node.name, changes);
-                }
-            }
-        }
-        Editor.Operations.ChangeCode(changes);
-        Editor.ForceParse();
-        state = Editor.CodeMirror.state;
-        changes = [];
-        procedureStart = null;
-        comments = [];
-        commentFrom = null;
-        commentsStart = null;
-        // Go over the syntax tree
-        syntaxTree(state)
-            .cursor()
-            .iterate((noderef) => {
-            var _a, _b, _c, _d, _e;
-            // Log(noderef.name, comments);
-            // check for misplaced non-global statements at the global level
-            // Collect them into intoProcedure, and remove them from the code
-            // I don't understand why the parser does not recognize `to test end test` as rouge statements.
-            if (noderef.name == 'Misplaced' || (noderef.name == 'Procedure' && noderef.node.getChildren('To').length == 0)) {
-                let skip = false;
-                Log(noderef.name, noderef.from, commentFrom, comments);
-                if (noderef.name == 'Misplaced') {
-                    let grandchild = (_a = noderef.node.firstChild) === null || _a === void 0 ? void 0 : _a.firstChild;
-                    if (grandchild && grandchild.name.includes('0Args')) {
-                        skip = true;
+                    while (cursor.nextSibling()) {
+                        checkForMisplaced(cursor.node);
+                        // console.log(cursor.node.name, changes);
                     }
                 }
-                if (!skip) {
-                    intoProcedure.push(AddComments(state.sliceDoc(noderef.from, noderef.to), comments));
-                }
-                changes.push({
-                    from: commentsStart !== null && commentsStart !== void 0 ? commentsStart : noderef.from,
-                    to: Math.min(noderef.to + 1, state.doc.toString().length),
-                    insert: '',
-                });
-                return false;
             }
-            // check for misplaced global statements
-            // Move them to the top of the program
-            if (noderef.name == 'Error') {
-                Log(noderef.name, comments);
-                changes.push({
-                    from: commentsStart !== null && commentsStart !== void 0 ? commentsStart : noderef.from,
-                    to: noderef.to + 1,
-                    insert: '',
-                });
-                changes.push({
-                    from: 0,
-                    to: 0,
-                    insert: AddComments(state.sliceDoc(noderef.from, noderef.to), comments) + '\n',
-                });
-                return false;
-            }
-            else if (noderef.name == 'Globals') {
-                let len = noderef.node.getChildren('Identifier').length;
-                let deleted = 0;
-                let temp_changes = [];
-                noderef.node.getChildren('Identifier').map((child) => {
-                    let value = state.sliceDoc(child.from, child.to);
-                    if (globals.includes(value.toLowerCase()) || reservedVars.includes(value.toLowerCase())) {
-                        temp_changes.push({
-                            from: child.from,
-                            to: child.to,
-                            insert: '',
-                        });
-                        deleted += 1;
+            Editor.Operations.ChangeCode(changes);
+            Editor.ForceParse();
+            state = Editor.CodeMirror.state;
+            changes = [];
+            procedureStart = null;
+            comments = [];
+            commentFrom = null;
+            commentsStart = null;
+            // Go over the syntax tree
+            syntaxTree(state)
+                .cursor()
+                .iterate((noderef) => {
+                var _a, _b, _c, _d, _e;
+                // Log(noderef.name, comments);
+                // check for misplaced non-global statements at the global level
+                // Collect them into intoProcedure, and remove them from the code
+                // I don't understand why the parser does not recognize `to test end test` as rouge statements.
+                if (noderef.name == 'Misplaced' || (noderef.name == 'Procedure' && noderef.node.getChildren('To').length == 0)) {
+                    let skip = false;
+                    Log(noderef.name, noderef.from, commentFrom, comments);
+                    if (noderef.name == 'Misplaced') {
+                        let grandchild = (_a = noderef.node.firstChild) === null || _a === void 0 ? void 0 : _a.firstChild;
+                        if (grandchild && grandchild.name.includes('0Args')) {
+                            skip = true;
+                        }
                     }
-                    globals.push(value.toLowerCase());
-                });
-                if (deleted == len || len == 0) {
+                    if (!skip) {
+                        intoProcedure.push(AddComments(state.sliceDoc(noderef.from, noderef.to), comments));
+                    }
+                    changes.push({
+                        from: commentsStart !== null && commentsStart !== void 0 ? commentsStart : noderef.from,
+                        to: Math.min(noderef.to + 1, state.doc.toString().length),
+                        insert: '',
+                    });
+                    return false;
+                }
+                // check for misplaced global statements
+                // Move them to the top of the program
+                if (noderef.name == 'Error') {
+                    Log(noderef.name, comments);
                     changes.push({
                         from: commentsStart !== null && commentsStart !== void 0 ? commentsStart : noderef.from,
                         to: noderef.to + 1,
                         insert: '',
                     });
+                    changes.push({
+                        from: 0,
+                        to: 0,
+                        insert: AddComments(state.sliceDoc(noderef.from, noderef.to), comments) + '\n',
+                    });
+                    return false;
                 }
-                else {
-                    changes = changes.concat(temp_changes);
-                }
-            }
-            else if (noderef.name == 'BreedsOwn') {
-                let vars = [];
-                let len = noderef.node.getChildren('Identifier').length;
-                let deleted = 0;
-                let temp_changes = [];
-                noderef.node.getChildren('Identifier').map((child) => {
-                    let value = state.sliceDoc(child.from, child.to);
-                    if (vars.includes(value.toLowerCase()) || reservedVars.includes(value.toLowerCase())) {
-                        temp_changes.push({
-                            from: child.from,
-                            to: child.to,
+                else if (noderef.name == 'Globals') {
+                    let len = noderef.node.getChildren('Identifier').length;
+                    let deleted = 0;
+                    let temp_changes = [];
+                    noderef.node.getChildren('Identifier').map((child) => {
+                        let value = state.sliceDoc(child.from, child.to);
+                        if (globals.includes(value.toLowerCase()) || reservedVars.includes(value.toLowerCase())) {
+                            temp_changes.push({
+                                from: child.from,
+                                to: child.to,
+                                insert: '',
+                            });
+                            deleted += 1;
+                        }
+                        globals.push(value.toLowerCase());
+                    });
+                    if (deleted == len || len == 0) {
+                        changes.push({
+                            from: commentsStart !== null && commentsStart !== void 0 ? commentsStart : noderef.from,
+                            to: noderef.to + 1,
                             insert: '',
                         });
-                        deleted += 1;
                     }
-                    vars.push(value.toLowerCase());
-                });
-                if (deleted == len || len == 0) {
-                    changes.push({
-                        from: commentsStart !== null && commentsStart !== void 0 ? commentsStart : noderef.from,
-                        to: noderef.to + 1,
-                        insert: '',
+                    else {
+                        changes = changes.concat(temp_changes);
+                    }
+                }
+                else if (noderef.name == 'BreedsOwn') {
+                    let vars = [];
+                    let len = noderef.node.getChildren('Identifier').length;
+                    let deleted = 0;
+                    let temp_changes = [];
+                    noderef.node.getChildren('Identifier').map((child) => {
+                        let value = state.sliceDoc(child.from, child.to);
+                        if (vars.includes(value.toLowerCase()) || reservedVars.includes(value.toLowerCase())) {
+                            temp_changes.push({
+                                from: child.from,
+                                to: child.to,
+                                insert: '',
+                            });
+                            deleted += 1;
+                        }
+                        vars.push(value.toLowerCase());
                     });
+                    if (deleted == len || len == 0) {
+                        changes.push({
+                            from: commentsStart !== null && commentsStart !== void 0 ? commentsStart : noderef.from,
+                            to: noderef.to + 1,
+                            insert: '',
+                        });
+                    }
+                    else {
+                        changes = changes.concat(temp_changes);
+                    }
                 }
-                else {
-                    changes = changes.concat(temp_changes);
+                else if (noderef.name == 'Breed') {
+                    let change = FixBreed(noderef.node, state, breeds);
+                    if (change != null) {
+                        changes.push({
+                            from: change.from,
+                            to: change.to,
+                            insert: change.insert,
+                        });
+                    }
+                    let plural = noderef.node.getChild('BreedPlural');
+                    let singular = noderef.node.getChild('BreedSingular');
+                    if (plural && singular) {
+                        breeds.push(state.sliceDoc(plural.from, plural.to).toLowerCase());
+                        breeds.push(state.sliceDoc(singular.from, singular.to).toLowerCase());
+                    }
                 }
-            }
-            else if (noderef.name == 'Breed') {
-                let change = FixBreed(noderef.node, state, breeds);
-                if (change != null) {
-                    changes.push({
-                        from: change.from,
-                        to: change.to,
-                        insert: change.insert,
+                else if (noderef.name == 'Extensions') {
+                    let len = noderef.node.getChildren('Identifier').length;
+                    let deleted = 0;
+                    let temp_changes = [];
+                    noderef.node.getChildren('Identifier').map((child) => {
+                        let value = state.sliceDoc(child.from, child.to);
+                        if (state.doc
+                            .toString()
+                            .toLowerCase()
+                            .includes('(' + value.toLowerCase() + ':') ||
+                            state.doc
+                                .toString()
+                                .toLowerCase()
+                                .includes(' ' + value.toLowerCase() + ':') ||
+                            state.doc
+                                .toString()
+                                .toLowerCase()
+                                .includes('\n' + value.toLowerCase() + ':') ||
+                            extensions.includes(value.toLowerCase())) {
+                            temp_changes.push({
+                                from: child.from,
+                                to: child.to,
+                                insert: '',
+                            });
+                            deleted += 1;
+                        }
+                        extensions.push(value.toLowerCase());
                     });
+                    if (deleted == len || len == 0) {
+                        changes.push({
+                            from: commentsStart !== null && commentsStart !== void 0 ? commentsStart : noderef.from,
+                            to: noderef.to + 1,
+                            insert: '',
+                        });
+                    }
+                    else {
+                        changes = changes.concat(temp_changes);
+                    }
                 }
-                let plural = noderef.node.getChild('BreedPlural');
-                let singular = noderef.node.getChild('BreedSingular');
-                if (plural && singular) {
-                    breeds.push(state.sliceDoc(plural.from, plural.to).toLowerCase());
-                    breeds.push(state.sliceDoc(singular.from, singular.to).toLowerCase());
+                else if (noderef.name == 'SpecialCommand0Args' &&
+                    state.sliceDoc(noderef.from, noderef.to).toLowerCase() == 'setup') {
+                    let procedure = (_c = (_b = noderef.node.parent) === null || _b === void 0 ? void 0 : _b.parent) === null || _c === void 0 ? void 0 : _c.parent;
+                    let name = procedure === null || procedure === void 0 ? void 0 : procedure.getChild('ProcedureName');
+                    if ((procedure === null || procedure === void 0 ? void 0 : procedure.name) == 'Procedure' && state.sliceDoc(name === null || name === void 0 ? void 0 : name.from, name === null || name === void 0 ? void 0 : name.to).toLowerCase() == 'go') {
+                        changes.push({
+                            from: commentsStart !== null && commentsStart !== void 0 ? commentsStart : noderef.from,
+                            to: noderef.to + 1,
+                            insert: '',
+                        });
+                    }
                 }
-            }
-            else if (noderef.name == 'Extensions') {
-                let len = noderef.node.getChildren('Identifier').length;
-                let deleted = 0;
-                let temp_changes = [];
-                noderef.node.getChildren('Identifier').map((child) => {
-                    let value = state.sliceDoc(child.from, child.to);
-                    if (state.doc
-                        .toString()
-                        .toLowerCase()
-                        .includes('(' + value.toLowerCase() + ':') ||
+                if (noderef.name == 'Procedure' && noderef.node.getChildren('ProcedureContent').length == 1) {
+                    let child = (_e = (_d = noderef.node
+                        .getChild('ProcedureContent')) === null || _d === void 0 ? void 0 : _d.getChild('CommandStatement')) === null || _e === void 0 ? void 0 : _e.getChild('SpecialCommand0Args');
+                    if (child &&
                         state.doc
                             .toString()
                             .toLowerCase()
-                            .includes(' ' + value.toLowerCase() + ':') ||
-                        state.doc
-                            .toString()
-                            .toLowerCase()
-                            .includes('\n' + value.toLowerCase() + ':') ||
-                        extensions.includes(value.toLowerCase())) {
-                        temp_changes.push({
-                            from: child.from,
-                            to: child.to,
+                            .includes('to ' + state.sliceDoc(child.from, child.to))) {
+                        changes.push({
+                            from: noderef.from,
+                            to: noderef.to,
                             insert: '',
                         });
-                        deleted += 1;
                     }
-                    extensions.push(value.toLowerCase());
-                });
-                if (deleted == len || len == 0) {
-                    changes.push({
-                        from: commentsStart !== null && commentsStart !== void 0 ? commentsStart : noderef.from,
-                        to: noderef.to + 1,
-                        insert: '',
-                    });
                 }
-                else {
-                    changes = changes.concat(temp_changes);
+                else if (noderef.name == 'Procedure' && noderef.node.getChildren('ProcedureContent').length == 0) {
+                    let child = noderef.node.getChild('ProcedureName');
+                    let name = state.sliceDoc(child === null || child === void 0 ? void 0 : child.from, child === null || child === void 0 ? void 0 : child.to).toLowerCase();
+                    let matches = state.doc.toString().match(new RegExp(name, 'gi'));
+                    if (matches && matches.length == 1) {
+                        changes.push({ from: noderef.from, to: noderef.to, insert: '' });
+                    }
                 }
-            }
-            else if (noderef.name == 'SpecialCommand0Args' &&
-                state.sliceDoc(noderef.from, noderef.to).toLowerCase() == 'setup') {
-                let procedure = (_c = (_b = noderef.node.parent) === null || _b === void 0 ? void 0 : _b.parent) === null || _c === void 0 ? void 0 : _c.parent;
-                let name = procedure === null || procedure === void 0 ? void 0 : procedure.getChild('ProcedureName');
-                if ((procedure === null || procedure === void 0 ? void 0 : procedure.name) == 'Procedure' && state.sliceDoc(name === null || name === void 0 ? void 0 : name.from, name === null || name === void 0 ? void 0 : name.to).toLowerCase() == 'go') {
-                    changes.push({
-                        from: commentsStart !== null && commentsStart !== void 0 ? commentsStart : noderef.from,
-                        to: noderef.to + 1,
-                        insert: '',
-                    });
+                else if (noderef.name == 'ProcedureName') {
+                    let name = state.sliceDoc(noderef.from, noderef.to).toLowerCase();
+                    if (reserved.includes(name)) {
+                        let pieces = name.split('-');
+                        pieces[0] = 'setup';
+                        changes.push({
+                            from: noderef.from,
+                            to: noderef.to,
+                            insert: pieces.join('-'),
+                        });
+                    }
                 }
-            }
-            if (noderef.name == 'Procedure' && noderef.node.getChildren('ProcedureContent').length == 1) {
-                let child = (_e = (_d = noderef.node
-                    .getChild('ProcedureContent')) === null || _d === void 0 ? void 0 : _d.getChild('CommandStatement')) === null || _e === void 0 ? void 0 : _e.getChild('SpecialCommand0Args');
-                if (child &&
-                    state.doc
-                        .toString()
-                        .toLowerCase()
-                        .includes('to ' + state.sliceDoc(child.from, child.to))) {
-                    changes.push({
-                        from: noderef.from,
-                        to: noderef.to,
-                        insert: '',
-                    });
+                // Record the position of the first procedure to know where to add 'play'
+                if (!procedureStart && noderef.name == 'Procedure')
+                    procedureStart = noderef.from;
+                // Record the position of the comments
+                if (noderef.name == 'LineComment') {
+                    // take only the one preceding comment
+                    comments = [state.sliceDoc(noderef.from, noderef.to)];
+                    commentsStart = noderef.from;
+                    // take all immediately preceding comments
+                    // comments.push(state.sliceDoc(noderef.from, noderef.to));
+                    // commentsStart = commentsStart ?? noderef.from;
                 }
-            }
-            else if (noderef.name == 'Procedure' && noderef.node.getChildren('ProcedureContent').length == 0) {
-                let child = noderef.node.getChild('ProcedureName');
-                let name = state.sliceDoc(child === null || child === void 0 ? void 0 : child.from, child === null || child === void 0 ? void 0 : child.to).toLowerCase();
-                let matches = state.doc.toString().match(new RegExp(name, 'gi'));
-                if (matches && matches.length == 1) {
-                    changes.push({ from: noderef.from, to: noderef.to, insert: '' });
+                else if (comments.length > 0 && !commentFrom) {
+                    // Record the position of what comes immediately after the comments
+                    // (this is in case of nesting, so we don't lose the comments)
+                    commentFrom = noderef.from;
                 }
-            }
-            else if (noderef.name == 'ProcedureName') {
-                let name = state.sliceDoc(noderef.from, noderef.to).toLowerCase();
-                if (reserved.includes(name)) {
-                    let pieces = name.split('-');
-                    pieces[0] = 'setup';
-                    changes.push({
-                        from: noderef.from,
-                        to: noderef.to,
-                        insert: pieces.join('-'),
-                    });
+                else if (comments.length > 0 && commentFrom && noderef.from > commentFrom) {
+                    // Discard the comment info when we move on to the next statement
+                    comments = [];
+                    commentFrom = null;
+                    commentsStart = null;
                 }
-            }
-            // Record the position of the first procedure to know where to add 'play'
-            if (!procedureStart && noderef.name == 'Procedure')
-                procedureStart = noderef.from;
-            // Record the position of the comments
-            if (noderef.name == 'LineComment') {
-                // take only the one preceding comment
-                comments = [state.sliceDoc(noderef.from, noderef.to)];
-                commentsStart = noderef.from;
-                // take all immediately preceding comments
-                // comments.push(state.sliceDoc(noderef.from, noderef.to));
-                // commentsStart = commentsStart ?? noderef.from;
-            }
-            else if (comments.length > 0 && !commentFrom) {
-                // Record the position of what comes immediately after the comments
-                // (this is in case of nesting, so we don't lose the comments)
-                commentFrom = noderef.from;
-            }
-            else if (comments.length > 0 && commentFrom && noderef.from > commentFrom) {
-                // Discard the comment info when we move on to the next statement
-                comments = [];
-                commentFrom = null;
-                commentsStart = null;
-            }
-        });
-        // If there are rogue statements, wrap them into a procedure
-        if (intoProcedure.length != 0) {
-            changes.push({
-                from: procedureStart !== null && procedureStart !== void 0 ? procedureStart : state.doc.toString().length,
-                to: procedureStart !== null && procedureStart !== void 0 ? procedureStart : state.doc.toString().length,
-                insert: '\nto play\n' + intoProcedure.join('\n') + '\nend\n\n',
             });
-        }
-        // Log("CHANGES",changes)
-        // Send in the changes
-        Editor.Operations.ChangeCode(changes);
-        // Third pass: re-introduce the snapshot
-        IntegrateSnapshot(Editor, Snapshot);
-        if (Parent)
-            IntegrateSnapshot(Editor, Parent);
-        // Final pass: prettify the code once again
-        Editor.Semantics.PrettifyAll();
-        return Editor.GetCode().trim();
+            // If there are rogue statements, wrap them into a procedure
+            if (intoProcedure.length != 0) {
+                changes.push({
+                    from: procedureStart !== null && procedureStart !== void 0 ? procedureStart : state.doc.toString().length,
+                    to: procedureStart !== null && procedureStart !== void 0 ? procedureStart : state.doc.toString().length,
+                    insert: '\nto play\n' + intoProcedure.join('\n') + '\nend\n\n',
+                });
+            }
+            // Send in the changes
+            Editor.Operations.ChangeCode(changes);
+            // Fourth pass: lint the code and apply the actions
+            let Errors = yield Editor.ForceLintAsync();
+            console.log(Errors);
+            let did_actions = false;
+            Errors.map((error) => {
+                if (error.actions) {
+                    did_actions = true;
+                    error.actions[0].apply(Editor.CodeMirror, error.from, error.to);
+                }
+            });
+            // If there were actions, run the auto-fix again
+            if (did_actions && try_again)
+                yield FixGeneratedCode(Editor, Editor.CodeMirror.state.doc.toString(), Parent, false);
+            // Fifth pass: re-introduce the snapshot
+            IntegrateSnapshot(Editor, Snapshot);
+            if (Parent)
+                IntegrateSnapshot(Editor, Parent);
+            // Final pass: prettify the code once again
+            Editor.Semantics.PrettifyAll();
+            return Editor.GetCode().trim();
+        });
     }
+    /** FixBreed: Fix the breed names. */
     function FixBreed(node, state, breeds) {
         let singular = node.getChild('BreedSingular');
         let plural = node.getChild('BreedPlural');
@@ -33667,7 +35013,9 @@
         }
         /** FixGeneratedCode: Try to fix and prettify a piece of generated code. */
         FixGeneratedCode(Source, Parent) {
-            return FixGeneratedCode(this.Galapagos, Source, Parent);
+            return __awaiter(this, void 0, void 0, function* () {
+                return FixGeneratedCode(this.Galapagos, Source, Parent);
+            });
         }
         // #endregion
         // #region "Linting"
@@ -34134,6 +35482,7 @@
         }
         /** UpdateSharedPreprocess: Update the shared preprocess context of the editor. */
         UpdateSharedPreprocess() {
+            var _a;
             var mainPreprocess = this.PreprocessContext.Clear();
             for (var child of this.GetChildren()) {
                 if (child.Options.ParseMode == ParseMode.Normal || child == this) {
@@ -34151,7 +35500,11 @@
                     for (var [p, vars] of preprocess.BreedVars) {
                         for (var variable of vars) {
                             mainPreprocess.BreedVars.set(variable, child.ID);
-                            mainPreprocess.BreedVarToPlurals.set(variable, p);
+                            let vars = mainPreprocess.BreedVarToPlurals.has(variable)
+                                ? (_a = mainPreprocess.BreedVarToPlurals.get(variable)) !== null && _a !== void 0 ? _a : []
+                                : [];
+                            vars.push(p);
+                            mainPreprocess.BreedVarToPlurals.set(variable, vars);
                         }
                     }
                     for (var [p, num_args] of preprocess.Commands) {
@@ -37442,13 +38795,15 @@
                 // Fix the code
                 var Parent = (_a = this.GetRecord().Context) === null || _a === void 0 ? void 0 : _a.CodeSnippet;
                 var ParentSnapshot = NetLogoUtils.BuildSnapshot(Parent);
-                Section.Content = NetLogoUtils.FixGeneratedCode(Section.Content, ParentSnapshot);
-                this.Code = Section.Content;
-                // Render the code
-                this.ContentContainer = $(`<code></code>`).replaceAll(this.ContentContainer).addClass("enterable");
-                NetLogoUtils.AnnotateCode(this.ContentContainer, this.Code);
-                BindCode.bind(this)(this.ContentContainer);
-                $(`<span></span>`).addClass("placeholder").text(Localized.Get("Code placeholder _", this.Code.split("\n").length)).appendTo(this.ContentContainer);
+                NetLogoUtils.FixGeneratedCode(Section.Content, ParentSnapshot).then(Result => {
+                    Section.Content = Result;
+                    this.Code = Section.Content;
+                    // Render the code
+                    this.ContentContainer = $(`<code></code>`).replaceAll(this.ContentContainer).addClass("enterable");
+                    NetLogoUtils.AnnotateCode(this.ContentContainer, this.Code);
+                    BindCode.bind(this)(this.ContentContainer);
+                    $(`<span></span>`).addClass("placeholder").text(Localized.Get("Code placeholder _", this.Code.split("\n").length)).appendTo(this.ContentContainer);
+                });
             }
             else {
                 this.Code = (_c = (_b = Section.Content) === null || _b === void 0 ? void 0 : _b.trim()) !== null && _c !== void 0 ? _c : "";
@@ -37671,7 +39026,7 @@
                     var Parent = (_b = this.GetRecord().Context) === null || _b === void 0 ? void 0 : _b.CodeSnippet;
                     var ParentSnapshot = NetLogoUtils.BuildSnapshot(Parent);
                     for (var Multiline of Multilines) {
-                        $(Multiline).text(NetLogoUtils.FixGeneratedCode($(Multiline).text(), ParentSnapshot));
+                        FixMultiline($(Multiline));
                     }
                     if (Multilines.length === 1)
                         Multilines.addClass("enterable");
@@ -37685,6 +39040,12 @@
             // Remove the section if it's empty
             if (Content == "" && ((_d = (_c = Section.Options) === null || _c === void 0 ? void 0 : _c.length) !== null && _d !== void 0 ? _d : 0) == 0 && this.Finalized)
                 this.Container.remove();
+            // Fix a multiline code block
+            function FixMultiline(Current) {
+                NetLogoUtils.FixGeneratedCode(Current.text(), ParentSnapshot).then(Result => {
+                    Current.text(Result);
+                });
+            }
         }
     }
 
@@ -38460,7 +39821,7 @@
                     this.ExecuteInput(Objective, Content, Temporary);
                 };
                 // Check if it is a command
-                if (!Chatable || Objective != "chat" && !/^[\d\.]+$/.test(Content)) {
+                if (!Chatable || Objective != "chat" || /^[\d\.]+$/.test(Content)) {
                     // Parse the code
                     this.Galapagos.ForceParse();
                     let Diagnostics = yield this.Galapagos.ForceLintAsync();
@@ -38823,7 +40184,11 @@
             Features[Localized.Get("Undo")] = () => this.Galapagos.Editing.Undo();
             Features[Localized.Get("Redo")] = () => this.Galapagos.Editing.Redo();
             Features[Localized.Get("JumpToLine")] = () => this.Galapagos.Editing.ShowJumpTo();
-            Features[Localized.Get("Prettify")] = () => this.Galapagos.Semantics.PrettifyOrAll();
+            Features[Localized.Get("Prettify")] = () => {
+                // var Before = this.Galapagos.GetCode();
+                this.Galapagos.Semantics.PrettifyOrAll();
+                // this.Galapagos.Selection.HighlightChanges(Before);
+            };
             Features[Localized.Get("ResetCode")] = () => this.ResetCode();
             for (var Feature in Features) {
                 $(`<li>${Feature}</li>`).attr("Tag", Feature).appendTo(List).click(function () {
@@ -38842,15 +40207,15 @@
             else {
                 var Dialog = $("#Dialog-Procedures");
                 var List = Dialog.children("ul").empty();
+                var Galapagos = this.Galapagos;
                 Dialog.children("h4").text(Localized.Get("JumpToProcedure"));
-                var Handler = () => {
-                    this.Galapagos.Selection.Select(parseInt($(this).attr("start")), parseInt($(this).attr("end")));
-                    $.modal.close();
-                };
                 for (var Procedure in Procedures) {
                     $(`<li>${Procedure}</li>`).appendTo(List)
                         .attr("start", Procedures[Procedure][0])
-                        .attr("end", Procedures[Procedure][1]).click(Handler);
+                        .attr("end", Procedures[Procedure][1]).on("click", function () {
+                        Galapagos.Selection.Select(parseInt($(this).attr("start")), parseInt($(this).attr("end")));
+                        $.modal.close();
+                    });
                 }
                 Dialog.modal({});
             }

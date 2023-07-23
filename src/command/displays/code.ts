@@ -208,7 +208,8 @@ export class CodeDisplay extends Display {
 			Diagnostics: NetLogoUtils.GetUniqueDiagnostics(Diagnostics.map(Diagnostic => {
 				return {
 					Message: NetLogoUtils.PostprocessLintMessage(Diagnostic.message),
-					Code: this.Editor.GetCodeSlice(Diagnostic.from, Diagnostic.to)
+					Code: this.Editor.GetCodeSlice(Diagnostic.from, Diagnostic.to),
+					Action: () => Diagnostic.actions?.[0].apply(this.Editor.CodeMirror, Diagnostic.from, Diagnostic.to)
 				};
 			}))
 		};

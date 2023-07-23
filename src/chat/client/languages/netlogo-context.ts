@@ -68,4 +68,6 @@ export interface Diagnostic {
     Message: string;
     /** Code: The code of the diagnostic. */
     Code: string;
+    /** Action: The action to take. */
+    Action?: () => void;
 }

@@ -11,6 +11,7 @@ import { GalapagosEditor } from "../../../CodeMirror-NetLogo/src/editor";
 import { Procedure } from "../chat/client/languages/netlogo-context";
 import { RuntimeError } from "../../../CodeMirror-NetLogo/src/lang/linters/runtime-linter";
 import { Diagnostic } from "../chat/client/languages/netlogo-context";
+import { LintContext } from "../../../CodeMirror-NetLogo/src/lang/classes/contexts";
 /** CommandTab: A tab for the command center. */
 export declare class CommandTab extends Tab {
     Disabled: boolean;
@@ -91,7 +92,7 @@ export declare class CommandTab extends Tab {
     /** TemporaryCode: The temporary code snippet that is in-use. */
     private TemporaryCode?;
     /** RecompileTemporarily Recompile the code snippet temporarily. */
-    RecompileTemporarily(Code: string, Procedures: string[], Callback: () => void): void;
+    RecompileTemporarily(Code: string, Context: LintContext, Callback: () => void): void;
     /** PlayCompiled: The callback after the code to play is compiled. */
     PlayCompiled(Succeeded: boolean, Errors?: RuntimeError[]): void;
 }

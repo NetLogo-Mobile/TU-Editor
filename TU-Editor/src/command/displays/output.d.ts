@@ -45,10 +45,12 @@ export declare class OutputDisplay extends Display {
     RestartBatch(): void;
     /** QueueResponse: Quere a response section */
     QueueResponse(Section: ChatResponseSection): void;
+    /** LastExecution: The last command execution. */
+    LastExecution: (() => void) | null;
     /** PrintCommandInput: Print a line of input to the screen. */
     PrintCommandInput(Content: string, Restart?: boolean): ChatRecord;
     /** FinishExecution: Notify the completion of the command. */
-    FinishExecution(Status: string, Code: string, Message: string | RuntimeError[]): void;
+    FinishExecution(Status: string, Code: string, Message: string | RuntimeError[], External?: boolean): void;
     /** PrintOutput: Provide for Unity to print compiled output. */
     PrintOutput(Class: string, Content: any): void;
     /** ShowWelcome: Show the initial welcome message. */

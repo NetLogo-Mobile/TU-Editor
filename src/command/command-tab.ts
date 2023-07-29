@@ -15,6 +15,8 @@ import { ChangeTopic } from "../chat/client/options/option-templates";
 import { NetLogoUtils } from "../utils/netlogo";
 import { Diagnostic } from "../chat/client/languages/netlogo-context";
 import { Toast } from "../utils/dialog";
+import { LintContext } from "../../../CodeMirror-NetLogo/src/lang/classes/contexts";
+import { BreedType } from "../../../CodeMirror-NetLogo/src/lang/classes/structures";
 
 declare const { bodyScrollLock, EditorDictionary }: any;
 
@@ -188,11 +190,6 @@ export class CommandTab extends Tab {
 			this.Reset();
 			return;
 		}
-		// Execute
-		var Execute = (Objective: string, Content: string, Temporary: boolean) => {
-			this.SetDisabled(true);
-			this.ExecuteInput(Objective, Content, Temporary);
-		};
 		// Check if it is a command
 		if (!Chatable || Objective != "chat" || /^[\d\.]+$/.test(Content)) {
 			// Parse the code
@@ -206,16 +203,16 @@ export class CommandTab extends Tab {
 				if (Mode == "Reporter" || Mode == "Unknown") Content = `show ${Content}`;
 				// Try to compile first, if it is in a temporary context
 				if (Temporary) {
-					this.Codes.Play(() => Execute(Objective, Content, Temporary));
+					this.Codes.Play(() => this.ExecuteInput(Objective, Content, Temporary));
 				} else {
-					Execute(Objective, Content, false);
+					this.ExecuteInput(Objective, Content, false);
 				}
 				return;
 			}
 		}
 		// Help pseudo-command
 		if (LowerContent.startsWith("help") && LowerContent.split(" ").length <= 3) {
-			Execute(Objective, Content, false);
+			this.ExecuteInput(Objective, Content, false);
 			return;
 		}
 		// Otherwise, assume it is a chat message
@@ -309,6 +306,7 @@ export class CommandTab extends Tab {
 	}
 	/** ExecuteCommand: Execute a command. */
 	public ExecuteCommand(Objective: string, Content: string, IsTemporary: boolean, Restart: boolean = false) {
+		this.SetDisabled(true);
 		// Transform command
 		switch (Objective.toLowerCase()) {
 			case "turtles":
@@ -324,12 +322,13 @@ export class CommandTab extends Tab {
 				Content = `help ${Content}`;
 		}
 		// Execute command
-		TurtleEditor.Call({ Type: "CommandExecute", Source: Objective, Command: Content, IsTemporary: IsTemporary });
 		var Record = this.Outputs.PrintCommandInput(Content, Restart);
 		Record.Context = Record.Context ?? { PreviousMessages: [] };
 		Record.Context.CodeSnippet = Content;
 		Record.Operation = "Execute";
 		this.Outputs.ScrollToBottom();
+		this.Outputs.LastExecution = () => this.ExecuteCommand(Objective, Content, IsTemporary, false);
+		TurtleEditor.Call({ Type: "CommandExecute", Source: Objective, Command: Content, IsTemporary: IsTemporary });
 		// Check if we really could execute
 		this.CheckExecution();
 	}
@@ -387,13 +386,24 @@ export class CommandTab extends Tab {
 	/** TemporaryCode: The temporary code snippet that is in-use. */
 	private TemporaryCode?: string;
 	/** RecompileTemporarily Recompile the code snippet temporarily. */
-	public RecompileTemporarily(Code: string, Procedures: string[], Callback: () => void) {
+	public RecompileTemporarily(Code: string, Context: LintContext, Callback: () => void) {
 		if (this.Disabled) return;
 		this.SetDisabled(true);
 		this.RecompileCallback = Callback;
 		// If the code is not the same, recompile it
 		if (this.TemporaryCode != Code) {
-			TurtleEditor.Call({ Type: "RecompileTemporarily", Code: Code, Procedures: Procedures });
+			TurtleEditor.Call({ Type: "RecompileTemporarily", Code: Code, Context: JSON.stringify({
+				Procedures: [...Context.Procedures.keys()],
+				Breeds: [...Context.Breeds.values()].map(Breed => {
+					return {
+						name: Breed.Plural,
+						singular: Breed.Singular,
+						varNames: Breed.Variables,
+						isDirected: Breed.BreedType == BreedType.Turtle ? undefined : Breed.BreedType == BreedType.DirectedLink ? true : false
+					};
+				}),
+				Extensions: [...Context.Extensions.keys()],
+			}) });
 			this.TemporaryCode = Code;
 		} else {
 			// Otherwise, just play it

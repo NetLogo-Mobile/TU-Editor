@@ -165,14 +165,17 @@ export class OutputDisplay extends Display {
 			this.Sections.push(Section);
 		else this.RenderResponses([Section], false);
 	}
+	/** LastExecution: The last command execution. */
+	public LastExecution: (() => void) | null = null;
 	/** PrintCommandInput: Print a line of input to the screen. */
 	public PrintCommandInput(Content: string, Restart: boolean = true): ChatRecord {
 		var Parent = this.Tab.ChatManager.GetPendingParent()
 		if (!Parent && Restart && !this.Subthread?.GetData().RootID) this.ActivateSubthread();
+		this.LastExecution = () => this.Tab.ExecuteCommand("observer", Content, false, false);
 		return this.RenderRequest(`\`\`\`\n${Content.replace("`", "\`")}\n\`\`\``, Parent).GetData();
 	}
 	/** FinishExecution: Notify the completion of the command. */
-	public FinishExecution(Status: string, Code: string, Message: string | RuntimeError[]) {
+	public FinishExecution(Status: string, Code: string, Message: string | RuntimeError[], External: boolean = false) {
 		if (Array.isArray(Message) && Message.length > 0 && Message[0].code) {
 			var Diagnostics = NetLogoUtils.ErrorsToDiagnostics(Message as RuntimeError[]);
 			this.RenderResponses([{
@@ -190,6 +193,13 @@ export class OutputDisplay extends Display {
 		} else {
 			this.PrintOutput(Status, Message);
 			this.RestartBatch();
+			if (this.LastExecution !== null) {
+				this.RenderOption({
+					Label: Localized.Get("Execute again"),
+					Style: "enter",
+					Callback: this.LastExecution
+				});
+			}
 			if (Status !== "Help" && ChatManager.Available) {
 				this.RenderOptions([ FollowUp() ]);
 				this.RenderOptions([ ExplainCode() ]);
@@ -202,6 +212,7 @@ export class OutputDisplay extends Display {
 			}
 		}
 		this.Tab.SetDisabled(false);
+		this.LastExecution = null;
 	}
 	/** PrintOutput: Provide for Unity to print compiled output. */ 
 	public PrintOutput(Class: string, Content: any) {
@@ -221,7 +232,8 @@ export class OutputDisplay extends Display {
 			case "Succeeded":
 				this.QueueResponse({
 					Type: ChatResponseType.Finish,
-					Content: Localized.Get("Successfully executed")
+					Content: Localized.Get("Successfully executed"),
+					Parsed: External
 				});
 				break;
 			case "Output":

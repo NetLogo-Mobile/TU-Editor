@@ -248,7 +248,6 @@ export class CodeDisplay extends Display {
 			// ExecuteCommand: Execute the command.
 			var ExecuteCommand = (Code: string) => {
 				Record.Container.hide();
-				this.Tab.SetDisabled(true);
 				this.Tab.ExecuteCommand("observer", Code, true);
 			}
 			// If it is a command or reporter, simply run it
@@ -261,26 +260,24 @@ export class CodeDisplay extends Display {
 					break;
 				default:
 					var State = this.Editor.GetState();
-					// Names of procedures
-					var Procedures: string[] = [];
+					// Find the first procedure
 					var FirstProcedure: Procedure | null = null;
 					for (var [Name, Procedure] of State.Procedures) {
 						FirstProcedure = FirstProcedure ?? Procedure;
-						Procedures.push(Name);
 					}
 					// Immediate execution
-					if (Procedures.length === 1 && FirstProcedure?.Arguments.length == 0) {
+					if (State.Procedures.size === 1 && FirstProcedure?.Arguments.length == 0) {
 						if (FirstProcedure.IsCommand) {
-							this.Tab.RecompileTemporarily(Code, Procedures, () => {
+							this.Tab.RecompileTemporarily(Code, this.Editor.LintContext, () => {
 								ExecuteCommand(FirstProcedure!.Name);
 							});
 						} else {
-							this.Tab.RecompileTemporarily(Code, Procedures, () => {
+							this.Tab.RecompileTemporarily(Code, this.Editor.LintContext, () => {
 								ExecuteCommand(`show ${FirstProcedure!.Name}`);
 							});
 						}
 					} else {
-						this.Tab.RecompileTemporarily(Code, Procedures, () => this.PlayProcedures());
+						this.Tab.RecompileTemporarily(Code, this.Editor.LintContext, () => this.PlayProcedures());
 					}
 					break;
 			}

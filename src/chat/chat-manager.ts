@@ -29,6 +29,7 @@ export class ChatManager {
         this.PendingRequest = this.PendingRequest ?? { Input: "" };
         this.PendingRequest.Input = Content.trim();
         this.PendingRequest.FriendlyInput = Friendly;
+        this.PendingRequest.Language = this.Thread.Language;
         // Clarify the pending request
         var Context = this.PendingRequest.Context ?? { };
         this.PendingRequest.Context = Context

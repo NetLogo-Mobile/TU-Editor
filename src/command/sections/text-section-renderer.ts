@@ -42,27 +42,34 @@ export class TextSectionRenderer extends SectionRenderer {
             var Multilines = Codes.filter((_, Element) => 
                 Element.parentElement?.childNodes.length === 1 && $(Element).text().indexOf("\n") !== -1);
             // Fix the multi-line code
+            var Promises = [];
             if (Multilines.length > 0) {
                 var Parent = this.GetRecord().Context?.CodeSnippet;
                 var ParentSnapshot = NetLogoUtils.BuildSnapshot(Parent);
                 for (var Multiline of Multilines) {
-                    FixMultiline($(Multiline));
+                    Promises.push(FixMultiline($(Multiline)));
                 }
                 if (Multilines.length === 1) Multilines.addClass("enterable");
             }
-            // Actions for the code snippets
-            Codes.filter(":not(.enterable)").addClass("copyable").on("click", function() { CopyCode($(this).data("code")!); });
             // Annotate the code snippets
-            NetLogoUtils.AnnotateCodes(Codes);
-            BindCode.bind(this)(Codes);
+            var Annotate = () => {
+                // Actions for the code snippets
+                Codes.filter(":not(.enterable)").addClass("copyable").on("click", function() { CopyCode($(this).data("code")!); });
+                // Annotate the code snippets
+                NetLogoUtils.AnnotateCodes(Codes);
+                BindCode.bind(this)(Codes);
+            }
+            if (Promises.length === 0) Annotate();
+            else Promise.all(Promises).then(() => { Annotate(); });
         }
         // Remove the section if it's empty
         if (Content == "" && (Section.Options?.length ?? 0) == 0 && this.Finalized)
             this.Container.remove();
         // Fix a multiline code block
-        function FixMultiline(Current: JQuery<HTMLElement>) {
-            NetLogoUtils.FixGeneratedCode(Current.text(), ParentSnapshot).then(Result => {
+        function FixMultiline(Current: JQuery<HTMLElement>): Promise<string> {
+            return NetLogoUtils.FixGeneratedCode(Current.text(), ParentSnapshot).then(Result => {
                 Current.text(Result);
+                return Result;
             });
         }
     }

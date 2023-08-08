@@ -345,12 +345,16 @@
 	list-style-type: none;
 }
 
-.command-output.code-enabled ul.options li.editor {
+.command-output ul.options li.editor-only {
 	display: none;
 }
 
-.command-output:not(.code-enabled) ul.options li.editor-only {
-	display: none;
+.command-output.code-enabled ul.options li.editor {
+	display: none !important;
+}
+
+.command-output.code-enabled ul.options li.editor-only {
+	display: block !important;
 }
 
 .command-output ul.options li:before {

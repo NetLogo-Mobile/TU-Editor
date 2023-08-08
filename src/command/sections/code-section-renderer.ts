@@ -57,7 +57,9 @@ export function BindCode(this: SectionRenderer, Container: JQuery<HTMLElement>):
         if (!Section.Edited) Section.Edited = $(Element).children("span:eq(0)").get(0)?.innerText?.trim();
     }).on("click", Enter).length == 0) return Container;
     // Pseudo option
-    if (Parent.GetData().Response.Options.findIndex(Option => Option.Style == "editor") === -1)
+    if (Parent.GetData().Response.Options.findIndex(Option => Option.Style == "editor") === -1) {
         this.ShowPseudoOption(EnterCode(), (Option) => Enter());
+        this.Parent!.Render();
+    }
     return Container;
 }

@@ -284,7 +284,7 @@ export class CommandTab extends Tab {
 		if (!this.Visible) this.Show();
 		this.ChatManager.SendRequest({
 			Input: JSON.stringify(Diagnostic),
-			FriendlyInput: Localized.Get("Can you explain the error message?"),
+			FriendlyInput: Localized.Get("Can you explain the error?"),
 			Operation: "CodeExplain", 
 			SubOperation: "CompileError",
 			ThreadID: NewThread ? undefined : this.Outputs.Subthread?.GetData()?.RootID,

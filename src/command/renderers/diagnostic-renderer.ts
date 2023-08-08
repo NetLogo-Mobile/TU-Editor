@@ -36,7 +36,8 @@ export class DiagnosticsRenderer extends JSONSectionRenderer<Diagnostics> {
         }
         // Show the options
         if (!ChatManager.Available) return;
-        this.ShowPseudoOption(ExplainErrors(Metadata.Type), (Option) => this.SubmitDiagnostics(Option, false));
+        this.ShowPseudoOption(ExplainErrors(Metadata.Type), 
+            (Option) => this.SubmitDiagnostics(Option, false));
     }
     /** SubmitDiagnostics: Submit the diagnostics to the server. */
     private SubmitDiagnostics(Option: ChatResponseOption, Fixing: boolean): void {

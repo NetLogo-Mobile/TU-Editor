@@ -7350,6 +7350,28 @@
                 off = start;
             }
         }
+        coordsForChar(pos) {
+            let { i, off } = this.childPos(pos, 1), child = this.children[i];
+            if (!(child instanceof LineView))
+                return null;
+            while (child.children.length) {
+                let { i, off: childOff } = child.childPos(off, 1);
+                for (;; i++) {
+                    if (i == child.children.length)
+                        return null;
+                    if ((child = child.children[i]).length)
+                        break;
+                }
+                off = childOff;
+            }
+            if (!(child instanceof TextView))
+                return null;
+            let end = findClusterBreak(child.text, off);
+            if (end == off)
+                return null;
+            let rects = textRange(child.dom, off, end).getClientRects();
+            return !rects.length || rects[0].top >= rects[0].bottom ? null : rects[0];
+        }
         measureVisibleLineHeights(viewport) {
             let result = [], { from, to } = viewport;
             let contentWidth = this.view.contentDOM.clientWidth;
@@ -10221,7 +10243,7 @@
             display: "flex",
             height: "100%",
             boxSizing: "border-box",
-            left: 0,
+            insetInlineStart: 0,
             zIndex: 200
         },
         "&light .cm-gutters": {
@@ -11683,6 +11705,17 @@
             let line = this.state.doc.lineAt(pos), order = this.bidiSpans(line);
             let span = order[BidiSpan.find(order, pos - line.from, -1, side)];
             return flattenRect(rect, (span.dir == Direction.LTR) == (side > 0));
+        }
+        /**
+        Return the rectangle around a given character. If `pos` does not
+        point in front of a character that is in the viewport and
+        rendered (i.e. not replaced, not a line break), this will return
+        null. For space characters that are a line wrap point, this will
+        return the position before the line break.
+        */
+        coordsForChar(pos) {
+            this.readMeasured();
+            return this.docView.coordsForChar(pos);
         }
         /**
         The default width of a character in the editor. May not
@@ -25214,7 +25247,7 @@
                     Declaration: /*@__PURE__*/continuedIndent()
                 }),
                 /*@__PURE__*/foldNodeProp.add({
-                    Block: foldInside
+                    "Block KeyframeList": foldInside
                 })
             ]
         }),
@@ -26463,6 +26496,7 @@
         'Arguments needed for execution _': (Name, Arguments) => `The "${Name}" procedure needs ${Arguments > 1 ? '' : 'an '}argument${Arguments > 1 ? 's' : ''} to run. Please provide ${Arguments > 1 ? 'them' : 'it'}.`,
         'Please download Turtle Universe': () => `The feature is unavailable in Web Preview. Please download [Turtle Universe](https://www.turtlesim.com/products/turtle-universe/) to continue.`,
         'Failed to retrieve knowledge': () => `Sorry, we did not find the specific knowledge.`,
+        'Execute again': () => 'Execute the code **again**',
         // Options
         'Help me fix this code': () => `Help me fix this code`,
         'Explain the error': () => `Explain the error`,
@@ -26631,6 +26665,7 @@
         'Arguments needed for execution _': (Name, Arguments) => `在执行 \`${Name}\` 之前，需要知道它的参数。`,
         'Please download Turtle Universe': () => `功能在网页模式下不可用。请下载[海龟实验室](https://www.turtlesim.com/products/turtle-universe/index-cn.html)以获得更好的体验。`,
         'Failed to retrieve knowledge': () => `抱歉，未能找到相应知识。`,
+        'Execute again': () => '**再次执行**这段代码',
         // Options
         'Help me fix this code': () => `试试 AI 自动修复代码`,
         'Explain the error': () => `让 AI 解释错误信息`,
@@ -27305,9 +27340,46 @@
             }
             return null;
         }
+        checkCodeBlocks(varName, blocks, proc_name, from, to) {
+            for (let b of blocks) {
+                // console.log(b)
+                if (b.PositionEnd < from || b.PositionStart > to)
+                    continue;
+                for (let localVar of b.Variables) {
+                    // console.log(localVar.Name,varName,localVar.CreationPos,to)
+                    if (localVar.Name == varName && localVar.CreationPos <= to)
+                        return proc_name;
+                }
+                // console.log("didn't find")
+                let other = this.checkCodeBlocks(varName, b.CodeBlocks, proc_name, from, to);
+                if (other != null) {
+                    return other;
+                }
+                let anon = this.checkAnonProc(varName, b.AnonymousProcedures, proc_name, from, to);
+                if (anon != null) {
+                    return anon;
+                }
+            }
+            return null;
+        }
+        checkAnonProc(varName, anon, proc_name, from, to) {
+            for (let anonProc of anon) {
+                if (anonProc.PositionEnd < from || anonProc.PositionStart > to)
+                    continue;
+                if (anonProc.Arguments.includes(varName))
+                    return '{anonymous},' + proc_name;
+                for (let localVar of anonProc.Variables) {
+                    if (localVar.Name == varName && localVar.CreationPos <= to)
+                        return '{anonymous},' + proc_name;
+                }
+            }
+            return null;
+        }
         /** GetProcedureFromVariable: Find the procedure that defines a certain variable. */
         GetProcedureFromVariable(varName, from, to) {
+            // console.log(from,to,"'"+varName+"'")
             for (let proc of this.Procedures.values()) {
+                // console.log(proc)
                 if (proc.PositionEnd < from || proc.PositionStart > to)
                     continue;
                 // Check the argument list in a procedure
@@ -27319,15 +27391,15 @@
                         return proc.Name;
                 }
                 // Check the anonymous arguments in a procedure
-                for (let anonProc of proc.AnonymousProcedures) {
-                    if (anonProc.PositionEnd > from || anonProc.PositionStart < to)
-                        continue;
-                    if (anonProc.Arguments.includes(varName))
-                        return '{anonymous},' + proc.Name;
-                    for (let localVar of anonProc.Variables) {
-                        if (localVar.Name == varName && localVar.CreationPos <= to)
-                            return '{anonymous},' + proc.Name;
-                    }
+                let anon = this.checkAnonProc(varName, proc.AnonymousProcedures, proc.Name, from, to);
+                // console.log(anon)
+                if (anon != null) {
+                    return anon;
+                }
+                let other = this.checkCodeBlocks(varName, proc.CodeBlocks, proc.Name, from, to);
+                // console.log(other)
+                if (other != null) {
+                    return other;
                 }
             }
             return null;
@@ -27427,6 +27499,9 @@
             Tag: Own,
             Type: undefined,
             Position: 0,
+            String: ['<breed>-own'],
+            Context: new AgentContexts('O---'),
+            isCommand: false,
         },
         {
             Match: /^(.*?)-(at)$/,
@@ -27434,6 +27509,9 @@
             Tag: SpecialReporter2ArgsTurtle,
             Type: BreedType$1.Turtle,
             Position: 0,
+            String: ['<breed>-at'],
+            Context: new AgentContexts('-TPL'),
+            isCommand: false,
         },
         {
             Match: /^(.*?)-(here)$/,
@@ -27441,6 +27519,9 @@
             Tag: SpecialReporter0ArgsTurtle,
             Type: BreedType$1.Turtle,
             Position: 0,
+            String: ['<breed>-here'],
+            Context: new AgentContexts('-TP-'),
+            isCommand: false,
         },
         {
             Match: /^(.*?)-(on)$/,
@@ -27448,6 +27529,9 @@
             Tag: SpecialReporter1ArgsTurtle,
             Type: BreedType$1.Turtle,
             Position: 0,
+            String: ['<breed>-on'],
+            Context: new AgentContexts('OTPL'),
+            isCommand: false,
         },
         {
             Match: /^(in)-(.*?)-(from)$/,
@@ -27455,6 +27539,9 @@
             Tag: SpecialReporter1ArgsLink,
             Type: BreedType$1.UndirectedLink,
             Position: 1,
+            String: ['in-<breed>-from'],
+            Context: new AgentContexts('-T--'),
+            isCommand: false,
         },
         {
             Match: /^(out)-(.*?)-(to)$/,
@@ -27462,6 +27549,9 @@
             Tag: SpecialReporter1ArgsLink,
             Type: BreedType$1.UndirectedLink,
             Position: 1,
+            String: ['out-<breed>-to'],
+            Context: new AgentContexts('-T--'),
+            isCommand: false,
         },
         {
             Match: /^(out|in)-(.*?)-(neighbor\?)$/,
@@ -27469,6 +27559,9 @@
             Tag: SpecialReporter1ArgsLink,
             Type: BreedType$1.UndirectedLink,
             Position: 1,
+            String: ['out-<breed>-neighbor?', 'in-<breed>-neighbor?'],
+            Context: new AgentContexts('-T--'),
+            isCommand: false,
         },
         {
             Match: /^(out|in)-(.*?)-(neighbors)$/,
@@ -27476,6 +27569,9 @@
             Tag: SpecialReporter0ArgsLink,
             Type: BreedType$1.UndirectedLink,
             Position: 1,
+            String: ['out-<breed>-neighbors', 'in-<breed>-neighbors'],
+            Context: new AgentContexts('-T--'),
+            isCommand: false,
         },
         {
             Match: /^(my-in|my-out|my)-(.*?)$/,
@@ -27483,6 +27579,9 @@
             Tag: SpecialReporter0ArgsLinkP,
             Type: BreedType$1.UndirectedLink,
             Position: 1,
+            String: ['my-out-<breed>', 'my-in-<breed>', 'my-<breed>'],
+            Context: new AgentContexts('-T--'),
+            isCommand: false,
         },
         {
             Match: /^(is)-(.*?)\?$/,
@@ -27490,6 +27589,9 @@
             Tag: SpecialReporter1ArgsBoth,
             Type: undefined,
             Position: 1,
+            String: ['is-<breed>?'],
+            Context: new AgentContexts('OTPL'),
+            isCommand: false,
         },
         {
             Match: /^(create)-(.*?)-(to|from|with)$/,
@@ -27497,6 +27599,9 @@
             Tag: SpecialCommandCreateLink,
             Type: BreedType$1.UndirectedLink,
             Position: 1,
+            String: ['create-<breed>-to', 'create-<breed>-with', 'create-<breed>-from'],
+            Context: new AgentContexts('-T--'),
+            isCommand: true,
         },
         {
             Match: /^(.*?)-(with|neighbor\?)$/,
@@ -27504,6 +27609,9 @@
             Tag: SpecialReporter1ArgsLink,
             Type: BreedType$1.UndirectedLink,
             Position: 0,
+            String: ['<breed>-with', '<breed>-neighbor?'],
+            Context: new AgentContexts('-T--'),
+            isCommand: false,
         },
         {
             Match: /^(.*?)-(neighbors)$/,
@@ -27511,17 +27619,44 @@
             Tag: SpecialReporter0ArgsLink,
             Type: BreedType$1.UndirectedLink,
             Position: 0,
+            String: ['<breed>-neighbors'],
+            Context: new AgentContexts('-T--'),
+            isCommand: false,
         },
         {
-            Match: /^(hatch|sprout|create-ordered|create)-(.*?)$/,
+            Match: /^(create-ordered|create)-(.*?)$/,
             Singular: false,
             Tag: SpecialCommandCreateTurtle,
             Type: BreedType$1.Turtle,
             Position: 1,
+            String: ['create-ordered-<breed>', 'create-<breed>'],
+            Context: new AgentContexts('O---'),
+            isCommand: true,
+        },
+        {
+            Match: /^(hatch)-(.*?)$/,
+            Singular: false,
+            Tag: SpecialCommandCreateTurtle,
+            Type: BreedType$1.Turtle,
+            Position: 1,
+            String: ['hatch-<breed>'],
+            Context: new AgentContexts('-T--'),
+            isCommand: true,
+        },
+        {
+            Match: /^(sprout)-(.*?)$/,
+            Singular: false,
+            Tag: SpecialCommandCreateTurtle,
+            Type: BreedType$1.Turtle,
+            Position: 1,
+            String: ['sprout-<breed>'],
+            Context: new AgentContexts('--P-'),
+            isCommand: true,
         },
     ];
     /** MatchBreed: Check if the token is a breed reporter/command/variable. */
     function MatchBreed(token, context, guessing = false) {
+        token = token.toLowerCase();
         // Check breed variables
         if (!guessing) {
             let breedVars = context.BreedVars;
@@ -27595,6 +27730,7 @@
                     Tag: rule.Tag,
                     Plural: plural,
                     Singular: singular,
+                    Context: rule.Context,
                     Type: type,
                     Valid: valid,
                     Prototype: match.slice(1).join('-'),
@@ -27949,31 +28085,23 @@
         }
         /** combineContext: Identify context of a block by combining with the previous context. */
         combineContext(node, state, priorContext, newContext) {
-            var _a, _b, _c, _d;
+            var _a, _b;
             let cursor = node.cursor();
             let child = cursor.firstChild();
             while (child) {
+                let context = undefined;
+                let name = undefined;
                 if ((cursor.node.name.includes('Command') || cursor.node.name.includes('Reporter')) &&
                     !cursor.node.name.includes('Commands') &&
                     !cursor.node.name.includes('Reporters') &&
                     !cursor.node.name.includes('Special')) {
-                    let name = getCodeName(state, cursor.node);
-                    let context = this.getPrimitiveContext(state, cursor.node, name);
-                    if (context) {
-                        newContext = combineContexts(context, priorContext);
-                        if (!noContext(newContext)) {
-                            priorContext = newContext;
-                        }
-                        else {
-                            this.ContextErrors.push(new ContextError(cursor.node.from, cursor.node.to, priorContext, context, name));
-                        }
-                    }
+                    name = getCodeName(state, cursor.node);
+                    context = this.getPrimitiveContext(state, cursor.node, name);
                 }
                 else if (cursor.node.name == 'VariableDeclaration') {
                     let n = (_a = cursor.node.getChild('SetVariable')) === null || _a === void 0 ? void 0 : _a.getChild('VariableName');
                     if (n) {
-                        let context = new AgentContexts();
-                        let name = getCodeName(state, n);
+                        name = getCodeName(state, n);
                         if (['shape', 'breed', 'hidden?', 'label', 'label-color', 'color'].includes(name)) {
                             context = new AgentContexts('-T-L');
                         }
@@ -27987,31 +28115,29 @@
                             context = new AgentContexts('---L');
                         }
                         else {
-                            context = (_b = this.Preprocess.GetBreedVariableContexts(name)) !== null && _b !== void 0 ? _b : context;
-                        }
-                        newContext = combineContexts(context, priorContext);
-                        if (!noContext(newContext)) {
-                            priorContext = newContext;
-                        }
-                        else {
-                            this.ContextErrors.push(new ContextError(cursor.node.from, cursor.node.to, priorContext, context, name));
+                            context = this.Preprocess.GetBreedVariableContexts(name);
                         }
                     }
                 }
-                else if (cursor.node.name.includes('Special') &&
-                    !cursor.node.name.includes('Both') &&
-                    !cursor.node.name.includes('Turtle') &&
-                    !cursor.node.name.includes('Link')) {
-                    let name = getCodeName(state, cursor.node);
-                    let context = (_d = (_c = this.Procedures.get(name)) === null || _c === void 0 ? void 0 : _c.Context) !== null && _d !== void 0 ? _d : null;
-                    if (context) {
-                        newContext = combineContexts(context, priorContext);
-                        if (!noContext(newContext)) {
-                            priorContext = newContext;
-                        }
-                        else {
-                            this.ContextErrors.push(new ContextError(cursor.node.from, cursor.node.to, priorContext, context, name));
-                        }
+                else if (cursor.node.name.includes('Special')) {
+                    name = getCodeName(state, cursor.node);
+                    if (!cursor.node.name.includes('Both') &&
+                        !cursor.node.name.includes('Turtle') &&
+                        !cursor.node.name.includes('Link')) {
+                        context = (_b = this.Procedures.get(name)) === null || _b === void 0 ? void 0 : _b.Context;
+                    }
+                    else {
+                        context = MatchBreed(name, this.Preprocess).Context;
+                    }
+                }
+                // Combine and check the context
+                if (context) {
+                    newContext = combineContexts(context, priorContext);
+                    if (!noContext(newContext)) {
+                        priorContext = newContext;
+                    }
+                    else {
+                        this.ContextErrors.push(new ContextError(cursor.node.from, cursor.node.to, priorContext, context, name));
                     }
                 }
                 child = cursor.nextSibling();
@@ -28102,13 +28228,11 @@
             }
             if (prim.breed != '') {
                 prim.context = new AgentContexts('null');
-                if (prim.breed != '') {
-                    for (let b of this.Breeds.values()) {
-                        if (prim.breed.toLowerCase() == b.Singular || prim.breed.toLowerCase() == b.Plural) {
-                            prim.context = this.Preprocess.GetBreedContext(b.Plural, false);
-                            break;
-                        }
-                    }
+                if (this.Preprocess.PluralBreeds.has(prim.breed)) {
+                    prim.context = this.Preprocess.GetBreedContext(prim.breed, false);
+                }
+                else if (this.Preprocess.SingularBreeds.has(prim.breed)) {
+                    prim.context = this.Preprocess.GetBreedContext(this.Preprocess.SingularToPlurals.get(prim.breed), false);
                 }
             }
             else {
@@ -28603,11 +28727,16 @@
             }
             else {
                 // if term is not a breed variable, check if it is a local variable for a procedure
-                if (closestTerm == '~VariableName' || (parentName == 'Identifier' && closestTerm == '')) {
+                if (closestTerm == '~VariableName' ||
+                    closestTerm == '~NewVariableDeclaration/Identifier' ||
+                    (parentName == 'Identifier' && closestTerm == '')) {
                     secondTerm = lintContext.GetProcedureFromVariable(term, lastFrom, lastTo);
+                    // console.log("SECOND",secondTerm)
                     // if procedure cannot be identified, term is an unidentified local variable
                     if (secondTerm != null)
                         closestTerm = '~LocalVariable';
+                    else
+                        closestTerm = '~VariableName';
                 }
             }
         }
@@ -29264,11 +29393,12 @@
     });
 
     let primitives$4 = PrimitiveManager;
+    let checker = generateChecker();
     // Keyword tokenizer
     const keyword = new ExternalTokenizer((input, stack) => {
         let token = '';
         // Find until the token is complete
-        while (isValidKeyword(input.next)) {
+        while (input.next >= 255 || checker[input.next]) {
             token += String.fromCharCode(input.next);
             input.advance();
         }
@@ -29443,6 +29573,13 @@
             ch == 95 ||
             // a-z
             (ch >= 97 && ch <= 122));
+    }
+    function generateChecker() {
+        let c = [];
+        for (var i = 0; i < 256; i++) {
+            c.push(isValidKeyword(i));
+        }
+        return c;
     }
     /** matchCustomProcedure: Check if the token is a custom procedure. */
     function matchCustomProcedure(token) {
@@ -29876,6 +30013,7 @@
         'create-links': 'create-links-with',
         'set-patch-color': 'set pcolor',
         'set-world-size': 'resize-world',
+        return: 'report',
     };
     /** checkUnrecognizedWithSuggestions: Check if the unrecognized identifier has a suggestion. */
     function checkUnrecognizedWithSuggestions(diagnostics, view, node) {
@@ -29958,20 +30096,22 @@
                 // Patch has no commands
                 if (b.BreedType == BreedType$1.Patch)
                     continue;
-                if (b.BreedType == BreedType$1.Turtle) {
-                    commands.push('hatch-' + b.Plural);
-                    commands.push('sprout-' + b.Plural);
-                    commands.push('create-' + b.Plural);
-                    commands.push('create-ordered-' + b.Plural);
-                }
                 else {
-                    commands.push('create-' + b.Plural + '-to');
-                    commands.push('create-' + b.Singular + '-to');
-                    commands.push('create-' + b.Plural + '-from');
-                    commands.push('create-' + b.Singular + '-from');
-                    commands.push('create-' + b.Plural + '-with');
-                    commands.push('create-' + b.Singular + '-with');
+                    commands = commands.concat(this.addBreedCompletions(b, true));
                 }
+                // if (b.BreedType == BreedType.Turtle) {
+                //   commands.push('hatch-' + b.Plural);
+                //   commands.push('sprout-' + b.Plural);
+                //   commands.push('create-' + b.Plural);
+                //   commands.push('create-ordered-' + b.Plural);
+                // } else {
+                //   commands.push('create-' + b.Plural + '-to');
+                //   commands.push('create-' + b.Singular + '-to');
+                //   commands.push('create-' + b.Plural + '-from');
+                //   commands.push('create-' + b.Singular + '-from');
+                //   commands.push('create-' + b.Plural + '-with');
+                //   commands.push('create-' + b.Singular + '-with');
+                // }
             }
             return commands;
         }
@@ -29979,29 +30119,47 @@
         getBreedReporters(state) {
             let reporters = [];
             for (let b of state.Breeds.values()) {
-                if (b.BreedType == BreedType$1.Turtle || b.BreedType == BreedType$1.Patch) {
-                    reporters.push(b.Plural + '-at');
-                    reporters.push(b.Plural + '-here');
-                    reporters.push(b.Plural + '-on');
-                    reporters.push('is-' + b.Singular + '?');
-                }
-                else {
-                    reporters.push('out-' + b.Singular + '-to');
-                    reporters.push('out-' + b.Singular + '-neighbors');
-                    reporters.push('out-' + b.Singular + '-neighbor?');
-                    reporters.push('in-' + b.Singular + '-from');
-                    reporters.push('in-' + b.Singular + '-neighbors');
-                    reporters.push('in-' + b.Singular + '-neighbor?');
-                    reporters.push('my-' + b.Plural);
-                    reporters.push('my-in-' + b.Plural);
-                    reporters.push('my-out-' + b.Plural);
-                    reporters.push(b.Singular + '-neighbor?');
-                    reporters.push(b.Singular + '-neighbors');
-                    reporters.push(b.Singular + '-with');
-                    reporters.push('is-' + b.Singular + '?');
-                }
+                reporters = reporters.concat(this.addBreedCompletions(b, false));
+                // if (b.BreedType == BreedType.Turtle || b.BreedType == BreedType.Patch) {
+                //   reporters.push(b.Plural + '-at');
+                //   reporters.push(b.Plural + '-here');
+                //   reporters.push(b.Plural + '-on');
+                //   reporters.push('is-' + b.Singular + '?');
+                // } else {
+                //   reporters.push('out-' + b.Singular + '-to');
+                //   reporters.push('out-' + b.Singular + '-neighbors');
+                //   reporters.push('out-' + b.Singular + '-neighbor?');
+                //   reporters.push('in-' + b.Singular + '-from');
+                //   reporters.push('in-' + b.Singular + '-neighbors');
+                //   reporters.push('in-' + b.Singular + '-neighbor?');
+                //   reporters.push('my-' + b.Plural);
+                //   reporters.push('my-in-' + b.Plural);
+                //   reporters.push('my-out-' + b.Plural);
+                //   reporters.push(b.Singular + '-neighbor?');
+                //   reporters.push(b.Singular + '-neighbors');
+                //   reporters.push(b.Singular + '-with');
+                //   reporters.push('is-' + b.Singular + '?');
+                // }
             }
             return reporters;
+        }
+        addBreedCompletions(breed, commands) {
+            let completions = [];
+            for (var rule of BreedStatementRules) {
+                if ((rule.Type == breed.BreedType || rule.Type == undefined) && rule.isCommand == commands && rule.Tag != Own) {
+                    if (rule.Singular == true || rule.Singular == undefined) {
+                        for (var s of rule.String) {
+                            completions.push(s.replace(/<breed>/g, breed.Singular));
+                        }
+                    }
+                    if (rule.Singular == false || rule.Singular == undefined) {
+                        for (var s of rule.String) {
+                            completions.push(s.replace(/<breed>/g, breed.Plural));
+                        }
+                    }
+                }
+            }
+            return completions;
         }
         /** GetCompletion: Get the completion hint at a given context. */
         GetCompletion(Context) {
@@ -30945,6 +31103,15 @@
             .iterate((node) => {
             var _a, _b, _c, _d;
             // Match the bracket/paren
+            // if(['OpenParen','CloseParen'].includes(node.name)) {
+            //   let parents: string[] = [];
+            //   let curr= node.node
+            //   while (curr.parent) {
+            //     parents.push(curr.parent.name);
+            //     curr = curr.parent;
+            //   }
+            //   console.log(getCodeName(view.state, node),parents)
+            // }
             if (['OpenBracket', 'OpenParen'].includes(node.name)) {
                 let match = matchBrackets(view.state, node.from, 1);
                 if (match && match.matched)
@@ -31202,12 +31369,13 @@
                 for (let i = 0, pos = start;; i++) {
                     let code = norm.charCodeAt(i);
                     let match = this.match(code, pos);
-                    if (match) {
-                        this.value = match;
-                        return this;
-                    }
-                    if (i == norm.length - 1)
+                    if (i == norm.length - 1) {
+                        if (match) {
+                            this.value = match;
+                            return this;
+                        }
                         break;
+                    }
                     if (pos == start && i < str.length && str.charCodeAt(i) == code)
                         pos++;
                 }
@@ -31462,10 +31630,10 @@
                 line = line * (sign == "-" ? -1 : 1) + startLine.number;
             }
             let docLine = state.doc.line(Math.max(1, Math.min(state.doc.lines, line)));
+            let selection = EditorSelection.cursor(docLine.from + Math.max(0, Math.min(col, docLine.length)));
             view.dispatch({
-                effects: dialogEffect.of(false),
-                selection: EditorSelection.cursor(docLine.from + Math.max(0, Math.min(col, docLine.length))),
-                scrollIntoView: true
+                effects: [dialogEffect.of(false), EditorView.scrollIntoView(selection.from, { y: 'center' })],
+                selection,
             });
             view.focus();
         }

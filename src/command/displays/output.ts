@@ -13,6 +13,7 @@ import { NetLogoUtils } from "../../utils/netlogo";
 import { DiagnosticType } from "../../chat/client/languages/netlogo-context";
 import { GenerateObjectID } from "../../utils/misc";
 import { ChangeTopic, ExplainCode, FollowUp } from "../../chat/client/options/option-templates";
+import { SectionRenderer } from "../sections/section-renderer";
 
 /** OutputDisplay: Display the output section. */
 export class OutputDisplay extends Display {
@@ -82,6 +83,16 @@ export class OutputDisplay extends Display {
 			var LastRecord = Subthread.Children[Subthread.Children.length - 1];
 			LastRecord.ActivateSelf("activated");
 			this.ScrollToElement(LastRecord.Container);
+			// If expanding, enter the last code section
+			if (Expanding) {
+				for (var I = Subthread.Children.length - 1; I >= 0; I--) {
+					var Child = Subthread.Children[I] as RecordRenderer;
+					if (Child.Children.findIndex(Current => (Current as SectionRenderer)?.GetData().Edited) > -1) {
+						this.Tab.Codes.SetContext(Child.GetData(), Subthread);
+						this.Tab.Codes.Show();
+					}
+				}
+			}
 		} else {
 			this.Tab.Codes.Hide();
 		}

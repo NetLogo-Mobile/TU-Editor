@@ -60,6 +60,8 @@ export class FullTextDisplay extends Display {
 	}
     /** RequestedTab: The tab that requested the full-screen help. */
 	private RequestedTab: Tab | null = null;
+	/** RequestedSection: The section that requested the full-screen help. */
+	private RequestedSection: Display | null = null;
 	/** ShowKnowledge: Try to retrieve and show a knowledge. */
 	public ShowKnowledge(ID: string) {
 		ChatNetwork.GetKnowledge(ID).then((Knowledge) => {
@@ -73,6 +75,9 @@ export class FullTextDisplay extends Display {
 	public ShowFullText(Knowledge: Knowledge) {
 		// Show the current tab
 		this.RequestedTab = this.Tab.Editor.CurrentTab;
+		if (this.RequestedTab == this.Tab)
+			this.RequestedSection = this.Tab.CurrentSection;
+		else this.RequestedSection = null;
 		this.CurrentKnowledge = Knowledge;
 		this.Show();
 		// Render the subject
@@ -146,5 +151,6 @@ export class FullTextDisplay extends Display {
 		if (!this.Container.is(":visible")) return;
 		this.Container.hide();
         this.RequestedTab?.Show();
+		this.RequestedSection?.Show();
 	}
 }

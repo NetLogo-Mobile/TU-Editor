@@ -41,6 +41,8 @@ export class CommandTab extends Tab {
 	public readonly Placeholder: JQuery<HTMLElement>;
 	/** SendButton: The send button. */
 	public readonly SendButton: JQuery<HTMLElement>;
+	/** CurrentSection: The visible section. */
+	public CurrentSection: Display | null = null;
 	/** Show: Show the command tab.  */
 	public Show() {
 		if (!this.Visible) TurtleEditor.Call({ Type: "TabSwitched", Tab: "$Command$" });

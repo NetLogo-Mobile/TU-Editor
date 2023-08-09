@@ -74,6 +74,7 @@ export class CodeDisplay extends Display {
 		// Show the output tab as well
 		this.Tab.Outputs.Show();
 		this.Tab.Outputs.Container.addClass("code-enabled");
+		this.Tab.CurrentSection = this;
 		this.Editor.SyncContext(this.Tab.Galapagos);
 		// Show myself
         $(this.Container).show();

@@ -31,10 +31,11 @@ export function NewTopic(Input: string, Label?: string): ChatResponseOption {
 }
 
 /** FollowUp: Generate a template follow-up option. */
-export function FollowUp(Label?: string): ChatResponseOption {
+export function FollowUp(Operation?: string, Label?: string): ChatResponseOption {
     return {
         Label: Label ?? "Can I ask a followup question?",
         Style: "followup",
+        Operation: Operation,
         AskInput: true,
         Inheritance: ContextInheritance.InheritRecursive
     }
@@ -103,12 +104,27 @@ export function AskCode(Label?: string, Style?: string, CodeOnly?: boolean): Cha
 }
 
 /** FixCode: Fix the current code snippet. */
-export function FixCode(Label?: string, Errors?: string): ChatResponseOption {
+export function FixCode(Label?: string): ChatResponseOption {
     return {
         Label: Label ?? "Can you try to fix the code?",
+        ActualInput: "",
         Style: "code",
         Operation: "CodeFix",
         AskInput: false,
+        InputInContext: true,
+        TextInContext: true,
+        CodeInContext: true,
+        Inheritance: ContextInheritance.CurrentOnly
+    }
+}
+
+/** FixCodeWithInput: Fix the current code snippet with extra user inputs. */
+export function FixCodeWithInput(Label?: string): ChatResponseOption {
+    return {
+        Label: Label ?? "Can you fix the code with my ideas?",
+        Style: "code",
+        Operation: "CodeFix",
+        AskInput: true,
         InputInContext: true,
         TextInContext: true,
         CodeInContext: true,

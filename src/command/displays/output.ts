@@ -201,7 +201,7 @@ export class OutputDisplay extends Display {
 				});
 			}
 			if (Status !== "Help" && ChatManager.Available) {
-				this.RenderOptions([ FollowUp() ]);
+				this.RenderOptions([ FollowUp("CodeAsk") ]);
 				this.RenderOptions([ ExplainCode() ]);
 				this.RenderOptions([ ChangeTopic() ]);
 			}

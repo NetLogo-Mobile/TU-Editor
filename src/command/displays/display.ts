@@ -22,6 +22,7 @@ export abstract class Display {
 		if (this.Visible && this.Tab.Visible) return;
         if (!this.Tab.Visible) this.Tab.Show();
         this.Tab.HideAllSections();
+        this.Tab.CurrentSection = this;
         $(this.Container).show();
         this.Visible = true;
     }

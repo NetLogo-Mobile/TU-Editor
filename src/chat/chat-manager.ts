@@ -64,21 +64,20 @@ export class ChatManager {
         var SendRequest = () => {
             if (ChatManager.IsRequesting) return;
             ChatManager.IsRequesting = true;
+            RecordRenderer.ActivateSelf("activated");
             RecordRenderer.SetFinalized(false);
             this.Commands.DisableInput();
-            this.Outputs.ScrollToBottom();
+            this.Outputs.ScrollToElement(RecordRenderer.Container);
             ChatNetwork.SendRequest(Record, this.Thread, (Section) => {
                 // Create the section
                 Subthread.RootID = Subthread.RootID ?? Record.ID;
                 CurrentRenderer = RecordRenderer.AddSection(Section);
                 CurrentRenderer?.Render();
-                this.Outputs.ScrollToBottom();
             }, (Section) => {
                 if (!CurrentRenderer) return;
                 // Update the section
                 CurrentRenderer.SetData(Section);
                 CurrentRenderer.Render();
-                this.Outputs.ScrollToBottom();
             }, (Section) => {
                 // Finish the section
                 if (!CurrentRenderer) return;
@@ -91,7 +90,6 @@ export class ChatManager {
                 CurrentRenderer.SetFinalized();
                 CurrentRenderer.SetData(Section);
                 CurrentRenderer.Render();
-                this.Outputs.ScrollToBottom();
             }).then((Record) => {
                 console.log(Record);
                 // Finish the record

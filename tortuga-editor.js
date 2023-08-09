@@ -39456,6 +39456,16 @@
                 var LastRecord = Subthread.Children[Subthread.Children.length - 1];
                 LastRecord.ActivateSelf("activated");
                 this.ScrollToElement(LastRecord.Container);
+                // If expanding, enter the last code section
+                if (Expanding) {
+                    for (var I = Subthread.Children.length - 1; I >= 0; I--) {
+                        var Child = Subthread.Children[I];
+                        if (Child.Children.findIndex(Current => Current === null || Current === void 0 ? void 0 : Current.GetData().Edited) > -1) {
+                            this.Tab.Codes.SetContext(Child.GetData(), Subthread);
+                            this.Tab.Codes.Show();
+                        }
+                    }
+                }
             }
             else {
                 this.Tab.Codes.Hide();

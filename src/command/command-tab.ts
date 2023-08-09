@@ -17,6 +17,7 @@ import { Diagnostic } from "../chat/client/languages/netlogo-context";
 import { Toast } from "../utils/dialog";
 import { LintContext } from "../../../CodeMirror-NetLogo/src/lang/classes/contexts";
 import { BreedType } from "../../../CodeMirror-NetLogo/src/lang/classes/structures";
+import { RecordRenderer } from "./outputs/record-renderer";
 
 declare const { bodyScrollLock, EditorDictionary }: any;
 
@@ -106,7 +107,8 @@ export class CommandTab extends Tab {
 			OnExplain: (Diagnostic, Context) => this.Editor.CommandTab.ExplainDiagnostic({
 				Message: NetLogoUtils.PostprocessLintMessage(Diagnostic.message),
 				Code: this.Galapagos.GetCodeSlice(Diagnostic.from, Diagnostic.to)
-			}, Context, true)
+			}, Context, true),
+			OnClick: () => this.ChooseDefault(),
 		});
 		// Send button
 		this.SendButton = $(`<div class="command-send"><div class="dot-stretching"></div></div>`).on("click", () => {
@@ -249,6 +251,7 @@ export class CommandTab extends Tab {
 	}
 	/** RefreshPlaceholder: Refresh the placeholder. */
 	public RefreshPlaceholder() {
+		this.Placeholder.removeClass("active");
 		if (this.Disabled) {
 			if (ChatManager.IsRequesting) {
 				this.Placeholder.text(Localized.Get("Waiting for the AI to respond"));
@@ -268,6 +271,22 @@ export class CommandTab extends Tab {
 			}
 		}
 		this.SendButton.toggleClass("disabled", this.Disabled);
+	}
+	/** ChooseDefault: Choose the default option when needed. */
+	public ChooseDefault() {
+		if (!ChatManager.Available || !this.Galapagos.IsReadOnly) return;
+		// If there is a pending request, choose the default option
+		var Activated = this.Outputs.Subthread?.GetActivated("activated") as RecordRenderer;
+		if (Activated) {
+			var Record = Activated.GetData();
+			var Option = Record.Response.Options.find(Option => Option.AskInput == true && Option.Style !== "Hidden");
+			if (Option) {
+				this.ChatManager.RequestOption(Option, Record);
+				return;
+			}
+		}
+		// Nothing to activate
+		this.Placeholder.addClass("active");
 	}
 	// #endregion
 

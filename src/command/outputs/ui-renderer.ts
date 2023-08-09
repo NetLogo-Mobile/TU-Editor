@@ -64,6 +64,10 @@ export abstract class UIRenderer {
         });
         return this;
     }
+    /** GetActivated: Get the activated renderer. */
+    public GetActivated(Class: string): UIRenderer {
+        return this.Children.find((Child) => Child.Container.hasClass(Class)) ?? this;
+    }
     /** SetStatus: Set the status of the renderer. */
     public SetStatus(Status: string): UIRenderer {
         this.Parent?.SetStatus(Status);

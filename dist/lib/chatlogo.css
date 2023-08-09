@@ -169,6 +169,19 @@
 	overflow-y: hidden;
 }
 
+.command-line .command-input .cm-editor {
+	flex: 1 1 auto;
+	height: auto;
+	font-size: 1em;
+	max-height: 2rem;
+	max-width: calc(100% - 2rem);
+	box-sizing: border-box;
+}
+
+.command-line .command-input .cm-editor span.cm-placeholder .active {
+	color: #cc2200;
+}
+
 .command-line .command-input .cm-editor .cm-scroller::-webkit-scrollbar {
 	display: none;
 }

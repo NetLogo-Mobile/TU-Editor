@@ -28,6 +28,8 @@ export declare abstract class UIRenderer {
     DeactivateAll(Class: string): UIRenderer;
     /** ActivateSelf: Activate the renderer with a class name and deactivate all other renderers. */
     ActivateSelf(Class: string): UIRenderer;
+    /** GetActivated: Get the activated renderer. */
+    GetActivated(Class: string): UIRenderer;
     /** SetStatus: Set the status of the renderer. */
     SetStatus(Status: string): UIRenderer;
 }

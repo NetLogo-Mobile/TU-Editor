@@ -35197,6 +35197,7 @@
             Extensions.push(EditorView.domEventHandlers({
                 keydown: (Event) => { var _a; return (_a = Options.OnKeyDown) === null || _a === void 0 ? void 0 : _a.call(Options, Event, this); },
                 keyup: (Event) => { var _a; return (_a = Options.OnKeyUp) === null || _a === void 0 ? void 0 : _a.call(Options, Event, this); },
+                click: (Event) => { var _a; return (_a = Options.OnClick) === null || _a === void 0 ? void 0 : _a.call(Options, Event, this); },
             }));
             // One-line mode
             // if (this.Options.OneLine) {
@@ -38128,6 +38129,11 @@
             });
             return this;
         }
+        /** GetActivated: Get the activated renderer. */
+        GetActivated(Class) {
+            var _a;
+            return (_a = this.Children.find((Child) => Child.Container.hasClass(Class))) !== null && _a !== void 0 ? _a : this;
+        }
         /** SetStatus: Set the status of the renderer. */
         SetStatus(Status) {
             var _a;
@@ -39809,7 +39815,8 @@
                 OnExplain: (Diagnostic, Context) => this.Editor.CommandTab.ExplainDiagnostic({
                     Message: NetLogoUtils.PostprocessLintMessage(Diagnostic.message),
                     Code: this.Galapagos.GetCodeSlice(Diagnostic.from, Diagnostic.to)
-                }, Context, true)
+                }, Context, true),
+                OnClick: () => this.ChooseDefault(),
             });
             // Send button
             this.SendButton = $(`<div class="command-send"><div class="dot-stretching"></div></div>`).on("click", () => {
@@ -39950,6 +39957,7 @@
         /** RefreshPlaceholder: Refresh the placeholder. */
         RefreshPlaceholder() {
             var _a, _b, _c;
+            this.Placeholder.removeClass("active");
             if (this.Disabled) {
                 if (ChatManager.IsRequesting) {
                     this.Placeholder.text(Localized.Get("Waiting for the AI to respond"));
@@ -39973,6 +39981,24 @@
                 }
             }
             this.SendButton.toggleClass("disabled", this.Disabled);
+        }
+        /** ChooseDefault: Choose the default option when needed. */
+        ChooseDefault() {
+            var _a;
+            if (!ChatManager.Available || !this.Galapagos.IsReadOnly)
+                return;
+            // If there is a pending request, choose the default option
+            var Activated = (_a = this.Outputs.Subthread) === null || _a === void 0 ? void 0 : _a.GetActivated("activated");
+            if (Activated) {
+                var Record = Activated.GetData();
+                var Option = Record.Response.Options.find(Option => Option.AskInput == true && Option.Style !== "Hidden");
+                if (Option) {
+                    this.ChatManager.RequestOption(Option, Record);
+                    return;
+                }
+            }
+            // Nothing to activate
+            this.Placeholder.addClass("active");
         }
         // #endregion
         // #region "Documentation"

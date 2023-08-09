@@ -73,6 +73,8 @@ export declare class CommandTab extends Tab {
     SetDisabled(Disabled: boolean): void;
     /** RefreshPlaceholder: Refresh the placeholder. */
     RefreshPlaceholder(): void;
+    /** ChooseDefault: Choose the default option when needed. */
+    ChooseDefault(): void;
     /** ExplainPrimitive: Explain the selected text in the command center in full. */
     ExplainPrimitive(Command: string): false | undefined;
     /** ExplainDiagnostic: Explain the diagnostic. */

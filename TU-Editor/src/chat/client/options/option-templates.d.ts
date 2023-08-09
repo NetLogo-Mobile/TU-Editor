@@ -5,7 +5,7 @@ export declare function ChangeTopic(Label?: string): ChatResponseOption;
 /** NewTopic: Generate a template new topic option. */
 export declare function NewTopic(Input: string, Label?: string): ChatResponseOption;
 /** FollowUp: Generate a template follow-up option. */
-export declare function FollowUp(Label?: string): ChatResponseOption;
+export declare function FollowUp(Operation?: string, Label?: string): ChatResponseOption;
 /** Clarify: Generate a template clarification option. */
 export declare function Clarify(Label?: string): ChatResponseOption;
 /** ExampleCode: Ask for an example code. */
@@ -17,7 +17,9 @@ export declare function EnterCode(Label?: string): ChatResponseOption;
 /** AskCode: Ask a question about the code. */
 export declare function AskCode(Label?: string, Style?: string, CodeOnly?: boolean): ChatResponseOption;
 /** FixCode: Fix the current code snippet. */
-export declare function FixCode(Label?: string, Errors?: string): ChatResponseOption;
+export declare function FixCode(Label?: string): ChatResponseOption;
+/** FixCodeWithInput: Fix the current code snippet with extra user inputs. */
+export declare function FixCodeWithInput(Label?: string): ChatResponseOption;
 /** ExplainCode: Explain the code. */
 export declare function ExplainCode(Label?: string): ChatResponseOption;
 /** ExplainErrors: Explain the errors. */

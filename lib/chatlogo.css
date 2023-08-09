@@ -599,7 +599,7 @@
 	display: flex;
 	flex-direction: row;
 	flex-grow: 1;
-	justify-content: right;
+	justify-content: flex-end;
 }
 
 .command-code .toolbar div.history div.hidden {

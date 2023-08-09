@@ -27,6 +27,8 @@ export declare class FullTextDisplay extends Display {
     constructor(Tab: CommandTab);
     /** RequestedTab: The tab that requested the full-screen help. */
     private RequestedTab;
+    /** RequestedSection: The section that requested the full-screen help. */
+    private RequestedSection;
     /** ShowKnowledge: Try to retrieve and show a knowledge. */
     ShowKnowledge(ID: string): void;
     /** ShowFullText: Show the full-screen help of a command. */

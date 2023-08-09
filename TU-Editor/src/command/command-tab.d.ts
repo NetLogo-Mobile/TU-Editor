@@ -31,6 +31,8 @@ export declare class CommandTab extends Tab {
     readonly Placeholder: JQuery<HTMLElement>;
     /** SendButton: The send button. */
     readonly SendButton: JQuery<HTMLElement>;
+    /** CurrentSection: The visible section. */
+    CurrentSection: Display | null;
     /** Show: Show the command tab.  */
     Show(): void;
     /** Hide: Hide the command tab. */

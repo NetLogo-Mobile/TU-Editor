@@ -35659,74 +35659,84 @@
             var SendRequest = () => {
                 if (ChatManager.IsRequesting)
                     return;
+                var Scrolled = false;
                 ChatManager.IsRequesting = true;
                 RecordRenderer.ActivateSelf("activated");
                 RecordRenderer.SetFinalized(false);
                 this.Commands.DisableInput();
-                this.Outputs.ScrollToElement(RecordRenderer.Container);
                 ChatNetwork.SendRequest(Record, this.Thread, (Section) => {
                     var _a;
                     // Create the section
                     Subthread.RootID = (_a = Subthread.RootID) !== null && _a !== void 0 ? _a : Record.ID;
                     CurrentRenderer = RecordRenderer.AddSection(Section);
                     CurrentRenderer === null || CurrentRenderer === void 0 ? void 0 : CurrentRenderer.Render();
+                    if (!Scrolled) {
+                        this.Outputs.ScrollToElement(RecordRenderer.Container);
+                        Scrolled = true;
+                    }
                 }, (Section) => {
-                    if (!CurrentRenderer)
-                        return;
                     // Update the section
-                    CurrentRenderer.SetData(Section);
-                    CurrentRenderer.Render();
+                    this.Commands.Outputs.ScrollToBottomIfNeeded(() => {
+                        if (!CurrentRenderer)
+                            return;
+                        CurrentRenderer.SetData(Section);
+                        CurrentRenderer.Render();
+                    });
                 }, (Section) => {
-                    var _a;
                     // Finish the section
-                    if (!CurrentRenderer)
-                        return;
-                    // Special handling for ServerErrors
-                    if (Section.Type == ChatResponseType.ServerError && Section.Field !== "Irrecoverable") {
-                        if (Section.Field == "Temperature")
-                            Record.Temperature = (_a = Record.Temperature) !== null && _a !== void 0 ? _a : 0 + 0.4;
-                        Section.Parsed = SendRequest;
-                    }
-                    CurrentRenderer.SetFinalized();
-                    CurrentRenderer.SetData(Section);
-                    CurrentRenderer.Render();
+                    this.Commands.Outputs.ScrollToBottomIfNeeded(() => {
+                        var _a;
+                        if (!CurrentRenderer)
+                            return;
+                        // Special handling for ServerErrors
+                        if (Section.Type == ChatResponseType.ServerError && Section.Field !== "Irrecoverable") {
+                            if (Section.Field == "Temperature")
+                                Record.Temperature = (_a = Record.Temperature) !== null && _a !== void 0 ? _a : 0 + 0.4;
+                            Section.Parsed = SendRequest;
+                        }
+                        CurrentRenderer.SetFinalized();
+                        CurrentRenderer.SetData(Section);
+                        CurrentRenderer.Render();
+                    });
                 }).then((Record) => {
-                    var _a;
                     console.log(Record);
-                    // Finish the record
-                    RecordRenderer.SetFinalized();
-                    RecordRenderer.SetData(Record);
-                    (_a = RecordRenderer.Parent) === null || _a === void 0 ? void 0 : _a.Render();
-                    // Show the input if there are no options
-                    if (Record.Response.Options.length == 0) {
-                        this.PendingRequest = null;
-                        this.Commands.EnableInput();
-                    }
-                    else
-                        this.Commands.SetDisabled(false);
-                    // Finish the request
-                    this.FinishRequest();
+                    this.Commands.Outputs.ScrollToBottomIfNeeded(() => {
+                        var _a;
+                        // Finish the record
+                        RecordRenderer.SetFinalized();
+                        RecordRenderer.SetData(Record);
+                        (_a = RecordRenderer.Parent) === null || _a === void 0 ? void 0 : _a.Render();
+                        // Show the input if there are no options
+                        if (Record.Response.Options.length == 0) {
+                            this.PendingRequest = null;
+                            this.Commands.EnableInput();
+                        }
+                        else
+                            this.Commands.SetDisabled(false);
+                        // Finish the request
+                        this.FinishRequest();
+                    });
                 }).catch((Error) => {
                     if (!ChatManager.IsRequesting)
                         return;
-                    RecordRenderer.SetFinalized();
-                    RecordRenderer.AddSection({
-                        Type: ChatResponseType.ServerError,
-                        Content: Localized.Get("Connection to server failed _", Error !== null && Error !== void 0 ? Error : Localized.Get("Unknown")),
-                        Parsed: SendRequest
-                    }).SetFinalized().Render();
-                    this.PendingRequest = null;
-                    this.Commands.EnableInput();
-                    this.FinishRequest();
+                    this.Commands.Outputs.ScrollToBottomIfNeeded(() => {
+                        RecordRenderer.SetFinalized();
+                        RecordRenderer.AddSection({
+                            Type: ChatResponseType.ServerError,
+                            Content: Localized.Get("Connection to server failed _", Error !== null && Error !== void 0 ? Error : Localized.Get("Unknown")),
+                            Parsed: SendRequest
+                        }).SetFinalized().Render();
+                        this.PendingRequest = null;
+                        this.Commands.EnableInput();
+                        this.FinishRequest();
+                    });
                 });
             };
             SendRequest();
-            this.Outputs.ScrollToBottom();
         }
         /** FinishRequest: Finish the current request. */
         FinishRequest() {
             ChatManager.IsRequesting = false;
-            this.Outputs.ScrollToBottom();
             this.Outputs.RestartBatch();
             this.Outputs.Tab.RefreshPlaceholder();
         }
@@ -37810,6 +37820,13 @@
         /** ScrollToBottom: After user entered input, screen view should scroll down to the bottom line. */
         ScrollToBottom() {
             this.ScrollContainer.scrollTop(this.ScrollContainer.get(0).scrollHeight);
+        }
+        /** ScrollToBottomIfNeeded: Scroll to bottom after the handler, if the container is at bottom. */
+        ScrollToBottomIfNeeded(Handler) {
+            var Bottom = this.IsAtBottom();
+            Handler();
+            if (Bottom)
+                this.ScrollToBottom();
         }
         /** ScrollToElement: Scroll to the element. */
         ScrollToElement(Element) {

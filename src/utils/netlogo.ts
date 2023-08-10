@@ -44,11 +44,16 @@ export class NetLogoUtils {
 		// Remove the trailing semicolon
 		if (Content.endsWith(';')) Content = Content.slice(0, -1);
 		// Remove the ```
-		if (Content.startsWith("```")) Content = Content.slice(3);
-		if (Content.indexOf("```") != -1) Content = Content.slice(0, Content.indexOf("```"));
-		// Remove the starting NetLogo
-		if (Content.startsWith("NetLogo\n"))
-			Content = Content.substring(8);
+		var Match = /```(.*?)```/gs.exec(Content)
+		if (Match) {
+			Content = Match[1];
+			// Remove the starting NetLogo
+			if (Content.startsWith("NetLogo\n"))
+				Content = Content.substring(8);
+			// Remove the starting plaintext
+			if (Content.startsWith("plaintext\n"))
+				Content = Content.substring(10);
+		}
 		// Replace back to "
 		Content = Content.replace(/`/g, '"').replace(/'/g, '"');
 		return this.SharedEditor.Semantics.FixGeneratedCode(Content, Parent);

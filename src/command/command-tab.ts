@@ -18,6 +18,7 @@ import { Toast } from "../utils/dialog";
 import { LintContext } from "../../../CodeMirror-NetLogo/src/lang/classes/contexts";
 import { BreedType } from "../../../CodeMirror-NetLogo/src/lang/classes/structures";
 import { RecordRenderer } from "./outputs/record-renderer";
+import { ContextInheritance } from "../chat/client/chat-option";
 
 declare const { bodyScrollLock, EditorDictionary }: any;
 
@@ -195,23 +196,27 @@ export class CommandTab extends Tab {
 			return;
 		}
 		// Check if it is a command
-		if (!Chatable || Objective != "chat" || /^[\d\.]+$/.test(Content)) {
-			// Parse the code
-			this.Galapagos.ForceParse();
-			let Diagnostics = await this.Galapagos.ForceLintAsync();
-			let Mode = this.Galapagos.Semantics.GetRecognizedMode();
-			// Check if the context is temporary
-			var Temporary = this.Codes.Visible;
-			// If there is no linting issues, assume it is code snippet
-			if (Diagnostics.length == 0 || !Chatable) {
-				if (Mode == "Reporter" || Mode == "Unknown") Content = `show ${Content}`;
-				// Try to compile first, if it is in a temporary context
-				if (Temporary) {
-					this.Codes.Play(() => this.ExecuteInput(Objective, Content, Temporary));
-				} else {
-					this.ExecuteInput(Objective, Content, false);
+		var PureNumber = /^[\d\.]+$/.test(Content);
+		if (!Chatable || Objective != "chat") {
+			var Inheritance = this.ChatManager.PendingRequest?.Option?.Inheritance ?? ContextInheritance.Drop;
+			if (Inheritance === ContextInheritance.Drop || !PureNumber) {
+				// Parse the code
+				this.Galapagos.ForceParse();
+				let Diagnostics = await this.Galapagos.ForceLintAsync();
+				let Mode = this.Galapagos.Semantics.GetRecognizedMode();
+				// Check if the context is temporary
+				var Temporary = this.Codes.Visible;
+				// If there is no linting issues, assume it is code snippet
+				if (Diagnostics.length == 0 || !Chatable) {
+					if (Mode == "Reporter" || Mode == "Unknown") Content = `show ${Content}`;
+					// Try to compile first, if it is in a temporary context
+					if (Temporary) {
+						this.Codes.Play(() => this.ExecuteInput(Objective, Content, Temporary));
+					} else {
+						this.ExecuteInput(Objective, Content, false);
+					}
+					return;
 				}
-				return;
 			}
 		}
 		// Help pseudo-command

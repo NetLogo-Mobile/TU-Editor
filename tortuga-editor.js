@@ -37825,8 +37825,11 @@
         ScrollToBottomIfNeeded(Handler) {
             var Bottom = this.IsAtBottom();
             Handler();
-            if (Bottom)
-                this.ScrollToBottom();
+            if (Bottom) {
+                if (this.ScrollingHandler)
+                    clearTimeout(this.ScrollingHandler);
+                this.ScrollingHandler = setTimeout(() => this.ScrollToBottom(), 1);
+            }
         }
         /** ScrollToElement: Scroll to the element. */
         ScrollToElement(Element) {
@@ -37881,13 +37884,16 @@
             if (Content.endsWith(';'))
                 Content = Content.slice(0, -1);
             // Remove the ```
-            if (Content.startsWith("```"))
-                Content = Content.slice(3);
-            if (Content.indexOf("```") != -1)
-                Content = Content.slice(0, Content.indexOf("```"));
-            // Remove the starting NetLogo
-            if (Content.startsWith("NetLogo\n"))
-                Content = Content.substring(8);
+            var Match = /```(.*?)```/gs.exec(Content);
+            if (Match) {
+                Content = Match[1];
+                // Remove the starting NetLogo
+                if (Content.startsWith("NetLogo\n"))
+                    Content = Content.substring(8);
+                // Remove the starting plaintext
+                if (Content.startsWith("plaintext\n"))
+                    Content = Content.substring(10);
+            }
             // Replace back to "
             Content = Content.replace(/`/g, '"').replace(/'/g, '"');
             return this.SharedEditor.Semantics.FixGeneratedCode(Content, Parent);
@@ -39896,7 +39902,7 @@
         }
         /** SendCommand: Send command to either execute or as a chat message. */
         SendCommand(Objective, Content) {
-            var _a;
+            var _a, _b, _c, _d;
             return __awaiter(this, void 0, void 0, function* () {
                 Content = (_a = Content === null || Content === void 0 ? void 0 : Content.trim()) !== null && _a !== void 0 ? _a : "";
                 var LowerContent = Content.toLowerCase();
@@ -39914,25 +39920,29 @@
                     return;
                 }
                 // Check if it is a command
-                if (!Chatable || Objective != "chat" || /^[\d\.]+$/.test(Content)) {
-                    // Parse the code
-                    this.Galapagos.ForceParse();
-                    let Diagnostics = yield this.Galapagos.ForceLintAsync();
-                    let Mode = this.Galapagos.Semantics.GetRecognizedMode();
-                    // Check if the context is temporary
-                    var Temporary = this.Codes.Visible;
-                    // If there is no linting issues, assume it is code snippet
-                    if (Diagnostics.length == 0 || !Chatable) {
-                        if (Mode == "Reporter" || Mode == "Unknown")
-                            Content = `show ${Content}`;
-                        // Try to compile first, if it is in a temporary context
-                        if (Temporary) {
-                            this.Codes.Play(() => this.ExecuteInput(Objective, Content, Temporary));
+                var PureNumber = /^[\d\.]+$/.test(Content);
+                if (!Chatable || Objective != "chat") {
+                    var Inheritance = (_d = (_c = (_b = this.ChatManager.PendingRequest) === null || _b === void 0 ? void 0 : _b.Option) === null || _c === void 0 ? void 0 : _c.Inheritance) !== null && _d !== void 0 ? _d : ContextInheritance.Drop;
+                    if (Inheritance === ContextInheritance.Drop || !PureNumber) {
+                        // Parse the code
+                        this.Galapagos.ForceParse();
+                        let Diagnostics = yield this.Galapagos.ForceLintAsync();
+                        let Mode = this.Galapagos.Semantics.GetRecognizedMode();
+                        // Check if the context is temporary
+                        var Temporary = this.Codes.Visible;
+                        // If there is no linting issues, assume it is code snippet
+                        if (Diagnostics.length == 0 || !Chatable) {
+                            if (Mode == "Reporter" || Mode == "Unknown")
+                                Content = `show ${Content}`;
+                            // Try to compile first, if it is in a temporary context
+                            if (Temporary) {
+                                this.Codes.Play(() => this.ExecuteInput(Objective, Content, Temporary));
+                            }
+                            else {
+                                this.ExecuteInput(Objective, Content, false);
+                            }
+                            return;
                         }
-                        else {
-                            this.ExecuteInput(Objective, Content, false);
-                        }
-                        return;
                     }
                 }
                 // Help pseudo-command

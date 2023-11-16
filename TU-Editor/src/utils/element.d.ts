@@ -21,7 +21,7 @@ export declare const XSSOptions: {
         caption: never[];
         center: never[];
         cite: never[];
-        code: never[];
+        code: string[];
         col: string[];
         colgroup: string[];
         dd: never[];

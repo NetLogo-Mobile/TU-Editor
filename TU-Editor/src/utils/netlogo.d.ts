@@ -11,9 +11,9 @@ export declare class NetLogoUtils {
     /** AnnotateCodes: Annotate some code elements. */
     static AnnotateCodes(Targets: JQuery<HTMLElement>, Prettify?: boolean): void;
     /** AnnotateCode: Annotate a code element. */
-    static AnnotateCode(Target: JQuery<HTMLElement>, Content?: string, Prettify?: boolean): string;
+    static AnnotateCode(Target: JQuery<HTMLElement>, Content?: string, Language?: string, Prettify?: boolean): string;
     /** HighlightCode: Highlight a code snippet. */
-    static HighlightCode(Content: string, Prettify?: boolean): [HTMLElement, string];
+    static HighlightCode(Content: string, Language?: string, Prettify?: boolean): [HTMLElement | Text, string];
     /** BuildSnapshot: Build a code snapshot. */
     static BuildSnapshot(Content?: string): CodeSnapshot | undefined;
     /** FixGeneratedCode: Fix some generated code. */

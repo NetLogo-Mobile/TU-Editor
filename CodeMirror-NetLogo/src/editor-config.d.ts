@@ -1,4 +1,4 @@
-import { EditorView, ViewUpdate } from '@codemirror/view';
+import { EditorView, KeyBinding, ViewUpdate } from '@codemirror/view';
 import { Diagnostic } from '@codemirror/lint';
 import { GalapagosEditor } from './editor';
 /** Options: Options of an editor. */
@@ -31,6 +31,8 @@ export interface EditorConfig {
     OnExplain?: (Diagnostic: Diagnostic, Context: string) => void;
     /** OnDictionaryClick: Triggers when a dictionary tooltip is clicked. */
     OnDictionaryClick?: (Key: string) => void;
+    /** KeyBindings: Custom key mappings (with the highest priority). */
+    KeyBindings?: KeyBinding[];
 }
 /** EditorLanguage: Language. */
 export declare enum EditorLanguage {
@@ -45,10 +47,10 @@ export declare enum ParseMode {
     Normal = "Normal",
     /** Oneline: Oneline mode (Command center), where the code is supposed to be a single line of command or reporter statement. */
     Oneline = "Oneline",
-    /** OnelineReporter: Oneline reporter mode (Widget input), where the code is supposed to be a single line of reporter statment. */
-    OnelineReporter = "OnelineReporter",
-    /** Embedded: Embedded mode (Button/Plot commands), where the code is supposed to be multiple lines of command statements. */
+    /** Embedded: Embedded command mode (Button/Plot commands), where the code is supposed to be multiple lines of command statements. */
     Embedded = "Embedded",
+    /** Reporter: Embedded reporter mode (Widget input), where the code is supposed to be multiple lines of reporter statment. */
+    Reporter = "Reporter",
     /** Generative: Generative mode (ChatLogo), a special Normal mode that does not provide context to its parent but instead take it back. */
     Generative = "Generative"
 }

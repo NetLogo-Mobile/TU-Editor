@@ -38,7 +38,7 @@ export class SSEClient {
         this.Request.setRequestHeader('Content-Type', 'application/json');
         this.Request.setRequestHeader('Authorization', `Bearer ${this.authorization}`);
         this.Request.setRequestHeader('Accept', 'text/event-stream');
-        this.Request.timeout = 30000;
+        this.Request.timeout = 15000;
 
         // If we have a last event ID, set the header to resume from that point
         if (this.lastEventId) {
@@ -49,6 +49,7 @@ export class SSEClient {
         var responseCursor = 0;
         this.Request.onreadystatechange = () => {
             if (this.Request.status === 200) {
+                this.Request.timeout = 60000;
                 const messages = this.Request.responseText.substring(responseCursor).trim().split('\n\n');
                 responseCursor = this.Request.responseText.length;
                 messages.forEach((message) => {

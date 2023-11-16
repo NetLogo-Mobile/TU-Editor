@@ -125,6 +125,10 @@ export class ChatNetwork {
     /** TryParse: Try to parse a JSON5 string. */
     private static TryParse(Source: string): any {
         try {
+            if (Source.startsWith("```json"))
+                Source = Source.substring(7);
+            if (Source.endsWith("```"))
+                Source = Source.substring(0, Source.length - 3);
             return JSON5.parse(Source);
         } catch (Exception) {
             console.log(Source);

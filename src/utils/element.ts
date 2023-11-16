@@ -30,7 +30,7 @@ export const XSSOptions = {
         caption: [],
         center: [],
         cite: [],
-        code: [],
+        code: ["class"],
         col: ["align", "valign", "span", "width"],
         colgroup: ["align", "valign", "span", "width"],
         dd: [],

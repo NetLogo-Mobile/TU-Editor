@@ -10,28 +10,35 @@ export class NetLogoUtils {
 	/** AnnotateCodes: Annotate some code elements. */
 	public static AnnotateCodes(Targets: JQuery<HTMLElement>, Prettify: boolean = true) {
         Targets.each(function() {
-            NetLogoUtils.AnnotateCode($(this), undefined, Prettify);
+			var Element = $(this);
+			var Language = Element.attr("class")?.split(" ")[0] ?? "netlogo";
+			Element.addClass(Language);
+            NetLogoUtils.AnnotateCode(Element, undefined, Language, Prettify);
         });
 	}
 	/** AnnotateCode: Annotate a code element. */
-	public static AnnotateCode(Target: JQuery<HTMLElement>, Content?: string, Prettify: boolean = true): string {
+	public static AnnotateCode(Target: JQuery<HTMLElement>, Content?: string, Language: string = "netlogo", Prettify: boolean = true): string {
         Content = Content ? Content : Target.text();
-		var [Element, Code] = NetLogoUtils.HighlightCode(Content);
+		var [Element, Code] = NetLogoUtils.HighlightCode(Content, Language, Prettify);
         Target.empty().append($(Element)).data("code", Code);
 		return Code;
 	}
 	/** HighlightCode: Highlight a code snippet. */
-	public static HighlightCode(Content: string, Prettify: boolean = true): [HTMLElement, string] {
-        this.SharedEditor.SetCode(Content.trim());
-		// Prettify it if it contains a newline
-		if (Prettify && Content.indexOf("\n") !== -1) {
-        	this.SharedEditor.Semantics.PrettifyAll();
-			Content = this.SharedEditor.GetCode().trim();
-       		this.SharedEditor.SetCode(Content);
+	public static HighlightCode(Content: string, Language: string = "netlogo", Prettify: boolean = true): [HTMLElement | Text, string] {
+        if (Language == "netlogo") {
+			this.SharedEditor.SetCode(Content.trim());
+			// Prettify it if it contains a newline
+			if (Prettify && Content.indexOf("\n") !== -1) {
+				this.SharedEditor.Semantics.PrettifyAll();
+				Content = this.SharedEditor.GetCode().trim();
+				   this.SharedEditor.SetCode(Content);
+			}
+			// Highlight it
+			var Element = this.SharedEditor.Semantics.Highlight();
+			return [Element, Content];
+		} else {
+			return [document.createTextNode(Content), Content]
 		}
-		// Highlight it
-        var Element = this.SharedEditor.Semantics.Highlight();
-		return [Element, Content];
 	}
 	/** BuildSnapshot: Build a code snapshot. */
 	public static BuildSnapshot(Content?: string): CodeSnapshot | undefined {
@@ -44,9 +51,9 @@ export class NetLogoUtils {
 		// Remove the trailing semicolon
 		if (Content.endsWith(';')) Content = Content.slice(0, -1);
 		// Remove the ```
-		var Match = /```(.*?)```/gs.exec(Content)
+		var Match = /```(netlogo\n)?(.*?)```/gs.exec(Content)
 		if (Match) {
-			Content = Match[1];
+			Content = Match[2];
 			// Remove the starting NetLogo
 			if (Content.startsWith("NetLogo\n"))
 				Content = Content.substring(8);

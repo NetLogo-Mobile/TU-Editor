@@ -74,6 +74,7 @@ export class CodeIdeationRenderer extends JSONSectionRenderer<CodeParameter[]> {
     }
     /** GetChooser: Return the section chooser for this renderer. */
     public static GetChooser(): RendererChooser {
-        return (Record, Section) => Section.Field == "Parameters" && Section.Content?.startsWith("[") ? new CodeIdeationRenderer() : undefined;
+        return (Record, Section) => Section.Field == "Parameters" && 
+            (Section.Content?.startsWith("[") || Section.Content?.startsWith("```json\n[")) ? new CodeIdeationRenderer() : undefined;
     }
 }

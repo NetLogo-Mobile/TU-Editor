@@ -187,6 +187,7 @@ export class OutputDisplay extends Display {
 	}
 	/** FinishExecution: Notify the completion of the command. */
 	public FinishExecution(Status: string, Code: string, Message: string | RuntimeError[], External: boolean = false) {
+		this.Tab.SetDisabled(false);
 		if (Array.isArray(Message) && Message.length > 0 && Message[0].code) {
 			var Diagnostics = NetLogoUtils.ErrorsToDiagnostics(Message as RuntimeError[]);
 			this.RenderResponses([{
@@ -222,7 +223,6 @@ export class OutputDisplay extends Display {
 				if (Code !== "") Record.Context.CodeSnippet = Code;
 			}
 		}
-		this.Tab.SetDisabled(false);
 		this.LastExecution = null;
 	}
 	/** PrintOutput: Provide for Unity to print compiled output. */ 
@@ -243,8 +243,7 @@ export class OutputDisplay extends Display {
 			case "Succeeded":
 				this.QueueResponse({
 					Type: ChatResponseType.Finish,
-					Content: Localized.Get("Successfully executed"),
-					Parsed: External
+					Content: Localized.Get("Successfully executed")
 				});
 				break;
 			case "Output":

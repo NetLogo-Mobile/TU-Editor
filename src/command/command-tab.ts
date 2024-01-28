@@ -208,7 +208,7 @@ export class CommandTab extends Tab {
 				var Temporary = this.Codes.Visible;
 				// If there is no linting issues, assume it is code snippet
 				if (Diagnostics.length == 0 || !Chatable) {
-					if (Mode == "Reporter" || Mode == "Unknown") Content = `show ${Content}`;
+					if (Mode == "Reporter") Content = `show ${Content}`;
 					// Try to compile first, if it is in a temporary context
 					if (Temporary) {
 						this.Codes.Play(() => this.ExecuteInput(Objective, Content, Temporary));

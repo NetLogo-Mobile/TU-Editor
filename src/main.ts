@@ -24,7 +24,6 @@ export class TurtleEditor {
     TurtleEditor.PostMessage = PostMessage;
     // Initialize the darkmode
 		this.Darkmode = new Darkmode();
-        this.Darkmode.showWidget();
     // Initialize the tabs
     this.EditorTabs = [new EditorTab($(Container).children("div.editor").get(0)!, this)];
     this.CommandTab = new CommandTab($(Container).children("div.commands").get(0)!, this);

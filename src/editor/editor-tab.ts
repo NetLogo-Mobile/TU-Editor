@@ -54,13 +54,6 @@ export class EditorTab extends Tab {
 			OnColorPickerCreate: (cpDiv) => {
             	var view = this.Galapagos.CodeMirror;
 				// only add the cpDiv if it doesn't already exist in the DOM 
-				let widget = document.querySelector(".cp-widget-wrap") as HTMLElement;
-				if (widget) {
-					widget.contentEditable = "true"
-					widget.classList.add("darkmode-ignore")
-					console.log(widget);
-					console.log("done")
-				}
 				if(!view.dom.querySelector("#colorPickerDiv")) {
 					cpDiv.classList.add("darkmode-ignore")
 					view.dom.appendChild(cpDiv);

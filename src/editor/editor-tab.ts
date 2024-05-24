@@ -49,7 +49,23 @@ export class EditorTab extends Tab {
 			OnExplain: (Diagnostic, Context) => this.Editor.CommandTab.ExplainDiagnostic({
 				Message: NetLogoUtils.PostprocessLintMessage(Diagnostic.message),
 				Code: this.Galapagos.GetCodeSlice(Diagnostic.from, Diagnostic.to)
-			}, Context, true)
+			}, Context, true),
+            // add Color Picker create handler 
+			OnColorPickerCreate: (cpDiv) => {
+            	var view = this.Galapagos.CodeMirror;
+				// only add the cpDiv if it doesn't already exist in the DOM 
+				let widget = document.querySelector(".cp-widget-wrap") as HTMLElement;
+				if (widget) {
+					widget.contentEditable = "true"
+					widget.classList.add("darkmode-ignore")
+					console.log(widget);
+					console.log("done")
+				}
+				if(!view.dom.querySelector("#colorPickerDiv")) {
+					cpDiv.classList.add("darkmode-ignore")
+					view.dom.appendChild(cpDiv);
+				}
+          	},
 		});
 	}
     // #endregion

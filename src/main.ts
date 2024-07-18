@@ -5,6 +5,7 @@ import { CommandTab } from "./command/command-tab";
 import { EditorTab } from "./editor/editor-tab";
 import { LegacyLocalized, RotateScreen } from "./legacy";
 import { Tab } from "./tab";
+import { LoadPolyfills } from "./utils/polyfills";
 
 declare const { Darkmode }: any;
 type Darkmode = any;
@@ -121,6 +122,7 @@ export class TurtleEditor {
 
 /** Export classes globally. */
 try {
+  LoadPolyfills();
   (window as any).TurtleEditor = TurtleEditor;
   (window as any).TurtleLocalized = LegacyLocalized;
   (window as any).RotateScreen = RotateScreen();
